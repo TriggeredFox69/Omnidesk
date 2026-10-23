@@ -5,6 +5,17 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
+  // Safe HTML Escaping Helper
+  function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // Default Team Agents
   const defaultAgents = [
     { id: 'EMP-101', name: 'Hamza Khan', role: 'Senior Closer', avatar: '👨‍💼', color: '#6366f1' },
@@ -334,6 +345,64 @@ document.addEventListener('DOMContentLoaded', () => {
     matrixBtns: document.querySelectorAll('.matrix-btn'),
     salesTags: document.querySelectorAll('.sales-tag'),
 
+    // Performance Score & Leaderboard Triggers
+    openScoreBtn: document.getElementById('openScoreBtn'),
+    openLeaderboardBtn: document.getElementById('openLeaderboardBtn'),
+
+    // Can't Handle & Lead Lock Shield Elements
+    cantHandleBtn: document.getElementById('cantHandleBtn'),
+    leadLockedShield: document.getElementById('leadLockedShield'),
+    lockedCloserName: document.getElementById('lockedCloserName'),
+
+    // Modal 5: Mark Paid Mini-Popup
+    markPaidModal: document.getElementById('markPaidModal'),
+    closeMarkPaidModalBtn: document.getElementById('closeMarkPaidModalBtn'),
+    cancelMarkPaidBtn: document.getElementById('cancelMarkPaidBtn'),
+    markPaidForm: document.getElementById('markPaidForm'),
+    paidCustomerName: document.getElementById('paidCustomerName'),
+    paidCustomerPhone: document.getElementById('paidCustomerPhone'),
+    paidPlanSelect: document.getElementById('paidPlanSelect'),
+    paidAmountInput: document.getElementById('paidAmountInput'),
+    paidMethodSelect: document.getElementById('paidMethodSelect'),
+    paidCustomerEmail: document.getElementById('paidCustomerEmail'),
+    paidTrxId: document.getElementById('paidTrxId'),
+    paidCloserName: document.getElementById('paidCloserName'),
+    confirmMarkPaidBtn: document.getElementById('confirmMarkPaidBtn'),
+
+    // Modal 6: Can't Handle Handover Modal
+    cantHandleModal: document.getElementById('cantHandleModal'),
+    closeCantHandleModalBtn: document.getElementById('closeCantHandleModalBtn'),
+    cancelCantHandleBtn: document.getElementById('cancelCantHandleBtn'),
+    cantHandleForm: document.getElementById('cantHandleForm'),
+    cantHandleClientName: document.getElementById('cantHandleClientName'),
+    cantHandleReasonSelect: document.getElementById('cantHandleReasonSelect'),
+    cantHandleNote: document.getElementById('cantHandleNote'),
+    confirmCantHandleBtn: document.getElementById('confirmCantHandleBtn'),
+
+    // Modal 7: Performance Portal & Leaderboard
+    scoreModal: document.getElementById('scoreModal'),
+    closeScoreModalBtn: document.getElementById('closeScoreModalBtn'),
+    tabMyScore: document.getElementById('tabMyScore'),
+    tabTeamScores: document.getElementById('tabTeamScores'),
+    viewMyScoreTab: document.getElementById('viewMyScoreTab'),
+    viewTeamScoresTab: document.getElementById('viewTeamScoresTab'),
+    perfHeroAvatar: document.getElementById('perfHeroAvatar'),
+    perfHeroName: document.getElementById('perfHeroName'),
+    perfHeroRole: document.getElementById('perfHeroRole'),
+    perfTierBadge: document.getElementById('perfTierBadge'),
+    myTotalRevenue: document.getElementById('myTotalRevenue'),
+    myDealsWon: document.getElementById('myDealsWon'),
+    myActivePipeline: document.getElementById('myActivePipeline'),
+    myConversionRate: document.getElementById('myConversionRate'),
+    myDealsCountLabel: document.getElementById('myDealsCountLabel'),
+    myDealsList: document.getElementById('myDealsList'),
+    orgTotalRevenue: document.getElementById('orgTotalRevenue'),
+    orgTotalDeals: document.getElementById('orgTotalDeals'),
+    orgTopCloser: document.getElementById('orgTopCloser'),
+    orgActiveClosers: document.getElementById('orgActiveClosers'),
+    teamLeaderboardTable: document.getElementById('teamLeaderboardTable'),
+    exportLeaderboardBtn: document.getElementById('exportLeaderboardBtn'),
+
     // Toast
     toast: document.getElementById('toast'),
     toastMsg: document.getElementById('toastMsg')
@@ -372,11 +441,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.openTeamModalBtn) {
         els.openTeamModalBtn.style.display = isAdmin ? 'inline-flex' : 'none';
       }
+      if (els.openLeaderboardBtn) {
+        els.openLeaderboardBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+      }
     } else {
       if (els.topAgentAvatar) els.topAgentAvatar.textContent = state.currentAgent.avatar;
       if (els.topAgentName) els.topAgentName.textContent = state.currentAgent.name;
       if (els.topAgentId) els.topAgentId.textContent = `${state.currentAgent.id} • ${state.currentAgent.role}`;
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
+      if (els.openLeaderboardBtn) els.openLeaderboardBtn.style.display = 'none';
     }
 
     // Update global counters
@@ -482,20 +555,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const lead = getLead(leadId);
     if (!lead) return;
 
-    if (lead.ownerId && lead.ownerId !== state.currentAgent.id) {
+    const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const myName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+
+    if (lead.ownerId && lead.ownerId !== myId && !isAdmin) {
       const owner = getAgent(lead.ownerId);
-      showToast(`⚠️ This lead is already locked by ${owner ? owner.name : lead.ownerId}!`);
+      showToast(`⚠️ This lead is already locked by ${owner ? owner.name : (lead.ownerName || lead.ownerId)}!`);
       return;
     }
 
-    lead.ownerId = state.currentAgent.id;
+    lead.ownerId = myId;
+    lead.ownerName = myName;
     lead.leadState = 'ongoing'; // YELLOW: Ongoing
 
     showToast(`🟡 Lead Claimed! You are now chatting with ${lead.name} (Ongoing).`);
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
-    syncLeadToServer(lead);
+    syncLeadToServer(lead, { ownerName: myName });
   }
 
   // Release Lead -> Transitions back to RED (Fresh / Unclaimed)
@@ -504,13 +582,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!lead) return;
 
     lead.ownerId = null;
+    lead.ownerName = null;
     lead.leadState = 'fresh'; // RED: Fresh
 
     showToast(`🔴 Lead released back to Open Pool (Fresh).`);
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
-    syncLeadToServer(lead);
+    syncLeadToServer(lead, { ownerName: null });
   }
 
   // Mark Lead as Paid / Closed -> Transitions to GREEN (Closed / Paid)
@@ -736,10 +815,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (lead && lead.unreadCount > 0) {
       lead.unreadCount = 0;
     }
-    // On mobile screens, activate full-screen chat thread
+    // On mobile screens, activate full-screen chat thread and collapse header chrome
     if (els.viewInbox) {
       els.viewInbox.classList.add('mobile-chat-open');
     }
+    document.body.classList.add('mobile-in-chat');
+
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
@@ -779,16 +860,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    const isOwner = lead.ownerId === currentUserId;
+    const isLockedOngoing = leadState === 'ongoing' && lead.ownerId && !isOwner;
+    const closerDisplayName = owner ? owner.name : (lead.ownerName || lead.ownerId);
+
     if (els.chatLeadCloser) {
       if (leadState === 'fresh') {
         els.chatLeadCloser.style.color = '#ff6688';
-        els.chatLeadCloser.textContent = 'Open Pool';
+        els.chatLeadCloser.textContent = 'Open Pool (Unclaimed)';
       } else if (leadState === 'ongoing') {
         els.chatLeadCloser.style.color = '#fbbf24';
-        els.chatLeadCloser.textContent = `🔒 ${owner ? owner.name : lead.ownerId}`;
+        els.chatLeadCloser.textContent = isOwner ? `🔒 You (${closerDisplayName})` : `🔒 ${closerDisplayName}`;
       } else if (leadState === 'paid') {
         els.chatLeadCloser.style.color = '#34d399';
-        els.chatLeadCloser.textContent = `✓ Paid & Active`;
+        const displayCloser = lead.paidDetails?.closedBy || closerDisplayName || 'Closer';
+        els.chatLeadCloser.textContent = `✓ Paid (${displayCloser})`;
       } else if (leadState === 'useless') {
         els.chatLeadCloser.style.color = '#38bdf8';
         els.chatLeadCloser.textContent = `🚫 Won't Pay / Dead`;
@@ -805,15 +893,29 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // Header Can't Handle Button (Only visible to the assigned closer or admin when ongoing)
+    if (els.cantHandleBtn) {
+      if (leadState === 'ongoing' && (isOwner || isAdmin)) {
+        els.cantHandleBtn.style.display = 'inline-flex';
+        els.cantHandleBtn.onclick = () => openCantHandleModal(lead);
+      } else {
+        els.cantHandleBtn.style.display = 'none';
+      }
+    }
+
     // Header Won't Pay Button
     if (els.markUselessHeaderBtn) {
-      if (leadState === 'useless') {
+      if (isLockedOngoing && !isAdmin) {
+        els.markUselessHeaderBtn.style.display = 'none';
+      } else if (leadState === 'useless') {
+        els.markUselessHeaderBtn.style.display = 'inline-flex';
         els.markUselessHeaderBtn.className = 'btn btn-ghost btn-xs';
         els.markUselessHeaderBtn.style.color = '#38bdf8';
         els.markUselessHeaderBtn.style.borderColor = 'rgba(56, 189, 248, 0.4)';
         els.markUselessHeaderBtn.innerHTML = `🔵 Won't Pay ✓`;
         els.markUselessHeaderBtn.onclick = () => reopenLead(lead.id);
       } else {
+        els.markUselessHeaderBtn.style.display = 'inline-flex';
         els.markUselessHeaderBtn.className = 'btn btn-useless btn-xs';
         els.markUselessHeaderBtn.style.color = '#ffffff';
         els.markUselessHeaderBtn.style.borderColor = 'transparent';
@@ -824,43 +926,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Header Mark Paid Button
     if (els.markPaidHeaderBtn) {
-      if (leadState === 'paid') {
+      if (isLockedOngoing && !isAdmin) {
+        els.markPaidHeaderBtn.style.display = 'none';
+      } else if (leadState === 'paid') {
+        els.markPaidHeaderBtn.style.display = 'inline-flex';
         els.markPaidHeaderBtn.className = 'btn btn-ghost btn-xs';
         els.markPaidHeaderBtn.style.color = '#10b981';
         els.markPaidHeaderBtn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-        els.markPaidHeaderBtn.innerHTML = `🟢 Closed (Paid) ✓`;
-        els.markPaidHeaderBtn.onclick = () => reopenLead(lead.id);
+        els.markPaidHeaderBtn.innerHTML = `🟢 Paid ✓`;
+        els.markPaidHeaderBtn.onclick = () => openMarkPaidModal(lead);
       } else {
+        els.markPaidHeaderBtn.style.display = 'inline-flex';
         els.markPaidHeaderBtn.className = 'btn btn-paid btn-xs';
         els.markPaidHeaderBtn.style.color = '#ffffff';
         els.markPaidHeaderBtn.style.borderColor = 'transparent';
         els.markPaidHeaderBtn.innerHTML = `Mark Paid`;
-        els.markPaidHeaderBtn.onclick = () => markLeadPaid(lead.id);
+        els.markPaidHeaderBtn.onclick = () => openMarkPaidModal(lead);
       }
     }
 
-    // Conflict Lock Notice
-    if (els.otherCloserNotice) {
-      if (leadState === 'ongoing' && lead.ownerId !== state.currentAgent.id) {
-        els.otherCloserNotice.style.display = 'block';
-        if (els.otherCloserName) els.otherCloserName.textContent = owner ? owner.name : lead.ownerId;
-        if (els.chatInput) {
-          els.chatInput.disabled = true;
-          els.chatInput.placeholder = `Lead is ongoing with ${owner ? owner.name : lead.ownerId}. Messaging locked.`;
-        }
-        if (els.sendMsgBtn) els.sendMsgBtn.disabled = true;
-      } else {
-        els.otherCloserNotice.style.display = 'none';
-        if (els.chatInput) {
-          els.chatInput.disabled = false;
-          els.chatInput.placeholder = 'Type WhatsApp message... (Press Enter to send)';
-        }
-        if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
+    // Quick Macro Bar & Message Composer Bar
+    const quickBar = document.querySelector('.quick-reply-bar');
+    const compBar = document.querySelector('.chat-composer-bar');
+
+    // ANTI-THEFT LEAD LOCKING ENFORCEMENT
+    if (isLockedOngoing && !isAdmin) {
+      // UNAUTHORIZED CLOSER: Show Anti-Theft Security Shield
+      if (els.leadLockedShield) {
+        els.leadLockedShield.style.display = 'flex';
+        if (els.lockedCloserName) els.lockedCloserName.textContent = closerDisplayName;
       }
+      if (els.chatMessagesArea) els.chatMessagesArea.style.display = 'none';
+      if (quickBar) quickBar.style.display = 'none';
+      if (compBar) compBar.style.display = 'none';
+      if (els.otherCloserNotice) els.otherCloserNotice.style.display = 'none';
+    } else {
+      // AUTHORIZED: Closer, Admin, or Fresh/Paid/Useless Lead
+      if (els.leadLockedShield) els.leadLockedShield.style.display = 'none';
+      if (els.chatMessagesArea) els.chatMessagesArea.style.display = 'flex';
+      if (quickBar) quickBar.style.display = 'flex';
+      if (compBar) compBar.style.display = 'flex';
+
+      // Admin Monitoring Notice
+      if (els.otherCloserNotice) {
+        if (isLockedOngoing && isAdmin) {
+          els.otherCloserNotice.style.display = 'block';
+          if (els.otherCloserName) els.otherCloserName.textContent = closerDisplayName;
+        } else {
+          els.otherCloserNotice.style.display = 'none';
+        }
+      }
+
+      if (els.chatInput) {
+        els.chatInput.disabled = false;
+        els.chatInput.placeholder = 'Type WhatsApp message... (Press Enter to send)';
+      }
+      if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
     }
 
     // Render Messages Thread
-    if (els.chatMessagesArea) {
+    if (els.chatMessagesArea && (!isLockedOngoing || isAdmin)) {
       els.chatMessagesArea.innerHTML = `
         <div class="msg-date-divider">TODAY • ENCRYPTED WHATSAPP THREAD</div>
       `;
@@ -871,10 +996,10 @@ document.addEventListener('DOMContentLoaded', () => {
         bubble.className = `msg-bubble ${isInbound ? 'msg-inbound' : 'msg-outbound'}`;
 
         bubble.innerHTML = `
-          ${!isInbound ? `<div class="msg-sender-tag">${msg.agentName || 'Agent'}</div>` : ''}
+          ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
           <div>${formatText(msg.text)}</div>
           <div class="msg-meta-row">
-            <span>${msg.time}</span>
+            <span>${escapeHtml(msg.time)}</span>
             ${!isInbound ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#53bdeb" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 14.5 17.5"/></svg>` : ''}
           </div>
         `;
@@ -942,9 +1067,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (els.dossierReleaseBtn) {
-      if (leadState === 'ongoing' && lead.ownerId === state.currentAgent.id) {
+      if (leadState === 'ongoing' && (lead.ownerId === currentUserId || isAdmin)) {
         els.dossierReleaseBtn.style.display = 'block';
-        els.dossierReleaseBtn.onclick = () => releaseLead(lead.id);
+        els.dossierReleaseBtn.onclick = () => openCantHandleModal(lead);
       } else {
         els.dossierReleaseBtn.style.display = 'none';
       }
@@ -959,7 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         els.dossierPaidBtn.className = 'btn btn-paid btn-sm';
         els.dossierPaidBtn.innerHTML = '✅ Confirm Client Paid (Closed)';
-        els.dossierPaidBtn.onclick = () => markLeadPaid(lead.id);
+        els.dossierPaidBtn.onclick = () => openMarkPaidModal(lead);
       }
     }
 
@@ -1009,8 +1134,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const lead = getLead(state.activeLeadId);
     if (!lead) return;
 
+    const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const myName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+
     // Check lock
-    if (lead.ownerId && lead.ownerId !== state.currentAgent.id) {
+    if (lead.ownerId && lead.ownerId !== myId && !isAdmin) {
       showToast('⚠️ You cannot send messages to a lead owned by another agent!');
       return;
     }
@@ -1020,7 +1149,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // If unclaimed, automatically claim when agent responds
     if (!lead.ownerId) {
-      lead.ownerId = state.currentAgent.id;
+      lead.ownerId = myId;
+      lead.ownerName = myName;
+      lead.leadState = 'ongoing';
       showToast(`🎯 You responded first! Lead automatically locked to you.`);
     }
 
@@ -1028,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     lead.messages.push({
       sender: 'agent',
-      agentName: state.currentAgent.name,
+      agentName: myName,
       text: text,
       time: now
     });
@@ -1350,6 +1481,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.viewInbox) {
         els.viewInbox.classList.remove('mobile-chat-open');
       }
+      document.body.classList.remove('mobile-in-chat');
       toggleDossierDrawer(false);
     });
   }
@@ -1846,6 +1978,488 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.createEmpForm) els.createEmpForm.addEventListener('submit', handleCreateEmployee);
   if (els.submitNewEmpBtn) els.submitNewEmpBtn.addEventListener('click', handleCreateEmployee);
   if (els.refreshTeamBtn) els.refreshTeamBtn.addEventListener('click', fetchTeamRoster);
+
+  // ==========================================
+  // MODAL 5: MARK PAID (DEAL WON POPUP)
+  // ==========================================
+
+  function openMarkPaidModal(lead) {
+    if (!lead) return;
+    state.activeLeadId = lead.id;
+
+    if (els.paidCustomerName) els.paidCustomerName.value = lead.name || '';
+    if (els.paidCustomerPhone) els.paidCustomerPhone.value = lead.display || lead.phone || '';
+    if (els.paidCustomerEmail) els.paidCustomerEmail.value = lead.email || '';
+    if (els.paidTrxId) els.paidTrxId.value = (lead.paidDetails && lead.paidDetails.trxId) ? lead.paidDetails.trxId : '';
+
+    const closerName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
+    if (els.paidCloserName) els.paidCloserName.textContent = closerName;
+
+    // Default plan & amount based on lead interest
+    let defPlan = 'Pro';
+    let defAmount = 5000;
+    if (lead.paidDetails && lead.paidDetails.plan) {
+      defPlan = lead.paidDetails.plan;
+      defAmount = lead.paidDetails.amount || 5000;
+    } else if (lead.interest && lead.interest.includes('Starter')) {
+      defPlan = 'Starter';
+      defAmount = 1700;
+    } else if (lead.interest && lead.interest.includes('Whale')) {
+      defPlan = 'Whale VIP';
+      defAmount = 15000;
+    }
+
+    if (els.paidPlanSelect) els.paidPlanSelect.value = defPlan;
+    if (els.paidAmountInput) els.paidAmountInput.value = defAmount;
+    if (els.paidMethodSelect) {
+      els.paidMethodSelect.value = (lead.paidDetails && lead.paidDetails.method) ? lead.paidDetails.method : 'EasyPaisa';
+    }
+
+    if (els.markPaidModal) els.markPaidModal.classList.add('open');
+  }
+
+  function closeMarkPaidModal() {
+    if (els.markPaidModal) els.markPaidModal.classList.remove('open');
+  }
+
+  if (els.paidPlanSelect) {
+    els.paidPlanSelect.addEventListener('change', () => {
+      const p = els.paidPlanSelect.value;
+      if (p === 'Pro') els.paidAmountInput.value = 5000;
+      else if (p === 'Starter') els.paidAmountInput.value = 1700;
+      else if (p === 'Whale VIP') els.paidAmountInput.value = 15000;
+      else if (p === 'Enterprise 3-Month') els.paidAmountInput.value = 12000;
+    });
+  }
+
+  function handleMarkPaidSubmit(e) {
+    if (e) e.preventDefault();
+    const lead = getLead(state.activeLeadId);
+    if (!lead) return;
+
+    const name = (els.paidCustomerName?.value || '').trim() || lead.name;
+    const plan = (els.paidPlanSelect?.value || 'Pro');
+    const amount = parseInt(els.paidAmountInput?.value, 10) || 5000;
+    const method = (els.paidMethodSelect?.value || 'EasyPaisa');
+    const email = (els.paidCustomerEmail?.value || '').trim();
+    const trxId = (els.paidTrxId?.value || '').trim();
+
+    const closerName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
+    const closerId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+
+    lead.name = name;
+    lead.email = email;
+    lead.leadState = 'paid';
+    lead.status = 'paid';
+    if (!lead.ownerId) {
+      lead.ownerId = closerId;
+      lead.ownerName = closerName;
+    }
+
+    lead.paidDetails = {
+      plan: plan,
+      amount: amount,
+      method: method,
+      email: email,
+      trxId: trxId,
+      closedBy: closerName,
+      closedById: closerId,
+      closedAt: new Date().toISOString()
+    };
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    lead.messages.push({
+      sender: 'agent',
+      agentName: closerName,
+      text: `🎉 PAYMENT CONFIRMED (DEAL WON)!\n• Plan: ${plan} (Rs. ${amount.toLocaleString()})\n• Method: ${method}${trxId ? '\n• Trx Ref: ' + trxId : ''}${email ? '\n• Account Email: ' + email : ''}\n• Closer: ${closerName}\nClient activated on Nunno Cloud!`,
+      time: now
+    });
+
+    closeMarkPaidModal();
+    showToast(`🟢 Deal Won! Closed Rs. ${amount.toLocaleString()} with ${name}! 🚀`);
+    renderConversationsList();
+    renderActiveChat();
+    renderAgentProfile();
+
+    syncLeadToServer(lead, {
+      name: lead.name,
+      email: lead.email,
+      paidDetails: lead.paidDetails,
+      newMessage: lead.messages[lead.messages.length - 1]
+    });
+  }
+
+  // ==========================================
+  // MODAL 6: CAN'T HANDLE (RELEASE LEAD TO RED POOL)
+  // ==========================================
+
+  function openCantHandleModal(lead) {
+    if (!lead) return;
+    state.activeLeadId = lead.id;
+
+    if (els.cantHandleClientName) {
+      els.cantHandleClientName.textContent = `${lead.name} (${lead.display || lead.phone})`;
+    }
+    if (els.cantHandleNote) {
+      els.cantHandleNote.value = '';
+    }
+    if (els.cantHandleModal) {
+      els.cantHandleModal.classList.add('open');
+    }
+  }
+
+  function closeCantHandleModal() {
+    if (els.cantHandleModal) els.cantHandleModal.classList.remove('open');
+  }
+
+  function handleCantHandleSubmit(e) {
+    if (e) e.preventDefault();
+    const lead = getLead(state.activeLeadId);
+    if (!lead) return;
+
+    const reason = els.cantHandleReasonSelect?.value || 'Requested handover to team';
+    const note = (els.cantHandleNote?.value || '').trim();
+    const closerName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    lead.messages.push({
+      sender: 'agent',
+      agentName: 'System Handover',
+      text: `⚠️ HANDOVER TO OPEN POOL: Closer ${closerName} released this lead back to Fresh (Red) pool.\n• Reason: ${reason}${note ? '\n• Handover Note: ' + note : ''}`,
+      time: now
+    });
+
+    // Append to lead notes
+    const handoverLog = `[Handover ${new Date().toLocaleDateString()} by ${closerName}]: ${reason}${note ? ' - ' + note : ''}`;
+    lead.notes = lead.notes ? `${lead.notes}\n${handoverLog}` : handoverLog;
+
+    // Reset status back to Fresh (Red) and release claim
+    lead.ownerId = null;
+    lead.ownerName = null;
+    lead.leadState = 'fresh';
+    lead.status = 'unread';
+    lead.unreadCount = (lead.unreadCount || 0) + 1;
+
+    closeCantHandleModal();
+    showToast(`🔴 Lead released back to Fresh (Red) pool for team closers!`);
+
+    // On mobile screens return to list so closer can pick another lead
+    document.body.classList.remove('mobile-in-chat');
+    if (els.viewInbox) {
+      els.viewInbox.classList.remove('mobile-chat-open');
+    }
+
+    renderConversationsList();
+    renderActiveChat();
+    renderAgentProfile();
+
+    syncLeadToServer(lead, {
+      action: 'release_lead',
+      ownerName: null,
+      notes: lead.notes,
+      handoverReason: reason,
+      handoverNote: note,
+      newMessage: lead.messages[lead.messages.length - 1]
+    });
+  }
+
+  // ==========================================
+  // MODAL 7: PERFORMANCE SCOREBOARD & TEAM LEADERBOARD
+  // ==========================================
+
+  function openScoreModal(initialTab = 'my') {
+    renderScoreData(initialTab);
+    if (els.scoreModal) els.scoreModal.classList.add('open');
+  }
+
+  function closeScoreModal() {
+    if (els.scoreModal) els.scoreModal.classList.remove('open');
+  }
+
+  function renderScoreData(activeTab = 'my') {
+    const user = state.currentUser;
+    const currentId = user ? user.id : state.currentAgent.id;
+    const currentName = user ? user.name : state.currentAgent.name;
+    const currentRole = (user && user.designation) || (user && user.role) || state.currentAgent.role || 'Senior Closer';
+    const isAdmin = user && user.role === 'admin';
+
+    // Toggle tab display
+    if (els.tabMyScore && els.tabTeamScores && els.viewMyScoreTab && els.viewTeamScoresTab) {
+      if (activeTab === 'team') {
+        els.tabMyScore.classList.remove('active');
+        els.tabTeamScores.classList.add('active');
+        els.viewMyScoreTab.style.display = 'none';
+        els.viewTeamScoresTab.style.display = 'block';
+      } else {
+        els.tabMyScore.classList.add('active');
+        els.tabTeamScores.classList.remove('active');
+        els.viewMyScoreTab.style.display = 'block';
+        els.viewTeamScoresTab.style.display = 'none';
+      }
+    }
+
+    // --- TAB 1: User Personal Performance Portal ---
+    const myPaidLeads = state.leads.filter(l => 
+      (l.leadState === 'paid' || l.status === 'paid') && 
+      (l.paidDetails?.closedById === currentId || l.ownerId === currentId)
+    );
+
+    const myRevenue = myPaidLeads.reduce((sum, l) => {
+      const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : 5000);
+      return sum + amt;
+    }, 0);
+
+    const myDealsWon = myPaidLeads.length;
+    const myActivePipeline = state.leads.filter(l => l.leadState === 'ongoing' && l.ownerId === currentId).length;
+    const myTotalHandled = state.leads.filter(l => l.ownerId === currentId).length;
+    const myWinRate = myTotalHandled > 0 ? Math.round((myDealsWon / myTotalHandled) * 100) : 0;
+
+    let tierBadge = '⚡ Active Closer';
+    if (myRevenue >= 25000) tierBadge = '🏆 Diamond Closer';
+    else if (myRevenue >= 10000) tierBadge = '🥇 Gold Closer';
+    else if (myRevenue >= 3000) tierBadge = '🥈 Silver Closer';
+
+    if (els.perfHeroAvatar) els.perfHeroAvatar.textContent = isAdmin ? '👑' : '👨‍💼';
+    if (els.perfHeroName) els.perfHeroName.textContent = currentName;
+    if (els.perfHeroRole) els.perfHeroRole.textContent = `${currentRole} • ${currentId}`;
+    if (els.perfTierBadge) els.perfTierBadge.innerHTML = `<span>${tierBadge}</span>`;
+
+    if (els.myTotalRevenue) els.myTotalRevenue.textContent = `Rs. ${myRevenue.toLocaleString()}`;
+    if (els.myDealsWon) els.myDealsWon.textContent = myDealsWon;
+    if (els.myActivePipeline) els.myActivePipeline.textContent = myActivePipeline;
+    if (els.myConversionRate) els.myConversionRate.textContent = `${myWinRate}%`;
+    if (els.myDealsCountLabel) els.myDealsCountLabel.textContent = `${myDealsWon} Deals Won`;
+
+    // Render my closed deals table
+    if (els.myDealsList) {
+      if (myPaidLeads.length === 0) {
+        els.myDealsList.innerHTML = `
+          <div style="text-align:center;padding:24px;color:var(--text-dim);font-size:12px;">
+            No closed deals yet. Claim fresh leads from the Red pool and close your first subscription!
+          </div>
+        `;
+      } else {
+        els.myDealsList.innerHTML = myPaidLeads.map(l => {
+          const plan = l.paidDetails?.plan || l.interest || 'Nunno Pro';
+          const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : 5000;
+          const method = l.paidDetails?.method || 'EasyPaisa';
+          const email = l.paidDetails?.email || l.email || '';
+          const closedAt = l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive;
+
+          return `
+            <div class="perf-deal-row">
+              <div class="perf-deal-client">
+                <div class="perf-deal-name">${escapeHtml(l.name)}</div>
+                <div class="perf-deal-sub mono">${escapeHtml(l.display || l.phone)}${email ? ' &bull; ' + escapeHtml(email) : ''}</div>
+              </div>
+              <div class="perf-deal-plan">
+                <span class="badge-role-admin" style="font-size:10px;">${escapeHtml(plan)}</span>
+                <span class="text-xs text-muted" style="margin-left:4px;">${escapeHtml(method)}</span>
+              </div>
+              <div class="perf-deal-amount mono">Rs. ${amt.toLocaleString()}</div>
+              <div class="perf-deal-date text-xs text-muted">${closedAt}</div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // --- TAB 2: Admin Organization Leaderboard ---
+    const allPaidLeads = state.leads.filter(l => l.leadState === 'paid' || l.status === 'paid');
+    const orgTotalRevenue = allPaidLeads.reduce((sum, l) => {
+      const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : 5000);
+      return sum + amt;
+    }, 0);
+    const orgTotalDeals = allPaidLeads.length;
+
+    // Collect all registered employees & default agents
+    const closersMap = new Map();
+
+    defaultAgents.forEach(a => {
+      closersMap.set(a.id, {
+        id: a.id,
+        name: a.name,
+        role: a.role,
+        avatar: a.avatar,
+        revenue: 0,
+        dealsWon: 0,
+        pipeline: 0,
+        handled: 0
+      });
+    });
+
+    state.employees.forEach(e => {
+      closersMap.set(e.id, {
+        id: e.id,
+        name: e.name,
+        role: e.designation || e.role,
+        avatar: e.role === 'admin' ? '👑' : '👨‍💼',
+        revenue: 0,
+        dealsWon: 0,
+        pipeline: 0,
+        handled: 0
+      });
+    });
+
+    if (user && !closersMap.has(user.id)) {
+      closersMap.set(user.id, {
+        id: user.id,
+        name: user.name,
+        role: user.designation || user.role,
+        avatar: user.role === 'admin' ? '👑' : '👨‍💼',
+        revenue: 0,
+        dealsWon: 0,
+        pipeline: 0,
+        handled: 0
+      });
+    }
+
+    // Aggregate metrics from leads
+    state.leads.forEach(l => {
+      const ownerId = l.paidDetails?.closedById || l.ownerId;
+      if (!ownerId) return;
+
+      if (!closersMap.has(ownerId)) {
+        closersMap.set(ownerId, {
+          id: ownerId,
+          name: l.paidDetails?.closedBy || l.ownerName || ownerId,
+          role: 'Closer',
+          avatar: '👨‍💼',
+          revenue: 0,
+          dealsWon: 0,
+          pipeline: 0,
+          handled: 0
+        });
+      }
+
+      const closer = closersMap.get(ownerId);
+      closer.handled++;
+
+      if (l.leadState === 'paid' || l.status === 'paid') {
+        closer.dealsWon++;
+        const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : 5000);
+        closer.revenue += amt;
+      } else if (l.leadState === 'ongoing') {
+        closer.pipeline++;
+      }
+    });
+
+    // Rank closers by Revenue DESC, then Deals Won DESC
+    const rankedClosers = Array.from(closersMap.values()).sort((a, b) => {
+      if (b.revenue !== a.revenue) return b.revenue - a.revenue;
+      return b.dealsWon - a.dealsWon;
+    });
+
+    const topMvp = rankedClosers.find(c => c.revenue > 0) || rankedClosers[0];
+
+    if (els.orgTotalRevenue) els.orgTotalRevenue.textContent = `Rs. ${orgTotalRevenue.toLocaleString()}`;
+    if (els.orgTotalDeals) els.orgTotalDeals.textContent = orgTotalDeals;
+    if (els.orgTopCloser) els.orgTopCloser.textContent = topMvp ? `${topMvp.name} (${topMvp.revenue.toLocaleString()} PKR)` : '-';
+    if (els.orgActiveClosers) els.orgActiveClosers.textContent = `${rankedClosers.length} Closers`;
+
+    // Render Leaderboard Rows
+    if (els.teamLeaderboardTable) {
+      els.teamLeaderboardTable.innerHTML = `
+        <div class="leaderboard-table-header">
+          <span style="width:40px;">Rank</span>
+          <span style="flex:1;">Closer & Team Member</span>
+          <span style="width:90px;text-align:center;">Deals Won</span>
+          <span style="width:90px;text-align:center;">Pipeline</span>
+          <span style="width:80px;text-align:center;">Win Rate</span>
+          <span style="width:130px;text-align:right;">Total Revenue</span>
+        </div>
+        ${rankedClosers.map((c, idx) => {
+          const isCurrentUser = c.id === currentId;
+          const winRate = c.handled > 0 ? Math.round((c.dealsWon / c.handled) * 100) : 0;
+          let rankBadge = `#${idx + 1}`;
+          if (idx === 0) rankBadge = '🥇';
+          else if (idx === 1) rankBadge = '🥈';
+          else if (idx === 2) rankBadge = '🥉';
+
+          return `
+            <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}">
+              <div class="leaderboard-rank mono">${rankBadge}</div>
+              <div class="leaderboard-closer">
+                <div class="agent-avatar" style="width:32px;height:32px;font-size:16px;">${c.avatar || '👨‍💼'}</div>
+                <div>
+                  <div class="leaderboard-closer-name">
+                    ${escapeHtml(c.name)}
+                    ${idx === 0 && c.revenue > 0 ? '<span class="badge-role-admin" style="font-size:9px;background:rgba(234,179,8,0.2);color:#fbbf24;border-color:rgba(234,179,8,0.3);margin-left:4px;">MVP</span>' : ''}
+                    ${isCurrentUser ? '<span class="brand-badge" style="font-size:8px;margin-left:4px;">You</span>' : ''}
+                  </div>
+                  <div class="leaderboard-closer-sub">${escapeHtml(c.role)} &bull; <span class="mono">${escapeHtml(c.id)}</span></div>
+                </div>
+              </div>
+              <div class="leaderboard-stat mono" style="font-weight:700;color:#10b981;">${c.dealsWon}</div>
+              <div class="leaderboard-stat mono" style="color:#fbbf24;">${c.pipeline}</div>
+              <div class="leaderboard-stat mono">${winRate}%</div>
+              <div class="leaderboard-revenue mono">Rs. ${c.revenue.toLocaleString()}</div>
+            </div>
+          `;
+        }).join('')}
+      `;
+    }
+  }
+
+  // Export Leaderboard CSV Audit
+  function exportLeaderboardCsv() {
+    let csv = 'Rank,Closer ID,Closer Name,Role,Deals Won,Active Pipeline,Total Revenue (PKR)\n';
+    const closersMap = new Map();
+
+    defaultAgents.forEach(a => { closersMap.set(a.id, { id: a.id, name: a.name, role: a.role, revenue: 0, dealsWon: 0, pipeline: 0 }); });
+    state.employees.forEach(e => { closersMap.set(e.id, { id: e.id, name: e.name, role: e.designation || e.role, revenue: 0, dealsWon: 0, pipeline: 0 }); });
+
+    state.leads.forEach(l => {
+      const ownerId = l.paidDetails?.closedById || l.ownerId;
+      if (!ownerId) return;
+      if (!closersMap.has(ownerId)) {
+        closersMap.set(ownerId, { id: ownerId, name: l.paidDetails?.closedBy || l.ownerName || ownerId, role: 'Closer', revenue: 0, dealsWon: 0, pipeline: 0 });
+      }
+      const c = closersMap.get(ownerId);
+      if (l.leadState === 'paid' || l.status === 'paid') {
+        c.dealsWon++;
+        const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : 5000);
+        c.revenue += amt;
+      } else if (l.leadState === 'ongoing') {
+        c.pipeline++;
+      }
+    });
+
+    const ranked = Array.from(closersMap.values()).sort((a, b) => b.revenue - a.revenue);
+    ranked.forEach((c, idx) => {
+      csv += `${idx + 1},"${c.id}","${c.name}","${c.role}",${c.dealsWon},${c.pipeline},${c.revenue}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Omnidesk_Team_Leaderboard_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('📊 Exported team audit CSV report!');
+  }
+
+  // Performance Score Modal Event Listeners
+  if (els.openScoreBtn) els.openScoreBtn.addEventListener('click', () => openScoreModal('my'));
+  if (els.openLeaderboardBtn) els.openLeaderboardBtn.addEventListener('click', () => openScoreModal('team'));
+  if (els.closeScoreModalBtn) els.closeScoreModalBtn.addEventListener('click', closeScoreModal);
+  if (els.tabMyScore) els.tabMyScore.addEventListener('click', () => renderScoreData('my'));
+  if (els.tabTeamScores) els.tabTeamScores.addEventListener('click', () => renderScoreData('team'));
+  if (els.exportLeaderboardBtn) els.exportLeaderboardBtn.addEventListener('click', exportLeaderboardCsv);
+
+  // Mark Paid Modal Event Listeners
+  if (els.closeMarkPaidModalBtn) els.closeMarkPaidModalBtn.addEventListener('click', closeMarkPaidModal);
+  if (els.cancelMarkPaidBtn) els.cancelMarkPaidBtn.addEventListener('click', closeMarkPaidModal);
+  if (els.markPaidForm) els.markPaidForm.addEventListener('submit', handleMarkPaidSubmit);
+  if (els.confirmMarkPaidBtn) els.confirmMarkPaidBtn.addEventListener('click', handleMarkPaidSubmit);
+
+  // Can't Handle Modal Event Listeners
+  if (els.closeCantHandleModalBtn) els.closeCantHandleModalBtn.addEventListener('click', closeCantHandleModal);
+  if (els.cancelCantHandleBtn) els.cancelCantHandleBtn.addEventListener('click', closeCantHandleModal);
+  if (els.cantHandleForm) els.cantHandleForm.addEventListener('submit', handleCantHandleSubmit);
+  if (els.confirmCantHandleBtn) els.confirmCantHandleBtn.addEventListener('click', handleCantHandleSubmit);
 
   // Initialize App
   checkAuthSession();

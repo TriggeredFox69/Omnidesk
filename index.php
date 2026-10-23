@@ -10,11 +10,11 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Nunno WhatsApp Omni-Desk — Multi-Agent CRM & Campaign Hub</title>
   <meta name="description" content="Next-generation multi-agent WhatsApp CRM and campaign desk for Nunno Cloud. Anti-theft lead locking, 3-pane team messenger, Pakistani network classifier, and human cadence outreach.">
   <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=2.6">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=3.0">
   <script>
     window.NUNNO_TEMPLATES = <?= $templatesJson ?>;
   </script>
@@ -49,12 +49,24 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
 
     </nav>
 
-    <!-- Top Right Actions, Admin Employees Trigger & Profile -->
-    <div style="display:flex;align-items:center;gap:10px;">
+    <!-- Top Right Actions, Score, Admin Employees Trigger & Profile -->
+    <div style="display:flex;align-items:center;gap:8px;">
+      <!-- My Performance Score Trigger -->
+      <button class="btn-header-perf" id="openScoreBtn" title="View My Performance Score & Closed Deals">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+        <span>📈 My Score</span>
+      </button>
+
+      <!-- Admin Only: Organization Leaderboard Trigger -->
+      <button class="btn-header-perf admin-leaderboard" id="openLeaderboardBtn" style="display:none;" title="Organization Leaderboard & All Users Scores">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+        <span>🏆 Leaderboard</span>
+      </button>
+
       <!-- Import .txt Numbers Trigger -->
       <button class="btn btn-wa btn-xs" id="openImportModalBtn">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        <span>Import .txt Numbers</span>
+        <span class="hide-mobile-txt">Import .txt</span>
       </button>
 
       <!-- Admin Only: Employee Management Trigger -->
@@ -198,9 +210,15 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
             <span>CRM</span>
           </button>
 
-          <button class="btn btn-paid btn-xs" id="markPaidHeaderBtn" title="Mark client as Paid (Closed)">
+          <button class="btn btn-paid btn-xs" id="markPaidHeaderBtn" title="Mark client as Paid (Closed Deal)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             <span>Mark Paid</span>
+          </button>
+
+          <!-- Can't Handle / Release to Red Pool Button -->
+          <button class="btn btn-warning btn-xs" id="cantHandleBtn" title="Can't handle this client? Release back to Fresh (Red) pool">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            <span>Can't Handle</span>
           </button>
 
           <button class="btn btn-useless btn-xs" id="markUselessHeaderBtn" title="Mark client as Useless / Won't Pay">
@@ -224,9 +242,20 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
         <!-- Dynamically rendered authentic WhatsApp bubbles -->
       </div>
 
-      <!-- Slim Conflict Notice (Only shown if owned by another agent) -->
+      <!-- Anti-Theft Lock Shield (Shown when ongoing lead is owned by another closer) -->
+      <div id="leadLockedShield" class="lead-locked-shield" style="display:none;">
+        <div class="lock-shield-card">
+          <div class="lock-shield-icon">🔒</div>
+          <h3 class="lock-shield-title">Lead In Progress & Protected</h3>
+          <p class="lock-shield-desc">This client is currently being handled by <strong id="lockedCloserName">Hamza Khan</strong>.</p>
+          <div class="lock-shield-badge">🛡️ Anti-Theft Lead Protection Active</div>
+          <p class="lock-shield-sub">Only the assigned closer or the Administrator can view or reply to this conversation.</p>
+        </div>
+      </div>
+
+      <!-- Slim Conflict Notice (Only shown if admin is inspecting another closer's chat) -->
       <div id="otherCloserNotice" class="other-closer-notice" style="display:none;">
-        🔒 Lead is ongoing with <strong id="otherCloserName">Bilal Tariq</strong>. Messaging locked to prevent double-contacting.
+        👑 <strong id="otherCloserName">Hamza Khan</strong> is handling this lead. (Admin Monitoring Mode)
       </div>
 
       <!-- Quick Response Macro Chips -->
@@ -730,12 +759,265 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     </div>
   </div>
 
+  <!-- ====================================================
+       MODAL 5: CONFIRM PAYMENT & CLOSE DEAL (MINI-POPUP)
+       ==================================================== -->
+  <div class="modal-overlay" id="markPaidModal">
+    <div class="modal-window" style="max-width:480px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">🎉</span>
+          <div style="font-size:16px;font-weight:800;color:#ffffff;">Close Deal & Record Payment</div>
+        </div>
+        <button class="btn btn-ghost btn-xs" id="closeMarkPaidModalBtn">✕</button>
+      </div>
+      <p class="text-xs text-muted" style="margin-top:4px;">Record customer payment details to activate subscription and allocate commission score.</p>
+
+      <form id="markPaidForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Customer Name</label>
+          <input type="text" id="paidCustomerName" class="form-input" placeholder="Client Name" required>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Phone Number</label>
+          <input type="text" id="paidCustomerPhone" class="form-input mono" disabled style="opacity:0.8;">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Plan Purchased</label>
+            <select id="paidPlanSelect" class="form-select">
+              <option value="Nunno Pro" data-amount="5000">💎 Nunno Pro (Rs. 5,000)</option>
+              <option value="Nunno Starter" data-amount="1700">⚡ Nunno Starter (Rs. 1,700)</option>
+              <option value="Whale VIP" data-amount="15000">🐋 Whale VIP (Rs. 15,000)</option>
+              <option value="Annual Pass" data-amount="35000">👑 Annual Pass (Rs. 35,000)</option>
+              <option value="Custom Plan" data-amount="0">💼 Custom Deal</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Amount (PKR)</label>
+            <input type="number" id="paidAmountInput" class="form-input mono" value="5000" required>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Payment Method</label>
+            <select id="paidMethodSelect" class="form-select">
+              <option value="EasyPaisa">💳 EasyPaisa</option>
+              <option value="JazzCash">📱 JazzCash</option>
+              <option value="Binance Pay (USDT)">🪙 Binance Pay (USDT)</option>
+              <option value="Bank Transfer">🏦 Bank Transfer / Raast</option>
+              <option value="SadaPay / NayaPay">⚡ SadaPay / NayaPay</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Customer Email (Optional)</label>
+            <input type="email" id="paidCustomerEmail" class="form-input" placeholder="client@gmail.com">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Transaction ID / Trx Ref (Optional)</label>
+          <input type="text" id="paidTrxId" class="form-input mono" placeholder="e.g. TID-984729104">
+        </div>
+
+        <div style="background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;font-size:11.5px;">
+          <span style="color:var(--text-muted);">Attributed Closer:</span>
+          <span style="font-weight:700;color:#10b981;" id="paidCloserName">Hamza Khan</span>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+          <button type="button" class="btn btn-ghost btn-sm" id="cancelMarkPaidBtn">Cancel</button>
+          <button type="submit" class="btn btn-paid btn-sm" id="confirmMarkPaidBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Confirm Deal & Mark Paid</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       MODAL 6: CAN'T HANDLE / RELEASE LEAD BACK TO RED
+       ==================================================== -->
+  <div class="modal-overlay" id="cantHandleModal">
+    <div class="modal-window" style="max-width:440px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">🚫</span>
+          <div style="font-size:16px;font-weight:800;color:#ffffff;">Can't Handle This Lead?</div>
+        </div>
+        <button class="btn btn-ghost btn-xs" id="closeCantHandleModalBtn">✕</button>
+      </div>
+      <p class="text-xs text-muted" style="margin-top:4px;">Releasing this lead changes its status back to <strong>🔴 Fresh (Red)</strong> so another sales closer can immediately pick it up.</p>
+
+      <form id="cantHandleForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Client</label>
+          <div style="background:var(--surface-2);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;color:#fff;" id="cantHandleClientName">Zeeshan Tariq</div>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Reason for Handover</label>
+          <select id="cantHandleReasonSelect" class="form-select">
+            <option value="Language barrier / Speaks regional language">🗣️ Language barrier (Speaks Pashto/Sindhi)</option>
+            <option value="Price objection / Demanding higher discount">💰 Price objection / Wants higher discount</option>
+            <option value="Unresponsive after pitch / Needs fresh angle">⏳ Unresponsive after pitch / Needs fresh angle</option>
+            <option value="Demanding complex technical crypto explanation">📈 Demanding complex technical crypto scalping explanation</option>
+            <option value="Too busy right now / Handing off to team">⏱️ Too busy right now / Handing off to team</option>
+            <option value="Other objection">📝 Other reason</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Handover Note for Next Closer (Optional)</label>
+          <input type="text" id="cantHandleNote" class="form-input" placeholder="e.g. Offered 30% off, client asked for demo video">
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+          <button type="button" class="btn btn-ghost btn-sm" id="cancelCantHandleBtn">Cancel</button>
+          <button type="submit" class="btn btn-warning btn-sm" id="confirmCantHandleBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            <span>Release to Fresh (Red) Pool</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       MODAL 7: PERFORMANCE PORTAL & TEAM LEADERBOARD
+       ==================================================== -->
+  <div class="modal-overlay" id="scoreModal">
+    <div class="emp-modal-box" style="max-width:920px;">
+      <div class="emp-modal-header">
+        <div class="emp-modal-title-group">
+          <div class="emp-modal-icon" style="background:rgba(234,179,8,0.15);border-color:rgba(234,179,8,0.3);color:#fbbf24;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+          </div>
+          <div>
+            <div style="font-size:17px;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:8px;">
+              <span id="scoreModalTitle">Performance & Score Center</span>
+              <span class="badge-role-admin" id="scoreModalBadge">KPI Tracker</span>
+            </div>
+            <div class="text-xs text-muted">Real-time revenue metrics, deals won, and team leaderboards</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-xs" id="closeScoreModalBtn">✕</button>
+      </div>
+
+      <!-- Performance Tabs (My Score vs Team Leaderboard) -->
+      <div style="display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.2);">
+        <button type="button" class="nav-tab-btn active" id="tabMyScore" style="padding:6px 14px;font-size:12px;">
+          <span>👤 My Score & Deals</span>
+        </button>
+        <button type="button" class="nav-tab-btn" id="tabTeamScores" style="padding:6px 14px;font-size:12px;">
+          <span>🏆 Team Leaderboard (All Users)</span>
+        </button>
+      </div>
+
+      <div class="emp-modal-body" style="grid-template-columns:1fr;padding:20px 24px;">
+        <!-- TAB 1: User Personal Performance Portal -->
+        <div id="viewMyScoreTab">
+          <!-- Top Closer Tier Card -->
+          <div class="perf-hero-card">
+            <div class="perf-hero-left">
+              <div class="perf-hero-avatar" id="perfHeroAvatar">👨‍💼</div>
+              <div>
+                <div class="perf-hero-name" id="perfHeroName">Hamza Khan</div>
+                <div class="perf-hero-role" id="perfHeroRole">Senior Closer &bull; EMP-101</div>
+              </div>
+            </div>
+            <div class="perf-tier-badge" id="perfTierBadge">
+              <span>🥇 Gold Closer</span>
+            </div>
+          </div>
+
+          <!-- 4 Score Cards Grid -->
+          <div class="score-cards-grid">
+            <div class="score-card revenue">
+              <span class="score-card-label">TOTAL REVENUE CLOSED</span>
+              <span class="score-card-value" id="myTotalRevenue">Rs. 0</span>
+              <span class="score-card-sub">From verified customer payments</span>
+            </div>
+            <div class="score-card closed">
+              <span class="score-card-label">DEALS WON</span>
+              <span class="score-card-value" id="myDealsWon">0</span>
+              <span class="score-card-sub">Paid customers activated</span>
+            </div>
+            <div class="score-card ongoing">
+              <span class="score-card-label">ACTIVE PIPELINE</span>
+              <span class="score-card-value" id="myActivePipeline">0</span>
+              <span class="score-card-sub">Ongoing chats in negotiation</span>
+            </div>
+            <div class="score-card rate">
+              <span class="score-card-label">CONVERSION RATE</span>
+              <span class="score-card-value" id="myConversionRate">0%</span>
+              <span class="score-card-sub">Deals won / Total handled</span>
+            </div>
+          </div>
+
+          <!-- My Recent Closed Deals Table -->
+          <div class="perf-section-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <h4 style="margin:0;font-size:13.5px;color:#fff;font-weight:700;">My Closed Deals History</h4>
+              <span class="text-xs text-muted" id="myDealsCountLabel">0 Closed</span>
+            </div>
+            <div id="myDealsList" class="perf-deals-table">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Admin Organization Leaderboard -->
+        <div id="viewTeamScoresTab" style="display:none;">
+          <!-- Organization KPI Summary -->
+          <div class="org-summary-grid">
+            <div class="org-stat-box">
+              <span class="org-stat-label">TOTAL COMPANY REVENUE</span>
+              <span class="org-stat-val" id="orgTotalRevenue">Rs. 0</span>
+            </div>
+            <div class="org-stat-box">
+              <span class="org-stat-label">TOTAL CLOSED CLIENTS</span>
+              <span class="org-stat-val" id="orgTotalDeals">0</span>
+            </div>
+            <div class="org-stat-box">
+              <span class="org-stat-label">TOP MVP CLOSER</span>
+              <span class="org-stat-val" id="orgTopCloser" style="color:#fbbf24;">-</span>
+            </div>
+            <div class="org-stat-box">
+              <span class="org-stat-label">ACTIVE SALES FORCE</span>
+              <span class="org-stat-val" id="orgActiveClosers">0 Closers</span>
+            </div>
+          </div>
+
+          <!-- Team Leaderboard Table -->
+          <div class="perf-section-card" style="margin-top:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h4 style="margin:0;font-size:14px;color:#fff;font-weight:700;display:flex;align-items:center;gap:6px;">
+                <span>🏆 Team Performance Leaderboard</span>
+              </h4>
+              <button type="button" class="btn btn-ghost btn-xs" id="exportLeaderboardBtn">📊 Export Audit CSV</button>
+            </div>
+            <div id="teamLeaderboardTable">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div class="toast" id="toast">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-wa)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/whatsapp-app.js?v=2.6"></script>
+  <script src="assets/js/whatsapp-app.js?v=3.0"></script>
 </body>
 </html>

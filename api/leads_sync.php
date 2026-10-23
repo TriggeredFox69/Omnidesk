@@ -221,6 +221,10 @@ if ($action === 'update_lead') {
             if (isset($input['leadState'])) $lead['leadState'] = $input['leadState'];
             if (isset($input['status'])) $lead['status'] = $input['status'];
             if (array_key_exists('ownerId', $input)) $lead['ownerId'] = $input['ownerId'];
+            if (array_key_exists('ownerName', $input)) $lead['ownerName'] = $input['ownerName'];
+            if (isset($input['name'])) $lead['name'] = $input['name'];
+            if (isset($input['email'])) $lead['email'] = $input['email'];
+            if (isset($input['paidDetails'])) $lead['paidDetails'] = $input['paidDetails'];
             if (isset($input['notes'])) $lead['notes'] = $input['notes'];
             if (isset($input['unreadCount'])) $lead['unreadCount'] = (int)$input['unreadCount'];
             if (isset($input['lastActive'])) $lead['lastActive'] = $input['lastActive'];
