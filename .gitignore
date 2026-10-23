@@ -15,6 +15,7 @@ data/leads.json
 data/sender_config.json
 data/campaign_logs.json
 data/blacklist.json
+data/users.json
 !data/.gitkeep
 
 # Environment & Server Overrides

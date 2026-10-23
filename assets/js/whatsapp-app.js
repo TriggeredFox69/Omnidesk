@@ -191,6 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // App Master State
   const state = {
     currentTab: 'inbox', // 'inbox', 'campaign', 'directory'
+    currentUser: null,   // Authenticated Admin or Employee
+    employees: [],       // Employee roster
     agents: defaultAgents,
     currentAgent: defaultAgents[0], // EMP-101 Hamza Khan
     leads: [...initialLeads],
@@ -223,6 +225,33 @@ document.addEventListener('DOMContentLoaded', () => {
     topAgentId: document.getElementById('topAgentId'),
     unreadGlobalBadge: document.getElementById('unreadGlobalBadge'),
     myLeadsCountBadge: document.getElementById('myLeadsCountBadge'),
+    openTeamModalBtn: document.getElementById('openTeamModalBtn'),
+    headerLogoutBtn: document.getElementById('headerLogoutBtn'),
+    headerEmpCount: document.getElementById('headerEmpCount'),
+
+    // Authentication Elements
+    authOverlay: document.getElementById('authOverlay'),
+    authForm: document.getElementById('authForm'),
+    authUsername: document.getElementById('authUsername'),
+    authPassword: document.getElementById('authPassword'),
+    authTogglePass: document.getElementById('authTogglePass'),
+    authAlert: document.getElementById('authAlert'),
+    authSubmitBtn: document.getElementById('authSubmitBtn'),
+
+    // Employee Provisioning & Roster Modal Elements
+    employeeModal: document.getElementById('employeeModal'),
+    closeTeamModalBtn: document.getElementById('closeTeamModalBtn'),
+    createEmpForm: document.getElementById('createEmpForm'),
+    newEmpName: document.getElementById('newEmpName'),
+    newEmpUsername: document.getElementById('newEmpUsername'),
+    newEmpPassword: document.getElementById('newEmpPassword'),
+    newEmpRole: document.getElementById('newEmpRole'),
+    newEmpPhone: document.getElementById('newEmpPhone'),
+    genEmpPassBtn: document.getElementById('genEmpPassBtn'),
+    submitNewEmpBtn: document.getElementById('submitNewEmpBtn'),
+    createEmpAlert: document.getElementById('createEmpAlert'),
+    teamRosterList: document.getElementById('teamRosterList'),
+    refreshTeamBtn: document.getElementById('refreshTeamBtn'),
 
     // Connected WhatsApp Direct Number Pill & Modal
     connectedNumberPill: document.getElementById('connectedNumberPill'),
@@ -330,15 +359,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update Topbar Agent Display
   function renderAgentProfile() {
-    if (els.topAgentAvatar) els.topAgentAvatar.textContent = state.currentAgent.avatar;
-    if (els.topAgentName) els.topAgentName.textContent = state.currentAgent.name;
-    if (els.topAgentId) els.topAgentId.textContent = `${state.currentAgent.id} • ${state.currentAgent.role}`;
+    const user = state.currentUser;
+    if (user) {
+      const isAdmin = user.role === 'admin';
+      if (els.topAgentAvatar) els.topAgentAvatar.textContent = isAdmin ? '👑' : '👨‍💼';
+      if (els.topAgentName) els.topAgentName.textContent = user.name;
+      if (els.topAgentId) {
+        els.topAgentId.innerHTML = isAdmin 
+          ? '<span class="badge-admin-crown">👑 Admin</span>' 
+          : `<span class="badge-employee-pill">💼 ${escapeHtml(user.designation || 'Closer')}</span>`;
+      }
+      if (els.openTeamModalBtn) {
+        els.openTeamModalBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+      }
+    } else {
+      if (els.topAgentAvatar) els.topAgentAvatar.textContent = state.currentAgent.avatar;
+      if (els.topAgentName) els.topAgentName.textContent = state.currentAgent.name;
+      if (els.topAgentId) els.topAgentId.textContent = `${state.currentAgent.id} • ${state.currentAgent.role}`;
+      if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
+    }
 
     // Update global counters
     const unreadCount = state.leads.filter(l => l.status === 'unread').length;
     if (els.unreadGlobalBadge) els.unreadGlobalBadge.textContent = unreadCount;
 
-    const myLeads = state.leads.filter(l => l.ownerId === state.currentAgent.id).length;
+    const activeId = user ? user.id : state.currentAgent.id;
+    const myLeads = state.leads.filter(l => l.ownerId === activeId).length;
     if (els.myLeadsCountBadge) els.myLeadsCountBadge.textContent = myLeads;
   }
 
@@ -1359,13 +1405,450 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.tabInbox) els.tabInbox.addEventListener('click', () => switchTab('inbox'));
   if (els.tabCampaign) els.tabCampaign.addEventListener('click', () => switchTab('campaign'));
 
+  // ==========================================
+  // AUTHENTICATION & EMPLOYEE PROVISIONING MODULE
+  // ==========================================
+
+  // Check active session on load
+  function checkAuthSession() {
+    fetch('api/auth.php?action=check')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.authenticated && data.user) {
+          applyUserSession(data.user);
+        } else {
+          // Check local offline fallback
+          const localSession = localStorage.getItem('nunno_active_session');
+          if (localSession) {
+            try {
+              const u = JSON.parse(localSession);
+              applyUserSession(u);
+              return;
+            } catch (e) {}
+          }
+          showAuthOverlay();
+        }
+      })
+      .catch(() => {
+        // Offline / file:/// mode fallback
+        const localSession = localStorage.getItem('nunno_active_session');
+        if (localSession) {
+          try {
+            const u = JSON.parse(localSession);
+            applyUserSession(u);
+            return;
+          } catch (e) {}
+        }
+        showAuthOverlay();
+      });
+  }
+
+  function showAuthOverlay() {
+    if (els.authOverlay) els.authOverlay.classList.remove('hidden');
+    if (els.authAlert) {
+      els.authAlert.className = 'auth-alert';
+      els.authAlert.style.display = 'none';
+    }
+  }
+
+  function hideAuthOverlay() {
+    if (els.authOverlay) els.authOverlay.classList.add('hidden');
+  }
+
+  function applyUserSession(user) {
+    state.currentUser = user;
+    localStorage.setItem('nunno_active_session', JSON.stringify(user));
+    hideAuthOverlay();
+
+    // Map to active closer/agent
+    state.currentAgent = {
+      id: user.id,
+      name: user.name,
+      role: user.designation || (user.role === 'admin' ? 'Master Admin' : 'Closer'),
+      avatar: user.role === 'admin' ? '👑' : '👨‍💼',
+      color: user.role === 'admin' ? '#a855f7' : '#25d366'
+    };
+
+    renderAgentProfile();
+
+    // If Admin, show Employees button and fetch roster
+    if (user.role === 'admin') {
+      if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'inline-flex';
+      fetchTeamRoster();
+    } else {
+      if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
+    }
+
+    renderConversationsList();
+    renderActiveChat();
+  }
+
+  function handleLogin(e) {
+    if (e) e.preventDefault();
+    const username = (els.authUsername?.value || '').trim();
+    const password = (els.authPassword?.value || '').trim();
+
+    if (!username || !password) {
+      showAuthError('Please enter both username and password.');
+      return;
+    }
+
+    if (els.authSubmitBtn) {
+      els.authSubmitBtn.disabled = true;
+      els.authSubmitBtn.innerHTML = '<span>Verifying...</span>';
+    }
+
+    fetch('api/auth.php?action=login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Invalid credentials.');
+      }
+      return data;
+    })
+    .then(data => {
+      applyUserSession(data.user);
+      showToast(`Welcome back, ${data.user.name}!`);
+      if (els.authPassword) els.authPassword.value = '';
+    })
+    .catch(err => {
+      // Offline fallback: check default admin
+      if (username.toLowerCase() === 'admin' && password === 'Admin@Omnidesk2026!') {
+        const offlineAdmin = {
+          id: 'USR-ADMIN-01',
+          name: 'System Administrator',
+          username: 'admin',
+          email: 'admin@nunno.cloud',
+          role: 'admin',
+          designation: 'Master Administrator'
+        };
+        applyUserSession(offlineAdmin);
+        showToast('Logged in as Master Administrator (Offline Mode)');
+        return;
+      }
+
+      // Check local employees in offline mode
+      const localEmps = getLocalEmployees();
+      const matched = localEmps.find(e => (e.username.toLowerCase() === username.toLowerCase() || (e.email && e.email.toLowerCase() === username.toLowerCase())) && e.password === password);
+      if (matched) {
+        applyUserSession(matched);
+        showToast(`Welcome, ${matched.name}!`);
+        return;
+      }
+
+      showAuthError(err.message || 'Invalid username or password.');
+    })
+    .finally(() => {
+      if (els.authSubmitBtn) {
+        els.authSubmitBtn.disabled = false;
+        els.authSubmitBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg><span>Sign In to Omni-Desk</span>';
+      }
+    });
+  }
+
+  function showAuthError(msg) {
+    if (!els.authAlert) return;
+    els.authAlert.className = 'auth-alert error';
+    els.authAlert.textContent = msg;
+    els.authAlert.style.display = 'block';
+  }
+
+  function handleLogout() {
+    if (!confirm('Are you sure you want to log out of Omni-Desk?')) return;
+    fetch('api/auth.php?action=logout', { method: 'POST' }).catch(() => {});
+    state.currentUser = null;
+    localStorage.removeItem('nunno_active_session');
+    if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
+    if (els.authUsername) els.authUsername.value = '';
+    if (els.authPassword) els.authPassword.value = '';
+    showAuthOverlay();
+    showToast('Logged out of Omni-Desk.');
+  }
+
+  function togglePasswordVisibility() {
+    if (!els.authPassword) return;
+    const isPass = els.authPassword.type === 'password';
+    els.authPassword.type = isPass ? 'text' : 'password';
+    if (els.authTogglePass) {
+      els.authTogglePass.innerHTML = isPass 
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    }
+  }
+
+  // --- EMPLOYEE PROVISIONING & MANAGEMENT (ADMIN ONLY) ---
+
+  function openTeamModal() {
+    if (!state.currentUser || state.currentUser.role !== 'admin') {
+      showToast('⚠️ Access Denied: Only Administrator can access Employee Provisioning.');
+      return;
+    }
+    if (els.employeeModal) els.employeeModal.classList.add('open');
+    if (els.createEmpAlert) els.createEmpAlert.style.display = 'none';
+    fetchTeamRoster();
+  }
+
+  function closeTeamModal() {
+    if (els.employeeModal) els.employeeModal.classList.remove('open');
+  }
+
+  function generateRandomPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    let pass = 'Omni@';
+    for (let i = 0; i < 6; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    pass += '!';
+    if (els.newEmpPassword) els.newEmpPassword.value = pass;
+  }
+
+  function handleCreateEmployee(e) {
+    if (e) e.preventDefault();
+    if (!state.currentUser || state.currentUser.role !== 'admin') {
+      showToast('⚠️ Only Administrator can provision employee accounts.');
+      return;
+    }
+
+    const name = (els.newEmpName?.value || '').trim();
+    const username = (els.newEmpUsername?.value || '').trim();
+    const password = (els.newEmpPassword?.value || '').trim();
+    const designation = (els.newEmpRole?.value || 'Senior Closer');
+    const role = designation.toLowerCase().includes('admin') ? 'admin' : 'employee';
+    const phone = (els.newEmpPhone?.value || '').trim();
+
+    if (!name || !username || !password) {
+      showCreateEmpAlert('Please fill in Full Name, Username, and Password.', 'error');
+      return;
+    }
+
+    if (password.length < 6) {
+      showCreateEmpAlert('Password must be at least 6 characters.', 'error');
+      return;
+    }
+
+    if (els.submitNewEmpBtn) {
+      els.submitNewEmpBtn.disabled = true;
+      els.submitNewEmpBtn.textContent = 'Provisioning...';
+    }
+
+    fetch('api/auth.php?action=create_employee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, username, password, designation, role, phone })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create employee.');
+      }
+      return data;
+    })
+    .then(data => {
+      showCreateEmpAlert(`✅ Employee account created successfully for ${name} (${username}).`, 'success');
+      showToast(`Employee ${name} provisioned!`);
+      if (els.newEmpName) els.newEmpName.value = '';
+      if (els.newEmpUsername) els.newEmpUsername.value = '';
+      if (els.newEmpPassword) els.newEmpPassword.value = '';
+      if (els.newEmpPhone) els.newEmpPhone.value = '';
+      fetchTeamRoster();
+    })
+    .catch(err => {
+      // Offline fallback: save to localStorage
+      const localEmps = getLocalEmployees();
+      if (localEmps.some(e => e.username.toLowerCase() === username.toLowerCase())) {
+        showCreateEmpAlert(`Username "${username}" is already taken.`, 'error');
+        return;
+      }
+      const newEmp = {
+        id: 'EMP-' + (100 + localEmps.length + 1),
+        name,
+        username,
+        email: username + '@nunno.cloud',
+        password,
+        role,
+        designation,
+        phone,
+        status: 'active',
+        created_at: new Date().toLocaleString()
+      };
+      localEmps.push(newEmp);
+      saveLocalEmployees(localEmps);
+      showCreateEmpAlert(`✅ Employee account created for ${name} (Stored locally).`, 'success');
+      showToast(`Employee ${name} provisioned!`);
+      if (els.newEmpName) els.newEmpName.value = '';
+      if (els.newEmpUsername) els.newEmpUsername.value = '';
+      if (els.newEmpPassword) els.newEmpPassword.value = '';
+      if (els.newEmpPhone) els.newEmpPhone.value = '';
+      renderRosterList(localEmps);
+    })
+    .finally(() => {
+      if (els.submitNewEmpBtn) {
+        els.submitNewEmpBtn.disabled = false;
+        els.submitNewEmpBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg><span>Provision Employee Account</span>';
+      }
+    });
+  }
+
+  function showCreateEmpAlert(msg, type) {
+    if (!els.createEmpAlert) return;
+    els.createEmpAlert.className = `auth-alert ${type}`;
+    els.createEmpAlert.textContent = msg;
+    els.createEmpAlert.style.display = 'block';
+  }
+
+  function fetchTeamRoster() {
+    fetch('api/auth.php?action=list_employees')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && Array.isArray(data.employees)) {
+          state.employees = data.employees;
+          renderRosterList(data.employees);
+          if (els.headerEmpCount) els.headerEmpCount.textContent = data.employees.length;
+        }
+      })
+      .catch(() => {
+        const localEmps = getLocalEmployees();
+        renderRosterList(localEmps);
+        if (els.headerEmpCount) els.headerEmpCount.textContent = localEmps.length;
+      });
+  }
+
+  function renderRosterList(employees) {
+    if (!els.teamRosterList) return;
+    if (!employees || employees.length === 0) {
+      els.teamRosterList.innerHTML = '<div class="text-xs text-muted" style="text-align:center;padding:24px;">No employees registered yet. Add your first closer above!</div>';
+      return;
+    }
+
+    els.teamRosterList.innerHTML = employees.map(emp => {
+      const isAdmin = emp.role === 'admin';
+      const isSuspended = emp.status === 'suspended';
+      const initials = (emp.name || 'Emp').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+      return `
+        <div class="emp-roster-card ${isSuspended ? 'suspended' : ''}">
+          <div class="emp-card-user">
+            <div class="emp-avatar ${isAdmin ? 'admin-av' : ''}">${isAdmin ? '👑' : initials}</div>
+            <div>
+              <div class="emp-card-name">${escapeHtml(emp.name)} ${isAdmin ? '<span class="badge-role-admin" style="font-size:9px;">Admin</span>' : ''}</div>
+              <div class="emp-card-sub">
+                <span class="mono">${escapeHtml(emp.username)}</span>
+                <span>&bull;</span>
+                <span>${escapeHtml(emp.designation || emp.role)}</span>
+              </div>
+            </div>
+          </div>
+          <div class="emp-actions-group">
+            <span class="emp-status-badge ${isSuspended ? 'suspended' : 'active'}">
+              ${isSuspended ? '🔴 Suspended' : '🟢 Active'}
+            </span>
+            ${!isAdmin ? `
+              <button class="btn-emp-action" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Activate Employee' : 'Suspend Employee'}">
+                ${isSuspended ? 'Activate' : 'Suspend'}
+              </button>
+              <button class="btn-emp-action delete" onclick="window.OmnideskDeleteEmp('${emp.id}', '${escapeHtml(emp.name)}')" title="Delete Employee">
+                ✕
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Global window hooks for inline onclicks in roster
+  window.OmnideskToggleStatus = function(empId) {
+    if (!confirm('Toggle status for this employee?')) return;
+    fetch('api/auth.php?action=toggle_status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: empId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success) {
+        showToast(data.message || 'Status updated.');
+        fetchTeamRoster();
+      } else {
+        alert(data.error || 'Failed to update status.');
+      }
+    })
+    .catch(() => {
+      const emps = getLocalEmployees();
+      const target = emps.find(e => e.id === empId);
+      if (target) {
+        target.status = target.status === 'active' ? 'suspended' : 'active';
+        saveLocalEmployees(emps);
+        renderRosterList(emps);
+        showToast(`Employee status set to ${target.status}.`);
+      }
+    });
+  };
+
+  window.OmnideskDeleteEmp = function(empId, empName) {
+    if (!confirm(`Are you sure you want to permanently delete employee "${empName}"?`)) return;
+    fetch('api/auth.php?action=delete_employee', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: empId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success) {
+        showToast('Employee removed.');
+        fetchTeamRoster();
+      } else {
+        alert(data.error || 'Failed to delete employee.');
+      }
+    })
+    .catch(() => {
+      let emps = getLocalEmployees();
+      emps = emps.filter(e => e.id !== empId);
+      saveLocalEmployees(emps);
+      renderRosterList(emps);
+      showToast('Employee removed (local).');
+    });
+  };
+
+  function getLocalEmployees() {
+    const raw = localStorage.getItem('nunno_local_employees');
+    if (raw) {
+      try { return JSON.parse(raw); } catch (e) {}
+    }
+    return [
+      { id: 'USR-ADMIN-01', name: 'System Administrator', username: 'admin', email: 'admin@nunno.cloud', password: 'Admin@Omnidesk2026!', role: 'admin', designation: 'Master Administrator', status: 'active' },
+      { id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', email: 'hamza@nunno.cloud', password: 'Agent@123', role: 'employee', designation: 'Senior Closer', status: 'active' }
+    ];
+  }
+
+  function saveLocalEmployees(list) {
+    localStorage.setItem('nunno_local_employees', JSON.stringify(list));
+  }
+
   // Connect WhatsApp Number Modal Event Listeners
   if (els.connectedNumberPill) els.connectedNumberPill.addEventListener('click', openConnectWaModal);
   if (els.closeConnectWaModalBtn) els.closeConnectWaModalBtn.addEventListener('click', closeConnectWaModal);
   if (els.cancelConnectWaBtn) els.cancelConnectWaBtn.addEventListener('click', closeConnectWaModal);
   if (els.saveConnectedWaBtn) els.saveConnectedWaBtn.addEventListener('click', saveConnectedWaNumber);
 
+  // Authentication & Employee Modal Event Listeners
+  if (els.authForm) els.authForm.addEventListener('submit', handleLogin);
+  if (els.authSubmitBtn) els.authSubmitBtn.addEventListener('click', handleLogin);
+  if (els.authTogglePass) els.authTogglePass.addEventListener('click', togglePasswordVisibility);
+  if (els.headerLogoutBtn) els.headerLogoutBtn.addEventListener('click', handleLogout);
+  if (els.openTeamModalBtn) els.openTeamModalBtn.addEventListener('click', openTeamModal);
+  if (els.closeTeamModalBtn) els.closeTeamModalBtn.addEventListener('click', closeTeamModal);
+  if (els.genEmpPassBtn) els.genEmpPassBtn.addEventListener('click', generateRandomPassword);
+  if (els.createEmpForm) els.createEmpForm.addEventListener('submit', handleCreateEmployee);
+  if (els.submitNewEmpBtn) els.submitNewEmpBtn.addEventListener('click', handleCreateEmployee);
+  if (els.refreshTeamBtn) els.refreshTeamBtn.addEventListener('click', fetchTeamRoster);
+
   // Initialize App
+  checkAuthSession();
   renderAgentProfile();
   renderConnectedNumber();
   renderConversationsList();
