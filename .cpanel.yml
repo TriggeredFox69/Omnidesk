@@ -1,15 +1,18 @@
 ---
 # cPanel Git™ Version Control Automated Deployment Recipe
-# When you click 'Deploy HEAD Commit' in cPanel, it syncs files to your web root.
+# Omnidesk production deployment to omnidesk.lalagpt.pk
 deployment:
   tasks:
-    # Adjust DEPLOYPATH to match your cPanel username and directory
-    # For main domain: /home/YOUR_CPANEL_USER/public_html/
-    # For subdirectory: /home/YOUR_CPANEL_USER/public_html/nunno_whatsapp/
-    # For subdomain: /home/YOUR_CPANEL_USER/wa.nunno.cloud/
-    - export DEPLOYPATH=/home/$USER/public_html/nunno_whatsapp/
+    # 1. Primary deployment to subdomain root
+    - export DEPLOYPATH=/home/dailygol/omnidesk.lalagpt.pk/
     - /bin/mkdir -p $DEPLOYPATH
     - /bin/cp -R * $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/data
     - /bin/chmod 755 $DEPLOYPATH
     - /bin/chmod 775 $DEPLOYPATH/data
+    # 2. Mirror deployment to public_html/omnidesk
+    - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
+    - /bin/mkdir -p $DEPLOYPATH2
+    - /bin/cp -R * $DEPLOYPATH2
+    - /bin/mkdir -p $DEPLOYPATH2/data
+    - /bin/chmod 775 $DEPLOYPATH2/data
