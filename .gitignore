@@ -1,0 +1,23 @@
+# Operating System Junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor Configs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Runtime Data & Confidential Customer Files
+# (Protects client phone numbers and notes from leaking publicly on GitHub)
+data/leads.json
+data/sender_config.json
+data/campaign_logs.json
+data/blacklist.json
+!data/.gitkeep
+
+# Environment & Server Overrides
+.env
+.env.local
+*.log

@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Nunno WhatsApp Omni-Desk — Multi-Agent CRM & Campaign Hub</title>
+  <meta name="description" content="Next-generation multi-agent WhatsApp CRM and campaign desk for Nunno Cloud. Anti-theft lead locking, 3-pane team messenger, Pakistani network classifier, and human cadence outreach.">
+  <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=2.6">
+  <script>
+    window.NUNNO_TEMPLATES = {
+      pro_liquidation_urdu: {
+        id: "pro_liquidation_urdu",
+        name: "Crypto Liquidation Alert (Roman Urdu)",
+        category: "High Intent Crypto",
+        lang: "Roman Urdu",
+        body: "{Salam|AoA|Hello} {name|Bhai|Trader}!\n\nKya aap bar bar market ke sudden wick ya stop-loss hunt se liquid ho rahe hain? 📉❌\n\n*Nunno AI Cloud* (`nunno.cloud`) ne Pakistan ke top traders ke liye *Liquidation Magnet System* launch kiya hai jo exact level pehle dikhata hai jahan whales retail ko target kar rahi hain.\n\n🔥 *Special Community Offer:*\n• Nunno Pro sirf *Rs. 5,000/month*\n• EasyPaisa, JazzCash aur USDT accepted\n• Coupon `NUNNO30` se *30% OFF*\n\nLive Demo aur Signals dekhne ke liye visit karein: https://nunno.cloud\n\n_Reply STOP agar aap mazeed updates nahi chahte._"
+      }
+    };
+  </script>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="topbar">
+    <div class="brand-wrap">
+      <img src="assets/images/nunno-logo.png" alt="Nunno Cloud" class="brand-logo-img">
+      <div class="brand-info">
+        <div class="brand-heading">
+          <span>Nunno</span>
+          <span class="brand-badge">Omni-Desk</span>
+        </div>
+        <span class="text-xs text-muted">Multi-Agent WhatsApp CRM</span>
+      </div>
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="nav-tab-bar">
+      <button class="nav-tab-btn active tab-wa" id="tabInbox">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span>Team Inbox</span>
+        <span class="unread-badge" id="unreadGlobalBadge" style="position:static;width:auto;height:auto;padding:1px 6px;font-size:9px;">3</span>
+      </button>
+
+      <button class="nav-tab-btn" id="tabCampaign">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>Campaign Studio</span>
+      </button>
+
+    </nav>
+
+    <!-- Top Right Actions & Active Closer Profile -->
+    <div style="display:flex;align-items:center;gap:12px;">
+      <!-- Import .txt Numbers Trigger -->
+      <button class="btn btn-wa btn-xs" id="openImportModalBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        <span>Import .txt Numbers</span>
+      </button>
+
+      <!-- Active Agent Switcher Pill -->
+      <div class="agent-profile-pill" id="agentPill" title="Click to Switch Active Agent Profile">
+        <div class="agent-avatar" id="topAgentAvatar">👨‍💼</div>
+        <div class="agent-details">
+          <span class="agent-name" id="topAgentName">Hamza Khan</span>
+          <span class="agent-id-badge" id="topAgentId">EMP-101 • Closer</span>
+        </div>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sub-header Live Status & KPI Status Widgets -->
+  <div class="subbar">
+    <div class="status-indicator-group">
+      <!-- Connected Direct Number Pill (Click to Set or View) -->
+      <div class="connected-number-pill" id="connectedNumberPill" title="Click to view or set your connected WhatsApp number">
+        <div class="pulse-circle online"></div>
+        <span class="conn-label">Direct WA:</span>
+        <span class="conn-number mono" id="connectedNumberText">Pending Setup (Click to Set)</span>
+      </div>
+
+      <!-- Quick KPI Status Widget Pills -->
+      <div class="kpi-widget-group">
+        <button type="button" class="kpi-stat-pill active" data-filter="all" id="kpiFilterAll">
+          <span class="kpi-dot dot-all"></span>
+          <span class="kpi-label">All</span>
+          <span class="kpi-count" id="kpiCountAll">8</span>
+        </button>
+        <button type="button" class="kpi-stat-pill kpi-fresh" data-filter="fresh" id="kpiFilterFresh">
+          <span class="kpi-dot dot-fresh"></span>
+          <span class="kpi-label">🔴 Fresh</span>
+          <span class="kpi-count" id="kpiCountFresh">2</span>
+        </button>
+        <button type="button" class="kpi-stat-pill kpi-ongoing" data-filter="ongoing" id="kpiFilterOngoing">
+          <span class="kpi-dot dot-ongoing"></span>
+          <span class="kpi-label">🟡 Ongoing</span>
+          <span class="kpi-count" id="kpiCountOngoing">3</span>
+        </button>
+        <button type="button" class="kpi-stat-pill kpi-paid" data-filter="paid" id="kpiFilterPaid">
+          <span class="kpi-dot dot-paid"></span>
+          <span class="kpi-label">🟢 Paid</span>
+          <span class="kpi-count" id="kpiCountPaid">2</span>
+        </button>
+        <button type="button" class="kpi-stat-pill kpi-useless" data-filter="useless" id="kpiFilterUseless">
+          <span class="kpi-dot dot-useless"></span>
+          <span class="kpi-label">🔵 Won't Pay</span>
+          <span class="kpi-count" id="kpiCountUseless">1</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="status-indicator-group">
+      <button type="button" class="kpi-stat-pill kpi-mine" data-filter="mine" id="kpiFilterMine">
+        <span class="kpi-label">👤 My Leads</span>
+        <span class="kpi-count" id="myLeadsCountBadge">2</span>
+      </button>
+      <div class="status-chip" title="Direct WhatsApp session without Meta Cloud API">
+        <span>Engine: <strong class="text-wa">Direct Device</strong></span>
+      </div>
+      <div class="status-chip">
+        <span>Anti-Ban: <strong>4-8s Jitter</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       VIEW 1: UNIFIED 3-PANE TEAM MESSENGER
+       ==================================================== -->
+  <main class="inbox-view-container" id="viewInbox">
+
+    <!-- Pane 1: Conversations List -->
+    <aside class="conversations-col">
+      <div class="conv-header">
+        <div class="conv-title-row">
+          <span style="font-weight:800;font-size:14px;color:#ffffff;">Live Messages</span>
+          <span class="panel-badge mono text-xs" id="convTotalBadge">8 Leads</span>
+        </div>
+
+        <input type="text" id="convSearchInput" class="conv-search-input" placeholder="Search by name or phone...">
+
+        <!-- Message Filter Buttons -->
+        <div class="inbox-filter-bar">
+          <button class="inbox-filter-btn active" data-filter="all">All</button>
+          <button class="inbox-filter-btn filter-fresh" data-filter="fresh">🔴 Fresh</button>
+          <button class="inbox-filter-btn filter-ongoing" data-filter="ongoing">🟡 Ongoing</button>
+          <button class="inbox-filter-btn filter-paid" data-filter="paid">🟢 Paid</button>
+          <button class="inbox-filter-btn filter-useless" data-filter="useless">🔵 Won't Pay</button>
+          <button class="inbox-filter-btn filter-mine" data-filter="mine">My Leads</button>
+        </div>
+      </div>
+
+      <div class="conversations-scroll" id="conversationsScroll">
+        <!-- Dynamically populated -->
+      </div>
+    </aside>
+
+    <!-- Pane 2: Active Chat Thread -->
+    <section class="chat-thread-col" id="chatThreadCol">
+      <div class="chat-header">
+        <div class="chat-lead-info">
+          <!-- Mobile Return to Conversations Button -->
+          <button type="button" class="chat-back-btn" id="chatBackBtn" title="Back to conversations">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+
+          <div class="conv-avatar-wrap" style="width:38px;height:38px;">
+            <span class="avatar-initials" id="chatLeadAvatar">ZT</span>
+            <div class="lead-status-dot status-ongoing" id="chatLeadDot"></div>
+          </div>
+          <div>
+            <div class="chat-lead-title">
+              <span id="chatLeadName">Zeeshan Tariq</span>
+              <span id="chatLeadStatusBadge" class="status-pill-clean ongoing">🟡 Ongoing</span>
+            </div>
+            <div class="chat-lead-meta">
+              <span class="mono" id="chatLeadPhone">+92 300 8472910</span>
+              <span class="lead-closer-text" id="chatLeadCloser">🔒 Hamza Khan</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-header-actions">
+          <!-- Mobile / Tablet CRM Toggle Button -->
+          <button type="button" class="btn btn-ghost btn-xs dossier-toggle-btn" id="dossierToggleBtn" title="View Lead CRM Details">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>CRM</span>
+          </button>
+
+          <button class="btn btn-paid btn-xs" id="markPaidHeaderBtn" title="Mark client as Paid (Closed)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Mark Paid</span>
+          </button>
+
+          <button class="btn btn-useless btn-xs" id="markUselessHeaderBtn" title="Mark client as Useless / Won't Pay">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <span>Won't Pay</span>
+          </button>
+
+          <button class="btn btn-claim btn-xs" id="chatClaimBtn" style="display:none;" title="Claim this lead">
+            ✋ Take Lead
+          </button>
+
+          <button class="btn btn-wa btn-xs btn-wa-native" id="launchNativeWaBtn" title="Launch official WhatsApp Web chat">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.888 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+            <span>Open WhatsApp Web</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Thread Area -->
+      <div class="chat-messages-area" id="chatMessagesArea">
+        <!-- Dynamically rendered authentic WhatsApp bubbles -->
+      </div>
+
+      <!-- Slim Conflict Notice (Only shown if owned by another agent) -->
+      <div id="otherCloserNotice" class="other-closer-notice" style="display:none;">
+        🔒 Lead is ongoing with <strong id="otherCloserName">Bilal Tariq</strong>. Messaging locked to prevent double-contacting.
+      </div>
+
+      <!-- Quick Response Macro Chips -->
+      <div class="quick-reply-bar">
+        <button type="button" class="quick-macro-chip" data-macro="Nunno Pro sirf Rs. 5,000/mo hai (EasyPaisa/JazzCash). Coupon NUNNO30 se 30% OFF!">💎 Pro (Rs. 5,000)</button>
+        <button type="button" class="quick-macro-chip" data-macro="Nunno Starter Plan sirf Rs. 1,700/month hai scalpers ke liye!">⚡ Starter (Rs. 1,700)</button>
+        <button type="button" class="quick-macro-chip" data-macro="EasyPaisa Account: 0300-8472910 (Title: Nunno Tech). Transfer karke screenshot share karein.">💳 EasyPaisa Details</button>
+        <button type="button" class="quick-macro-chip" data-macro="JazzCash Account: 0321-4567890 (Title: Nunno Trading).">📱 JazzCash Details</button>
+        <button type="button" class="quick-macro-chip" data-macro="USDT (TRC-20): TQn9Y2khEsLJW1ChVGB1B... (USDT 18 for Pro)">🪙 USDT Address</button>
+        <button type="button" class="quick-macro-chip" data-macro="Live demo aur signals platform yahan check karein: https://nunno.cloud">🔗 Platform Demo</button>
+      </div>
+
+      <!-- Message Composer Bar -->
+      <div class="chat-composer-bar">
+        <textarea id="chatInput" class="chat-input" placeholder="Type WhatsApp message... (Press Enter to send)"></textarea>
+        <button class="btn btn-wa btn-sm" id="sendMsgBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <span>Send</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Pane 3: Clean Lead CRM Panel (SaaS Sales Intelligence Cockpit) -->
+    <aside class="lead-dossier-col" id="leadDossierCol">
+      <!-- Drawer Header (visible on mobile / tablet) -->
+      <div class="dossier-drawer-header" id="dossierDrawerHeader">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="widget-icon-pill">⚡</div>
+          <span style="font-weight:700;color:#ffffff;font-size:13px;">Lead CRM & Sales Control</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-xs" id="closeDossierDrawerBtn" title="Close CRM Panel">✕</button>
+      </div>
+
+      <!-- WIDGET 1: Status Matrix & Quick Switcher -->
+      <div class="dossier-widget widget-status">
+        <div class="widget-header">
+          <span class="widget-badge-label">LIFECYCLE STATUS</span>
+          <div id="dossierStatusPill" class="status-pill-clean ongoing">🟡 Ongoing</div>
+        </div>
+
+        <!-- 4-Button Segmented Status Matrix -->
+        <div class="status-matrix-grid">
+          <button type="button" class="matrix-btn matrix-fresh" data-set-state="fresh" id="matrixBtnFresh" title="Reset lead to Open Pool (Unclaimed)">
+            <span class="matrix-dot dot-fresh"></span>
+            <span>🔴 Fresh</span>
+          </button>
+          <button type="button" class="matrix-btn matrix-ongoing" data-set-state="ongoing" id="matrixBtnOngoing" title="Claim lead for ongoing discussion">
+            <span class="matrix-dot dot-ongoing"></span>
+            <span>🟡 Ongoing</span>
+          </button>
+          <button type="button" class="matrix-btn matrix-paid" data-set-state="paid" id="matrixBtnPaid" title="Client paid and subscription activated">
+            <span class="matrix-dot dot-paid"></span>
+            <span>🟢 Paid</span>
+          </button>
+          <button type="button" class="matrix-btn matrix-useless" data-set-state="useless" id="matrixBtnUseless" title="Client won't pay / useless / time-waster">
+            <span class="matrix-dot dot-useless"></span>
+            <span>🔵 Won't Pay</span>
+          </button>
+        </div>
+
+        <!-- Plan & Expected Revenue Meter -->
+        <div class="deal-value-row">
+          <div class="deal-plan-wrap">
+            <span class="text-xs text-muted">Tier:</span>
+            <span class="lead-plan-badge" id="dossierInterest">Nunno Pro</span>
+          </div>
+          <div class="deal-val-amount" id="dossierDealValue">PKR 5,000</div>
+        </div>
+      </div>
+
+      <!-- WIDGET 2: Assigned Closer & Anti-Theft Lock -->
+      <div class="dossier-widget widget-agent">
+        <div class="widget-header">
+          <span class="widget-badge-label">ASSIGNED CLOSER</span>
+          <span class="agent-lock-badge" id="dossierLockBadge">🔒 Locked</span>
+        </div>
+
+        <div class="closer-profile-card">
+          <div class="closer-avatar" id="dossierOwnerAvatar">👨‍💼</div>
+          <div class="closer-info">
+            <div class="closer-name" id="dossierOwner">Hamza Khan</div>
+            <div class="closer-role" id="dossierOwnerRole">Senior Closer • EMP-101</div>
+          </div>
+        </div>
+
+        <!-- Claim / Release Actions -->
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button type="button" class="btn btn-claim btn-sm" id="dossierClaimBtn" style="flex:1;display:none;">✋ Take Lead</button>
+          <button type="button" class="btn btn-ghost btn-xs" id="dossierReleaseBtn" style="flex:1;">Release to Pool</button>
+        </div>
+
+        <!-- Reassignment Select -->
+        <div class="form-group" style="margin-top:8px;">
+          <label class="text-xs text-muted" style="margin-bottom:3px;display:block;">Transfer to Teammate</label>
+          <select id="dossierTransferSelect" class="form-select form-select-sm">
+            <option value="">-- Select Closer --</option>
+            <option value="EMP-101">Hamza Khan (EMP-101)</option>
+            <option value="EMP-102">Bilal Tariq (EMP-102)</option>
+            <option value="EMP-103">Ayesha Noor (EMP-103)</option>
+            <option value="EMP-104">Zain Ahmed (EMP-104)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- WIDGET 3: 1-Click Power Actions -->
+      <div class="dossier-widget widget-actions">
+        <span class="widget-badge-label">QUICK CONVERSION ACTIONS</span>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+          <button type="button" class="btn btn-paid btn-sm" id="dossierPaidBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Confirm Client Paid (Closed)</span>
+          </button>
+          <button type="button" class="btn btn-useless btn-sm" id="dossierUselessBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            <span>Mark as Useless (Won't Pay)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- WIDGET 4: Closer Private Sales Notes with Quick Tags -->
+      <div class="dossier-widget widget-notes" style="flex:1;min-height:190px;">
+        <div class="widget-header">
+          <span class="widget-badge-label">PRIVATE CLOSER NOTES</span>
+          <span id="notesSavedIndicator" class="text-xs notes-saved">Auto-saved</span>
+        </div>
+
+        <!-- Quick Sales Tags -->
+        <div class="sales-quick-tags">
+          <span class="sales-tag" data-append="Offered 30% discount">+ 30% Offer</span>
+          <span class="sales-tag" data-append="Scalping Binance Futures">+ Scalper</span>
+          <span class="sales-tag" data-append="EasyPaisa details shared">+ EasyPaisa</span>
+          <span class="sales-tag" data-append="Wants free trial only">+ Wants Free</span>
+          <span class="sales-tag" data-append="Refused to pay / Inactive">+ Won't Pay</span>
+        </div>
+
+        <textarea id="dossierNotes" class="form-textarea dossier-notes-area" placeholder="Type sales intel here..."></textarea>
+      </div>
+    </aside>
+
+    <!-- Drawer Backdrop for Mobile & Tablet -->
+    <div class="dossier-backdrop" id="dossierBackdrop"></div>
+  </main>
+
+  <!-- ====================================================
+       VIEW 2: OUTREACH QUEUE & CAMPAIGN STUDIO
+       ==================================================== -->
+  <div class="view-container" id="viewCampaign">
+    <div class="campaign-grid">
+      <!-- Left: Audience & Sanitizer -->
+      <aside class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-wa)" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Batch Outreach List</span>
+          </div>
+          <span class="panel-badge mono">1-Click Queue</span>
+        </div>
+
+        <p class="text-xs text-muted">Import manual .txt numbers to queue up individualized outreach pitches with anti-ban human cadence.</p>
+
+        <button class="btn btn-wa btn-sm" onclick="document.getElementById('openImportModalBtn').click()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Upload Custom .txt File</span>
+        </button>
+
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-val text-wa">8</span>
+            <span class="stat-lbl">Total Leads</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-val" style="color:var(--c-indigo);">3</span>
+            <span class="stat-lbl">My Claimed</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-val" style="color:#ef4444;">4</span>
+            <span class="stat-lbl">🔴 Fresh (Unclaimed)</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-val" style="color:#10b981;">1</span>
+            <span class="stat-lbl">🟢 Closed (Paid)</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Template & Spintax -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-indigo)" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span>Nunno High-Conversion Pitch</span>
+          </div>
+          <span class="panel-badge" style="color:var(--c-indigo);">Spintax Active</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Select Pitch Strategy</label>
+          <select id="campaignTemplateSelect" class="form-select">
+            <option value="pro_liquidation_urdu">Crypto Liquidation Alert (Roman Urdu)</option>
+            <option value="gold_scalper_hybrid">Gold ($XAUUSD) & Forex Scalper Pitch</option>
+            <option value="flash_discount_easypaisa">Flash 48-Hour Discount (EasyPaisa/JazzCash)</option>
+            <option value="institutional_alpha_en">Institutional Alpha (English Professional)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Personalization Tags</label>
+          <div class="tag-chips">
+            <span class="tag-chip">{name}</span>
+            <span class="tag-chip">{plan}</span>
+            <span class="tag-chip">{price}</span>
+            <span class="tag-chip">{coupon}</span>
+            <span class="tag-chip">{link}</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="flex:1;">
+          <textarea class="form-textarea" style="min-height:160px;">{Salam|AoA|Hello} {name|Bhai|Trader}!
+
+Kya aap bar bar market ke sudden wick ya stop-loss hunt se liquid ho rahe hain? 📉❌
+
+*Nunno AI Cloud* (`nunno.cloud`) ne Pakistan ke top traders ke liye *Liquidation Magnet System* launch kiya hai jo exact level pehle dikhata hai jahan whales target kar rahi hain.
+
+🔥 *Special Community Offer:*
+• Nunno Pro sirf *Rs. 5,000/month*
+• EasyPaisa, JazzCash aur USDT accepted
+• Coupon `NUNNO30` se *30% OFF*
+
+Live Demo aur Signals dekhne ke liye visit karein: https://nunno.cloud
+
+_Reply STOP agar aap mazeed updates nahi chahte._</textarea>
+        </div>
+      </section>
+
+      <!-- Right: Real-Time Preview Simulator -->
+      <aside class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-wa)" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            <span>Live WhatsApp Bubble</span>
+          </div>
+          <span class="panel-badge mono">Preview</span>
+        </div>
+
+        <div style="background:#0b141a;border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08);">
+          <div style="background:#005c4b;color:#ffffff;padding:10px 14px;border-radius:8px 0px 8px 8px;font-size:12.5px;line-height:1.45;">
+            Salam Zeeshan Bhai!<br><br>
+            Kya aap bar bar sudden liquidation wick se tang aa chuke hain?<br><br>
+            <strong>Nunno AI Pro</strong> sirf <strong>Rs. 5,000/mo</strong> mein EasyPaisa / JazzCash se activate karein. Coupon <code>NUNNO30</code> se 30% discount!<br><br>
+            <span style="font-size:10px;color:rgba(255,255,255,0.6);float:right;">09:41 AM ✓✓</span>
+          </div>
+        </div>
+
+        <button class="btn btn-wa btn-lg" style="width:100%;margin-top:10px;" onclick="window.open('https://web.whatsapp.com', '_blank')">
+          <span>Open WhatsApp Web Session</span>
+        </button>
+      </aside>
+    </div>
+  </div>
+
+
+  <!-- ====================================================
+       MODAL 1: AGENT SWITCHER & IDENTITY MODAL
+       ==================================================== -->
+  <div class="modal-overlay" id="agentModal">
+    <div class="modal-window">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:16px;font-weight:800;color:#ffffff;">Switch Active Closer Identity</div>
+        <button class="btn btn-ghost btn-xs" id="closeAgentModalBtn">✕</button>
+      </div>
+      <p class="text-xs text-muted">Select your employee ID. Once logged in, any lead you claim will be locked exclusively to your ID so other agents cannot conflict or steal it.</p>
+
+      <div style="display:flex;flex-direction:column;gap:8px;" id="agentListContainer">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       MODAL 2: MANUAL .TXT NUMBERS IMPORT MODAL
+       ==================================================== -->
+  <div class="modal-overlay" id="importTxtModal">
+    <div class="modal-window" style="max-width:540px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:16px;font-weight:800;color:#ffffff;">Import Manual .txt Phone Numbers</div>
+        <button class="btn btn-ghost btn-xs" id="closeImportModalBtn">✕</button>
+      </div>
+      <p class="text-xs text-muted">Upload any .txt file or paste numbers. Pakistani numbers (03xx / +923xx) will be auto-sanitized and operators classified.</p>
+
+      <div class="form-group">
+        <label class="form-label">Select .txt File from PC</label>
+        <input type="file" id="txtFileInput" accept=".txt,.csv" class="form-input">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Or Paste Numbers Directly</label>
+        <textarea id="txtPasteArea" class="form-textarea mono text-xs" style="min-height:100px;" placeholder="03001234567, Ali&#10;03217654321, Usman&#10;+923339876543, Tariq"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Lead Ownership Assignment</label>
+        <select id="importAssignMode" class="form-select">
+          <option value="pool">🟢 Open Pool (Available for any agent to claim)</option>
+          <option value="mine">🔒 Claim Directly for Me (Hamza Khan)</option>
+          <option value="distribute">⚖️ Round-Robin Distribute Equally Across Team</option>
+        </select>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importTxtModal').classList.remove('open')">Cancel</button>
+        <button class="btn btn-wa btn-sm" id="confirmImportBtn">Validate & Import Leads</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================
+       MODAL 3: CONNECT DIRECT WHATSAPP SENDER NUMBER
+       ==================================================== -->
+  <div class="modal-overlay" id="connectWaModal">
+    <div class="modal-window">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">📱</span>
+          <div style="font-size:16px;font-weight:800;color:#ffffff;">Connect Your WhatsApp Number</div>
+        </div>
+        <button class="btn btn-ghost btn-xs" id="closeConnectWaModalBtn">✕</button>
+      </div>
+      <p class="text-xs text-muted" style="margin-top:6px;">This software sends cold outreach & CRM chats directly from your connected WhatsApp number with anti-ban human cadence (4-8s randomized delay). No Meta Cloud API or developer verification required.</p>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label class="form-label">Enter Your WhatsApp Phone Number</label>
+        <input type="text" id="inputConnectedWaNumber" class="form-input mono" placeholder="e.g. 0300 1234567 or +923001234567">
+        <span class="text-xs text-dim">You can set your number now or tell me later and I will link it.</span>
+      </div>
+
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;font-size:11.5px;color:var(--text-muted);display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:6px;color:#10b981;font-weight:700;">
+          <span>✓</span> <span>Zero Meta API • Direct Session Dispatch</span>
+        </div>
+        <div>Messages dispatch legitimately through your session so your outbound delivery rate is 100% and immune to Meta API template rejections.</div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+        <button class="btn btn-ghost btn-sm" id="cancelConnectWaBtn">Cancel</button>
+        <button class="btn btn-wa btn-sm" id="saveConnectedWaBtn">Save & Set Number</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-wa)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="toastMsg">Ready</span>
+  </div>
+
+  <script src="assets/js/whatsapp-app.js?v=2.6"></script>
+</body>
+</html>
