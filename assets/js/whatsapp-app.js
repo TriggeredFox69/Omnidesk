@@ -2389,7 +2389,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showAuthOverlay() {
-    if (els.authOverlay) els.authOverlay.classList.remove('hidden');
+    if (els.authOverlay) {
+      els.authOverlay.classList.remove('hidden');
+      els.authOverlay.style.display = 'flex';
+      els.authOverlay.style.pointerEvents = 'auto';
+    }
     if (els.authAlert) {
       els.authAlert.className = 'auth-alert';
       els.authAlert.style.display = 'none';
@@ -2397,7 +2401,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function hideAuthOverlay() {
-    if (els.authOverlay) els.authOverlay.classList.add('hidden');
+    if (els.authOverlay) {
+      els.authOverlay.classList.add('hidden');
+      els.authOverlay.style.display = 'none';
+      els.authOverlay.style.pointerEvents = 'none';
+    }
   }
 
   function applyUserSession(user) {

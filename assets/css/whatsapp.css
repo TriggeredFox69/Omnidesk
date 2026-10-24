@@ -1256,6 +1256,14 @@ body {
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.auth-overlay.hidden,
+.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 .auth-card {
   width: 100%;
