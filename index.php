@@ -70,15 +70,6 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
         <span class="badge-role-admin" id="headerEmpCount">2</span>
       </button>
 
-      <!-- Active Logged-in Profile Pill -->
-      <div class="agent-profile-pill" id="agentPill" title="Logged in session profile">
-        <div class="agent-avatar" id="topAgentAvatar">👑</div>
-        <div class="agent-details">
-          <span class="agent-name" id="topAgentName">System Administrator</span>
-          <span class="badge-admin-crown" id="topAgentId">👑 Admin</span>
-        </div>
-      </div>
-
       <!-- Logout Button -->
       <button class="btn-header-logout" id="headerLogoutBtn" title="Lock & Log Out of Desk">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
