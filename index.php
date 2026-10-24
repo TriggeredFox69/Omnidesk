@@ -85,7 +85,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
       <div class="connected-number-pill" id="connectedNumberPill" title="Click to view or set your connected WhatsApp number">
         <div class="pulse-circle online"></div>
         <span class="conn-label">Direct WA:</span>
-        <span class="conn-number mono" id="connectedNumberText">Pending Setup (Click to Set)</span>
+        <span class="conn-number mono" id="connectedNumberText">+92 304 6588806</span>
       </div>
 
       <!-- Quick KPI Status Widget Pills -->
@@ -485,7 +485,12 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
 
         <!-- 2. Drop .txt File Area -->
         <div class="form-group">
-          <label class="form-label">Drop Target Numbers (.txt / .csv)</label>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="form-label" style="margin-bottom:0;">Drop Target Numbers (.txt / .csv)</label>
+            <button type="button" class="btn btn-ghost btn-xs" id="quickAddMyNumberBtn" style="color:#00a884;font-size:11px;padding:2px 6px;" title="1-Click test on your connected number">
+              <span>⚡ Load My Number (03046588806)</span>
+            </button>
+          </div>
           <input type="file" id="campaignFileInput" accept=".txt,.csv" style="display:none;">
           <div class="campaign-drop-zone" id="campaignDropZone" title="Click or Drag & Drop .txt file here">
             <div class="drop-zone-icon">📥</div>
@@ -543,8 +548,8 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
               <span>⏱️ Anti-Ban Human Cadence Delay</span>
             </div>
             <select id="campaignPresetSelect" class="form-select form-select-sm" style="width:auto;padding:3px 8px;font-size:11px;">
-              <option value="fast">⚡ Fast (3s - 6s)</option>
-              <option value="recommended" selected>🛡️ Safe Recommended (6s - 12s)</option>
+              <option value="fast" selected>⚡ Fast (3s - 6s)</option>
+              <option value="recommended">🛡️ Safe Recommended (6s - 12s)</option>
               <option value="human">👤 Natural Human (12s - 25s)</option>
               <option value="custom">⚙️ Custom Pace</option>
             </select>
@@ -552,11 +557,11 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
           <div style="display:flex;gap:10px;margin-top:4px;">
             <div style="flex:1;">
               <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Min Delay (seconds)</label>
-              <input type="number" id="campaignDelayMin" class="form-input form-input-sm" value="6" min="1" max="180">
+              <input type="number" id="campaignDelayMin" class="form-input form-input-sm" value="3" min="1" max="180">
             </div>
             <div style="flex:1;">
               <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Max Delay (seconds)</label>
-              <input type="number" id="campaignDelayMax" class="form-input form-input-sm" value="12" min="2" max="300">
+              <input type="number" id="campaignDelayMax" class="form-input form-input-sm" value="6" min="2" max="300">
             </div>
           </div>
         </div>

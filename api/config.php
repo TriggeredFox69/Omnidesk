@@ -15,8 +15,7 @@ return [
     'official_wa'     => '+923000000000',
 
     // Direct Connected WhatsApp Sender (Direct device/web connection — No WhatsApp API)
-    // User will provide their WhatsApp number later (e.g. +923001234567)
-    'connected_whatsapp_number' => '',
+    'connected_whatsapp_number' => '+923046588806',
     'sender_engine' => [
         'mode'               => 'direct_device', // Direct WhatsApp Sender (No Meta Cloud API)
         'anti_ban_delay_min' => 4,               // Anti-ban delay min (seconds)

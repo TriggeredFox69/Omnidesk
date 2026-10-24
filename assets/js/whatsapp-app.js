@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     searchQuery: '',
 
     // Direct Connected WhatsApp Sender (Direct Device Mode — Zero Meta API)
-    connectedWaNumber: localStorage.getItem('nunno_connected_wa_number') || '',
+    connectedWaNumber: localStorage.getItem('nunno_connected_wa_number') || '+92 304 6588806',
 
     // Campaign Studio queue state
     campaignQueue: [...initialLeads],
@@ -480,6 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
     campaignNameInput: document.getElementById('campaignNameInput'),
     campaignFileInput: document.getElementById('campaignFileInput'),
     campaignDropZone: document.getElementById('campaignDropZone'),
+    quickAddMyNumberBtn: document.getElementById('quickAddMyNumberBtn'),
     togglePasteAreaBtn: document.getElementById('togglePasteAreaBtn'),
     campaignPasteArea: document.getElementById('campaignPasteArea'),
     applyPasteNumbersBtn: document.getElementById('applyPasteNumbersBtn'),
@@ -1568,13 +1569,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
 
   const campaignState = {
-    name: 'Nunno VIP Outreach',
-    audience: [],
+    name: 'Nunno VIP Outreach Test',
+    audience: [
+      {
+        id: 'c_lead_user_test',
+        name: 'Askar (My Number)',
+        phone: '923046588806',
+        display: '+92 304 6588806',
+        city: 'Pakistan',
+        network: 'Jazz',
+        status: 'pending',
+        sentAt: null
+      }
+    ],
     currentIndex: 0,
     isRunning: false,
     isPaused: false,
-    minDelay: 6,
-    maxDelay: 12,
+    minDelay: 3,
+    maxDelay: 6,
     timeoutId: null,
     countdownInterval: null,
     remainingSeconds: 0,
@@ -2000,7 +2012,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dot) dot.style.background = '#10b981';
     }
 
-    logCampaignTerminal(`✅ [${currentNum}/${total}] Sent to <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} - ${escapeHtml(contact.city)}, ${contact.network})`, 'success');
+    const waDirectLink = `https://wa.me/${contact.phone}?text=${encodeURIComponent(personalizedMsg)}`;
+    logCampaignTerminal(`✅ [${currentNum}/${total}] Sent to <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} - ${escapeHtml(contact.city)}, ${contact.network}) <a href="${waDirectLink}" target="_blank" style="color:#53bdeb;margin-left:6px;text-decoration:underline;font-weight:600;">[Open Chat]</a>`, 'success');
 
     renderConversationsList();
     if (state.activeLeadId === existingLead.id) {
@@ -2016,6 +2029,17 @@ document.addEventListener('DOMContentLoaded', () => {
         time: timeNow
       }
     });
+
+    // Notify direct sender backend
+    fetch('api/direct_sender.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send_direct',
+        phone: contact.phone,
+        message: personalizedMsg
+      })
+    }).catch(() => {});
 
     campaignState.currentIndex++;
 
@@ -2174,6 +2198,30 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCampaignAudienceUI();
       logCampaignTerminal('🗑️ Target audience list cleared by operator.', 'info');
       showToast('Audience list cleared.');
+    });
+  }
+
+  if (els.quickAddMyNumberBtn) {
+    els.quickAddMyNumberBtn.addEventListener('click', () => {
+      const userPhone = '923046588806';
+      const exists = campaignState.audience.some(c => c.phone === userPhone);
+      if (!exists) {
+        campaignState.audience.unshift({
+          id: `c_lead_my_test_${Date.now()}`,
+          name: 'Askar (My Number)',
+          phone: userPhone,
+          display: '+92 304 6588806',
+          city: 'Pakistan',
+          network: 'Jazz',
+          status: 'pending',
+          sentAt: null
+        });
+        renderCampaignAudienceUI();
+        showToast('⚡ Loaded your WhatsApp number (+92 304 6588806) into campaign queue!');
+        logCampaignTerminal('⚡ User test number +92 304 6588806 added to target queue.', 'info');
+      } else {
+        showToast('ℹ️ Your number is already in the campaign queue.');
+      }
     });
   }
 
