@@ -14,7 +14,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
   <title>Nunno Omni-Desk — WhatsApp CRM & Campaign Hub</title>
   <meta name="description" content="Premium multi-agent WhatsApp CRM and campaign studio for Nunno Cloud. Anti-theft lead locking, glassmorphism UI, real-time team inbox.">
   <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=4.0">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=5.6">
   <script>
     window.NUNNO_TEMPLATES = <?= $templatesJson ?>;
     window.NUNNO_CONFIG = {
@@ -52,6 +52,11 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         <span>Campaign Studio</span>
       </button>
+
+      <button class="nav-tab-btn employee-home-tab" id="tabEmployee" style="display:none;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
+        <span>My workspace</span>
+      </button>
     </nav>
 
     <!-- Top Right Actions -->
@@ -61,15 +66,15 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
         <span>My Score</span>
       </button>
 
-      <button class="btn-header-perf admin-leaderboard" id="openLeaderboardBtn" style="display:none;" title="Organization Leaderboard">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
-        <span>Leaderboard</span>
-      </button>
-
       <button class="btn-header-admin" id="openTeamModalBtn" style="display:none;" title="Admin Portal: Manage Employees">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Employees</span>
         <span class="badge-role-admin" id="headerEmpCount">2</span>
+      </button>
+
+      <button type="button" class="btn-header-theme" id="themeToggleBtn" title="Switch to dark theme" aria-label="Switch to dark theme" aria-pressed="false">
+        <svg class="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"/></svg>
+        <span>Dark theme</span>
       </button>
 
       <button class="btn-header-logout" id="headerLogoutBtn" title="Logout">
@@ -143,7 +148,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
     <aside class="conversations-col">
       <div class="conv-header">
         <div class="conv-title-row">
-          <span>Live Messages</span>
+          <span>All chats</span>
           <span class="panel-badge" id="convTotalBadge">8 Leads</span>
         </div>
         <input type="text" id="convSearchInput" class="conv-search-input" placeholder="Search by name or phone…">
@@ -162,6 +167,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
 
     <!-- Pane 2: Active Chat Thread -->
     <section class="chat-thread-col" id="chatThreadCol" style="position:relative;">
+      <div class="chat-transition-overlay" id="chatTransitionOverlay" aria-hidden="true"><span class="chat-transition-mark">N</span><span class="chat-transition-spinner"></span><span>Opening conversation</span></div>
       <div class="chat-header">
         <div class="chat-lead-info">
           <button type="button" class="chat-back-btn" id="chatBackBtn" title="Back to conversations">
@@ -254,7 +260,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
 
-          <textarea id="chatInput" class="chat-input" rows="2" placeholder="Type a WhatsApp message… (Enter to send)"></textarea>
+          <textarea id="chatInput" class="chat-input" rows="2" placeholder="Write a message…"></textarea>
 
           <button type="button" class="btn-composer-mic" id="voiceRecordBtn" title="Record voice note">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
@@ -311,19 +317,19 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
         </div>
         <div class="status-matrix-grid">
           <button type="button" class="matrix-btn matrix-fresh" data-set-state="fresh" id="matrixBtnFresh">
-            <span class="matrix-dot dot-fresh"></span><span>🔴 Fresh</span>
+            <span class="matrix-dot dot-fresh"></span><span>Fresh</span>
           </button>
           <button type="button" class="matrix-btn matrix-ongoing" data-set-state="ongoing" id="matrixBtnOngoing">
-            <span class="matrix-dot dot-ongoing"></span><span>🟡 Ongoing</span>
+            <span class="matrix-dot dot-ongoing"></span><span>Ongoing</span>
           </button>
           <button type="button" class="matrix-btn matrix-pending" data-set-state="pending_verification" id="matrixBtnPending">
-            <span class="matrix-dot dot-pending"></span><span>⚪ Review</span>
+            <span class="matrix-dot dot-pending"></span><span>Review</span>
           </button>
           <button type="button" class="matrix-btn matrix-paid" data-set-state="paid" id="matrixBtnPaid">
-            <span class="matrix-dot dot-paid"></span><span>🟢 Paid</span>
+            <span class="matrix-dot dot-paid"></span><span>Paid</span>
           </button>
           <button type="button" class="matrix-btn matrix-useless" data-set-state="useless" id="matrixBtnUseless">
-            <span class="matrix-dot dot-useless"></span><span>🔵 Won't Pay</span>
+            <span class="matrix-dot dot-useless"></span><span>Won't pay</span>
           </button>
         </div>
         <div class="deal-value-row">
@@ -574,8 +580,8 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           <span class="panel-badge">Preview</span>
         </div>
 
-        <div style="background:#030812;border-radius:var(--r-md);padding:14px;border:1px solid var(--border-soft);">
-          <div id="campaignBubblePreview" style="background:linear-gradient(135deg,#1a3a50,#0f2a3a);border:1px solid rgba(0,212,170,0.15);color:var(--text-primary);padding:10px 14px;border-radius:10px 10px 2px 10px;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;"></div>
+        <div class="campaign-preview-stage" aria-label="WhatsApp message preview">
+          <div id="campaignBubblePreview" class="campaign-message-bubble"></div>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:8px;">
@@ -615,6 +621,28 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
       </aside>
     </div>
   </div>
+
+  <main class="employee-workspace" id="viewEmployee" style="display:none;">
+    <section class="employee-welcome">
+      <div>
+        <span class="workspace-eyebrow">YOUR SALES DESK</span>
+        <h1>Good to see you, <span id="employeeWelcomeName">there</span></h1>
+        <p>Your leads, follow-ups and progress, all in one place.</p>
+      </div>
+      <button type="button" class="btn btn-wa" id="employeeOpenInboxBtn">Open team inbox <span aria-hidden="true">↗</span></button>
+    </section>
+    <section class="employee-metrics" aria-label="Your performance">
+      <article class="employee-metric"><span>My leads</span><strong id="employeeMetricLeads">0</strong><small>Assigned to you</small></article>
+      <article class="employee-metric"><span>Needs follow-up</span><strong id="employeeMetricFollowups">0</strong><small>Open conversations</small></article>
+      <article class="employee-metric"><span>Awaiting review</span><strong id="employeeMetricReview">0</strong><small>Payments submitted</small></article>
+      <article class="employee-metric"><span>Verified sales</span><strong id="employeeMetricRevenue">PKR 0</strong><small id="employeeMetricDeals">0 closed deals</small></article>
+    </section>
+    <section class="employee-board">
+      <div class="employee-board-heading"><div><span class="workspace-eyebrow">PIPELINE</span><h2>Your leads</h2></div><button class="employee-text-link" type="button" id="employeeViewScoreBtn">View my score ↗</button></div>
+      <div class="employee-lead-list" id="employeeLeadList"></div>
+    </section>
+    <aside class="employee-portal-note"><span class="employee-note-mark">✳</span><p><strong>A good conversation starts with listening.</strong><br>Reply in the team inbox, save a private note, and update a lead’s status as it progresses.</p></aside>
+  </main>
 
   <!-- ════════════════════════════════════════════════════════
        MODAL 1: AGENT SWITCHER
@@ -742,15 +770,11 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
             Sign In to Omni-Desk
           </button>
 
-          <!-- Quick 1-Click Fillers -->
           <div class="quick-fill-bar">
-            <button type="button" class="quick-fill-btn" id="quickFillAdminBtn">
-              👑 Admin
-            </button>
-            <button type="button" class="quick-fill-btn" id="quickFillEmpBtn">
-              👨‍💼 Closer (Hamza)
-            </button>
+            <button type="button" class="quick-fill-btn" id="quickFillAdminBtn">👑 Admin</button>
+            <button type="button" class="quick-fill-btn" id="quickFillEmpBtn">👨‍💼 Closer (Hamza)</button>
           </div>
+
         </form>
 
         <footer class="card-footer">
@@ -981,7 +1005,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
               <span id="scoreModalTitle">Performance & Score Center</span>
               <span class="badge-role-admin" id="scoreModalBadge">KPI Tracker</span>
             </div>
-            <div class="text-xs text-muted">Real-time revenue metrics, deals won, and team leaderboards</div>
+            <div class="text-xs text-muted">Real-time revenue metrics, deals won, and personal sales and commission metrics</div>
           </div>
         </div>
         <button class="btn btn-ghost btn-xs" id="closeScoreModalBtn">✕</button>
@@ -990,7 +1014,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
       <!-- Tabs -->
       <div style="display:flex;gap:6px;padding:12px 24px;border-bottom:1px solid var(--border-subtle);background:rgba(0,0,0,0.15);overflow-x:auto;">
         <button type="button" class="nav-tab-btn active" id="tabMyScore" style="padding:6px 14px;font-size:12px;">👤 My Score & Deals</button>
-        <button type="button" class="nav-tab-btn" id="tabTeamScores" style="padding:6px 14px;font-size:12px;">🏆 Team Leaderboard</button>
         <button type="button" class="nav-tab-btn" id="tabVerifySales" style="padding:6px 14px;font-size:12px;">
           🛡️ Verify Transactions (<span id="pendingVerifCount">0</span>)
         </button>
@@ -1087,25 +1110,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           </div>
         </div>
 
-        <!-- TAB 2: Leaderboard -->
-        <div id="viewTeamScoresTab" style="display:none;">
-          <div class="org-summary-grid">
-            <div class="org-stat-box"><span class="org-stat-label">Total Company Sales</span><span class="org-stat-val" id="orgTotalRevenue">Rs. 0</span></div>
-            <div class="org-stat-box"><span class="org-stat-label">Total Closed Deals</span><span class="org-stat-val" id="orgTotalDeals">0</span></div>
-            <div class="org-stat-box"><span class="org-stat-label">Salaries Qualified</span><span class="org-stat-val" id="orgSalariesUnlocked">0</span></div>
-            <div class="org-stat-box"><span class="org-stat-label">Commissions Paid</span><span class="org-stat-val" id="orgCommissionsTotal">Rs. 0</span></div>
-          </div>
-
-          <div class="perf-section-card" style="margin-top:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-              <h4 style="margin:0;font-size:14px;color:#fff;font-weight:700;">🏆 Team Performance Leaderboard</h4>
-              <button type="button" class="btn btn-ghost btn-xs" id="exportLeaderboardBtn">📊 Export Payroll CSV</button>
-            </div>
-            <div id="teamLeaderboardTable"></div>
-          </div>
-        </div>
-
-        <!-- TAB 3: Verify Transactions -->
+        <!-- TAB 3: Verify Transactions --><!-- TAB 3: Verify Transactions -->
         <div id="viewVerifySalesTab" style="display:none;">
           <div class="perf-hero-card" style="margin-bottom:16px;">
             <div class="perf-hero-left">
@@ -1132,6 +1137,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/whatsapp-app.js?v=4.0"></script>
+  <script src="assets/js/whatsapp-app.js?v=5.5"></script>
 </body>
 </html>

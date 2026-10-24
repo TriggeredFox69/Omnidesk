@@ -275,8 +275,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Topbar Tabs
     tabInbox: document.getElementById('tabInbox'),
     tabCampaign: document.getElementById('tabCampaign'),
+    tabEmployee: document.getElementById('tabEmployee'),
     viewInbox: document.getElementById('viewInbox'),
     viewCampaign: document.getElementById('viewCampaign'),
+    viewEmployee: document.getElementById('viewEmployee'),
+    employeeLeadList: document.getElementById('employeeLeadList'),
 
     // Topbar Badges & Agent Pill
     agentPill: document.getElementById('agentPill'),
@@ -286,6 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
     unreadGlobalBadge: document.getElementById('unreadGlobalBadge'),
     myLeadsCountBadge: document.getElementById('myLeadsCountBadge'),
     openTeamModalBtn: document.getElementById('openTeamModalBtn'),
+    themeToggleBtn: document.getElementById('themeToggleBtn'),
     headerLogoutBtn: document.getElementById('headerLogoutBtn'),
     headerEmpCount: document.getElementById('headerEmpCount'),
 
@@ -400,7 +404,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Performance Score & Leaderboard Triggers
     openScoreBtn: document.getElementById('openScoreBtn'),
-    openLeaderboardBtn: document.getElementById('openLeaderboardBtn'),
 
     // Can't Handle & Lead Lock Shield Elements
     cantHandleBtn: document.getElementById('cantHandleBtn'),
@@ -436,10 +439,8 @@ document.addEventListener('DOMContentLoaded', () => {
     scoreModal: document.getElementById('scoreModal'),
     closeScoreModalBtn: document.getElementById('closeScoreModalBtn'),
     tabMyScore: document.getElementById('tabMyScore'),
-    tabTeamScores: document.getElementById('tabTeamScores'),
     tabVerifySales: document.getElementById('tabVerifySales'),
     viewMyScoreTab: document.getElementById('viewMyScoreTab'),
-    viewTeamScoresTab: document.getElementById('viewTeamScoresTab'),
     viewVerifySalesTab: document.getElementById('viewVerifySalesTab'),
     pendingVerifCount: document.getElementById('pendingVerifCount'),
     pendingAuditHeaderCount: document.getElementById('pendingAuditHeaderCount'),
@@ -473,8 +474,6 @@ document.addEventListener('DOMContentLoaded', () => {
     orgTotalDeals: document.getElementById('orgTotalDeals'),
     orgSalariesUnlocked: document.getElementById('orgSalariesUnlocked'),
     orgCommissionsTotal: document.getElementById('orgCommissionsTotal'),
-    teamLeaderboardTable: document.getElementById('teamLeaderboardTable'),
-    exportLeaderboardBtn: document.getElementById('exportLeaderboardBtn'),
 
     // Campaign Studio DOM Elements
     campaignNameInput: document.getElementById('campaignNameInput'),
@@ -517,6 +516,26 @@ document.addEventListener('DOMContentLoaded', () => {
     toastMsg: document.getElementById('toastMsg')
   };
 
+  function setTheme(theme) {
+    const isDark = theme === 'dark';
+    document.body.classList.toggle('theme-dark', isDark);
+    localStorage.setItem('nunno_theme', isDark ? 'dark' : 'light');
+    if (!els.themeToggleBtn) return;
+    const label = isDark ? 'Light theme' : 'Dark theme';
+    const icon = isDark
+      ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>'
+      : '<path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"/>';
+    els.themeToggleBtn.setAttribute('aria-label', `Switch to ${isDark ? 'light' : 'dark'} theme`);
+    els.themeToggleBtn.setAttribute('title', `Switch to ${isDark ? 'light' : 'dark'} theme`);
+    els.themeToggleBtn.setAttribute('aria-pressed', String(isDark));
+    els.themeToggleBtn.innerHTML = `<svg class="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${icon}</svg><span>${label}</span>`;
+  }
+
+  setTheme(localStorage.getItem('nunno_theme') === 'dark' ? 'dark' : 'light');
+  els.themeToggleBtn?.addEventListener('click', () => {
+    setTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
+  });
+
   // Toast Function
   function showToast(msg, duration = 3000) {
     if (!els.toast) return;
@@ -535,9 +554,15 @@ document.addEventListener('DOMContentLoaded', () => {
     return state.agents.find(a => a.id === id);
   }
 
+  function canAccessCampaignStudio() {
+    const role = String(state.currentUser?.role || state.currentAgent?.role || '').trim().toLowerCase();
+    return role === 'admin' || role === 'master admin';
+  }
+
   // Update Topbar Agent Display
   function renderAgentProfile() {
     const user = state.currentUser;
+    if (els.tabCampaign) els.tabCampaign.style.display = canAccessCampaignStudio() ? 'inline-flex' : 'none';
     if (user) {
       const isAdmin = user.role === 'admin';
       if (els.topAgentAvatar) els.topAgentAvatar.textContent = isAdmin ? '👑' : '👨‍💼';
@@ -555,9 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.openTeamModalBtn) {
         els.openTeamModalBtn.style.display = isAdmin ? 'inline-flex' : 'none';
       }
-      if (els.openLeaderboardBtn) {
-        els.openLeaderboardBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-      }
+      if (els.tabEmployee) els.tabEmployee.style.display = isAdmin ? 'none' : 'inline-flex';
     } else {
       if (els.openScoreBtn) {
         els.openScoreBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg><span>My Score</span>';
@@ -566,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.topAgentName) els.topAgentName.textContent = state.currentAgent.name;
       if (els.topAgentId) els.topAgentId.textContent = `${state.currentAgent.id} • ${state.currentAgent.role}`;
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
-      if (els.openLeaderboardBtn) els.openLeaderboardBtn.style.display = 'none';
+      if (els.tabEmployee) els.tabEmployee.style.display = 'none';
     }
 
     // Update global counters
@@ -949,6 +972,17 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleDossierDrawer(false);
     }
 
+    const transition = document.getElementById('chatTransitionOverlay');
+    if (transition) {
+      transition.classList.add('active');
+      transition.setAttribute('aria-hidden', 'false');
+      window.clearTimeout(selectLead.transitionTimer);
+      selectLead.transitionTimer = window.setTimeout(() => {
+        transition.classList.remove('active');
+        transition.setAttribute('aria-hidden', 'true');
+      }, 420);
+    }
+
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
@@ -1143,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (els.chatInput) {
         els.chatInput.disabled = false;
-        els.chatInput.placeholder = 'Type WhatsApp message... (Press Enter to send)';
+        els.chatInput.placeholder = 'Write a message…';
       }
       if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
     }
@@ -1686,7 +1720,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!els.campaignBubblePreview) return;
     const rawTemplate = els.campaignCustomMsg ? els.campaignCustomMsg.value : '';
     if (!rawTemplate.trim()) {
-      els.campaignBubblePreview.innerHTML = '<span style="color:#8696a0;font-style:italic;">Type a custom message or pick a template above to preview live output...</span>';
+      els.campaignBubblePreview.innerHTML = '<span class="campaign-preview-placeholder">Type a message or choose a template to preview it here.</span>';
       return;
     }
 
@@ -1699,13 +1733,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let html = escapeHtml(personalized);
     html = html.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
     html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
-    html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.25);padding:1px 4px;border-radius:4px;font-family:monospace;font-size:11px;">$1</code>');
+    html = html.replace(/`([^`]+)`/g, '<code class="campaign-inline-code">$1</code>');
     html = html.replace(/\n/g, '<br>');
 
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    html += `<div style="font-size:10px;color:rgba(255,255,255,0.6);text-align:right;margin-top:6px;display:flex;justify-content:flex-end;align-items:center;gap:3px;">
+    html += `<div class="campaign-preview-meta">
       <span>${timeStr}</span>
-      <span style="color:#53bdeb;">✓✓</span>
+      <span class="campaign-preview-checks">✓✓</span>
     </div>`;
 
     els.campaignBubblePreview.innerHTML = html;
@@ -2351,17 +2385,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
 
   function switchTab(tabName) {
+    if (tabName === 'campaign' && !canAccessCampaignStudio()) {
+      showToast('Campaign Studio is available to administrators only.');
+      return;
+    }
     state.currentTab = tabName;
     toggleDossierDrawer(false);
+    document.querySelector('.subbar')?.classList.toggle('workspace-subbar-hidden', tabName !== 'inbox');
 
     // Buttons
-    [els.tabInbox, els.tabCampaign].forEach(b => {
+    [els.tabInbox, els.tabCampaign, els.tabEmployee].forEach(b => {
       if (b) b.classList.remove('active', 'tab-wa');
     });
 
     // Views
     if (els.viewInbox) els.viewInbox.style.display = 'none';
     if (els.viewCampaign) els.viewCampaign.style.display = 'none';
+    if (els.viewEmployee) els.viewEmployee.style.display = 'none';
 
     if (tabName === 'inbox') {
       if (els.tabInbox) els.tabInbox.classList.add('active', 'tab-wa');
@@ -2373,11 +2413,63 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.viewCampaign) els.viewCampaign.style.display = 'block';
       updateCampaignPreview();
       renderCampaignAudienceUI();
+    } else if (tabName === 'employee') {
+      if (els.tabEmployee) els.tabEmployee.classList.add('active', 'tab-wa');
+      if (els.viewEmployee) els.viewEmployee.style.display = 'block';
+      renderEmployeeWorkspace();
     }
   }
 
   if (els.tabInbox) els.tabInbox.addEventListener('click', () => switchTab('inbox'));
   if (els.tabCampaign) els.tabCampaign.addEventListener('click', () => switchTab('campaign'));
+  if (els.tabEmployee) els.tabEmployee.addEventListener('click', () => switchTab('employee'));
+  document.getElementById('employeeOpenInboxBtn')?.addEventListener('click', () => switchTab('inbox'));
+  document.getElementById('employeeViewScoreBtn')?.addEventListener('click', () => openScoreModal('my'));
+  els.employeeLeadList?.addEventListener('click', event => {
+    const leadButton = event.target.closest('[data-employee-lead]');
+    if (!leadButton) return;
+    const leadId = leadButton.dataset.employeeLead;
+    switchTab('inbox');
+    if (leadId) {
+      selectLead(leadId);
+    } else {
+      document.querySelector('.inbox-filter-btn[data-filter="fresh"]')?.click();
+    }
+  });
+
+  function renderEmployeeWorkspace() {
+    const user = state.currentUser;
+    if (!user || user.role === 'admin') return;
+    const employeeName = user.name || 'there';
+    const nameTarget = document.getElementById('employeeWelcomeName');
+    if (nameTarget) nameTarget.textContent = employeeName.split(' ')[0];
+    const mine = state.leads.filter(lead => lead.ownerId === user.id || lead.paidDetails?.closedById === user.id);
+    const active = mine.filter(lead => getLeadState(lead) === 'ongoing');
+    const pending = mine.filter(lead => getLeadState(lead) === 'pending_verification');
+    const paid = mine.filter(lead => getLeadState(lead) === 'paid');
+    const revenue = paid.reduce((sum, lead) => sum + (Number(lead.paidDetails?.amount) || (String(lead.interest || '').includes('Starter') ? 1700 : 5000)), 0);
+    const setMetric = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = value; };
+    setMetric('employeeMetricLeads', mine.length);
+    setMetric('employeeMetricFollowups', active.length);
+    setMetric('employeeMetricReview', pending.length);
+    setMetric('employeeMetricRevenue', `PKR ${revenue.toLocaleString()}`);
+    setMetric('employeeMetricDeals', `${paid.length} verified ${paid.length === 1 ? 'deal' : 'deals'}`);
+    if (!els.employeeLeadList) return;
+    const sorted = [...mine].sort((a, b) => {
+      const stateRank = { ongoing: 0, fresh: 1, pending_verification: 2, paid: 3, useless: 4 };
+      return (stateRank[getLeadState(a)] ?? 5) - (stateRank[getLeadState(b)] ?? 5);
+    });
+    if (!sorted.length) {
+      els.employeeLeadList.innerHTML = '<div class="employee-empty"><span>✳</span><strong>Your pipeline is ready.</strong><p>Claim a fresh lead from the team inbox to start your first conversation.</p><button class="employee-text-link" type="button" data-employee-lead="">Browse available leads →</button></div>';
+      return;
+    }
+    const stateLabel = { ongoing: 'In progress', fresh: 'New', pending_verification: 'In review', paid: 'Verified', useless: 'Closed' };
+    els.employeeLeadList.innerHTML = sorted.map(lead => {
+      const status = getLeadState(lead);
+      const lastMessage = [...(lead.messages || [])].reverse().find(message => message.sender === 'lead')?.text || lead.notes || 'No message preview yet.';
+      return `<button class="employee-lead-row" type="button" data-employee-lead="${escapeHtml(lead.id)}"><span class="employee-lead-avatar">${escapeHtml((lead.name || '?').split(' ').filter(Boolean).map(part => part[0]).slice(0, 2).join('').toUpperCase())}</span><span class="employee-lead-main"><strong>${escapeHtml(lead.name)}</strong><small>${escapeHtml(String(lastMessage).slice(0, 90))}</small></span><span class="employee-lead-product">${escapeHtml(lead.interest || 'Nunno')}</span><span class="employee-lead-status ${escapeHtml(status)}">${escapeHtml(stateLabel[status] || status)}</span><span class="employee-lead-time">${escapeHtml(lead.lastActive || '')}</span><span aria-hidden="true" class="employee-lead-arrow">↗</span></button>`;
+    }).join('');
+  }
 
   // ==========================================
   // AUTHENTICATION & EMPLOYEE PROVISIONING MODULE
@@ -2449,6 +2541,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const roleTag = document.getElementById('animRoleTag');
     const subtext = document.getElementById('animSubtext');
 
+    if (overlay) overlay.classList.remove('logout-mode');
+
     const userName = (user && user.name) ? user.name : '';
     const isAdmin = (user && user.role === 'admin');
 
@@ -2483,6 +2577,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1600);
   }
 
+  function triggerLogoutAnimation(onComplete) {
+    const overlay = document.getElementById('loginAnimOverlay');
+    const loginContainer = document.getElementById('loginMainContainer');
+    const authOverlay = document.getElementById('authOverlay');
+    const subtext = document.getElementById('animSubtext');
+    const roleTag = document.getElementById('animRoleTag');
+    if (!overlay) { onComplete?.(); return; }
+    if (authOverlay) {
+      authOverlay.classList.remove('hidden');
+      authOverlay.style.display = 'flex';
+      authOverlay.style.pointerEvents = 'auto';
+    }
+    if (loginContainer) loginContainer.style.display = 'none';
+    if (roleTag) roleTag.textContent = 'Secure sign out';
+    if (subtext) subtext.textContent = 'Closing your workspace…';
+    overlay.classList.add('logout-mode', 'active');
+    window.setTimeout(() => {
+      overlay.classList.remove('active', 'logout-mode');
+      if (typeof onComplete === 'function') onComplete();
+    }, 1050);
+  }
+
   function applyUserSession(user) {
     state.currentUser = user;
     localStorage.setItem('nunno_active_session', JSON.stringify(user));
@@ -2509,6 +2625,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderConversationsList();
     renderActiveChat();
+    if (user.role === 'admin') switchTab('inbox');
+    else switchTab('employee');
   }
 
   function handleLogin(e) {
@@ -2596,13 +2714,18 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleLogout() {
     if (!confirm('Are you sure you want to log out of Omni-Desk?')) return;
     fetch('api/auth.php?action=logout', { method: 'POST' }).catch(() => {});
-    state.currentUser = null;
-    localStorage.removeItem('nunno_active_session');
-    if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
-    if (els.authUsername) els.authUsername.value = '';
-    if (els.authPassword) els.authPassword.value = '';
-    showAuthOverlay();
-    showToast('Logged out of Omni-Desk.');
+    document.body.classList.remove('mobile-in-chat');
+    if (els.viewInbox) els.viewInbox.classList.remove('mobile-chat-open');
+    toggleDossierDrawer(false);
+    triggerLogoutAnimation(() => {
+      state.currentUser = null;
+      localStorage.removeItem('nunno_active_session');
+      if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
+      if (els.authUsername) els.authUsername.value = '';
+      if (els.authPassword) els.authPassword.value = '';
+      showAuthOverlay();
+      showToast('Logged out of Omni-Desk.');
+    });
   }
 
   function togglePasswordVisibility() {
@@ -2766,32 +2889,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const initials = (emp.name || 'Emp').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
       return `
-        <div class="emp-roster-card ${isSuspended ? 'suspended' : ''}">
+        <article class="emp-roster-card ${isSuspended ? 'suspended' : ''}">
           <div class="emp-card-user">
-            <div class="emp-avatar ${isAdmin ? 'admin-av' : ''}">${isAdmin ? '👑' : initials}</div>
-            <div>
+            <div class="emp-avatar ${isAdmin ? 'admin-av' : ''}">${initials}</div>
+            <div class="emp-card-identity">
               <div class="emp-card-name">${escapeHtml(emp.name)} ${isAdmin ? '<span class="badge-role-admin" style="font-size:9px;">Admin</span>' : ''}</div>
               <div class="emp-card-sub">
-                <span class="mono">${escapeHtml(emp.username)}</span>
-                <span>&bull;</span>
-                <span>${escapeHtml(emp.designation || emp.role)}</span>
+                <span class="emp-card-username">${escapeHtml(emp.username)}</span>
+                <span class="emp-card-role">${escapeHtml(emp.designation || emp.role)}</span>
               </div>
             </div>
           </div>
           <div class="emp-actions-group">
             <span class="emp-status-badge ${isSuspended ? 'suspended' : 'active'}">
-              ${isSuspended ? '🔴 Suspended' : '🟢 Active'}
+              <span class="emp-status-indicator" aria-hidden="true"></span>${isSuspended ? 'Suspended' : 'Active'}
             </span>
             ${!isAdmin ? `
-              <button class="btn-emp-action" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Activate Employee' : 'Suspend Employee'}">
+              <button type="button" class="btn-emp-action" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Activate Employee' : 'Suspend Employee'}">
                 ${isSuspended ? 'Activate' : 'Suspend'}
               </button>
-              <button class="btn-emp-action delete" onclick="window.OmnideskDeleteEmp('${emp.id}', '${escapeHtml(emp.name)}')" title="Delete Employee">
-                ✕
+              <button type="button" class="btn-emp-action delete" onclick="window.OmnideskDeleteEmp('${emp.id}', '${escapeHtml(emp.name)}')" title="Remove employee" aria-label="Remove ${escapeHtml(emp.name)}">
+                Remove
               </button>
             ` : ''}
           </div>
-        </div>
+        </article>
       `;
     }).join('');
   }
@@ -2876,24 +2998,17 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.authSubmitBtn) els.authSubmitBtn.addEventListener('click', handleLogin);
   if (els.authTogglePass) els.authTogglePass.addEventListener('click', togglePasswordVisibility);
 
-  const quickFillAdminBtn = document.getElementById('quickFillAdminBtn');
-  const quickFillEmpBtn = document.getElementById('quickFillEmpBtn');
-  if (quickFillAdminBtn) {
-    quickFillAdminBtn.addEventListener('click', () => {
-      if (els.authUsername) els.authUsername.value = 'admin';
-      if (els.authPassword) els.authPassword.value = 'Admin@Omnidesk2026!';
-      if (els.authAlert) els.authAlert.style.display = 'none';
-      if (els.authSubmitBtn) els.authSubmitBtn.focus();
-    });
-  }
-  if (quickFillEmpBtn) {
-    quickFillEmpBtn.addEventListener('click', () => {
-      if (els.authUsername) els.authUsername.value = 'hamza';
-      if (els.authPassword) els.authPassword.value = 'Agent@123';
-      if (els.authAlert) els.authAlert.style.display = 'none';
-      if (els.authSubmitBtn) els.authSubmitBtn.focus();
-    });
-  }
+  document.getElementById('quickFillAdminBtn')?.addEventListener('click', () => {
+    if (els.authUsername) els.authUsername.value = 'admin';
+    if (els.authPassword) els.authPassword.value = 'Admin@Omnidesk2026!';
+    if (els.authAlert) els.authAlert.style.display = 'none';
+  });
+  document.getElementById('quickFillEmpBtn')?.addEventListener('click', () => {
+    if (els.authUsername) els.authUsername.value = 'hamza';
+    if (els.authPassword) els.authPassword.value = 'Agent@123';
+    if (els.authAlert) els.authAlert.style.display = 'none';
+  });
+
   if (els.headerLogoutBtn) els.headerLogoutBtn.addEventListener('click', handleLogout);
   if (els.openTeamModalBtn) els.openTeamModalBtn.addEventListener('click', openTeamModal);
   if (els.closeTeamModalBtn) els.closeTeamModalBtn.addEventListener('click', closeTeamModal);
@@ -3359,14 +3474,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Toggle tab display
     if (els.tabMyScore) els.tabMyScore.classList.toggle('active', activeTab === 'my');
-    if (els.tabTeamScores) els.tabTeamScores.classList.toggle('active', activeTab === 'team');
     if (els.tabVerifySales) {
       els.tabVerifySales.style.display = isAdmin ? 'inline-flex' : 'none';
       els.tabVerifySales.classList.toggle('active', activeTab === 'verify');
     }
 
     if (els.viewMyScoreTab) els.viewMyScoreTab.style.display = activeTab === 'my' ? 'block' : 'none';
-    if (els.viewTeamScoresTab) els.viewTeamScoresTab.style.display = activeTab === 'team' ? 'block' : 'none';
     if (els.viewVerifySalesTab) els.viewVerifySalesTab.style.display = (activeTab === 'verify' && isAdmin) ? 'block' : 'none';
 
     // --- TAB 1: User Personal Performance Portal ---
@@ -4251,12 +4364,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Performance Score Modal Event Listeners
   if (els.openScoreBtn) els.openScoreBtn.addEventListener('click', () => openScoreModal('my'));
-  if (els.openLeaderboardBtn) els.openLeaderboardBtn.addEventListener('click', () => openScoreModal('team'));
   if (els.closeScoreModalBtn) els.closeScoreModalBtn.addEventListener('click', closeScoreModal);
   if (els.tabMyScore) els.tabMyScore.addEventListener('click', () => renderScoreData('my'));
-  if (els.tabTeamScores) els.tabTeamScores.addEventListener('click', () => renderScoreData('team'));
   if (els.tabVerifySales) els.tabVerifySales.addEventListener('click', () => renderScoreData('verify'));
-  if (els.exportLeaderboardBtn) els.exportLeaderboardBtn.addEventListener('click', exportLeaderboardCsv);
 
   // Expose global functions for direct inline click handlers
   window.verifyPaymentDeal = verifyPaymentDeal;
