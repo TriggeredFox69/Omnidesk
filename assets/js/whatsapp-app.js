@@ -477,6 +477,39 @@ document.addEventListener('DOMContentLoaded', () => {
     teamLeaderboardTable: document.getElementById('teamLeaderboardTable'),
     exportLeaderboardBtn: document.getElementById('exportLeaderboardBtn'),
 
+    // Campaign Studio DOM Elements
+    campaignNameInput: document.getElementById('campaignNameInput'),
+    campaignFileInput: document.getElementById('campaignFileInput'),
+    campaignDropZone: document.getElementById('campaignDropZone'),
+    togglePasteAreaBtn: document.getElementById('togglePasteAreaBtn'),
+    campaignPasteArea: document.getElementById('campaignPasteArea'),
+    applyPasteNumbersBtn: document.getElementById('applyPasteNumbersBtn'),
+    campaignAudienceBadge: document.getElementById('campaignAudienceBadge'),
+    campaignAudienceSummary: document.getElementById('campaignAudienceSummary'),
+    campaignLoadedCountText: document.getElementById('campaignLoadedCountText'),
+    clearAudienceBtn: document.getElementById('clearAudienceBtn'),
+    campaignAudienceList: document.getElementById('campaignAudienceList'),
+    campaignAssignSelect: document.getElementById('campaignAssignSelect'),
+    campaignDelayMin: document.getElementById('campaignDelayMin'),
+    campaignDelayMax: document.getElementById('campaignDelayMax'),
+    campaignPresetSelect: document.getElementById('campaignPresetSelect'),
+    campaignPitchPreset: document.getElementById('campaignPitchPreset'),
+    campaignCustomMsg: document.getElementById('campaignCustomMsg'),
+    campaignBubblePreview: document.getElementById('campaignBubblePreview'),
+    startCampaignBtn: document.getElementById('startCampaignBtn'),
+    pauseCampaignBtn: document.getElementById('pauseCampaignBtn'),
+    stopCampaignBtn: document.getElementById('stopCampaignBtn'),
+    campaignProgressCard: document.getElementById('campaignProgressCard'),
+    campaignProgressCount: document.getElementById('campaignProgressCount'),
+    campaignProgressPct: document.getElementById('campaignProgressPct'),
+    campaignProgressFill: document.getElementById('campaignProgressFill'),
+    campaignCountdown: document.getElementById('campaignCountdown'),
+    campaignCurrentPace: document.getElementById('campaignCurrentPace'),
+    campaignTerminalLog: document.getElementById('campaignTerminalLog'),
+    campaignLogCount: document.getElementById('campaignLogCount'),
+    campaignStatusBadge: document.getElementById('campaignStatusBadge'),
+    campaignTagChips: document.querySelectorAll('#viewCampaign .tag-chip'),
+
     // Toast
     toast: document.getElementById('toast'),
     toastMsg: document.getElementById('toastMsg')
@@ -1514,19 +1547,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.closeAgentModalBtn) els.closeAgentModalBtn.addEventListener('click', closeAgentModal);
 
   // ==========================================
-  // MANUAL .TXT UPLOADER / PARSER
+  // PAKISTANI NUMBER SANITIZER & NETWORK CLASSIFIER
   // ==========================================
-
-  function openImportModal() {
-    if (els.importTxtModal) els.importTxtModal.classList.add('open');
-  }
-
-  function closeImportModal() {
-    if (els.importTxtModal) els.importTxtModal.classList.remove('open');
-  }
-
-  if (els.openImportModalBtn) els.openImportModalBtn.addEventListener('click', openImportModal);
-  if (els.closeImportModalBtn) els.closeImportModalBtn.addEventListener('click', closeImportModal);
 
   // Normalize Pakistani Number
   function cleanNumber(raw) {
@@ -1553,87 +1575,623 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'Other';
   }
 
-  function handleImport() {
-    const text = els.txtPasteArea.value.trim();
-    if (!text) {
-      showToast('⚠️ Please paste numbers or select a .txt file.');
+  // ==========================================
+  // CAMPAIGN STUDIO OUTREACH ENGINE (.TXT DROP, CADENCE, SPINTAX & DISPATCH)
+  // ==========================================
+
+  const campaignState = {
+    name: 'Nunno VIP Outreach',
+    audience: [],
+    currentIndex: 0,
+    isRunning: false,
+    isPaused: false,
+    minDelay: 6,
+    maxDelay: 12,
+    timeoutId: null,
+    countdownInterval: null,
+    remainingSeconds: 0,
+    totalSent: 0,
+    logEvents: 0
+  };
+
+  const campaignPitchTemplates = {
+    custom: '',
+    pro_liquidation_urdu: `{Salam|AoA|Hello} {name|Bhai|Trader}!\n\nKya aap bar bar market ke sudden wick ya stop-loss hunt se liquid ho rahe hain? 📉❌\n\n*Nunno AI Cloud* (\`nunno.cloud\`) ne Pakistan ke top traders ke liye *Liquidation Magnet System* launch kiya hai jo exact level pehle dikhata hai jahan whales target kar rahi hain.\n\n🔥 *Special Community Offer:*\n• Nunno Pro sirf *Rs. 5,000/month*\n• EasyPaisa, JazzCash aur USDT accepted\n• Coupon \`NUNNO30\` se *30% OFF*\n\nLive Demo aur Signals dekhne ke liye visit karein: https://nunno.cloud\n\n_Reply STOP agar aap mazeed updates nahi chahte._`,
+    starter_scalper: `Salam {name|Bhai}! 👋\n\nAgar aap Binance ya Bybit pe 15m/5m scalping karte hain to Nunno Starter Signals sirf *Rs. 1,700* mein available hain.\n\n✅ 90%+ Accuracy Scalp setups\n✅ Instant JazzCash / EasyPaisa activation\n\nKya aapko demo charts dekhne hain? Reply YES karein!`,
+    flash_discount: `⚡ *FLASH 48-HOUR TRADER PASS* ⚡\n\nAssalam o Alaikum {name}!\n\nNunno Pro Membership pe aglay 48 ghanton ke liye flat *Rs. 2,000 discount* active hai.\n\nNormal Price: Rs. 5,000\n*Flash Price: Rs. 3,000 only*\n\nPayment EasyPaisa / JazzCash se transfer karke receipt yahan share karein, 5 minute mein instant access mil jayega.`,
+    whale_institutional: `Greetings {name},\n\nWe noticed high-volume positioning in Pakistani crypto traders' circles. Nunno AI Cloud offers real-time order-book liquidity heatmaps and institutional whale tracking.\n\nAccess our enterprise portal at https://nunno.cloud with code VIP2026.\n\nBest regards,\nNunno Cloud Desk`
+  };
+
+  function logCampaignTerminal(msg, type = 'info') {
+    if (!els.campaignTerminalLog) return;
+    campaignState.logEvents++;
+    if (els.campaignLogCount) {
+      els.campaignLogCount.textContent = `${campaignState.logEvents} events`;
+    }
+    const time = new Date().toLocaleTimeString();
+    const line = document.createElement('div');
+    line.className = `log-line log-${type}`;
+    line.innerHTML = `<span style="color:#8696a0;font-size:10.5px;margin-right:4px;">[${time}]</span> ${msg}`;
+    els.campaignTerminalLog.appendChild(line);
+    els.campaignTerminalLog.scrollTop = els.campaignTerminalLog.scrollHeight;
+  }
+
+  function resolveSpintax(text) {
+    if (!text) return '';
+    return text.replace(/\{([^{}]+)\}/g, (match, contents) => {
+      const lower = contents.trim().toLowerCase();
+      if (['name', 'phone', 'city', 'plan', 'price', 'coupon', 'link'].includes(lower)) {
+        return match;
+      }
+      if (contents.includes('|')) {
+        const parts = contents.split('|');
+        return parts[Math.floor(Math.random() * parts.length)].trim();
+      }
+      return contents;
+    });
+  }
+
+  function personalizeMessage(template, contact) {
+    if (!template) return '';
+    let msg = resolveSpintax(template);
+
+    msg = msg.replace(/\{name(?:\|([^{}]+))?\}/gi, (match, fallback) => {
+      if (contact && contact.name && contact.name !== 'Trader') return contact.name;
+      if (fallback) {
+        const fbParts = fallback.split('|');
+        return fbParts[Math.floor(Math.random() * fbParts.length)].trim();
+      }
+      return 'Trader';
+    });
+
+    const contactName = (contact && contact.name) ? contact.name : 'Trader';
+    const contactPhone = (contact && contact.display) ? contact.display : ((contact && contact.phone) ? contact.phone : '+92 300 1234567');
+    const contactCity = (contact && contact.city) ? contact.city : 'Pakistan';
+
+    msg = msg
+      .replace(/\{name\}/gi, contactName)
+      .replace(/\{phone\}/gi, contactPhone)
+      .replace(/\{city\}/gi, contactCity)
+      .replace(/\{plan\}/gi, 'Nunno Pro')
+      .replace(/\{price\}/gi, 'Rs. 5,000')
+      .replace(/\{coupon\}/gi, 'NUNNO30')
+      .replace(/\{link\}/gi, 'https://nunno.cloud');
+
+    return msg;
+  }
+
+  function updateCampaignPreview() {
+    if (!els.campaignBubblePreview) return;
+    const rawTemplate = els.campaignCustomMsg ? els.campaignCustomMsg.value : '';
+    if (!rawTemplate.trim()) {
+      els.campaignBubblePreview.innerHTML = '<span style="color:#8696a0;font-style:italic;">Type a custom message or pick a template above to preview live output...</span>';
       return;
     }
 
-    const lines = text.split(/[\r\n]+/);
-    const assignMode = els.importAssignMode.value; // 'pool', 'mine', 'distribute'
-    let addedCount = 0;
+    const sampleContact = campaignState.audience.length > 0
+      ? campaignState.audience[0]
+      : { name: 'Zeeshan Tariq', phone: '923008472910', display: '+92 300 8472910', city: 'Lahore' };
 
+    const personalized = personalizeMessage(rawTemplate, sampleContact);
+
+    let html = escapeHtml(personalized);
+    html = html.replace(/\*([^*]+)\*/g, '<strong>$1</strong>');
+    html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+    html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.25);padding:1px 4px;border-radius:4px;font-family:monospace;font-size:11px;">$1</code>');
+    html = html.replace(/\n/g, '<br>');
+
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    html += `<div style="font-size:10px;color:rgba(255,255,255,0.6);text-align:right;margin-top:6px;display:flex;justify-content:flex-end;align-items:center;gap:3px;">
+      <span>${timeStr}</span>
+      <span style="color:#53bdeb;">✓✓</span>
+    </div>`;
+
+    els.campaignBubblePreview.innerHTML = html;
+  }
+
+  function parseContactsFromText(text) {
+    if (!text) return 0;
+    const lines = text.split(/[\r\n]+/);
+    let added = 0;
     lines.forEach((line, idx) => {
       line = line.trim();
       if (!line) return;
       const parts = line.split(/[,\t;|]+/);
       const rawPhone = parts[0] ? parts[0].trim() : '';
-      const name = parts[1] ? parts[1].trim() : 'Trader';
-      const city = parts[2] ? parts[2].trim() : 'Pakistan';
+      const rawName = parts[1] ? parts[1].trim() : 'Trader';
+      const rawCity = parts[2] ? parts[2].trim() : 'Pakistan';
 
       const clean = cleanNumber(rawPhone);
       if (!clean) return;
 
-      // Check if already in leads
-      if (state.leads.some(l => l.phone === clean)) return;
+      if (campaignState.audience.some(c => c.phone === clean)) return;
 
-      let ownerId = null;
-      if (assignMode === 'mine') {
-        ownerId = state.currentAgent.id;
-      } else if (assignMode === 'distribute') {
-        const agentIdx = idx % state.agents.length;
-        ownerId = state.agents[agentIdx].id;
-      }
-
-      state.leads.push({
-        id: `lead_${Date.now()}_${idx}`,
-        name: name,
+      campaignState.audience.push({
+        id: `c_lead_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+        name: rawName,
         phone: clean,
         display: `+92 ${clean.substring(2, 5)} ${clean.substring(5)}`,
-        city: city,
+        city: rawCity,
         network: getNetwork(clean),
-        ownerId: ownerId,
-        status: 'unread',
-        unreadCount: 1,
-        interest: 'Nunno Pro',
-        lastActive: 'Just imported',
-        notes: `Imported via .txt file on ${new Date().toLocaleDateString()}.`,
-        messages: [
-          { sender: 'lead', text: 'Lead imported from list. Ready for outreach.', time: 'Just now' }
-        ]
+        status: 'pending',
+        sentAt: null
       });
-      addedCount++;
+      added++;
     });
 
-    closeImportModal();
-    els.txtPasteArea.value = '';
-    renderConversationsList();
-    renderAgentProfile();
-    showToast(`✅ Successfully imported ${addedCount} valid Pakistani numbers!`);
-
-    // Sync imported leads to cPanel server (prevents data scatter)
-    fetch('api/leads_sync.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'import_leads', leads: state.leads })
-    }).catch(() => {});
+    renderCampaignAudienceUI();
+    if (added > 0) {
+      logCampaignTerminal(`✅ Parsed & queued ${added} valid target numbers into campaign. Total audience: ${campaignState.audience.length}.`, 'success');
+    }
+    return added;
   }
 
-  if (els.confirmImportBtn) els.confirmImportBtn.addEventListener('click', handleImport);
+  function renderCampaignAudienceUI() {
+    const count = campaignState.audience.length;
+    if (els.campaignAudienceBadge) {
+      els.campaignAudienceBadge.textContent = `${count} Contacts`;
+    }
+    if (els.campaignLoadedCountText) {
+      els.campaignLoadedCountText.textContent = `${count} Numbers`;
+    }
 
-  // File reader for .txt file input
-  if (els.txtFileInput) {
-    els.txtFileInput.addEventListener('change', (e) => {
-      if (e.target.files.length) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          if (els.txtPasteArea) els.txtPasteArea.value = ev.target.result;
-        };
-        reader.readAsText(e.target.files[0]);
+    if (count > 0) {
+      if (els.campaignAudienceSummary) els.campaignAudienceSummary.style.display = 'flex';
+      if (els.campaignAudienceList) els.campaignAudienceList.style.display = 'flex';
+    } else {
+      if (els.campaignAudienceSummary) els.campaignAudienceSummary.style.display = 'none';
+      if (els.campaignAudienceList) els.campaignAudienceList.style.display = 'none';
+    }
+
+    if (els.campaignAudienceList) {
+      els.campaignAudienceList.innerHTML = campaignState.audience.map((c) => {
+        const dotBg = c.status === 'sent' ? '#10b981' : (c.status === 'sending' ? '#eab308' : '#64748b');
+        const statusLabel = c.status === 'sent'
+          ? `<span style="color:#10b981;font-weight:700;">✓ Sent (${c.sentAt || ''})</span>`
+          : (c.status === 'sending' ? '<span style="color:#eab308;">⏳ Sending...</span>' : '<span style="color:#8696a0;">Pending</span>');
+
+        return `
+          <div class="campaign-audience-item" id="c_item_${c.id}">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:8px;height:8px;border-radius:50%;background:${dotBg};"></div>
+              <div>
+                <div style="font-weight:700;color:#ffffff;font-size:12px;">${escapeHtml(c.name)} <span class="mono text-muted text-xs">(${escapeHtml(c.display)})</span></div>
+                <div class="text-xs text-muted" style="font-size:10.5px;">📍 ${escapeHtml(c.city)} • <span style="color:#00a884;font-weight:600;">${escapeHtml(c.network)}</span></div>
+              </div>
+            </div>
+            <div style="font-size:11px;" id="c_status_${c.id}">${statusLabel}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    updateCampaignPreview();
+  }
+
+  function readCampaignFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target.result;
+      const added = parseContactsFromText(content);
+      if (added > 0) {
+        showToast(`📥 Successfully imported ${added} contacts from ${file.name}!`);
+      } else {
+        showToast(`⚠️ No valid Pakistani phone numbers (03xx / 923xx) found in ${file.name}`);
+      }
+    };
+    reader.onerror = () => {
+      showToast('❌ Failed to read file. Please try pasting the text manually.');
+    };
+    reader.readAsText(file);
+  }
+
+  function applyCampaignDelayPreset(val) {
+    if (!els.campaignDelayMin || !els.campaignDelayMax) return;
+    if (val === 'fast') {
+      els.campaignDelayMin.value = 3;
+      els.campaignDelayMax.value = 6;
+    } else if (val === 'recommended') {
+      els.campaignDelayMin.value = 6;
+      els.campaignDelayMax.value = 12;
+    } else if (val === 'human') {
+      els.campaignDelayMin.value = 12;
+      els.campaignDelayMax.value = 25;
+    }
+    campaignState.minDelay = parseInt(els.campaignDelayMin.value, 10) || 6;
+    campaignState.maxDelay = parseInt(els.campaignDelayMax.value, 10) || 12;
+  }
+
+  function startCampaign() {
+    if (campaignState.isRunning && !campaignState.isPaused) return;
+
+    if (campaignState.audience.length === 0) {
+      showToast('⚠️ Please drop a .txt phone list or paste numbers first!');
+      return;
+    }
+
+    const msg = els.campaignCustomMsg ? els.campaignCustomMsg.value.trim() : '';
+    if (!msg) {
+      showToast('⚠️ Please write a campaign message!');
+      return;
+    }
+
+    const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'Nunno Outreach';
+
+    let minD = parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 6, 10) || 6;
+    let maxD = parseInt(els.campaignDelayMax ? els.campaignDelayMax.value : 12, 10) || 12;
+    if (minD < 1) minD = 1;
+    if (maxD < minD) maxD = minD + 2;
+    campaignState.minDelay = minD;
+    campaignState.maxDelay = maxD;
+
+    campaignState.isRunning = true;
+    campaignState.isPaused = false;
+
+    if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'none';
+    if (els.pauseCampaignBtn) {
+      els.pauseCampaignBtn.style.display = 'inline-flex';
+      els.pauseCampaignBtn.innerHTML = '<span>⏸️ Pause</span>';
+    }
+    if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'inline-flex';
+    if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'block';
+
+    if (els.campaignStatusBadge) {
+      els.campaignStatusBadge.style.color = '#00a884';
+      els.campaignStatusBadge.style.background = '#0a332c';
+      els.campaignStatusBadge.style.borderColor = '#00a884';
+      els.campaignStatusBadge.innerHTML = `🟢 Sending "${escapeHtml(campaignName)}"`;
+    }
+
+    logCampaignTerminal(`🚀 Launching campaign <strong>"${escapeHtml(campaignName)}"</strong> with ${campaignState.audience.length} target contacts. Cadence: ${campaignState.minDelay}s - ${campaignState.maxDelay}s.`, 'info');
+
+    dispatchNextCampaignMessage();
+  }
+
+  function pauseCampaign() {
+    if (!campaignState.isRunning) return;
+
+    if (campaignState.isPaused) {
+      campaignState.isPaused = false;
+      if (els.pauseCampaignBtn) els.pauseCampaignBtn.innerHTML = '<span>⏸️ Pause</span>';
+      if (els.campaignStatusBadge) {
+        els.campaignStatusBadge.style.color = '#00a884';
+        els.campaignStatusBadge.style.background = '#0a332c';
+        els.campaignStatusBadge.style.borderColor = '#00a884';
+        els.campaignStatusBadge.innerHTML = `🟢 Running (${campaignState.currentIndex + 1}/${campaignState.audience.length})`;
+      }
+      logCampaignTerminal(`▶️ Outreach campaign resumed. Dispatching next recipient...`, 'info');
+      dispatchNextCampaignMessage();
+    } else {
+      campaignState.isPaused = true;
+      if (campaignState.timeoutId) clearTimeout(campaignState.timeoutId);
+      if (campaignState.countdownInterval) clearInterval(campaignState.countdownInterval);
+      if (els.pauseCampaignBtn) els.pauseCampaignBtn.innerHTML = '<span>▶️ Resume</span>';
+      if (els.campaignCountdown) els.campaignCountdown.textContent = 'Paused';
+      if (els.campaignStatusBadge) {
+        els.campaignStatusBadge.style.color = '#eab308';
+        els.campaignStatusBadge.style.background = '#3b2f0a';
+        els.campaignStatusBadge.style.borderColor = '#eab308';
+        els.campaignStatusBadge.innerHTML = `🟡 Paused at Lead ${campaignState.currentIndex + 1} of ${campaignState.audience.length}`;
+      }
+      logCampaignTerminal(`⏸️ Campaign paused by operator. Standing by.`, 'warn');
+    }
+  }
+
+  function stopCampaign() {
+    if (campaignState.timeoutId) clearTimeout(campaignState.timeoutId);
+    if (campaignState.countdownInterval) clearInterval(campaignState.countdownInterval);
+
+    campaignState.isRunning = false;
+    campaignState.isPaused = false;
+
+    if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
+    if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
+    if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
+
+    if (els.campaignStatusBadge) {
+      els.campaignStatusBadge.style.color = '#ef4444';
+      els.campaignStatusBadge.style.background = '#311417';
+      els.campaignStatusBadge.style.borderColor = '#ef4444';
+      els.campaignStatusBadge.innerHTML = `⏹️ Stopped (${campaignState.totalSent} Sent)`;
+    }
+
+    logCampaignTerminal(`⏹️ Campaign halted by operator. Total delivered: ${campaignState.totalSent} of ${campaignState.audience.length}.`, 'warn');
+    showToast(`⏹️ Campaign stopped. ${campaignState.totalSent} messages dispatched.`);
+  }
+
+  function finishCampaign() {
+    if (campaignState.timeoutId) clearTimeout(campaignState.timeoutId);
+    if (campaignState.countdownInterval) clearInterval(campaignState.countdownInterval);
+
+    campaignState.isRunning = false;
+    campaignState.isPaused = false;
+
+    if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
+    if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
+    if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
+
+    if (els.campaignCountdown) els.campaignCountdown.textContent = 'Complete';
+    if (els.campaignProgressPct) els.campaignProgressPct.textContent = '100%';
+    if (els.campaignProgressFill) els.campaignProgressFill.style.width = '100%';
+
+    if (els.campaignStatusBadge) {
+      els.campaignStatusBadge.style.color = '#00a884';
+      els.campaignStatusBadge.style.background = '#0a332c';
+      els.campaignStatusBadge.style.borderColor = '#00a884';
+      els.campaignStatusBadge.innerHTML = `✅ All ${campaignState.totalSent} Messages Delivered`;
+    }
+
+    logCampaignTerminal(`🎉 All ${campaignState.totalSent} campaign messages dispatched successfully! All leads registered in CRM.`, 'success');
+    showToast(`🎉 Campaign completed! ${campaignState.totalSent} leads reached.`);
+  }
+
+  function dispatchNextCampaignMessage() {
+    if (!campaignState.isRunning || campaignState.isPaused) return;
+
+    while (campaignState.currentIndex < campaignState.audience.length &&
+           campaignState.audience[campaignState.currentIndex].status === 'sent') {
+      campaignState.currentIndex++;
+    }
+
+    if (campaignState.currentIndex >= campaignState.audience.length) {
+      finishCampaign();
+      return;
+    }
+
+    const contact = campaignState.audience[campaignState.currentIndex];
+    const total = campaignState.audience.length;
+    const currentNum = campaignState.currentIndex + 1;
+
+    if (els.campaignProgressCount) els.campaignProgressCount.textContent = `${currentNum} / ${total}`;
+    const pct = Math.round((currentNum / total) * 100);
+    if (els.campaignProgressPct) els.campaignProgressPct.textContent = `${pct}%`;
+    if (els.campaignProgressFill) els.campaignProgressFill.style.width = `${pct}%`;
+
+    const template = els.campaignCustomMsg ? els.campaignCustomMsg.value : '';
+    const personalizedMsg = personalizeMessage(template, contact);
+    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    contact.status = 'sending';
+    const statusEl = document.getElementById(`c_status_${contact.id}`);
+    if (statusEl) statusEl.innerHTML = '<span style="color:#eab308;">⏳ Sending...</span>';
+
+    const assignMode = els.campaignAssignSelect ? els.campaignAssignSelect.value : 'pool';
+    const currentCloser = state.currentUser;
+    const ownerId = (assignMode === 'mine' && currentCloser) ? currentCloser.id : null;
+    const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'Nunno Outreach';
+
+    let existingLead = state.leads.find(l => l.phone === contact.phone);
+    if (existingLead) {
+      existingLead.messages.push({
+        id: `msg_c_${Date.now()}`,
+        sender: 'agent',
+        agentName: currentCloser ? currentCloser.name : 'System Outreach',
+        text: personalizedMsg,
+        time: timeNow
+      });
+      existingLead.lastActive = 'Just now';
+      existingLead.status = 'sent';
+    } else {
+      const newLead = {
+        id: `lead_${Date.now()}_${contact.phone}`,
+        name: contact.name,
+        phone: contact.phone,
+        display: contact.display,
+        city: contact.city,
+        network: contact.network,
+        ownerId: ownerId,
+        leadState: (assignMode === 'mine') ? 'ongoing' : 'fresh',
+        status: 'sent',
+        unreadCount: 0,
+        interest: 'Nunno Pro',
+        lastActive: 'Just now',
+        notes: `Outreach sent via campaign "${campaignName}". Assign: ${assignMode === 'mine' ? (currentCloser ? currentCloser.name : 'Myself') : 'Open Pool'}.`,
+        messages: [
+          {
+            id: `msg_c_${Date.now()}`,
+            sender: 'agent',
+            agentName: currentCloser ? currentCloser.name : 'System Outreach',
+            text: personalizedMsg,
+            time: timeNow
+          }
+        ]
+      };
+      state.leads.unshift(newLead);
+      existingLead = newLead;
+    }
+
+    contact.status = 'sent';
+    contact.sentAt = timeNow;
+    campaignState.totalSent++;
+
+    if (statusEl) statusEl.innerHTML = `<span style="color:#10b981;font-weight:700;">✓ Sent (${timeNow})</span>`;
+    const itemEl = document.getElementById(`c_item_${contact.id}`);
+    if (itemEl) {
+      const dot = itemEl.querySelector('div[style*="border-radius:50%"]');
+      if (dot) dot.style.background = '#10b981';
+    }
+
+    logCampaignTerminal(`✅ [${currentNum}/${total}] Sent to <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} - ${escapeHtml(contact.city)}, ${contact.network})`, 'success');
+
+    renderConversationsList();
+    if (state.activeLeadId === existingLead.id) {
+      renderActiveChat();
+    }
+
+    syncLeadToServer(existingLead, {
+      newMessage: {
+        id: `msg_c_${Date.now()}`,
+        sender: 'agent',
+        agentName: currentCloser ? currentCloser.name : 'System Outreach',
+        text: personalizedMsg,
+        time: timeNow
+      }
+    });
+
+    campaignState.currentIndex++;
+
+    if (campaignState.currentIndex >= campaignState.audience.length) {
+      finishCampaign();
+      return;
+    }
+
+    const minSec = campaignState.minDelay;
+    const maxSec = campaignState.maxDelay;
+    const jitterSec = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+
+    campaignState.remainingSeconds = jitterSec;
+    if (els.campaignCurrentPace) els.campaignCurrentPace.textContent = `~${jitterSec}s jitter`;
+    if (els.campaignCountdown) els.campaignCountdown.textContent = `${jitterSec}s`;
+
+    if (campaignState.countdownInterval) clearInterval(campaignState.countdownInterval);
+    campaignState.countdownInterval = setInterval(() => {
+      if (campaignState.isPaused || !campaignState.isRunning) {
+        clearInterval(campaignState.countdownInterval);
+        return;
+      }
+      campaignState.remainingSeconds--;
+      if (campaignState.remainingSeconds <= 0) {
+        clearInterval(campaignState.countdownInterval);
+        if (els.campaignCountdown) els.campaignCountdown.textContent = 'Sending...';
+      } else {
+        if (els.campaignCountdown) els.campaignCountdown.textContent = `${campaignState.remainingSeconds}s`;
+      }
+    }, 1000);
+
+    campaignState.timeoutId = setTimeout(() => {
+      dispatchNextCampaignMessage();
+    }, jitterSec * 1000);
+  }
+
+  // Wire Campaign Event Listeners
+  if (els.campaignTagChips) {
+    els.campaignTagChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        const tagToInsert = chip.getAttribute('data-insert') || chip.textContent.trim();
+        if (!els.campaignCustomMsg) return;
+        const start = els.campaignCustomMsg.selectionStart || 0;
+        const end = els.campaignCustomMsg.selectionEnd || 0;
+        const currentText = els.campaignCustomMsg.value;
+        els.campaignCustomMsg.value = currentText.substring(0, start) + tagToInsert + currentText.substring(end);
+        els.campaignCustomMsg.focus();
+        els.campaignCustomMsg.selectionStart = els.campaignCustomMsg.selectionEnd = start + tagToInsert.length;
+        updateCampaignPreview();
+      });
+    });
+  }
+
+  if (els.campaignPitchPreset) {
+    els.campaignPitchPreset.addEventListener('change', (e) => {
+      const selected = e.target.value;
+      if (campaignPitchTemplates[selected] !== undefined && campaignPitchTemplates[selected] !== '') {
+        if (els.campaignCustomMsg) els.campaignCustomMsg.value = campaignPitchTemplates[selected];
+        updateCampaignPreview();
       }
     });
   }
+
+  if (els.campaignCustomMsg) {
+    els.campaignCustomMsg.addEventListener('input', updateCampaignPreview);
+  }
+
+  if (els.campaignPresetSelect) {
+    els.campaignPresetSelect.addEventListener('change', (e) => {
+      applyCampaignDelayPreset(e.target.value);
+    });
+  }
+  if (els.campaignDelayMin) {
+    els.campaignDelayMin.addEventListener('change', () => {
+      campaignState.minDelay = parseInt(els.campaignDelayMin.value, 10) || 6;
+    });
+  }
+  if (els.campaignDelayMax) {
+    els.campaignDelayMax.addEventListener('change', () => {
+      campaignState.maxDelay = parseInt(els.campaignDelayMax.value, 10) || 12;
+    });
+  }
+
+  if (els.campaignDropZone && els.campaignFileInput) {
+    els.campaignDropZone.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT' && !e.target.closest('#campaignFileInput')) {
+        els.campaignFileInput.click();
+      }
+    });
+
+    els.campaignDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      els.campaignDropZone.classList.add('drag-active');
+    });
+
+    els.campaignDropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      els.campaignDropZone.classList.remove('drag-active');
+    });
+
+    els.campaignDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      els.campaignDropZone.classList.remove('drag-active');
+      const files = e.dataTransfer.files;
+      if (files && files.length) {
+        readCampaignFile(files[0]);
+      }
+    });
+
+    els.campaignFileInput.addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (files && files.length) {
+        readCampaignFile(files[0]);
+      }
+      els.campaignFileInput.value = '';
+    });
+  }
+
+  if (els.togglePasteAreaBtn && els.campaignPasteArea && els.applyPasteNumbersBtn) {
+    els.togglePasteAreaBtn.addEventListener('click', () => {
+      const isHidden = els.campaignPasteArea.style.display === 'none';
+      els.campaignPasteArea.style.display = isHidden ? 'block' : 'none';
+      els.applyPasteNumbersBtn.style.display = isHidden ? 'block' : 'none';
+      const span = els.togglePasteAreaBtn.querySelector('span');
+      if (span) span.textContent = isHidden ? '✕ Hide Manual Paste Box' : '✏️ Or Paste Phone Numbers Manually';
+    });
+
+    els.applyPasteNumbersBtn.addEventListener('click', () => {
+      const text = els.campaignPasteArea.value.trim();
+      if (!text) {
+        showToast('⚠️ Please paste numbers first.');
+        return;
+      }
+      const added = parseContactsFromText(text);
+      if (added > 0) {
+        showToast(`✅ Added ${added} contacts from manual paste.`);
+        els.campaignPasteArea.value = '';
+      } else {
+        showToast('⚠️ No valid Pakistani numbers detected.');
+      }
+    });
+  }
+
+  if (els.clearAudienceBtn) {
+    els.clearAudienceBtn.addEventListener('click', () => {
+      if (campaignState.isRunning) {
+        showToast('⚠️ Cannot clear while campaign is active. Stop it first.');
+        return;
+      }
+      campaignState.audience = [];
+      campaignState.currentIndex = 0;
+      campaignState.totalSent = 0;
+      renderCampaignAudienceUI();
+      logCampaignTerminal('🗑️ Target audience list cleared by operator.', 'info');
+      showToast('Audience list cleared.');
+    });
+  }
+
+  if (els.startCampaignBtn) els.startCampaignBtn.addEventListener('click', startCampaign);
+  if (els.pauseCampaignBtn) els.pauseCampaignBtn.addEventListener('click', pauseCampaign);
+  if (els.stopCampaignBtn) els.stopCampaignBtn.addEventListener('click', stopCampaign);
 
   // ==========================================
   // MOBILE & TABLET RESPONSIVE DRAWER CONTROLS
@@ -1711,6 +2269,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (tabName === 'campaign') {
       if (els.tabCampaign) els.tabCampaign.classList.add('active', 'tab-wa');
       if (els.viewCampaign) els.viewCampaign.style.display = 'block';
+      updateCampaignPreview();
+      renderCampaignAudienceUI();
     }
   }
 
@@ -3527,4 +4087,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderConversationsList();
   renderActiveChat();
   fetchServerLeads();
+  updateCampaignPreview();
+  renderCampaignAudienceUI();
 });

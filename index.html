@@ -467,72 +467,146 @@
        VIEW 2: OUTREACH QUEUE & CAMPAIGN STUDIO
        ==================================================== -->
   <div class="view-container" id="viewCampaign">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <h2 style="font-size:17px;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:8px;">
+          <span>🚀</span>
+          <span>WhatsApp Campaign Outreach Studio</span>
+        </h2>
+        <p class="text-xs text-muted" style="margin-top:2px;">Launch personalized human-cadence outreach campaigns with custom delay and anti-ban jitter intervals.</p>
+      </div>
+      <div id="campaignStatusBadge" class="panel-badge mono" style="font-size:11.5px;padding:4px 10px;color:#8696a0;background:#182229;border:1px solid #2a3942;">
+        ⚪ Ready to Launch
+      </div>
+    </div>
+
     <div class="campaign-grid">
-      <!-- Left: Audience & Sanitizer -->
+      <!-- COLUMN 1: Audience & .txt File Drop Zone -->
       <aside class="panel">
         <div class="panel-header">
           <div class="panel-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-wa)" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>Batch Outreach List</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Target Audience & Contacts</span>
           </div>
-          <span class="panel-badge mono">1-Click Queue</span>
+          <span id="campaignAudienceBadge" class="panel-badge mono">0 Contacts</span>
         </div>
 
-        <p class="text-xs text-muted">Outreach pitches are delivered to assigned leads with anti-ban human cadence.</p>
+        <!-- 1. Campaign Name -->
+        <div class="form-group">
+          <label class="form-label" for="campaignNameInput">Campaign Name</label>
+          <input type="text" id="campaignNameInput" class="form-input" value="Nunno VIP Outreach" placeholder="e.g. October VIP Scalpers Pitch">
+        </div>
 
-        <div class="stats-grid">
-          <div class="stat-box">
-            <span class="stat-val text-wa">8</span>
-            <span class="stat-lbl">Total Leads</span>
+        <!-- 2. Drop .txt File Area -->
+        <div class="form-group">
+          <label class="form-label">Drop Target Numbers (.txt / .csv)</label>
+          <input type="file" id="campaignFileInput" accept=".txt,.csv" style="display:none;">
+          <div class="campaign-drop-zone" id="campaignDropZone" title="Click or Drag & Drop .txt file here">
+            <div class="drop-zone-icon">📥</div>
+            <div class="drop-zone-title">Drop your .txt phone list here</div>
+            <div class="drop-zone-sub">or <span class="drop-zone-browse">browse files</span> from your computer</div>
+            <div class="drop-zone-hint">Format: 03001234567, Ali, Lahore (1 per line). Numbers are auto-sanitized.</div>
           </div>
-          <div class="stat-box">
-            <span class="stat-val" style="color:var(--c-indigo);">3</span>
-            <span class="stat-lbl">My Claimed</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-val" style="color:#ef4444;">4</span>
-            <span class="stat-lbl">🔴 Fresh (Unclaimed)</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-val" style="color:#10b981;">1</span>
-            <span class="stat-lbl">🟢 Closed (Paid)</span>
-          </div>
+        </div>
+
+        <!-- 3. Toggle Paste Area -->
+        <div>
+          <button type="button" class="btn btn-ghost btn-xs" id="togglePasteAreaBtn" style="width:100%;justify-content:center;">
+            <span>✏️ Or Paste Phone Numbers Manually</span>
+          </button>
+          <textarea id="campaignPasteArea" class="form-textarea mono text-xs" style="display:none;min-height:90px;margin-top:6px;" placeholder="03001234567, Ali, Lahore&#10;03214567890, Bilal, Karachi&#10;+923335123984, Usman, Islamabad"></textarea>
+          <button type="button" class="btn btn-secondary btn-xs" id="applyPasteNumbersBtn" style="display:none;width:100%;margin-top:4px;">
+            <span>Parse & Add Pasted Numbers</span>
+          </button>
+        </div>
+
+        <!-- 4. Loaded Audience Preview -->
+        <div id="campaignAudienceSummary" style="display:none;" class="campaign-audience-summary">
+          <span>👥 <strong id="campaignLoadedCountText">0 Numbers</strong> loaded</span>
+          <button type="button" class="btn btn-ghost btn-xs" id="clearAudienceBtn" style="color:#ef4444;">Clear</button>
+        </div>
+
+        <div id="campaignAudienceList" class="campaign-audience-list" style="display:none;">
+          <!-- Dynamically populated contacts -->
+        </div>
+
+        <!-- 5. Closer Assignment -->
+        <div class="form-group">
+          <label class="form-label">Assign Created Leads To</label>
+          <select id="campaignAssignSelect" class="form-select form-select-sm">
+            <option value="pool">🟢 Open Pool (Available for any closer to claim)</option>
+            <option value="mine">🔒 Myself (Lock directly to my profile)</option>
+          </select>
         </div>
       </aside>
 
-      <!-- Center: Template & Spintax -->
+      <!-- COLUMN 2: Delay Configuration & Detailed Custom Message -->
       <section class="panel">
         <div class="panel-header">
           <div class="panel-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-indigo)" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            <span>Nunno High-Conversion Pitch</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Message Content & Human Cadence</span>
           </div>
-          <span class="panel-badge" style="color:var(--c-indigo);">Spintax Active</span>
+          <span class="panel-badge" style="color:#00a884;">Spintax Enabled</span>
         </div>
 
+        <!-- Delay Interval Configuration -->
+        <div class="campaign-delay-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;font-size:12.5px;color:#e9edef;display:flex;align-items:center;gap:6px;">
+              <span>⏱️ Anti-Ban Human Cadence Delay</span>
+            </div>
+            <select id="campaignPresetSelect" class="form-select form-select-sm" style="width:auto;padding:3px 8px;font-size:11px;">
+              <option value="fast">⚡ Fast (3s - 6s)</option>
+              <option value="recommended" selected>🛡️ Safe Recommended (6s - 12s)</option>
+              <option value="human">👤 Natural Human (12s - 25s)</option>
+              <option value="custom">⚙️ Custom Pace</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <div style="flex:1;">
+              <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Min Delay (seconds)</label>
+              <input type="number" id="campaignDelayMin" class="form-input form-input-sm" value="6" min="1" max="180">
+            </div>
+            <div style="flex:1;">
+              <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Max Delay (seconds)</label>
+              <input type="number" id="campaignDelayMax" class="form-input form-input-sm" value="12" min="2" max="300">
+            </div>
+          </div>
+        </div>
+
+        <!-- Strategy Template Selector -->
         <div class="form-group">
-          <label class="form-label">Select Pitch Strategy</label>
-          <select id="campaignTemplateSelect" class="form-select">
-            <option value="pro_liquidation_urdu">Crypto Liquidation Alert (Roman Urdu)</option>
-            <option value="gold_scalper_hybrid">Gold ($XAUUSD) & Forex Scalper Pitch</option>
-            <option value="flash_discount_easypaisa">Flash 48-Hour Discount (EasyPaisa/JazzCash)</option>
-            <option value="institutional_alpha_en">Institutional Alpha (English Professional)</option>
+          <label class="form-label">Pitch Template / Starting Draft</label>
+          <select id="campaignPitchPreset" class="form-select form-select-sm">
+            <option value="custom">✍️ Custom Message (Write Your Own)</option>
+            <option value="pro_liquidation_urdu" selected>💎 Crypto Liquidation Alert (Roman Urdu)</option>
+            <option value="starter_scalper">⚡ Nunno Starter (Rs. 1,700 Scalper Signals)</option>
+            <option value="flash_discount">🔥 Flash 48-Hour Discount (EasyPaisa / JazzCash)</option>
+            <option value="whale_institutional">🐋 Whale Institutional Alpha (VIP Futures)</option>
           </select>
         </div>
 
+        <!-- Personalization Tags -->
         <div class="form-group">
-          <label class="form-label">Personalization Tags</label>
+          <label class="form-label" style="display:flex;justify-content:space-between;">
+            <span>Personalization Tags (Click to insert)</span>
+            <span class="text-xs text-muted">Auto-replaced per client</span>
+          </label>
           <div class="tag-chips">
-            <span class="tag-chip">{name}</span>
-            <span class="tag-chip">{plan}</span>
-            <span class="tag-chip">{price}</span>
-            <span class="tag-chip">{coupon}</span>
-            <span class="tag-chip">{link}</span>
+            <span class="tag-chip" data-insert="{name}">{name}</span>
+            <span class="tag-chip" data-insert="{phone}">{phone}</span>
+            <span class="tag-chip" data-insert="{city}">{city}</span>
+            <span class="tag-chip" data-insert="{plan}">{plan}</span>
+            <span class="tag-chip" data-insert="{price}">{price}</span>
+            <span class="tag-chip" data-insert="{coupon}">{coupon}</span>
+            <span class="tag-chip" data-insert="{link}">{link}</span>
           </div>
         </div>
 
+        <!-- Custom Message Textarea -->
         <div class="form-group" style="flex:1;">
-          <textarea class="form-textarea" style="min-height:160px;">{Salam|AoA|Hello} {name|Bhai|Trader}!
+          <textarea id="campaignCustomMsg" class="form-textarea" style="min-height:160px;line-height:1.5;font-size:13px;" placeholder="Write your detailed WhatsApp outreach message here...">{Salam|AoA|Hello} {name|Bhai|Trader}!
 
 Kya aap bar bar market ke sudden wick ya stop-loss hunt se liquid ho rahe hain? 📉❌
 
@@ -549,28 +623,65 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         </div>
       </section>
 
-      <!-- Right: Real-Time Preview Simulator -->
+      <!-- COLUMN 3: Real-Time Preview, Launch Controls & Live Terminal -->
       <aside class="panel">
         <div class="panel-header">
           <div class="panel-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-wa)" stroke-width="2.5"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            <span>Live WhatsApp Bubble</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            <span>Live WhatsApp Bubble Preview</span>
           </div>
           <span class="panel-badge mono">Preview</span>
         </div>
 
-        <div style="background:#0b141a;border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.08);">
-          <div style="background:#005c4b;color:#ffffff;padding:10px 14px;border-radius:8px 0px 8px 8px;font-size:12.5px;line-height:1.45;">
-            Salam Zeeshan Bhai!<br><br>
-            Kya aap bar bar sudden liquidation wick se tang aa chuke hain?<br><br>
-            <strong>Nunno AI Pro</strong> sirf <strong>Rs. 5,000/mo</strong> mein EasyPaisa / JazzCash se activate karein. Coupon <code>NUNNO30</code> se 30% discount!<br><br>
-            <span style="font-size:10px;color:rgba(255,255,255,0.6);float:right;">09:41 AM ✓✓</span>
+        <!-- Live Bubble Simulator -->
+        <div style="background:#0b141a;border-radius:12px;padding:14px;border:1px solid #222d34;">
+          <div id="campaignBubblePreview" style="background:#005c4b;color:#e9edef;padding:10px 14px;border-radius:8px 8px 2px 8px;font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word;">
+            <!-- Live Preview -->
           </div>
         </div>
 
-        <button class="btn btn-wa btn-lg" style="width:100%;margin-top:10px;" onclick="window.open('https://web.whatsapp.com', '_blank')">
-          <span>Open WhatsApp Web Session</span>
-        </button>
+        <!-- Campaign Launch Controls -->
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+          <button type="button" class="btn btn-wa btn-lg" id="startCampaignBtn" style="width:100%;justify-content:center;font-weight:700;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>Start Outreach Campaign</span>
+          </button>
+
+          <div style="display:flex;gap:6px;">
+            <button type="button" class="btn btn-secondary btn-sm" id="pauseCampaignBtn" style="flex:1;display:none;">
+              <span>⏸️ Pause</span>
+            </button>
+            <button type="button" class="btn btn-rose btn-sm" id="stopCampaignBtn" style="flex:1;display:none;">
+              <span>⏹️ Stop Campaign</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Progress Status -->
+        <div id="campaignProgressCard" class="campaign-progress-wrap" style="display:none;margin-top:6px;">
+          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:#e9edef;">
+            <span>Progress: <strong id="campaignProgressCount">0 / 0</strong></span>
+            <span id="campaignProgressPct">0%</span>
+          </div>
+          <div class="campaign-progress-bar">
+            <div id="campaignProgressFill" class="campaign-progress-fill"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#8696a0;">
+            <span>Next in: <strong id="campaignCountdown" style="color:#00a884;">--</strong></span>
+            <span>Speed: <span id="campaignCurrentPace">--</span></span>
+          </div>
+        </div>
+
+        <!-- Live Terminal Log -->
+        <div class="form-group" style="margin-top:6px;">
+          <label class="form-label" style="display:flex;justify-content:space-between;">
+            <span>Live Dispatch Log</span>
+            <span class="text-xs text-muted" id="campaignLogCount">0 events</span>
+          </label>
+          <div id="campaignTerminalLog" class="campaign-terminal-log">
+            <div class="log-line log-info">System ready. Drop a .txt list or paste numbers to begin outreach.</div>
+          </div>
+        </div>
       </aside>
     </div>
   </div>
