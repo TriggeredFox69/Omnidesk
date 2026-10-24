@@ -403,7 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
     dossierUselessBtn: document.getElementById('dossierUselessBtn'),
     dossierClaimBtn: document.getElementById('dossierClaimBtn'),
     dossierReleaseBtn: document.getElementById('dossierReleaseBtn'),
-    dossierTransferSelect: document.getElementById('dossierTransferSelect'),
     dossierNotes: document.getElementById('dossierNotes'),
     notesSavedIndicator: document.getElementById('notesSavedIndicator'),
     matrixBtns: document.querySelectorAll('.matrix-btn'),
@@ -754,22 +753,6 @@ document.addEventListener('DOMContentLoaded', () => {
     lead.status = 'replied';
 
     showToast(`🟡 Lead re-opened to Ongoing.`);
-    renderConversationsList();
-    renderActiveChat();
-    renderAgentProfile();
-    syncLeadToServer(lead);
-  }
-
-  // Transfer Lead
-  function transferLead(leadId, targetAgentId) {
-    const lead = getLead(leadId);
-    const targetAgent = getAgent(targetAgentId);
-    if (!lead || !targetAgent) return;
-
-    lead.ownerId = targetAgentId;
-    lead.leadState = 'ongoing';
-
-    showToast(`➡️ Lead successfully transferred to ${targetAgent.name}!`);
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
@@ -1483,17 +1466,6 @@ document.addEventListener('DOMContentLoaded', () => {
             syncLeadToServer(lead);
           }, 400);
         }
-      }
-    });
-  }
-
-  // Dossier Transfer Select
-  if (els.dossierTransferSelect) {
-    els.dossierTransferSelect.addEventListener('change', (e) => {
-      const targetId = e.target.value;
-      if (targetId && state.activeLeadId) {
-        transferLead(state.activeLeadId, targetId);
-        e.target.value = '';
       }
     });
   }

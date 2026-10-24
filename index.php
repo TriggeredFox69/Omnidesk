@@ -403,22 +403,13 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
           </div>
         </div>
 
-        <!-- Claim / Release Actions -->
+        <!-- Claim / Can't Handle Actions -->
         <div style="display:flex;gap:6px;margin-top:8px;">
           <button type="button" class="btn btn-claim btn-sm" id="dossierClaimBtn" style="flex:1;display:none;">✋ Take Lead</button>
-          <button type="button" class="btn btn-ghost btn-xs" id="dossierReleaseBtn" style="flex:1;">Release to Pool</button>
-        </div>
-
-        <!-- Reassignment Select -->
-        <div class="form-group" style="margin-top:8px;">
-          <label class="text-xs text-muted" style="margin-bottom:3px;display:block;">Transfer to Teammate</label>
-          <select id="dossierTransferSelect" class="form-select form-select-sm">
-            <option value="">-- Select Closer --</option>
-            <option value="EMP-101">Hamza Khan (EMP-101)</option>
-            <option value="EMP-102">Bilal Tariq (EMP-102)</option>
-            <option value="EMP-103">Ayesha Noor (EMP-103)</option>
-            <option value="EMP-104">Zain Ahmed (EMP-104)</option>
-          </select>
+          <button type="button" class="btn btn-warning btn-xs" id="dossierReleaseBtn" style="flex:1;display:none;" title="Can't handle this client? Release back to Red pool">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            <span>Can't Handle (Release to Red)</span>
+          </button>
         </div>
       </div>
 
