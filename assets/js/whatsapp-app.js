@@ -327,15 +327,6 @@ document.addEventListener('DOMContentLoaded', () => {
     closeAgentModalBtn: document.getElementById('closeAgentModalBtn'),
     agentListContainer: document.getElementById('agentListContainer'),
 
-    // Manual .txt Import Modal
-    importTxtModal: document.getElementById('importTxtModal'),
-    openImportModalBtn: document.getElementById('openImportModalBtn'),
-    closeImportModalBtn: document.getElementById('closeImportModalBtn'),
-    txtFileInput: document.getElementById('txtFileInput'),
-    txtPasteArea: document.getElementById('txtPasteArea'),
-    importAssignMode: document.getElementById('importAssignMode'),
-    confirmImportBtn: document.getElementById('confirmImportBtn'),
-
     // Inbox Controls
     convSearchInput: document.getElementById('convSearchInput'),
     inboxFilterBtns: document.querySelectorAll('.inbox-filter-btn'),
