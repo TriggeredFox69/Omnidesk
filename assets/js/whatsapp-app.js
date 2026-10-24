@@ -47,7 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
         { sender: 'agent', agentName: 'Hamza Khan', text: 'Salam Zeeshan Bhai! Nunno AI Cloud ne Pakistan ke crypto traders ke liye Liquidation Magnet System launch kiya hai jo exact level pehle dikhata hai jahan whales target kar rahi hain. 30% OFF offer available hai!', time: '10:15 AM' },
         { sender: 'lead', text: 'Assalam o alaikum bhai, EasyPaisa se payment ho sakti hai? Aur breakout alert kitne symbols pe aata hai?', time: '10:32 AM' },
         { sender: 'agent', agentName: 'Hamza Khan', text: 'Ji bilkul Zeeshan Bhai! EasyPaisa, JazzCash aur USDT teenon supported hain. Pro plan mein 12-layer multi-symbol alerts live aate hain.', time: '10:35 AM' },
-        { sender: 'lead', text: 'Theek hai, mujhe EasyPaisa account number share kar dein, main abhi activate karwana chahta hoon.', time: '10:40 AM' }
+        { sender: 'lead', text: 'Theek hai, mujhe EasyPaisa account number share kar dein, main abhi activate karwana chahta hoon.', time: '10:40 AM' },
+        { id: 'msg_lead1_vn1', sender: 'lead', type: 'audio', duration: '0:24', durationSeconds: 24, text: '🎙️ Voice note (0:24)', time: '10:41 AM' },
+        { id: 'msg_lead1_vn2', sender: 'agent', agentName: 'Hamza Khan', type: 'audio', duration: '0:18', durationSeconds: 18, text: '🎙️ Voice note (0:18)', time: '10:42 AM' }
       ]
     },
     {
@@ -67,7 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
       messages: [
         { sender: 'agent', agentName: 'System Outreach', text: '⚡ FLASH 48-HOUR TRADER PASS: Bilal Bhai, Nunno Pro pe flat 40% discount chal raha hai. EasyPaisa / JazzCash instant accepted: nunno.cloud', time: '09:00 AM' },
         { sender: 'lead', text: 'AoA bhai, kya isme Gold ($XAUUSD) ke liquidation wicks bhi detect hote hain?', time: '09:45 AM' },
-        { sender: 'lead', text: 'Mujhe demo video ya coupon code send karein.', time: '09:46 AM' }
+        { sender: 'lead', text: 'Mujhe demo video ya coupon code send karein.', time: '09:46 AM' },
+        { id: 'msg_lead2_vn1', sender: 'lead', type: 'audio', duration: '0:35', durationSeconds: 35, text: '🎙️ Voice note (0:35)', time: '09:48 AM' }
       ]
     },
     {
@@ -136,7 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
       notes: 'Big portfolio trader. Looking for private whale signals.',
       messages: [
         { sender: 'agent', agentName: 'System Outreach', text: 'Salam Hamza! Institutional order flow alpha is now live on Nunno Whale Suite.', time: 'Yesterday' },
-        { sender: 'lead', text: 'Whale tier ka yearly price kya hai? Kya 1-on-1 trading architect support milega?', time: '06:15 PM' }
+        { sender: 'lead', text: 'Whale tier ka yearly price kya hai? Kya 1-on-1 trading architect support milega?', time: '06:15 PM' },
+        { id: 'msg_lead5_vn1', sender: 'lead', type: 'audio', duration: '0:42', durationSeconds: 42, text: '🎙️ Voice note (0:42)', time: '06:17 PM' }
       ]
     },
     {
@@ -367,6 +371,17 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput: document.getElementById('chatInput'),
     sendMsgBtn: document.getElementById('sendMsgBtn'),
     launchNativeWaBtn: document.getElementById('launchNativeWaBtn'),
+    simClientAudioBtn: document.getElementById('simClientAudioBtn'),
+
+    // Audio & Voice Message Controls
+    voiceRecordBtn: document.getElementById('voiceRecordBtn'),
+    audioUploadBtn: document.getElementById('audioUploadBtn'),
+    audioFileInput: document.getElementById('audioFileInput'),
+    composerNormalView: document.getElementById('composerNormalView'),
+    composerRecordingView: document.getElementById('composerRecordingView'),
+    recordingTimer: document.getElementById('recordingTimer'),
+    cancelRecordBtn: document.getElementById('cancelRecordBtn'),
+    sendRecordBtn: document.getElementById('sendRecordBtn'),
 
     // Macro Chips
     macroChips: document.querySelectorAll('.quick-macro-chip'),
@@ -880,7 +895,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="conv-timestamp">${lastMsg.time || lead.lastActive}</span>
           </div>
           <div class="conv-preview-row">
-            <span class="text-xs text-muted">${lastMsg.text}</span>
+            <span class="text-xs text-muted" style="${lastMsg.type === 'audio' ? 'color:#53bdeb;display:inline-flex;align-items:center;gap:4px;' : ''}">${lastMsg.type === 'audio' ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice note (${lastMsg.duration || '0:20'})` : escapeHtml(lastMsg.text)}</span>
           </div>
           <div class="conv-bottom-row">
             <span class="mono text-xs text-muted">${lead.display}</span>
@@ -1110,20 +1125,84 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="msg-date-divider">TODAY • ENCRYPTED WHATSAPP THREAD</div>
       `;
 
-      lead.messages.forEach(msg => {
+      lead.messages.forEach((msg, idx) => {
         const bubble = document.createElement('div');
         const isInbound = msg.sender === 'lead';
         bubble.className = `msg-bubble ${isInbound ? 'msg-inbound' : 'msg-outbound'}`;
 
-        bubble.innerHTML = `
-          ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
-          <div>${formatText(msg.text)}</div>
-          <div class="msg-meta-row">
-            <span>${escapeHtml(msg.time)}</span>
-            ${!isInbound ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#53bdeb" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 14.5 17.5"/></svg>` : ''}
-          </div>
-        `;
+        if (msg.type === 'audio') {
+          bubble.classList.add('msg-audio-bubble');
+          const msgId = msg.id || (`msg_audio_${idx}_${(msg.time || '').replace(/[^a-zA-Z0-9]/g, '')}`);
+          msg.id = msgId;
+          const durSec = msg.durationSeconds || parseDurationToSeconds(msg.duration || '0:20');
+          const durDisplay = msg.duration || formatSeconds(durSec);
+          const isCurrentlyPlaying = activeAudio.msgId === msgId;
+
+          bubble.innerHTML = `
+            ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : `<div class="msg-sender-tag" style="color:#53bdeb;">🎙️ Client Voice Note</div>`}
+            <div class="voice-player" id="vp_${msgId}" data-msg-id="${msgId}">
+              <button type="button" class="vn-play-btn" data-vn-id="${msgId}" title="Play/Pause Voice Note">
+                <svg class="vn-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="${isCurrentlyPlaying ? 'display:none;' : ''}"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                <svg class="vn-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="${isCurrentlyPlaying ? '' : 'display:none;'}"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              </button>
+
+              <div class="vn-body">
+                <div class="vn-waveform-track" data-track-id="${msgId}" title="Click to seek">
+                  <div class="vn-waveform-bars" id="vnbars_${msgId}">
+                    ${generateWaveformBarsHtml(durSec)}
+                  </div>
+                </div>
+                <div class="vn-info-row">
+                  <span class="vn-timer" id="vntimer_${msgId}">${durDisplay}</span>
+                  <button type="button" class="vn-speed-btn" data-speed-id="${msgId}" title="Toggle playback speed (1x / 1.5x / 2x)">${activeAudio.currentRate || 1}x</button>
+                </div>
+              </div>
+
+              <div class="vn-mic-badge-wrap">
+                <div class="vn-avatar">${isInbound ? '👤' : (state.currentAgent?.avatar || '🎧')}</div>
+                <div class="vn-mic-badge">🎤</div>
+              </div>
+            </div>
+            <div class="msg-meta-row">
+              <span>${escapeHtml(msg.time)}</span>
+              ${!isInbound ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#53bdeb" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 14.5 17.5"/></svg>` : ''}
+            </div>
+          `;
+        } else {
+          bubble.innerHTML = `
+            ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
+            <div>${formatText(msg.text)}</div>
+            <div class="msg-meta-row">
+              <span>${escapeHtml(msg.time)}</span>
+              ${!isInbound ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#53bdeb" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 14.5 17.5"/></svg>` : ''}
+            </div>
+          `;
+        }
+
         els.chatMessagesArea.appendChild(bubble);
+      });
+
+      // Attach voice note interaction handlers
+      els.chatMessagesArea.querySelectorAll('.vn-play-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-vn-id');
+          if (id) playVoiceNote(id);
+        });
+      });
+      els.chatMessagesArea.querySelectorAll('.vn-speed-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-speed-id');
+          if (id) cyclePlaybackSpeed(id);
+        });
+      });
+      els.chatMessagesArea.querySelectorAll('.vn-waveform-track').forEach(track => {
+        track.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = track.getAttribute('data-track-id');
+          if (id) seekAudio(id, e);
+        });
       });
 
       els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
@@ -2890,6 +2969,563 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('📊 Exported payroll and task commission audit CSV!');
   }
 
+  // ====================================================
+  // WHATSAPP VOICE NOTES & AUDIO ENGINE (PTT & RECEIVE)
+  // ====================================================
+
+  function formatSeconds(totalSec) {
+    const s = Math.round(Number(totalSec) || 0);
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
+
+  function parseDurationToSeconds(durStr) {
+    if (!durStr) return 20;
+    const parts = durStr.split(':').map(Number);
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return (parts[0] * 60) + parts[1];
+    }
+    return Number(durStr) || 20;
+  }
+
+  function generateWaveformBarsHtml(durSec) {
+    const heights = [35, 60, 40, 80, 100, 50, 70, 90, 45, 65, 85, 30, 55, 95, 75, 40, 60, 85, 100, 70, 50, 35, 65, 80, 45, 60, 30, 50];
+    return heights.map((h, i) => `<span class="vn-bar" data-bar-idx="${i}" style="height:${h}%;"></span>`).join('');
+  }
+
+  // Active Playback State
+  const activeAudio = {
+    msgId: null,
+    audioElement: null,
+    synthInterval: null,
+    audioContext: null,
+    oscillator: null,
+    gainNode: null,
+    currentRate: 1, // 1x, 1.5x, 2x
+    currentTime: 0,
+    duration: 0
+  };
+
+  function stopCurrentAudio() {
+    if (activeAudio.audioElement) {
+      try {
+        activeAudio.audioElement.pause();
+        activeAudio.audioElement.currentTime = 0;
+      } catch (e) {}
+      activeAudio.audioElement = null;
+    }
+    if (activeAudio.synthInterval) {
+      clearInterval(activeAudio.synthInterval);
+      activeAudio.synthInterval = null;
+    }
+    if (activeAudio.oscillator) {
+      try { activeAudio.oscillator.stop(); } catch (e) {}
+      activeAudio.oscillator = null;
+    }
+    if (activeAudio.gainNode) {
+      try { activeAudio.gainNode.disconnect(); } catch (e) {}
+      activeAudio.gainNode = null;
+    }
+
+    if (activeAudio.msgId) {
+      updateVoicePlayerUI(activeAudio.msgId, false, 0, activeAudio.duration);
+    }
+    activeAudio.msgId = null;
+    activeAudio.currentTime = 0;
+  }
+
+  function playVoiceNote(msgId) {
+    const lead = getLead(state.activeLeadId);
+    if (!lead) return;
+    const msg = lead.messages.find(m => m.id === msgId);
+    if (!msg) return;
+
+    if (activeAudio.msgId === msgId) {
+      // Toggle pause if already playing this message
+      stopCurrentAudio();
+      return;
+    }
+
+    // Stop whatever else might be playing
+    stopCurrentAudio();
+
+    activeAudio.msgId = msgId;
+    const durSec = msg.durationSeconds || parseDurationToSeconds(msg.duration || '0:20');
+    activeAudio.duration = durSec;
+    activeAudio.currentTime = 0;
+
+    updateVoicePlayerUI(msgId, true, 0, durSec);
+
+    // If message contains a real playable audio data URL or blob
+    if (msg.audioUrl) {
+      try {
+        const audio = new Audio(msg.audioUrl);
+        audio.playbackRate = activeAudio.currentRate || 1;
+        activeAudio.audioElement = audio;
+
+        audio.addEventListener('timeupdate', () => {
+          if (activeAudio.msgId !== msgId) return;
+          activeAudio.currentTime = audio.currentTime;
+          updateVoicePlayerUI(msgId, true, audio.currentTime, audio.duration || durSec);
+        });
+
+        audio.addEventListener('ended', () => {
+          stopCurrentAudio();
+        });
+
+        audio.addEventListener('error', () => {
+          playSyntheticVoice(msgId, durSec);
+        });
+
+        audio.play().catch(err => {
+          playSyntheticVoice(msgId, durSec);
+        });
+      } catch (e) {
+        playSyntheticVoice(msgId, durSec);
+      }
+    } else {
+      // Pleasant audible speech-cadence synthesizer for demo & simulated voice notes
+      playSyntheticVoice(msgId, durSec);
+    }
+  }
+
+  function playSyntheticVoice(msgId, durationSec) {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) {
+        runTimerOnlyPlayback(msgId, durationSec);
+        return;
+      }
+      if (!activeAudio.audioContext) {
+        activeAudio.audioContext = new AudioCtx();
+      }
+      if (activeAudio.audioContext.state === 'suspended') {
+        activeAudio.audioContext.resume();
+      }
+
+      const ctx = activeAudio.audioContext;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(230, ctx.currentTime);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(850, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      activeAudio.oscillator = osc;
+      activeAudio.gainNode = gain;
+
+      let step = 0;
+      const intervalMs = 100;
+      activeAudio.synthInterval = setInterval(() => {
+        if (activeAudio.msgId !== msgId) {
+          clearInterval(activeAudio.synthInterval);
+          return;
+        }
+        activeAudio.currentTime += (intervalMs / 1000) * (activeAudio.currentRate || 1);
+
+        step++;
+        if (osc.frequency) {
+          const modFreq = 220 + Math.sin(step * 0.4) * 40 + Math.cos(step * 0.2) * 15;
+          osc.frequency.setValueAtTime(modFreq, ctx.currentTime);
+        }
+
+        updateVoicePlayerUI(msgId, true, activeAudio.currentTime, durationSec);
+
+        if (activeAudio.currentTime >= durationSec) {
+          stopCurrentAudio();
+        }
+      }, intervalMs);
+    } catch (err) {
+      runTimerOnlyPlayback(msgId, durationSec);
+    }
+  }
+
+  function runTimerOnlyPlayback(msgId, durationSec) {
+    const intervalMs = 100;
+    activeAudio.synthInterval = setInterval(() => {
+      if (activeAudio.msgId !== msgId) {
+        clearInterval(activeAudio.synthInterval);
+        return;
+      }
+      activeAudio.currentTime += (intervalMs / 1000) * (activeAudio.currentRate || 1);
+      updateVoicePlayerUI(msgId, true, activeAudio.currentTime, durationSec);
+      if (activeAudio.currentTime >= durationSec) {
+        stopCurrentAudio();
+      }
+    }, intervalMs);
+  }
+
+  function updateVoicePlayerUI(msgId, isPlaying, currentSec, totalSec) {
+    const player = document.getElementById(`vp_${msgId}`);
+    if (!player) return;
+
+    const playIcon = player.querySelector('.vn-icon-play');
+    const pauseIcon = player.querySelector('.vn-icon-pause');
+    const timer = player.querySelector('.vn-timer');
+    const barsContainer = player.querySelector('.vn-waveform-bars');
+
+    if (playIcon && pauseIcon) {
+      playIcon.style.display = isPlaying ? 'none' : 'block';
+      pauseIcon.style.display = isPlaying ? 'block' : 'none';
+    }
+
+    if (timer) {
+      if (isPlaying && currentSec > 0) {
+        timer.textContent = `${formatSeconds(currentSec)} / ${formatSeconds(totalSec)}`;
+      } else {
+        timer.textContent = formatSeconds(totalSec);
+      }
+    }
+
+    if (barsContainer) {
+      const bars = barsContainer.querySelectorAll('.vn-bar');
+      const ratio = totalSec > 0 ? Math.min(1, Math.max(0, currentSec / totalSec)) : 0;
+      const playedCount = Math.round(ratio * bars.length);
+      bars.forEach((b, i) => {
+        b.classList.toggle('played', i <= playedCount);
+      });
+    }
+  }
+
+  function cyclePlaybackSpeed(msgId) {
+    const player = document.getElementById(`vp_${msgId}`);
+    if (!player) return;
+    const speedBtn = player.querySelector('.vn-speed-btn');
+
+    const rates = [1, 1.5, 2];
+    let nextIdx = (rates.indexOf(activeAudio.currentRate) + 1) % rates.length;
+    activeAudio.currentRate = rates[nextIdx];
+
+    if (speedBtn) {
+      speedBtn.textContent = `${activeAudio.currentRate}x`;
+    }
+
+    if (activeAudio.audioElement) {
+      activeAudio.audioElement.playbackRate = activeAudio.currentRate;
+    }
+  }
+
+  function seekAudio(msgId, clickEvent) {
+    const track = document.querySelector(`[data-track-id="${msgId}"]`);
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    const clickX = clickEvent.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+
+    const lead = getLead(state.activeLeadId);
+    if (!lead) return;
+    const msg = lead.messages.find(m => m.id === msgId);
+    if (!msg) return;
+    const totalSec = msg.durationSeconds || parseDurationToSeconds(msg.duration || '0:20');
+    const targetTime = ratio * totalSec;
+
+    if (activeAudio.msgId === msgId) {
+      activeAudio.currentTime = targetTime;
+      if (activeAudio.audioElement) {
+        activeAudio.audioElement.currentTime = targetTime;
+      }
+      updateVoicePlayerUI(msgId, true, targetTime, totalSec);
+    } else {
+      playVoiceNote(msgId);
+      setTimeout(() => {
+        if (activeAudio.msgId === msgId) {
+          activeAudio.currentTime = targetTime;
+          if (activeAudio.audioElement) {
+            activeAudio.audioElement.currentTime = targetTime;
+          }
+          updateVoicePlayerUI(msgId, true, targetTime, totalSec);
+        }
+      }, 60);
+    }
+  }
+
+  // Microphone Recording State
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let recordTimer = null;
+  let recordingSeconds = 0;
+  let mediaStream = null;
+
+  async function startRecordingAudio() {
+    const lead = getLead(state.activeLeadId);
+    if (!lead) {
+      showToast('⚠️ Please select a lead before recording audio.');
+      return;
+    }
+
+    const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    if (lead.ownerId && lead.ownerId !== myId && !isAdmin) {
+      showToast('⚠️ You cannot send voice notes to a lead owned by another agent!');
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      fallbackSimulatedOrUploadAudio();
+      return;
+    }
+
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      recordingSeconds = 0;
+
+      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4'];
+      let selectedMime = '';
+      for (const m of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(m)) {
+          selectedMime = m;
+          break;
+        }
+      }
+
+      mediaRecorder = selectedMime ? new MediaRecorder(mediaStream, { mimeType: selectedMime }) : new MediaRecorder(mediaStream);
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.start(200);
+
+      if (els.composerNormalView) els.composerNormalView.style.display = 'none';
+      if (els.composerRecordingView) els.composerRecordingView.style.display = 'flex';
+      if (els.voiceRecordBtn) els.voiceRecordBtn.classList.add('recording');
+      if (els.recordingTimer) els.recordingTimer.textContent = '0:00';
+
+      recordTimer = setInterval(() => {
+        recordingSeconds++;
+        if (els.recordingTimer) {
+          els.recordingTimer.textContent = formatSeconds(recordingSeconds);
+        }
+        if (recordingSeconds >= 120) {
+          sendRecordingAudio();
+        }
+      }, 1000);
+
+    } catch (err) {
+      console.warn('Microphone getUserMedia failed:', err);
+      fallbackSimulatedOrUploadAudio();
+    }
+  }
+
+  function cancelRecordingAudio() {
+    if (recordTimer) {
+      clearInterval(recordTimer);
+      recordTimer = null;
+    }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+      mediaStream = null;
+    }
+    audioChunks = [];
+    recordingSeconds = 0;
+
+    if (els.composerRecordingView) els.composerRecordingView.style.display = 'none';
+    if (els.composerNormalView) els.composerNormalView.style.display = 'flex';
+    if (els.voiceRecordBtn) els.voiceRecordBtn.classList.remove('recording');
+    showToast('🗑️ Voice note discarded.');
+  }
+
+  function sendRecordingAudio() {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      cancelRecordingAudio();
+      return;
+    }
+
+    const durationSec = Math.max(1, recordingSeconds);
+    const durationStr = formatSeconds(durationSec);
+
+    if (recordTimer) {
+      clearInterval(recordTimer);
+      recordTimer = null;
+    }
+
+    mediaRecorder.onstop = () => {
+      const mime = mediaRecorder.mimeType || 'audio/webm';
+      const audioBlob = new Blob(audioChunks, { type: mime });
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const audioDataUrl = reader.result;
+        dispatchOutgoingAudioMessage(audioDataUrl, durationStr, durationSec);
+      };
+      reader.readAsDataURL(audioBlob);
+
+      if (els.composerRecordingView) els.composerRecordingView.style.display = 'none';
+      if (els.composerNormalView) els.composerNormalView.style.display = 'flex';
+      if (els.voiceRecordBtn) els.voiceRecordBtn.classList.remove('recording');
+    };
+
+    mediaRecorder.stop();
+  }
+
+  function dispatchOutgoingAudioMessage(audioUrl, durationStr, durationSeconds) {
+    const lead = getLead(state.activeLeadId);
+    if (!lead) return;
+
+    const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const myName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
+
+    if (!lead.ownerId) {
+      lead.ownerId = myId;
+      lead.ownerName = myName;
+      lead.leadState = 'ongoing';
+      showToast(`🎯 You responded with audio! Lead locked to you.`);
+    }
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msgId = 'msg_' + Date.now();
+
+    const newMsg = {
+      id: msgId,
+      sender: 'agent',
+      agentName: myName,
+      type: 'audio',
+      audioUrl: audioUrl || null,
+      duration: durationStr,
+      durationSeconds: durationSeconds,
+      text: `🎤 Voice note (${durationStr})`,
+      time: now
+    };
+
+    lead.messages.push(newMsg);
+    lead.status = 'replied';
+    lead.lastActive = 'Just now';
+
+    showToast(`🎙️ Voice note (${durationStr}) sent to ${lead.name}! 🚀`);
+    renderConversationsList();
+    renderActiveChat();
+    syncLeadToServer(lead, { newMessage: newMsg });
+  }
+
+  function fallbackSimulatedOrUploadAudio() {
+    const confirmDemo = confirm(
+      "Microphone access is not available or blocked in this browser.\n\n" +
+      "• Click OK to send a simulated Voice Note ('0:18' Nunno Trading Breakdown)\n" +
+      "• Click Cancel to select an audio file (.mp3, .wav, .m4a) from your computer"
+    );
+    if (confirmDemo) {
+      dispatchOutgoingAudioMessage(null, '0:18', 18);
+    } else if (els.audioFileInput) {
+      els.audioFileInput.click();
+    }
+  }
+
+  // Simulate Incoming Customer Audio Note
+  function simulateClientAudioMessage(leadId) {
+    const lead = getLead(leadId || state.activeLeadId);
+    if (!lead) {
+      showToast('⚠️ Please select a conversation first.');
+      return;
+    }
+
+    const sampleAudios = [
+      { dur: '0:24', sec: 24, text: '🎙️ Voice note (0:24): EasyPaisa account details chahiye bhai' },
+      { dur: '0:18', sec: 18, text: '🎙️ Voice note (0:18): Signal accuracy aur live proof bhej dein' },
+      { dur: '0:32', sec: 32, text: '🎙️ Voice note (0:32): 30% discount coupon code active hai?' },
+      { dur: '0:45', sec: 45, text: '🎙️ Voice note (0:45): Whale package ke yearly terms discuss karne hain' }
+    ];
+    const picked = sampleAudios[Math.floor(Math.random() * sampleAudios.length)];
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const msgId = 'msg_' + Date.now();
+
+    const incomingMsg = {
+      id: msgId,
+      sender: 'lead',
+      type: 'audio',
+      duration: picked.dur,
+      durationSeconds: picked.sec,
+      text: picked.text,
+      time: now
+    };
+
+    lead.messages.push(incomingMsg);
+    lead.status = 'unread';
+    lead.unreadCount = (lead.unreadCount || 0) + 1;
+    lead.lastActive = 'Just now';
+
+    playIncomingNotificationSound();
+
+    showToast(`🎙️ Received new Voice Note from ${lead.name} (${picked.dur})!`);
+    renderConversationsList();
+    renderActiveChat();
+    syncLeadToServer(lead, { newMessage: incomingMsg, unreadCount: lead.unreadCount });
+  }
+
+  function playIncomingNotificationSound() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.26);
+    } catch (e) {}
+  }
+
+  // Audio Recording & Upload Event Listeners
+  if (els.voiceRecordBtn) els.voiceRecordBtn.addEventListener('click', startRecordingAudio);
+  if (els.cancelRecordBtn) els.cancelRecordBtn.addEventListener('click', cancelRecordingAudio);
+  if (els.sendRecordBtn) els.sendRecordBtn.addEventListener('click', sendRecordingAudio);
+  if (els.simClientAudioBtn) els.simClientAudioBtn.addEventListener('click', () => simulateClientAudioMessage());
+
+  if (els.audioUploadBtn && els.audioFileInput) {
+    els.audioUploadBtn.addEventListener('click', () => {
+      const lead = getLead(state.activeLeadId);
+      if (!lead) {
+        showToast('⚠️ Please select a conversation first.');
+        return;
+      }
+      els.audioFileInput.click();
+    });
+
+    els.audioFileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (readEvt) => {
+        const dataUrl = readEvt.target.result;
+        const tempAudio = new Audio(dataUrl);
+        tempAudio.onloadedmetadata = () => {
+          const sec = Math.round(tempAudio.duration) || 20;
+          dispatchOutgoingAudioMessage(dataUrl, formatSeconds(sec), sec);
+        };
+        tempAudio.onerror = () => {
+          dispatchOutgoingAudioMessage(dataUrl, '0:25', 25);
+        };
+      };
+      reader.readAsDataURL(file);
+      els.audioFileInput.value = '';
+    });
+  }
+
   // Performance Score Modal Event Listeners
   if (els.openScoreBtn) els.openScoreBtn.addEventListener('click', () => openScoreModal('my'));
   if (els.openLeaderboardBtn) els.openLeaderboardBtn.addEventListener('click', () => openScoreModal('team'));
@@ -2904,6 +3540,10 @@ document.addEventListener('DOMContentLoaded', () => {
   window.rejectFakeDeal = rejectFakeDeal;
   window.selectLead = selectLead;
   window.closeScoreModal = closeScoreModal;
+  window.playVoiceNote = playVoiceNote;
+  window.cyclePlaybackSpeed = cyclePlaybackSpeed;
+  window.seekAudio = seekAudio;
+  window.simulateClientAudioMessage = simulateClientAudioMessage;
 
   // Mark Paid Modal Event Listeners
   if (els.closeMarkPaidModalBtn) els.closeMarkPaidModalBtn.addEventListener('click', closeMarkPaidModal);

@@ -912,43 +912,171 @@ html, body {
   font-family: inherit;
 }
 
-/* ── Quick Reply Chips ── */
-.quick-reply-bar {
-  padding: 8px 14px;
-  background: #111b21;
-  border-top: 1px solid #222d34;
-  display: flex;
-  gap: 7px;
-  overflow-x: auto;
-  flex-shrink: 0;
+/* ── WhatsApp Voice Note (PTT) Bubbles ── */
+.msg-audio-bubble {
+  min-width: 290px;
+  max-width: 360px;
+  padding: 9px 12px 6px;
 }
-.quick-macro-chip {
-  background: #202c33;
-  border: 1px solid #2a3942;
-  color: #aebac1;
-  font-size: 11.5px;
-  font-weight: 500;
-  padding: 4px 11px;
-  border-radius: 14px;
+.voice-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 2px;
+}
+.vn-play-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: #53bdeb; /* unplayed blue/cyan */
+  color: #111b21;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  white-space: nowrap;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.msg-outbound .vn-play-btn {
+  background: #00a884; /* closer voice note teal/green */
+  color: #ffffff;
+}
+.vn-play-btn:hover {
+  transform: scale(1.06);
+}
+.vn-play-btn:active {
+  transform: scale(0.94);
+}
+.vn-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.vn-waveform-track {
+  position: relative;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.vn-waveform-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+}
+.vn-bar {
+  flex: 1;
+  min-width: 2px;
+  background: #64748b;
+  border-radius: 2px;
+  transition: background 0.12s ease;
+}
+.vn-bar.played {
+  background: #53bdeb;
+}
+.msg-outbound .vn-bar.played {
+  background: #00a884;
+}
+.vn-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #8696a0;
+  font-family: var(--font-mono);
+}
+.vn-speed-btn {
+  background: #182229;
+  border: 1px solid #2a3942;
+  color: #8696a0;
+  border-radius: 8px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
   transition: var(--transition-fast);
 }
-.quick-macro-chip:hover {
-  background: #2a3942;
-  color: #00a884;
+.vn-speed-btn:hover {
+  color: #e9edef;
   border-color: #00a884;
 }
+.vn-mic-badge-wrap {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+.vn-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #2a3942;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.vn-mic-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #53bdeb;
+  color: #111b21;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #202c33;
+}
+.msg-outbound .vn-mic-badge {
+  background: #00a884;
+  color: #ffffff;
+  border-color: #005c4b;
+}
 
-/* ── Chat Composer Bar (Spacious WhatsApp Desktop Experience) ── */
+/* ── Chat Composer Bar (Spacious WhatsApp Desktop Experience with Audio) ── */
 .chat-composer-bar {
   padding: 14px 20px;
   background: #111b21;
   border-top: 1px solid #222d34;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
+  position: relative;
+}
+.composer-inner-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.btn-composer-icon {
+  width: 44px;
+  height: 60px;
+  background: transparent;
+  border: none;
+  color: #8696a0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+.btn-composer-icon:hover {
+  color: #00a884;
+  background: #202c33;
 }
 .chat-input {
   flex: 1;
@@ -973,6 +1101,35 @@ html, body {
   box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
 }
 .chat-input::placeholder { color: #8696a0; font-size: 14px; }
+.btn-composer-mic {
+  width: 48px;
+  height: 60px;
+  background: #202c33;
+  border: 1px solid #2a3942;
+  color: #8696a0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+.btn-composer-mic:hover {
+  color: #ffffff;
+  background: #00a884;
+  border-color: #00a884;
+}
+.btn-composer-mic.recording {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+  animation: pulse-mic 1s infinite alternate;
+}
+@keyframes pulse-mic {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
+}
 .chat-composer-bar #sendMsgBtn {
   height: 60px;
   padding: 0 22px;
@@ -983,6 +1140,86 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Live Audio Recording Overlay Bar ── */
+.composer-recording-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  background: #182229;
+  border: 1px solid #2a3942;
+  border-radius: 12px;
+  padding: 8px 16px;
+  height: 60px;
+  box-sizing: border-box;
+}
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.recording-pulse-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse-dot 0.9s infinite alternate;
+}
+@keyframes pulse-dot {
+  from { opacity: 0.35; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+.recording-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e9edef;
+}
+.recording-timer {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: #ef4444;
+  background: #202c33;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid #2a3942;
+}
+.recording-soundwave {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  flex: 1;
+  max-width: 120px;
+  justify-content: center;
+}
+.soundbar {
+  width: 3px;
+  height: 8px;
+  background: #00a884;
+  border-radius: 2px;
+  animation: soundwave-bar 0.75s ease-in-out infinite alternate;
+}
+.soundbar:nth-child(2) { animation-delay: 0.12s; }
+.soundbar:nth-child(3) { animation-delay: 0.25s; }
+.soundbar:nth-child(4) { animation-delay: 0.38s; }
+.soundbar:nth-child(5) { animation-delay: 0.18s; }
+.soundbar:nth-child(6) { animation-delay: 0.3s; }
+.soundbar:nth-child(7) { animation-delay: 0.45s; }
+.soundbar:nth-child(8) { animation-delay: 0.22s; }
+@keyframes soundwave-bar {
+  from { height: 4px; }
+  to { height: 22px; }
+}
+.recording-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -2635,32 +2872,50 @@ html, body {
     background: rgba(10, 13, 20, 0.95);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
   }
-  .quick-macro-chip {
-    font-size: 10px;
-    padding: 3px 8px;
-    height: 26px;
-    flex-shrink: 0;
-  }
   .chat-composer-bar {
-    padding: 10px 14px;
-    gap: 8px;
+    padding: 8px 12px;
+    gap: 6px;
     background: #111b21;
     flex-shrink: 0;
     border-top: 1px solid #222d34;
   }
+  .composer-inner-wrap {
+    gap: 6px;
+  }
+  .btn-composer-icon {
+    width: 36px;
+    height: 52px;
+  }
   .chat-input {
     height: 52px;
     min-height: 52px;
-    font-size: 14px;
-    padding: 10px 14px;
+    font-size: 13.5px;
+    padding: 8px 12px;
     border-radius: 10px;
     line-height: 20px;
   }
+  .btn-composer-mic {
+    width: 40px;
+    height: 52px;
+    border-radius: 10px;
+  }
   #sendMsgBtn {
     height: 52px;
-    padding: 0 16px;
+    padding: 0 14px;
     font-size: 13px;
     border-radius: 10px;
+  }
+  .composer-recording-wrap {
+    height: 52px;
+    padding: 6px 12px;
+    gap: 8px;
+  }
+  .recording-label {
+    display: none;
+  }
+  .msg-audio-bubble {
+    min-width: 250px;
+    max-width: 300px;
   }
   .view-container { padding: 10px; }
   .campaign-grid {
