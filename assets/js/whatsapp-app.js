@@ -361,7 +361,6 @@ document.addEventListener('DOMContentLoaded', () => {
     chatMessagesArea: document.getElementById('chatMessagesArea'),
     chatInput: document.getElementById('chatInput'),
     sendMsgBtn: document.getElementById('sendMsgBtn'),
-    launchNativeWaBtn: document.getElementById('launchNativeWaBtn'),
     simClientAudioBtn: document.getElementById('simClientAudioBtn'),
 
     // Audio & Voice Message Controls
@@ -1327,17 +1326,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // WIDGET 4: Closer Notes
     if (els.dossierNotes) {
       els.dossierNotes.value = lead.notes || '';
-    }
-
-    // Direct WhatsApp Web Launch Button
-    if (els.launchNativeWaBtn) {
-      els.launchNativeWaBtn.onclick = () => {
-        const text = els.chatInput ? els.chatInput.value.trim() : '';
-        const encoded = encodeURIComponent(text);
-        const url = `https://web.whatsapp.com/send?phone=${lead.phone}&text=${encoded}`;
-        window.open(url, '_blank');
-        showToast(`🚀 Opening direct WhatsApp chat with ${lead.name}`);
-      };
     }
   }
 

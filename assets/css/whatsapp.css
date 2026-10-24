@@ -2980,7 +2980,6 @@ html, body {
     font-size: 10px;
     white-space: nowrap;
   }
-  .chat-header-actions .btn-wa-native span { display: none; }
   .msg-bubble {
     max-width: 86%;
     font-size: 13px;
