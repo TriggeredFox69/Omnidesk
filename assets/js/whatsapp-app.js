@@ -547,6 +547,11 @@ document.addEventListener('DOMContentLoaded', () => {
           ? '<span class="badge-admin-crown">👑 Admin</span>' 
           : `<span class="badge-employee-pill">💼 ${escapeHtml(user.designation || 'Closer')}</span>`;
       }
+      if (els.openScoreBtn) {
+        els.openScoreBtn.innerHTML = isAdmin
+          ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg><span>📈 My Score</span>'
+          : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/></svg><span>💼 Closer Portal (${escapeHtml((user.name || 'Closer').split(' ')[0])})</span>`;
+      }
       if (els.openTeamModalBtn) {
         els.openTeamModalBtn.style.display = isAdmin ? 'inline-flex' : 'none';
       }
@@ -554,6 +559,9 @@ document.addEventListener('DOMContentLoaded', () => {
         els.openLeaderboardBtn.style.display = isAdmin ? 'inline-flex' : 'none';
       }
     } else {
+      if (els.openScoreBtn) {
+        els.openScoreBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg><span>My Score</span>';
+      }
       if (els.topAgentAvatar) els.topAgentAvatar.textContent = state.currentAgent.avatar;
       if (els.topAgentName) els.topAgentName.textContent = state.currentAgent.name;
       if (els.topAgentId) els.topAgentId.textContent = `${state.currentAgent.id} • ${state.currentAgent.role}`;
@@ -2776,6 +2784,25 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.authForm) els.authForm.addEventListener('submit', handleLogin);
   if (els.authSubmitBtn) els.authSubmitBtn.addEventListener('click', handleLogin);
   if (els.authTogglePass) els.authTogglePass.addEventListener('click', togglePasswordVisibility);
+
+  const quickFillAdminBtn = document.getElementById('quickFillAdminBtn');
+  const quickFillEmpBtn = document.getElementById('quickFillEmpBtn');
+  if (quickFillAdminBtn) {
+    quickFillAdminBtn.addEventListener('click', () => {
+      if (els.authUsername) els.authUsername.value = 'admin';
+      if (els.authPassword) els.authPassword.value = 'Admin@Omnidesk2026!';
+      if (els.authAlert) els.authAlert.style.display = 'none';
+      if (els.authSubmitBtn) els.authSubmitBtn.focus();
+    });
+  }
+  if (quickFillEmpBtn) {
+    quickFillEmpBtn.addEventListener('click', () => {
+      if (els.authUsername) els.authUsername.value = 'hamza';
+      if (els.authPassword) els.authPassword.value = 'Agent@123';
+      if (els.authAlert) els.authAlert.style.display = 'none';
+      if (els.authSubmitBtn) els.authSubmitBtn.focus();
+    });
+  }
   if (els.headerLogoutBtn) els.headerLogoutBtn.addEventListener('click', handleLogout);
   if (els.openTeamModalBtn) els.openTeamModalBtn.addEventListener('click', openTeamModal);
   if (els.closeTeamModalBtn) els.closeTeamModalBtn.addEventListener('click', closeTeamModal);
@@ -3220,6 +3247,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentRole = normalizeRole(currentRawRole);
     const isAdmin = currentRole === 'Admin';
 
+    if (!isAdmin && activeTab === 'verify') {
+      activeTab = 'my';
+    }
+    state.activeScoreTab = activeTab;
+
+    const scoreTitle = document.getElementById('scoreModalTitle');
+    const scoreBadge = document.getElementById('scoreModalBadge');
+    if (scoreTitle) {
+      scoreTitle.textContent = isAdmin ? 'Executive Performance & Score Center' : 'Employee Closer Portal & Financial Ledger';
+    }
+    if (scoreBadge) {
+      scoreBadge.textContent = isAdmin ? '👑 Admin Suite' : '💼 Employee Portal';
+    }
+
     // Count pending verification deals
     const allPendingDeals = state.leads.filter(l => getLeadState(l) === 'pending_verification');
     if (els.pendingVerifCount) els.pendingVerifCount.textContent = allPendingDeals.length;
@@ -3228,11 +3269,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Toggle tab display
     if (els.tabMyScore) els.tabMyScore.classList.toggle('active', activeTab === 'my');
     if (els.tabTeamScores) els.tabTeamScores.classList.toggle('active', activeTab === 'team');
-    if (els.tabVerifySales) els.tabVerifySales.classList.toggle('active', activeTab === 'verify');
+    if (els.tabVerifySales) {
+      els.tabVerifySales.style.display = isAdmin ? 'inline-flex' : 'none';
+      els.tabVerifySales.classList.toggle('active', activeTab === 'verify');
+    }
 
     if (els.viewMyScoreTab) els.viewMyScoreTab.style.display = activeTab === 'my' ? 'block' : 'none';
     if (els.viewTeamScoresTab) els.viewTeamScoresTab.style.display = activeTab === 'team' ? 'block' : 'none';
-    if (els.viewVerifySalesTab) els.viewVerifySalesTab.style.display = activeTab === 'verify' ? 'block' : 'none';
+    if (els.viewVerifySalesTab) els.viewVerifySalesTab.style.display = (activeTab === 'verify' && isAdmin) ? 'block' : 'none';
 
     // --- TAB 1: User Personal Performance Portal ---
     const myPerf = calculateCloserPerformance(currentId);
