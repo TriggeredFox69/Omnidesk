@@ -566,6 +566,23 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
           </div>
         </div>
 
+        <!-- Live WhatsApp Delivery Dispatch Mode -->
+        <div class="campaign-dispatch-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+            <label style="font-weight:700;font-size:12px;color:#e9edef;display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="campaignAutoOpenWa" checked style="accent-color:#00a884;width:15px;height:15px;">
+              <span>🚀 Auto-Open Real WhatsApp Chat Tab</span>
+            </label>
+            <select id="campaignWaTargetType" class="form-select form-select-sm" style="width:auto;padding:2px 8px;font-size:11px;">
+              <option value="web" selected>🌐 WhatsApp Web</option>
+              <option value="wame">📱 Universal wa.me</option>
+            </select>
+          </div>
+          <p class="text-xs text-muted" style="margin:2px 0 0 21px;font-size:11px;line-height:1.4;">
+            As each lead's cadence timer reaches 0, their real WhatsApp chat automatically opens with your custom message pre-typed. Simply hit Send!
+          </p>
+        </div>
+
         <!-- Strategy Template Selector -->
         <div class="form-group">
           <label class="form-label">Pitch Template / Starting Draft</label>

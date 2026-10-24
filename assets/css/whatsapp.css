@@ -1815,6 +1815,32 @@ html, body {
   flex-direction: column;
   gap: 8px;
 }
+.campaign-dispatch-card {
+  background: #182229;
+  border: 1px solid #2a3942;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.btn-terminal-send {
+  background: #00a884;
+  color: #111b21 !important;
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  margin-left: 6px;
+  transition: opacity 0.15s;
+}
+.btn-terminal-send:hover {
+  opacity: 0.9;
+}
 
 .campaign-progress-wrap {
   display: flex;

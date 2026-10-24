@@ -493,6 +493,8 @@ document.addEventListener('DOMContentLoaded', () => {
     campaignDelayMin: document.getElementById('campaignDelayMin'),
     campaignDelayMax: document.getElementById('campaignDelayMax'),
     campaignPresetSelect: document.getElementById('campaignPresetSelect'),
+    campaignAutoOpenWa: document.getElementById('campaignAutoOpenWa'),
+    campaignWaTargetType: document.getElementById('campaignWaTargetType'),
     campaignPitchPreset: document.getElementById('campaignPitchPreset'),
     campaignCustomMsg: document.getElementById('campaignCustomMsg'),
     campaignBubblePreview: document.getElementById('campaignBubblePreview'),
@@ -2012,8 +2014,35 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dot) dot.style.background = '#10b981';
     }
 
-    const waDirectLink = `https://wa.me/${contact.phone}?text=${encodeURIComponent(personalizedMsg)}`;
-    logCampaignTerminal(`✅ [${currentNum}/${total}] Sent to <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} - ${escapeHtml(contact.city)}, ${contact.network}) <a href="${waDirectLink}" target="_blank" style="color:#53bdeb;margin-left:6px;text-decoration:underline;font-weight:600;">[Open Chat]</a>`, 'success');
+    const targetType = (els.campaignWaTargetType && els.campaignWaTargetType.value) || 'web';
+    const encodedText = encodeURIComponent(personalizedMsg);
+    const waUrl = (targetType === 'wame')
+      ? `https://wa.me/${contact.phone}?text=${encodedText}`
+      : `https://web.whatsapp.com/send?phone=${contact.phone}&text=${encodedText}`;
+
+    const autoOpen = !els.campaignAutoOpenWa || els.campaignAutoOpenWa.checked;
+
+    let popupBlocked = false;
+    if (autoOpen) {
+      try {
+        const win = window.open(waUrl, '_blank');
+        if (!win || win.closed || typeof win.closed === 'undefined') {
+          popupBlocked = true;
+        }
+      } catch (err) {
+        popupBlocked = true;
+      }
+    }
+
+    if (popupBlocked) {
+      logCampaignTerminal(`⚠️ Pop-up blocked for <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)})! <a href="${waUrl}" target="_blank" class="btn-terminal-send">👉 Click to Open & Send</a> <span style="font-size:10.5px;color:#8696a0;">(Allow pop-ups in browser URL bar for auto-open)</span>`, 'warn');
+      showToast(`⚠️ Pop-up blocked! Click [Open & Send] in terminal log for ${contact.name}`);
+    } else if (autoOpen) {
+      logCampaignTerminal(`🚀 Opened WhatsApp chat for <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} • ${contact.network})! Hit Send in WhatsApp tab. <a href="${waUrl}" target="_blank" class="btn-terminal-send">💬 View Tab</a>`, 'success');
+      showToast(`🚀 Opened WhatsApp for ${contact.name}! Hit Send in the tab.`);
+    } else {
+      logCampaignTerminal(`✅ [${currentNum}/${total}] Prepared for <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} • ${contact.network}) <a href="${waUrl}" target="_blank" class="btn-terminal-send">💬 Open Chat</a>`, 'success');
+    }
 
     renderConversationsList();
     if (state.activeLeadId === existingLead.id) {
