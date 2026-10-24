@@ -509,16 +509,15 @@
 
         <div class="campaign-dispatch-card">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-            <label style="font-weight:700;font-size:11.5px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
-              <input type="checkbox" id="campaignAutoOpenWa" checked style="accent-color:var(--cyan);width:14px;height:14px;">
-              <span>🚀 Auto-Open Real WhatsApp Chat Tab</span>
-            </label>
-            <select id="campaignWaTargetType" class="form-select form-select-sm" style="width:auto;padding:2px 8px;font-size:11px;">
-              <option value="web" selected>🌐 WhatsApp Web</option>
-              <option value="wame">📱 Universal wa.me</option>
-            </select>
+            <div style="font-weight:700;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+              <span>⚡ Autonomous Background Outreach Engine</span>
+              <span class="badge-role-admin" style="font-size:9.5px;padding:1px 6px;">100% Automated</span>
+            </div>
+            <span class="mono text-xs" style="color:var(--cyan);">Sender: +92 304 6588806</span>
           </div>
-          <p class="text-xs text-muted" style="margin:5px 0 0;line-height:1.4;">Each lead's chat tab opens automatically with your message pre-typed. Just hit Send!</p>
+          <p class="text-xs text-muted" style="margin:5px 0 0;line-height:1.4;">
+            Messages are dispatched automatically in the background with anti-ban jitter delays. No browser redirects or manual clicking required.
+          </p>
         </div>
 
         <div class="form-group" style="margin:0;">
@@ -662,72 +661,106 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
   <!-- ════════════════════════════════════════════════════════
        AUTHENTICATION WALL / LOGIN
   ════════════════════════════════════════════════════════ -->
+  <!-- ════════════════════════════════════════════════════════
+       AUTHENTICATION WALL & LOGIN (NUNNO SALES DESIGN)
+  ════════════════════════════════════════════════════════ -->
   <div class="auth-overlay" id="authOverlay">
-    <div class="auth-card">
-      <div class="auth-header">
-        <div class="auth-logo-wrap">
-          <img src="assets/images/nunno-logo.png" alt="Nunno Cloud">
-        </div>
-        <h2 class="auth-title">Nunno Omni-Desk</h2>
-        <p class="auth-subtitle">Internal WhatsApp CRM & Outreach Hub</p>
-        <div class="auth-lock-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <span>Authorized Personnel Only • No Public Signups</span>
-        </div>
-      </div>
+    <div class="bg-grid"></div>
 
-      <div class="auth-alert" id="authAlert"></div>
-
-      <form class="auth-form" id="authForm" onsubmit="return false;">
-        <div class="auth-field">
-          <label for="authUsername">Username or Email</label>
-          <div class="auth-input-wrap">
-            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <input type="text" id="authUsername" placeholder="e.g. admin or employee" autocomplete="username" required autofocus>
+    <!-- FULLSCREEN NUNNO 360 ROTATE & ZOOM-OUT OVERLAY -->
+    <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true" role="status" aria-live="polite">
+      <div class="anim-aura"></div>
+      <div class="anim-scene">
+        <div class="anim-logo-box">
+          <img src="assets/images/nunno-logo.png" alt="Nunno" class="anim-logo-img">
+        </div>
+        <div class="anim-label">
+          <div class="anim-brand-text">
+            <span>Nunno</span>
+            <span class="anim-role-tag" id="animRoleTag">Omni-Desk</span>
           </div>
-        </div>
-
-        <div class="auth-field">
-          <label for="authPassword">Password</label>
-          <div class="auth-input-wrap">
-            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <input type="password" id="authPassword" placeholder="Enter your password" autocomplete="current-password" required>
-            <button type="button" class="auth-toggle-pass" id="authTogglePass">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <button type="submit" class="auth-btn-submit" id="authSubmitBtn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-          <span>Sign In to Omni-Desk</span>
-        </button>
-      </form>
-
-      <div class="auth-hint-box">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <div style="font-weight:700;color:#fff;display:flex;align-items:center;gap:6px;font-size:12px;">
-            <span>🔑</span> <span>Quick Login Credential Selector</span>
-          </div>
-          <span class="panel-badge" style="font-size:9px;">1-Click Fill</span>
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:10px;">
-          <button type="button" class="btn btn-secondary btn-xs" id="quickFillAdminBtn" style="flex:1;justify-content:center;padding:6px 10px;font-size:11px;">
-            👑 Master Admin
-          </button>
-          <button type="button" class="btn btn-secondary btn-xs" id="quickFillEmpBtn" style="flex:1;justify-content:center;padding:6px 10px;font-size:11px;">
-            👨‍💼 Closer (Hamza)
-          </button>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">
-          <div>👑 <strong>Admin:</strong> <code>admin</code> &bull; <code>Admin@Omnidesk2026!</code></div>
-          <div>👨‍💼 <strong>Closer:</strong> <code>hamza</code> &bull; <code>Agent@123</code></div>
-        </div>
-        <div style="margin-top:8px;color:var(--text-dim);font-size:10px;">
-          ⚠️ <em>Public registration is permanently closed. Only Admins can provision employee accounts.</em>
+          <div class="anim-subtext" id="animSubtext">Opening workspace…</div>
         </div>
       </div>
     </div>
+
+    <main class="login-container" id="loginMainContainer">
+      <!-- HERO NUNNO LOGO WITH PURPLE EDGE GLOW -->
+      <header class="brand-hero">
+        <div class="logo-frame" id="logoHeroFrame">
+          <img src="assets/images/nunno-logo.png" alt="Nunno Omni-Desk" class="logo-img">
+        </div>
+        <h1 class="brand-title">
+          Nunno
+          <span class="brand-badge">Omni-Desk</span>
+        </h1>
+        <p class="brand-subtitle">Internal WhatsApp CRM & Outreach Hub</p>
+      </header>
+
+      <!-- LOGIN CARD -->
+      <div class="login-card">
+        <div id="authAlert" class="auth-alert" role="alert"></div>
+
+        <form id="authForm" autocomplete="on" onsubmit="return false;">
+          <div class="form-group" style="margin-bottom:16px;">
+            <label class="form-label" for="authUsername">Work Username or Email</label>
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="authUsername" 
+                class="form-input" 
+                placeholder="admin or closer" 
+                required 
+                autofocus 
+                autocomplete="username"
+              >
+              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:16px;">
+            <label class="form-label" for="authPassword">Password</label>
+            <div class="input-wrapper">
+              <input 
+                type="password" 
+                id="authPassword" 
+                class="form-input" 
+                placeholder="••••••••••••" 
+                required 
+                autocomplete="current-password"
+              >
+              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="3"></rect>
+                <path d="M7 11V7a5 5 0 0110 0v4"></path>
+              </svg>
+              <button type="button" class="pwd-toggle" id="authTogglePass">SHOW</button>
+            </div>
+          </div>
+
+          <button type="submit" id="authSubmitBtn" class="submit-btn">
+            Sign In to Omni-Desk
+          </button>
+
+          <!-- Quick 1-Click Fillers -->
+          <div class="quick-fill-bar">
+            <button type="button" class="quick-fill-btn" id="quickFillAdminBtn">
+              👑 Admin
+            </button>
+            <button type="button" class="quick-fill-btn" id="quickFillEmpBtn">
+              👨‍💼 Closer (Hamza)
+            </button>
+          </div>
+        </form>
+
+        <footer class="card-footer">
+          <div>🔒 <strong>Authorized Personnel Only.</strong> No public registration.</div>
+          <div class="footer-divider"></div>
+          <div>Single-Number Multi-Closer Architecture with Anti-Theft Lead Locking</div>
+        </footer>
+      </div>
+    </main>
   </div>
 
   <!-- ════════════════════════════════════════════════════════

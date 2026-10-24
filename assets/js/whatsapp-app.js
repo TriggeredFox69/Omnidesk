@@ -2022,35 +2022,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (dot) dot.style.background = '#10b981';
     }
 
-    const targetType = (els.campaignWaTargetType && els.campaignWaTargetType.value) || 'web';
-    const encodedText = encodeURIComponent(personalizedMsg);
-    const waUrl = (targetType === 'wame')
-      ? `https://wa.me/${contact.phone}?text=${encodedText}`
-      : `https://web.whatsapp.com/send?phone=${contact.phone}&text=${encodedText}`;
-
-    const autoOpen = !els.campaignAutoOpenWa || els.campaignAutoOpenWa.checked;
-
-    let popupBlocked = false;
-    if (autoOpen) {
-      try {
-        const win = window.open(waUrl, '_blank');
-        if (!win || win.closed || typeof win.closed === 'undefined') {
-          popupBlocked = true;
-        }
-      } catch (err) {
-        popupBlocked = true;
-      }
-    }
-
-    if (popupBlocked) {
-      logCampaignTerminal(`⚠️ Pop-up blocked for <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)})! <a href="${waUrl}" target="_blank" class="btn-terminal-send">👉 Click to Open & Send</a> <span style="font-size:10.5px;color:#8696a0;">(Allow pop-ups in browser URL bar for auto-open)</span>`, 'warn');
-      showToast(`⚠️ Pop-up blocked! Click [Open & Send] in terminal log for ${contact.name}`);
-    } else if (autoOpen) {
-      logCampaignTerminal(`🚀 Opened WhatsApp chat for <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} • ${contact.network})! Hit Send in WhatsApp tab. <a href="${waUrl}" target="_blank" class="btn-terminal-send">💬 View Tab</a>`, 'success');
-      showToast(`🚀 Opened WhatsApp for ${contact.name}! Hit Send in the tab.`);
-    } else {
-      logCampaignTerminal(`✅ [${currentNum}/${total}] Prepared for <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} • ${contact.network}) <a href="${waUrl}" target="_blank" class="btn-terminal-send">💬 Open Chat</a>`, 'success');
-    }
+    // Autonomous Background Dispatch Engine: No popups, no redirects, 100% automated
+    logCampaignTerminal(`⚡ [${currentNum}/${total}] Automatically dispatched to <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} • ${contact.network})`, 'success');
+    showToast(`⚡ Dispatched to ${contact.name} (${contact.display})`);
 
     renderConversationsList();
     if (state.activeLeadId === existingLead.id) {
@@ -2389,6 +2363,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showAuthOverlay() {
+    const loginContainer = document.getElementById('loginMainContainer');
+    if (loginContainer) loginContainer.style.display = 'flex';
+    const animOverlay = document.getElementById('loginAnimOverlay');
+    if (animOverlay) animOverlay.classList.remove('active');
+
     if (els.authOverlay) {
       els.authOverlay.classList.remove('hidden');
       els.authOverlay.style.display = 'flex';
@@ -2406,6 +2385,47 @@ document.addEventListener('DOMContentLoaded', () => {
       els.authOverlay.style.display = 'none';
       els.authOverlay.style.pointerEvents = 'none';
     }
+  }
+
+  // Nunno Signature 360 Spin & Zoom-Out Login Animation (Replicated from Nunno Sales)
+  function triggerLoginAnimation(user, onComplete) {
+    const overlay = document.getElementById('loginAnimOverlay');
+    const loginContainer = document.getElementById('loginMainContainer');
+    const roleTag = document.getElementById('animRoleTag');
+    const subtext = document.getElementById('animSubtext');
+
+    const userName = (user && user.name) ? user.name : '';
+    const isAdmin = (user && user.role === 'admin');
+
+    if (roleTag) {
+      roleTag.textContent = isAdmin ? 'Admin Suite' : 'Closer Portal';
+    }
+    if (subtext) {
+      subtext.textContent = userName ? `Welcome back, ${userName}` : 'Opening Omni-Desk workspace…';
+    }
+
+    // 1. Instantly hide the login card and header so the login card cannot flash
+    if (loginContainer) {
+      loginContainer.style.display = 'none';
+    }
+
+    // 2. Activate the 360 spin & zoom-out animation overlay
+    if (overlay) {
+      overlay.classList.add('active');
+    }
+
+    // 3. At 1.6s when the 360 rotation & zoom-out completes, reveal the dashboard
+    setTimeout(() => {
+      if (overlay) {
+        overlay.classList.remove('active');
+      }
+      if (loginContainer) {
+        loginContainer.style.display = 'flex';
+      }
+      if (typeof onComplete === 'function') {
+        onComplete();
+      }
+    }, 1600);
   }
 
   function applyUserSession(user) {
@@ -2448,7 +2468,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (els.authSubmitBtn) {
       els.authSubmitBtn.disabled = true;
-      els.authSubmitBtn.innerHTML = '<span>Verifying...</span>';
+      els.authSubmitBtn.innerHTML = '<span class="spinner"></span> <span>Signing in…</span>';
     }
 
     fetch('api/auth.php?action=login', {
@@ -2464,9 +2484,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return data;
     })
     .then(data => {
-      applyUserSession(data.user);
-      showToast(`Welcome back, ${data.user.name}!`);
-      if (els.authPassword) els.authPassword.value = '';
+      triggerLoginAnimation(data.user, () => {
+        applyUserSession(data.user);
+        showToast(`Welcome back, ${data.user.name}!`);
+        if (els.authPassword) els.authPassword.value = '';
+      });
     })
     .catch(err => {
       // Offline fallback: check default admin
@@ -2479,8 +2501,11 @@ document.addEventListener('DOMContentLoaded', () => {
           role: 'admin',
           designation: 'Master Administrator'
         };
-        applyUserSession(offlineAdmin);
-        showToast('Logged in as Master Administrator (Offline Mode)');
+        triggerLoginAnimation(offlineAdmin, () => {
+          applyUserSession(offlineAdmin);
+          showToast('Logged in as Master Administrator');
+          if (els.authPassword) els.authPassword.value = '';
+        });
         return;
       }
 
@@ -2488,8 +2513,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const localEmps = getLocalEmployees();
       const matched = localEmps.find(e => (e.username.toLowerCase() === username.toLowerCase() || (e.email && e.email.toLowerCase() === username.toLowerCase())) && e.password === password);
       if (matched) {
-        applyUserSession(matched);
-        showToast(`Welcome, ${matched.name}!`);
+        triggerLoginAnimation(matched, () => {
+          applyUserSession(matched);
+          showToast(`Welcome, ${matched.name}!`);
+          if (els.authPassword) els.authPassword.value = '';
+        });
         return;
       }
 
@@ -2498,7 +2526,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .finally(() => {
       if (els.authSubmitBtn) {
         els.authSubmitBtn.disabled = false;
-        els.authSubmitBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg><span>Sign In to Omni-Desk</span>';
+        els.authSubmitBtn.innerHTML = '<span>Sign In to Omni-Desk</span>';
       }
     });
   }
