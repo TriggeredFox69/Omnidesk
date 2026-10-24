@@ -98,6 +98,18 @@ document.addEventListener('DOMContentLoaded', () => {
       ownerId: 'EMP-101', // GREEN: Closed - Client Paid!
       leadState: 'paid',
       status: 'paid',
+      verificationStatus: 'verified',
+      verifiedBy: 'System Administrator',
+      paidDetails: {
+        plan: 'Nunno Starter',
+        amount: 1700,
+        method: 'JazzCash',
+        trxId: 'JC-88391024',
+        email: 'kashif.m@gmail.com',
+        closedBy: 'Hamza Khan',
+        closedById: 'EMP-101',
+        closedAt: '2026-10-23T14:30:00Z'
+      },
       unreadCount: 0,
       interest: 'Nunno Starter (Paid Rs. 1,700)',
       lastActive: 'Yesterday',
@@ -183,16 +195,49 @@ document.addEventListener('DOMContentLoaded', () => {
       messages: [
         { sender: 'agent', agentName: 'System Outreach', text: 'Salam Rizwan! Nunno Cloud Liquidation Radar live access at nunno.cloud', time: '01:00 PM' }
       ]
+    },
+    {
+      id: 'lead_9',
+      name: 'Farhan Saeed',
+      phone: '923015556677',
+      display: '+92 301 5556677',
+      city: 'Islamabad',
+      network: 'Jazz',
+      ownerId: 'EMP-102',
+      leadState: 'pending_verification',
+      status: 'pending_verification',
+      verificationStatus: 'pending',
+      unreadCount: 0,
+      interest: 'Nunno Pro',
+      lastActive: '10 mins ago',
+      notes: 'Paid Rs. 5,000 via EasyPaisa. Trx Ref: EP-984729104. Awaiting Admin verification.',
+      paidDetails: {
+        plan: 'Nunno Pro',
+        amount: 5000,
+        method: 'EasyPaisa',
+        trxId: 'EP-984729104',
+        email: 'farhan.crypto@gmail.com',
+        closedBy: 'Bilal Tariq',
+        closedById: 'EMP-102',
+        closedAt: new Date(Date.now() - 3600000).toISOString()
+      },
+      messages: [
+        { sender: 'agent', agentName: 'Bilal Tariq', text: 'Salam Farhan Bhai! Nunno Pro subscription details share kar di hain.', time: '05:40 PM' },
+        { sender: 'lead', text: 'Maine PKR 5,000 EasyPaisa kar diye hain. Trx TID: EP-984729104. Account email: farhan.crypto@gmail.com', time: '06:10 PM' },
+        { sender: 'agent', agentName: 'Bilal Tariq', text: '⚪ PAYMENT SUBMITTED (PENDING ADMIN VERIFICATION)\n• Plan: Nunno Pro (Rs. 5,000)\n• Method: EasyPaisa\n• Trx Ref: EP-984729104\n• Account Email: farhan.crypto@gmail.com\n⏳ Awaiting Admin verification in the Admin Portal before commission & green status unlock.', time: '06:12 PM' }
+      ]
     }
   ];
 
   // Helper: Single Source of Truth for Traffic-Light Status
   // RED = Fresh (Unclaimed)
   // YELLOW = Ongoing (Claimed by an agent)
-  // GREEN = Closed (Client has paid!)
+  // GREY = Pending Verification (Submitted as paid, awaiting Admin audit)
+  // GREEN = Closed (Client has paid & Admin verified!)
   // BLUE = Useless (Dealt with, won't pay / dead lead)
   function getLeadState(lead) {
     if (!lead) return 'fresh';
+    if (lead.leadState === 'pending_verification' || lead.status === 'pending_verification' || lead.leadState === 'pending' || lead.status === 'pending') return 'pending_verification';
     if (lead.leadState === 'paid' || lead.status === 'paid') return 'paid';
     if (lead.leadState === 'useless' || lead.status === 'useless') return 'useless';
     if (lead.ownerId !== null) return 'ongoing';
@@ -298,6 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
     kpiCountFresh: document.getElementById('kpiCountFresh'),
     kpiCountOngoing: document.getElementById('kpiCountOngoing'),
     kpiCountPaid: document.getElementById('kpiCountPaid'),
+    kpiCountPending: document.getElementById('kpiCountPending'),
+    kpiFilterPending: document.getElementById('kpiFilterPending'),
     kpiCountUseless: document.getElementById('kpiCountUseless'),
     convTotalBadge: document.getElementById('convTotalBadge'),
 
@@ -311,6 +358,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chatLeadCloser: document.getElementById('chatLeadCloser'),
     chatClaimBtn: document.getElementById('chatClaimBtn'),
     markPaidHeaderBtn: document.getElementById('markPaidHeaderBtn'),
+    verifyPaidHeaderBtn: document.getElementById('verifyPaidHeaderBtn'),
+    rejectPaidHeaderBtn: document.getElementById('rejectPaidHeaderBtn'),
     markUselessHeaderBtn: document.getElementById('markUselessHeaderBtn'),
     otherCloserNotice: document.getElementById('otherCloserNotice'),
     otherCloserName: document.getElementById('otherCloserName'),
@@ -384,8 +433,18 @@ document.addEventListener('DOMContentLoaded', () => {
     closeScoreModalBtn: document.getElementById('closeScoreModalBtn'),
     tabMyScore: document.getElementById('tabMyScore'),
     tabTeamScores: document.getElementById('tabTeamScores'),
+    tabVerifySales: document.getElementById('tabVerifySales'),
     viewMyScoreTab: document.getElementById('viewMyScoreTab'),
     viewTeamScoresTab: document.getElementById('viewTeamScoresTab'),
+    viewVerifySalesTab: document.getElementById('viewVerifySalesTab'),
+    pendingVerifCount: document.getElementById('pendingVerifCount'),
+    pendingAuditHeaderCount: document.getElementById('pendingAuditHeaderCount'),
+    verifySalesList: document.getElementById('verifySalesList'),
+    dossierAdminVerifActions: document.getElementById('dossierAdminVerifActions'),
+    dossierVerifyBtn: document.getElementById('dossierVerifyBtn'),
+    dossierRejectBtn: document.getElementById('dossierRejectBtn'),
+    dossierPendingNotice: document.getElementById('dossierPendingNotice'),
+    matrixBtnPending: document.getElementById('matrixBtnPending'),
     perfHeroAvatar: document.getElementById('perfHeroAvatar'),
     perfHeroName: document.getElementById('perfHeroName'),
     perfHeroRole: document.getElementById('perfHeroRole'),
@@ -533,6 +592,9 @@ document.addEventListener('DOMContentLoaded', () => {
       leadState: lead.leadState,
       status: lead.status,
       ownerId: lead.ownerId,
+      ownerName: lead.ownerName,
+      verificationStatus: lead.verificationStatus,
+      paidDetails: lead.paidDetails,
       notes: lead.notes,
       unreadCount: lead.unreadCount,
       lastActive: lead.lastActive,
@@ -722,9 +784,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.inboxFilter === 'all') return true;
       if (state.inboxFilter === 'fresh') return lState === 'fresh';
       if (state.inboxFilter === 'ongoing') return lState === 'ongoing';
+      if (state.inboxFilter === 'pending_verification' || state.inboxFilter === 'pending') return lState === 'pending_verification';
       if (state.inboxFilter === 'paid') return lState === 'paid';
       if (state.inboxFilter === 'useless') return lState === 'useless';
-      if (state.inboxFilter === 'mine') return l.ownerId === state.currentAgent.id;
+      if (state.inboxFilter === 'mine') {
+        const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+        return l.ownerId === myId || l.paidDetails?.closedById === myId;
+      }
       return true;
     });
 
@@ -732,16 +798,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const countAll = state.leads.length;
     const countFresh = state.leads.filter(l => getLeadState(l) === 'fresh').length;
     const countOngoing = state.leads.filter(l => getLeadState(l) === 'ongoing').length;
+    const countPending = state.leads.filter(l => getLeadState(l) === 'pending_verification').length;
     const countPaid = state.leads.filter(l => getLeadState(l) === 'paid').length;
     const countUseless = state.leads.filter(l => getLeadState(l) === 'useless').length;
-    const countMine = state.leads.filter(l => l.ownerId === state.currentAgent.id).length;
+    const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const countMine = state.leads.filter(l => l.ownerId === currentUserId || l.paidDetails?.closedById === currentUserId).length;
 
     if (els.kpiCountAll) els.kpiCountAll.textContent = countAll;
     if (els.kpiCountFresh) els.kpiCountFresh.textContent = countFresh;
     if (els.kpiCountOngoing) els.kpiCountOngoing.textContent = countOngoing;
+    if (els.kpiCountPending) els.kpiCountPending.textContent = countPending;
     if (els.kpiCountPaid) els.kpiCountPaid.textContent = countPaid;
     if (els.kpiCountUseless) els.kpiCountUseless.textContent = countUseless;
     if (els.myLeadsCountBadge) els.myLeadsCountBadge.textContent = countMine;
+    if (els.pendingVerifCount) els.pendingVerifCount.textContent = countPending;
+    if (els.pendingAuditHeaderCount) els.pendingAuditHeaderCount.textContent = `${countPending} Pending Deals`;
     if (els.convTotalBadge) els.convTotalBadge.textContent = `${filtered.length} Leads`;
 
     // Sync active class on filter buttons & KPI pills
@@ -777,13 +848,16 @@ document.addEventListener('DOMContentLoaded', () => {
       // Clean initials for avatar
       const initials = lead.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
-      // Clean 4-State Badge
+      // Clean 5-State Badge
       let statusBadgeHtml = '';
       if (leadState === 'fresh') {
         statusBadgeHtml = `<span class="status-pill-clean fresh">🔴 Fresh</span>`;
       } else if (leadState === 'ongoing') {
         const ownerName = owner ? owner.name.split(' ')[0] : 'Claimed';
         statusBadgeHtml = `<span class="status-pill-clean ongoing">🟡 Ongoing (${ownerName})</span>`;
+      } else if (leadState === 'pending_verification') {
+        const closerName = lead.paidDetails?.closedBy ? lead.paidDetails.closedBy.split(' ')[0] : (owner ? owner.name.split(' ')[0] : 'In Review');
+        statusBadgeHtml = `<span class="status-pill-clean pending">⚪ In Review (${closerName})</span>`;
       } else if (leadState === 'paid') {
         statusBadgeHtml = `<span class="status-pill-clean paid">🟢 Paid</span>`;
       } else if (leadState === 'useless') {
@@ -797,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
       item.innerHTML = `
         <div class="conv-avatar-wrap">
           <span class="avatar-initials">${initials}</span>
-          <div class="lead-status-dot status-${leadState}" title="${leadState === 'fresh' ? '🔴 Fresh (No one claimed)' : leadState === 'ongoing' ? '🟡 Ongoing (In Progress)' : '🟢 Closed (Client Paid)'}"></div>
+          <div class="lead-status-dot status-${leadState}" title="${leadState === 'fresh' ? '🔴 Fresh (No one claimed)' : leadState === 'ongoing' ? '🟡 Ongoing (In Progress)' : leadState === 'pending_verification' ? '⚪ In Review (Awaiting Admin Verification)' : leadState === 'paid' ? '🟢 Closed (Client Paid)' : '🔵 Won\'t Pay'}"></div>
           ${lead.unreadCount > 0 ? `<div class="unread-badge">${lead.unreadCount}</div>` : ''}
         </div>
         <div class="conv-body">
@@ -861,6 +935,9 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (leadState === 'ongoing') {
         els.chatLeadStatusBadge.className = 'status-pill-clean ongoing';
         els.chatLeadStatusBadge.innerHTML = '🟡 Ongoing';
+      } else if (leadState === 'pending_verification') {
+        els.chatLeadStatusBadge.className = 'status-pill-clean pending';
+        els.chatLeadStatusBadge.innerHTML = '⚪ In Review (Pending Verification)';
       } else if (leadState === 'paid') {
         els.chatLeadStatusBadge.className = 'status-pill-clean paid';
         els.chatLeadStatusBadge.innerHTML = '🟢 Closed (Paid)';
@@ -871,7 +948,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    const currentRawRole = (state.currentUser && state.currentUser.designation) || (state.currentUser && state.currentUser.role) || state.currentAgent.role || 'Team Member';
+    const currentRole = normalizeRole(currentRawRole);
+    const isAdmin = currentRole === 'Admin';
     const isOwner = lead.ownerId === currentUserId;
     const isLockedOngoing = leadState === 'ongoing' && lead.ownerId && !isOwner;
     const closerDisplayName = owner ? owner.name : (lead.ownerName || lead.ownerId);
@@ -883,6 +962,10 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (leadState === 'ongoing') {
         els.chatLeadCloser.style.color = '#fbbf24';
         els.chatLeadCloser.textContent = isOwner ? `🔒 You (${closerDisplayName})` : `🔒 ${closerDisplayName}`;
+      } else if (leadState === 'pending_verification') {
+        els.chatLeadCloser.style.color = '#cbd5e1';
+        const displayCloser = lead.paidDetails?.closedBy || closerDisplayName || 'Closer';
+        els.chatLeadCloser.textContent = `⚪ In Review (${displayCloser})`;
       } else if (leadState === 'paid') {
         els.chatLeadCloser.style.color = '#34d399';
         const displayCloser = lead.paidDetails?.closedBy || closerDisplayName || 'Closer';
@@ -934,24 +1017,51 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Header Mark Paid Button
-    if (els.markPaidHeaderBtn) {
-      if (isLockedOngoing && !isAdmin) {
-        els.markPaidHeaderBtn.style.display = 'none';
-      } else if (leadState === 'paid') {
-        els.markPaidHeaderBtn.style.display = 'inline-flex';
-        els.markPaidHeaderBtn.className = 'btn btn-ghost btn-xs';
-        els.markPaidHeaderBtn.style.color = '#10b981';
-        els.markPaidHeaderBtn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-        els.markPaidHeaderBtn.innerHTML = `🟢 Paid ✓`;
-        els.markPaidHeaderBtn.onclick = () => openMarkPaidModal(lead);
+    // Header Verification & Mark Paid Buttons
+    if (leadState === 'pending_verification') {
+      if (isAdmin) {
+        if (els.verifyPaidHeaderBtn) {
+          els.verifyPaidHeaderBtn.style.display = 'inline-flex';
+          els.verifyPaidHeaderBtn.onclick = () => verifyPaymentDeal(lead.id);
+        }
+        if (els.rejectPaidHeaderBtn) {
+          els.rejectPaidHeaderBtn.style.display = 'inline-flex';
+          els.rejectPaidHeaderBtn.onclick = () => rejectFakeDeal(lead.id);
+        }
+        if (els.markPaidHeaderBtn) els.markPaidHeaderBtn.style.display = 'none';
       } else {
-        els.markPaidHeaderBtn.style.display = 'inline-flex';
-        els.markPaidHeaderBtn.className = 'btn btn-paid btn-xs';
-        els.markPaidHeaderBtn.style.color = '#ffffff';
-        els.markPaidHeaderBtn.style.borderColor = 'transparent';
-        els.markPaidHeaderBtn.innerHTML = `Mark Paid`;
-        els.markPaidHeaderBtn.onclick = () => openMarkPaidModal(lead);
+        if (els.verifyPaidHeaderBtn) els.verifyPaidHeaderBtn.style.display = 'none';
+        if (els.rejectPaidHeaderBtn) els.rejectPaidHeaderBtn.style.display = 'none';
+        if (els.markPaidHeaderBtn) {
+          els.markPaidHeaderBtn.style.display = 'inline-flex';
+          els.markPaidHeaderBtn.className = 'btn btn-ghost btn-xs';
+          els.markPaidHeaderBtn.style.color = '#cbd5e1';
+          els.markPaidHeaderBtn.style.borderColor = 'rgba(148, 163, 184, 0.4)';
+          els.markPaidHeaderBtn.innerHTML = `⚪ In Review`;
+          els.markPaidHeaderBtn.onclick = () => openMarkPaidModal(lead);
+        }
+      }
+    } else {
+      if (els.verifyPaidHeaderBtn) els.verifyPaidHeaderBtn.style.display = 'none';
+      if (els.rejectPaidHeaderBtn) els.rejectPaidHeaderBtn.style.display = 'none';
+      if (els.markPaidHeaderBtn) {
+        if (isLockedOngoing && !isAdmin) {
+          els.markPaidHeaderBtn.style.display = 'none';
+        } else if (leadState === 'paid') {
+          els.markPaidHeaderBtn.style.display = 'inline-flex';
+          els.markPaidHeaderBtn.className = 'btn btn-ghost btn-xs';
+          els.markPaidHeaderBtn.style.color = '#10b981';
+          els.markPaidHeaderBtn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+          els.markPaidHeaderBtn.innerHTML = `🟢 Paid ✓`;
+          els.markPaidHeaderBtn.onclick = () => openMarkPaidModal(lead);
+        } else {
+          els.markPaidHeaderBtn.style.display = 'inline-flex';
+          els.markPaidHeaderBtn.className = 'btn btn-paid btn-xs';
+          els.markPaidHeaderBtn.style.color = '#ffffff';
+          els.markPaidHeaderBtn.style.borderColor = 'transparent';
+          els.markPaidHeaderBtn.innerHTML = `Mark Paid`;
+          els.markPaidHeaderBtn.onclick = () => openMarkPaidModal(lead);
+        }
       }
     }
 
@@ -1029,6 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.dossierStatusPill) {
       if (leadState === 'fresh') els.dossierStatusPill.innerHTML = `<span class="status-pill-clean fresh">🔴 FRESH</span>`;
       else if (leadState === 'ongoing') els.dossierStatusPill.innerHTML = `<span class="status-pill-clean ongoing">🟡 ONGOING</span>`;
+      else if (leadState === 'pending_verification') els.dossierStatusPill.innerHTML = `<span class="status-pill-clean pending">⚪ IN REVIEW</span>`;
       else if (leadState === 'paid') els.dossierStatusPill.innerHTML = `<span class="status-pill-clean paid">🟢 PAID</span>`;
       else if (leadState === 'useless') els.dossierStatusPill.innerHTML = `<span class="status-pill-clean useless">🔵 WON'T PAY</span>`;
     }
@@ -1085,16 +1196,33 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // WIDGET 3: Power Conversion Buttons
-    if (els.dossierPaidBtn) {
-      if (leadState === 'paid') {
-        els.dossierPaidBtn.className = 'btn btn-ghost btn-sm';
-        els.dossierPaidBtn.innerHTML = 'Re-open Lead to Ongoing';
-        els.dossierPaidBtn.onclick = () => reopenLead(lead.id);
+    // WIDGET 3: Power Conversion Buttons & Admin Audit Controls
+    if (leadState === 'pending_verification') {
+      if (isAdmin) {
+        if (els.dossierAdminVerifActions) els.dossierAdminVerifActions.style.display = 'flex';
+        if (els.dossierVerifyBtn) els.dossierVerifyBtn.onclick = () => verifyPaymentDeal(lead.id);
+        if (els.dossierRejectBtn) els.dossierRejectBtn.onclick = () => rejectFakeDeal(lead.id);
+        if (els.dossierPendingNotice) els.dossierPendingNotice.style.display = 'none';
+        if (els.dossierPaidBtn) els.dossierPaidBtn.style.display = 'none';
       } else {
-        els.dossierPaidBtn.className = 'btn btn-paid btn-sm';
-        els.dossierPaidBtn.innerHTML = '✅ Confirm Client Paid (Closed)';
-        els.dossierPaidBtn.onclick = () => openMarkPaidModal(lead);
+        if (els.dossierAdminVerifActions) els.dossierAdminVerifActions.style.display = 'none';
+        if (els.dossierPendingNotice) els.dossierPendingNotice.style.display = 'block';
+        if (els.dossierPaidBtn) els.dossierPaidBtn.style.display = 'none';
+      }
+    } else {
+      if (els.dossierAdminVerifActions) els.dossierAdminVerifActions.style.display = 'none';
+      if (els.dossierPendingNotice) els.dossierPendingNotice.style.display = 'none';
+      if (els.dossierPaidBtn) {
+        els.dossierPaidBtn.style.display = 'block';
+        if (leadState === 'paid') {
+          els.dossierPaidBtn.className = 'btn btn-ghost btn-sm';
+          els.dossierPaidBtn.innerHTML = 'Re-open Lead to Ongoing';
+          els.dossierPaidBtn.onclick = () => reopenLead(lead.id);
+        } else {
+          els.dossierPaidBtn.className = 'btn btn-paid btn-sm';
+          els.dossierPaidBtn.innerHTML = '✅ Record Sale (Submit Verification)';
+          els.dossierPaidBtn.onclick = () => openMarkPaidModal(lead);
+        }
       }
     }
 
@@ -2059,8 +2187,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     lead.name = name;
     lead.email = email;
-    lead.leadState = 'paid';
-    lead.status = 'paid';
+    lead.leadState = 'pending_verification';
+    lead.status = 'pending_verification';
+    lead.verificationStatus = 'pending';
     if (!lead.ownerId) {
       lead.ownerId = closerId;
       lead.ownerName = closerName;
@@ -2081,20 +2210,128 @@ document.addEventListener('DOMContentLoaded', () => {
     lead.messages.push({
       sender: 'agent',
       agentName: closerName,
-      text: `🎉 PAYMENT CONFIRMED (DEAL WON)!\n• Plan: ${plan} (Rs. ${amount.toLocaleString()})\n• Method: ${method}${trxId ? '\n• Trx Ref: ' + trxId : ''}${email ? '\n• Account Email: ' + email : ''}\n• Closer: ${closerName}\nClient activated on Nunno Cloud!`,
+      text: `⚪ PAYMENT SUBMITTED (PENDING VERIFICATION)\n• Plan: ${plan} (Rs. ${amount.toLocaleString()})\n• Method: ${method}${trxId ? '\n• Trx Ref: ' + trxId : ''}${email ? '\n• Account Email: ' + email : ''}\n• Closer: ${closerName}\n⏳ Awaiting Admin verification in the Admin Portal before 10k target & commission score are credited.`,
       time: now
     });
 
     closeMarkPaidModal();
-    showToast(`🟢 Deal Won! Closed Rs. ${amount.toLocaleString()} with ${name}! 🚀`);
+    showToast(`⚪ Sale submitted! Status set to Grey (Pending Admin Verification). 🛡️`);
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
 
     syncLeadToServer(lead, {
+      leadState: 'pending_verification',
+      status: 'pending_verification',
+      verificationStatus: 'pending',
       name: lead.name,
       email: lead.email,
       paidDetails: lead.paidDetails,
+      newMessage: lead.messages[lead.messages.length - 1]
+    });
+  }
+
+  // Admin Anti-Fraud Action: Verify & Approve Deal (Turns Green & Credits Score)
+  function verifyPaymentDeal(leadId) {
+    const user = state.currentUser;
+    const currentRawRole = (user && user.designation) || (user && user.role) || state.currentAgent.role || 'Team Member';
+    const currentRole = normalizeRole(currentRawRole);
+    if (currentRole !== 'Admin') {
+      showToast('❌ Only Administrators can verify and approve payments.');
+      return;
+    }
+
+    const lead = getLead(leadId);
+    if (!lead) return;
+
+    const adminName = user ? user.name : 'System Administrator';
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const plan = lead.paidDetails?.plan || lead.interest || 'Nunno Pro';
+    const amount = lead.paidDetails?.amount ? Number(lead.paidDetails.amount) : 5000;
+    const closerName = lead.paidDetails?.closedBy || lead.ownerName || 'Closer';
+
+    lead.leadState = 'paid';
+    lead.status = 'paid';
+    lead.verificationStatus = 'verified';
+    lead.verifiedBy = adminName;
+    lead.verifiedAt = new Date().toISOString();
+
+    lead.messages.push({
+      sender: 'agent',
+      agentName: 'Admin Audit Verification',
+      text: `🟢 PAYMENT VERIFIED & APPROVED (DEAL WON)!\n• Verified By: ${adminName}\n• Closer Credited: ${closerName}\n• Plan: ${plan} (Rs. ${amount.toLocaleString()})\n• Transaction officially verified on banking portal. Account activated! 🚀`,
+      time: now
+    });
+
+    showToast(`🟢 Payment Verified! Deal won and turned Green (Rs. ${amount.toLocaleString()}). 🚀`);
+    renderConversationsList();
+    renderActiveChat();
+    renderAgentProfile();
+    if (els.scoreModal && els.scoreModal.classList.contains('open')) {
+      renderScoreData(state.activeScoreTab || 'verify');
+    }
+
+    syncLeadToServer(lead, {
+      leadState: 'paid',
+      status: 'paid',
+      verificationStatus: 'verified',
+      verifiedBy: adminName,
+      verifiedAt: lead.verifiedAt,
+      newMessage: lead.messages[lead.messages.length - 1]
+    });
+  }
+
+  // Admin Anti-Fraud Action: Reject Fake Deal (Reverts Lead & Awards Zero Score)
+  function rejectFakeDeal(leadId) {
+    const user = state.currentUser;
+    const currentRawRole = (user && user.designation) || (user && user.role) || state.currentAgent.role || 'Team Member';
+    const currentRole = normalizeRole(currentRawRole);
+    if (currentRole !== 'Admin') {
+      showToast('❌ Only Administrators can reject fake transactions.');
+      return;
+    }
+
+    const lead = getLead(leadId);
+    if (!lead) return;
+
+    const defaultReason = 'Fake Transaction / Payment Not Received on EasyPaisa or Bank';
+    const reason = prompt('Reason for rejecting this deal (Fake sale / Invalid Ref / No deposit):', defaultReason);
+    if (reason === null) return; // User cancelled prompt
+
+    const adminName = user ? user.name : 'System Administrator';
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const prevCloser = lead.paidDetails?.closedBy || lead.ownerName || 'Closer';
+
+    // Revert lead back to ongoing or fresh
+    lead.leadState = lead.ownerId ? 'ongoing' : 'fresh';
+    lead.status = lead.ownerId ? 'replied' : 'unread';
+    lead.verificationStatus = 'rejected';
+    lead.rejectionReason = reason || defaultReason;
+    lead.rejectedBy = adminName;
+    lead.rejectedAt = new Date().toISOString();
+    lead.paidDetails = null;
+
+    lead.messages.push({
+      sender: 'agent',
+      agentName: 'Security & Anti-Fraud Audit',
+      text: `⚠️ PAYMENT REJECTED (FAKE SALE SHIELD):\n• Rejected By Admin: ${adminName}\n• Reason: ${reason || defaultReason}\n• Submitter Closer: ${prevCloser}\nDeal has been rejected and reverted. Zero sales credit or commission awarded.`,
+      time: now
+    });
+
+    showToast(`❌ Fake deal rejected! Lead reverted to ${lead.leadState}. Zero score awarded.`);
+    renderConversationsList();
+    renderActiveChat();
+    renderAgentProfile();
+    if (els.scoreModal && els.scoreModal.classList.contains('open')) {
+      renderScoreData(state.activeScoreTab || 'verify');
+    }
+
+    syncLeadToServer(lead, {
+      leadState: lead.leadState,
+      status: lead.status,
+      verificationStatus: 'rejected',
+      rejectionReason: lead.rejectionReason,
+      paidDetails: null,
       newMessage: lead.messages[lead.messages.length - 1]
     });
   }
@@ -2208,8 +2445,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Core Calculator: Computes 10k target eligibility, Base Salary, and Post-Target Commissions
   function calculateCloserPerformance(closerId) {
+    // Only VERIFIED deals count towards company revenue, 10k target, and commissions
     const paidLeads = state.leads.filter(l => 
       (l.leadState === 'paid' || l.status === 'paid') && 
+      (l.paidDetails?.closedById === closerId || l.ownerId === closerId)
+    );
+
+    // Pending deals undergoing Admin verification
+    const pendingLeads = state.leads.filter(l => 
+      (l.leadState === 'pending_verification' || l.status === 'pending_verification') && 
       (l.paidDetails?.closedById === closerId || l.ownerId === closerId)
     );
 
@@ -2255,8 +2499,32 @@ document.addEventListener('DOMContentLoaded', () => {
         method,
         closedAt,
         dealCommission,
-        dealTag
+        dealTag,
+        isPending: false
       };
+    });
+
+    // Show pending deals in closer's ledger
+    pendingLeads.forEach(l => {
+      const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : 5000;
+      const plan = l.paidDetails?.plan || l.interest || 'Nunno Pro';
+      const method = l.paidDetails?.method || 'EasyPaisa';
+      const email = l.paidDetails?.email || l.email || '';
+      const closedAt = l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive;
+
+      dealLedger.unshift({
+        id: l.id,
+        name: l.name,
+        display: l.display || l.phone,
+        email,
+        plan,
+        amt,
+        method,
+        closedAt,
+        dealCommission: 0,
+        dealTag: `⚪ In Review (Awaiting Admin Audit)`,
+        isPending: true
+      });
     });
 
     const totalSales = runningSales;
@@ -2266,6 +2534,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     return {
       paidLeads,
+      pendingLeads,
       dealLedger,
       totalSales,
       isTargetAchieved,
@@ -2276,6 +2545,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderScoreData(activeTab = 'my') {
+    state.activeScoreTab = activeTab;
     const user = state.currentUser;
     const currentId = user ? user.id : state.currentAgent.id;
     const currentName = user ? user.name : state.currentAgent.name;
@@ -2283,20 +2553,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentRole = normalizeRole(currentRawRole);
     const isAdmin = currentRole === 'Admin';
 
+    // Count pending verification deals
+    const allPendingDeals = state.leads.filter(l => getLeadState(l) === 'pending_verification');
+    if (els.pendingVerifCount) els.pendingVerifCount.textContent = allPendingDeals.length;
+    if (els.pendingAuditHeaderCount) els.pendingAuditHeaderCount.textContent = `${allPendingDeals.length} Pending Deals`;
+
     // Toggle tab display
-    if (els.tabMyScore && els.tabTeamScores && els.viewMyScoreTab && els.viewTeamScoresTab) {
-      if (activeTab === 'team') {
-        els.tabMyScore.classList.remove('active');
-        els.tabTeamScores.classList.add('active');
-        els.viewMyScoreTab.style.display = 'none';
-        els.viewTeamScoresTab.style.display = 'block';
-      } else {
-        els.tabMyScore.classList.add('active');
-        els.tabTeamScores.classList.remove('active');
-        els.viewMyScoreTab.style.display = 'block';
-        els.viewTeamScoresTab.style.display = 'none';
-      }
-    }
+    if (els.tabMyScore) els.tabMyScore.classList.toggle('active', activeTab === 'my');
+    if (els.tabTeamScores) els.tabTeamScores.classList.toggle('active', activeTab === 'team');
+    if (els.tabVerifySales) els.tabVerifySales.classList.toggle('active', activeTab === 'verify');
+
+    if (els.viewMyScoreTab) els.viewMyScoreTab.style.display = activeTab === 'my' ? 'block' : 'none';
+    if (els.viewTeamScoresTab) els.viewTeamScoresTab.style.display = activeTab === 'team' ? 'block' : 'none';
+    if (els.viewVerifySalesTab) els.viewVerifySalesTab.style.display = activeTab === 'verify' ? 'block' : 'none';
 
     // --- TAB 1: User Personal Performance Portal ---
     const myPerf = calculateCloserPerformance(currentId);
@@ -2365,7 +2634,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         els.myDealsList.innerHTML = myPerf.dealLedger.map(deal => {
           return `
-            <div class="perf-deal-row">
+            <div class="perf-deal-row" style="${deal.isPending ? 'border-left:3px solid #94a3b8;opacity:0.9;' : ''}">
               <div class="perf-deal-client">
                 <div class="perf-deal-name">${escapeHtml(deal.name)}</div>
                 <div class="perf-deal-sub mono">${escapeHtml(deal.display)}${deal.email ? ' &bull; ' + escapeHtml(deal.email) : ''}</div>
@@ -2376,7 +2645,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
               <div style="text-align:right;">
                 <div class="perf-deal-amount mono">Rs. ${deal.amt.toLocaleString()}</div>
-                <div class="text-xs" style="font-weight:600;color:${deal.dealCommission > 0 ? '#10b981' : '#fbbf24'};">${deal.dealTag}</div>
+                <div class="text-xs" style="font-weight:600;color:${deal.isPending ? '#cbd5e1' : (deal.dealCommission > 0 ? '#10b981' : '#fbbf24')};">${deal.dealTag}</div>
               </div>
               <div class="perf-deal-date text-xs text-muted">${deal.closedAt}</div>
             </div>
@@ -2503,6 +2772,84 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('')}
       `;
     }
+
+    // --- TAB 3: Admin Transaction Audit & Verification Portal ---
+    if (els.verifySalesList && activeTab === 'verify') {
+      if (allPendingDeals.length === 0) {
+        els.verifySalesList.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;background:var(--surface-0);border:1px solid var(--border-subtle);border-radius:12px;">
+            <div style="font-size:36px;margin-bottom:10px;">🛡️✅</div>
+            <h4 style="margin:0 0 6px 0;font-size:16px;color:#ffffff;font-weight:700;">Zero Pending Verifications</h4>
+            <p class="text-xs text-muted" style="max-width:440px;margin:0 auto;">All customer subscription payments have been audited and verified. Incoming sales will appear here in Grey for Admin verification before green status and commission score unlock.</p>
+          </div>
+        `;
+      } else {
+        els.verifySalesList.innerHTML = allPendingDeals.map(lead => {
+          const p = lead.paidDetails || {};
+          const plan = p.plan || lead.interest || 'Nunno Pro';
+          const amt = p.amount ? Number(p.amount) : 5000;
+          const method = p.method || 'EasyPaisa';
+          const trxId = p.trxId || 'N/A';
+          const closer = p.closedBy || lead.ownerName || 'Closer';
+          const email = p.email || lead.email || 'None';
+          const submittedAt = p.closedAt ? new Date(p.closedAt).toLocaleString() : lead.lastActive;
+          const initials = lead.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
+          return `
+            <div class="verify-deal-card">
+              <div class="verify-deal-top">
+                <div class="verify-deal-customer">
+                  <div class="verify-deal-avatar">${initials}</div>
+                  <div>
+                    <div class="verify-deal-name">${escapeHtml(lead.name)}</div>
+                    <div class="verify-deal-sub mono">${escapeHtml(lead.display || lead.phone)} &bull; ${escapeHtml(lead.city || 'Pakistan')}</div>
+                  </div>
+                </div>
+                <div class="verify-deal-amount-wrap">
+                  <div class="verify-deal-amount">PKR ${amt.toLocaleString()}</div>
+                  <div class="verify-deal-plan">${escapeHtml(plan)}</div>
+                </div>
+              </div>
+
+              <div class="verify-audit-grid">
+                <div class="verify-audit-item">
+                  <span class="verify-audit-label">Submitted By Closer</span>
+                  <span class="verify-audit-val" style="color:#fbbf24;">👤 ${escapeHtml(closer)}</span>
+                </div>
+                <div class="verify-audit-item">
+                  <span class="verify-audit-label">Payment Gateway</span>
+                  <span class="verify-audit-val">${escapeHtml(method)}</span>
+                </div>
+                <div class="verify-audit-item">
+                  <span class="verify-audit-label">Trx ID / Bank Ref</span>
+                  <span class="verify-audit-val mono" style="color:#38bdf8;">${escapeHtml(trxId)}</span>
+                </div>
+                <div class="verify-audit-item">
+                  <span class="verify-audit-label">Client Email</span>
+                  <span class="verify-audit-val">${escapeHtml(email)}</span>
+                </div>
+                <div class="verify-audit-item" style="grid-column: 1 / -1;">
+                  <span class="verify-audit-label">Submission Timestamp</span>
+                  <span class="verify-audit-val text-muted" style="font-size:11px;">⏱️ ${submittedAt}</span>
+                </div>
+              </div>
+
+              <div class="verify-actions-row">
+                <button type="button" class="btn btn-ghost btn-xs" onclick="selectLead('${lead.id}'); closeScoreModal();">
+                  💬 View Chat
+                </button>
+                <button type="button" class="btn btn-rose btn-sm" onclick="rejectFakeDeal('${lead.id}')">
+                  ❌ Reject Fake Sale
+                </button>
+                <button type="button" class="btn btn-emerald btn-sm" onclick="verifyPaymentDeal('${lead.id}')">
+                  ✅ Verify & Turn Green
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
   }
 
   // Export Leaderboard CSV Audit
@@ -2549,7 +2896,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.closeScoreModalBtn) els.closeScoreModalBtn.addEventListener('click', closeScoreModal);
   if (els.tabMyScore) els.tabMyScore.addEventListener('click', () => renderScoreData('my'));
   if (els.tabTeamScores) els.tabTeamScores.addEventListener('click', () => renderScoreData('team'));
+  if (els.tabVerifySales) els.tabVerifySales.addEventListener('click', () => renderScoreData('verify'));
   if (els.exportLeaderboardBtn) els.exportLeaderboardBtn.addEventListener('click', exportLeaderboardCsv);
+
+  // Expose global functions for direct inline click handlers
+  window.verifyPaymentDeal = verifyPaymentDeal;
+  window.rejectFakeDeal = rejectFakeDeal;
+  window.selectLead = selectLead;
+  window.closeScoreModal = closeScoreModal;
 
   // Mark Paid Modal Event Listeners
   if (els.closeMarkPaidModalBtn) els.closeMarkPaidModalBtn.addEventListener('click', closeMarkPaidModal);

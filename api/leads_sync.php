@@ -226,6 +226,10 @@ if ($action === 'update_lead') {
             if (isset($input['email'])) $lead['email'] = $input['email'];
             if (isset($input['paidDetails'])) $lead['paidDetails'] = $input['paidDetails'];
             if (isset($input['notes'])) $lead['notes'] = $input['notes'];
+            if (isset($input['verificationStatus'])) $lead['verificationStatus'] = $input['verificationStatus'];
+            if (isset($input['verifiedBy'])) $lead['verifiedBy'] = $input['verifiedBy'];
+            if (isset($input['verifiedAt'])) $lead['verifiedAt'] = $input['verifiedAt'];
+            if (isset($input['rejectionReason'])) $lead['rejectionReason'] = $input['rejectionReason'];
             if (isset($input['unreadCount'])) $lead['unreadCount'] = (int)$input['unreadCount'];
             if (isset($input['lastActive'])) $lead['lastActive'] = $input['lastActive'];
             if (isset($input['newMessage'])) {

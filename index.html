@@ -120,6 +120,11 @@
           <span class="kpi-label">🟡 Ongoing</span>
           <span class="kpi-count" id="kpiCountOngoing">3</span>
         </button>
+        <button type="button" class="kpi-stat-pill kpi-pending" data-filter="pending_verification" id="kpiFilterPending">
+          <span class="kpi-dot dot-pending"></span>
+          <span class="kpi-label">⚪ In Review</span>
+          <span class="kpi-count" id="kpiCountPending">0</span>
+        </button>
         <button type="button" class="kpi-stat-pill kpi-paid" data-filter="paid" id="kpiFilterPaid">
           <span class="kpi-dot dot-paid"></span>
           <span class="kpi-label">🟢 Paid</span>
@@ -167,6 +172,7 @@
           <button class="inbox-filter-btn active" data-filter="all">All</button>
           <button class="inbox-filter-btn filter-fresh" data-filter="fresh">🔴 Fresh</button>
           <button class="inbox-filter-btn filter-ongoing" data-filter="ongoing">🟡 Ongoing</button>
+          <button class="inbox-filter-btn filter-pending" data-filter="pending_verification">⚪ In Review</button>
           <button class="inbox-filter-btn filter-paid" data-filter="paid">🟢 Paid</button>
           <button class="inbox-filter-btn filter-useless" data-filter="useless">🔵 Won't Pay</button>
           <button class="inbox-filter-btn filter-mine" data-filter="mine">My Leads</button>
@@ -215,6 +221,16 @@
             <span>Mark Paid</span>
           </button>
 
+          <!-- Admin Transaction Verification Buttons (Shown when deal is pending) -->
+          <button class="btn btn-emerald btn-xs" id="verifyPaidHeaderBtn" style="display:none;" title="Verify & approve customer payment (Turn Green)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Verify Payment</span>
+          </button>
+          <button class="btn btn-rose btn-xs" id="rejectPaidHeaderBtn" style="display:none;" title="Reject fake transaction / revert lead">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span>Reject Fake</span>
+          </button>
+
           <!-- Can't Handle / Release to Red Pool Button -->
           <button class="btn btn-warning btn-xs" id="cantHandleBtn" title="Can't handle this client? Release back to Fresh (Red) pool">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
@@ -258,21 +274,11 @@
         👑 <strong id="otherCloserName">Hamza Khan</strong> is handling this lead. (Admin Monitoring Mode)
       </div>
 
-      <!-- Quick Response Macro Chips -->
-      <div class="quick-reply-bar">
-        <button type="button" class="quick-macro-chip" data-macro="Nunno Pro sirf Rs. 5,000/mo hai (EasyPaisa/JazzCash). Coupon NUNNO30 se 30% OFF!">💎 Pro (Rs. 5,000)</button>
-        <button type="button" class="quick-macro-chip" data-macro="Nunno Starter Plan sirf Rs. 1,700/month hai scalpers ke liye!">⚡ Starter (Rs. 1,700)</button>
-        <button type="button" class="quick-macro-chip" data-macro="EasyPaisa Account: 0300-8472910 (Title: Nunno Tech). Transfer karke screenshot share karein.">💳 EasyPaisa Details</button>
-        <button type="button" class="quick-macro-chip" data-macro="JazzCash Account: 0321-4567890 (Title: Nunno Trading).">📱 JazzCash Details</button>
-        <button type="button" class="quick-macro-chip" data-macro="USDT (TRC-20): TQn9Y2khEsLJW1ChVGB1B... (USDT 18 for Pro)">🪙 USDT Address</button>
-        <button type="button" class="quick-macro-chip" data-macro="Live demo aur signals platform yahan check karein: https://nunno.cloud">🔗 Platform Demo</button>
-      </div>
-
-      <!-- Message Composer Bar -->
+      <!-- Message Composer Bar (Spacious WhatsApp Desktop Experience) -->
       <div class="chat-composer-bar">
-        <textarea id="chatInput" class="chat-input" placeholder="Type WhatsApp message... (Press Enter to send)"></textarea>
-        <button class="btn btn-wa btn-sm" id="sendMsgBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <textarea id="chatInput" class="chat-input" rows="2" placeholder="Type WhatsApp message... (Press Enter to send)"></textarea>
+        <button class="btn btn-wa" id="sendMsgBtn" title="Send WhatsApp Message">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           <span>Send</span>
         </button>
       </div>
@@ -296,7 +302,7 @@
           <div id="dossierStatusPill" class="status-pill-clean ongoing">🟡 Ongoing</div>
         </div>
 
-        <!-- 4-Button Segmented Status Matrix -->
+        <!-- 5-Button Segmented Status Matrix -->
         <div class="status-matrix-grid">
           <button type="button" class="matrix-btn matrix-fresh" data-set-state="fresh" id="matrixBtnFresh" title="Reset lead to Open Pool (Unclaimed)">
             <span class="matrix-dot dot-fresh"></span>
@@ -305,6 +311,10 @@
           <button type="button" class="matrix-btn matrix-ongoing" data-set-state="ongoing" id="matrixBtnOngoing" title="Claim lead for ongoing discussion">
             <span class="matrix-dot dot-ongoing"></span>
             <span>🟡 Ongoing</span>
+          </button>
+          <button type="button" class="matrix-btn matrix-pending" data-set-state="pending_verification" id="matrixBtnPending" title="Deal submitted, undergoing Admin verification">
+            <span class="matrix-dot dot-pending"></span>
+            <span>⚪ In Review</span>
           </button>
           <button type="button" class="matrix-btn matrix-paid" data-set-state="paid" id="matrixBtnPaid" title="Client paid and subscription activated">
             <span class="matrix-dot dot-paid"></span>
@@ -364,6 +374,23 @@
       <div class="dossier-widget widget-actions">
         <span class="widget-badge-label">QUICK CONVERSION ACTIONS</span>
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+          <!-- Admin Verification Controls (shown when deal is pending verification) -->
+          <div id="dossierAdminVerifActions" style="display:none;flex-direction:column;gap:6px;">
+            <button type="button" class="btn btn-emerald btn-sm" id="dossierVerifyBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Verify Payment (Turn Green)</span>
+            </button>
+            <button type="button" class="btn btn-rose btn-sm" id="dossierRejectBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span>Reject Fake Sale</span>
+            </button>
+          </div>
+
+          <!-- Closer Pending Notice (shown when lead is in review) -->
+          <div id="dossierPendingNotice" style="display:none;background:#161d28;border:1px solid #2a3942;border-radius:8px;padding:8px 10px;font-size:11.5px;color:#cbd5e1;line-height:1.4;">
+            ⚪ <strong>Under Verification:</strong> Payment details submitted. Awaiting Admin verification before 10k target & commission score are credited.
+          </div>
+
           <button type="button" class="btn btn-paid btn-sm" id="dossierPaidBtn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             <span>Confirm Client Paid (Closed)</span>
@@ -764,12 +791,12 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <div class="modal-window" style="max-width:480px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:20px;">🎉</span>
-          <div style="font-size:16px;font-weight:800;color:#ffffff;">Close Deal & Record Payment</div>
+          <span style="font-size:20px;">🛡️</span>
+          <div style="font-size:16px;font-weight:800;color:#ffffff;">Record Sale & Submit for Verification</div>
         </div>
         <button class="btn btn-ghost btn-xs" id="closeMarkPaidModalBtn">✕</button>
       </div>
-      <p class="text-xs text-muted" style="margin-top:4px;">Record customer payment details to activate subscription and allocate commission score.</p>
+      <p class="text-xs text-muted" style="margin-top:4px;">Deal will first be placed in <strong>⚪ Grey (In Review)</strong>. Once Admin validates the transaction in the Admin Portal, it turns <strong>🟢 Green</strong> and unlocks your 10k target & commission score.</p>
 
       <form id="markPaidForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
         <div class="form-group" style="margin:0;">
@@ -832,7 +859,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           <button type="button" class="btn btn-ghost btn-sm" id="cancelMarkPaidBtn">Cancel</button>
           <button type="submit" class="btn btn-paid btn-sm" id="confirmMarkPaidBtn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            <span>Confirm Deal & Mark Paid</span>
+            <span>Submit Sale for Verification (Grey)</span>
           </button>
         </div>
       </form>
@@ -908,13 +935,16 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         <button class="btn btn-ghost btn-xs" id="closeScoreModalBtn">✕</button>
       </div>
 
-      <!-- Performance Tabs (My Score vs Team Leaderboard) -->
-      <div style="display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.2);">
+      <!-- Performance Tabs (My Score vs Team Leaderboard vs Verify Transactions) -->
+      <div style="display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(0,0,0,0.2);overflow-x:auto;">
         <button type="button" class="nav-tab-btn active" id="tabMyScore" style="padding:6px 14px;font-size:12px;">
           <span>👤 My Score & Deals</span>
         </button>
         <button type="button" class="nav-tab-btn" id="tabTeamScores" style="padding:6px 14px;font-size:12px;">
           <span>🏆 Team Leaderboard (All Users)</span>
+        </button>
+        <button type="button" class="nav-tab-btn" id="tabVerifySales" style="padding:6px 14px;font-size:12px;">
+          <span>🛡️ Verify Transactions (<span id="pendingVerifCount">0</span>)</span>
         </button>
       </div>
 
@@ -1056,6 +1086,26 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
             <div id="teamLeaderboardTable">
               <!-- Dynamically populated -->
             </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: Admin Transaction Audit & Verification Portal (Anti-Fake Sale Shield) -->
+        <div id="viewVerifySalesTab" style="display:none;">
+          <div class="perf-hero-card" style="margin-bottom:16px;">
+            <div class="perf-hero-left">
+              <div class="perf-hero-avatar" style="background:#1e293b;border-color:#38bdf8;color:#38bdf8;">🛡️</div>
+              <div>
+                <div class="perf-hero-name">Anti-Fraud Transaction Audit Portal</div>
+                <div class="perf-hero-role">Audit submitted payments before confirming deals, 10k target milestone credit, & task commissions</div>
+              </div>
+            </div>
+            <div class="perf-tier-badge" style="background:#1e293b;border-color:#38bdf8;color:#38bdf8;">
+              <span id="pendingAuditHeaderCount">0 Pending Deals</span>
+            </div>
+          </div>
+
+          <div id="verifySalesList" style="display:flex;flex-direction:column;gap:12px;">
+            <!-- Dynamically populated -->
           </div>
         </div>
       </div>
