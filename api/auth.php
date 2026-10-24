@@ -35,8 +35,8 @@ function initUsersStorage($usersFile) {
                 'username'      => 'admin',
                 'email'         => 'admin@nunno.cloud',
                 'password_hash' => password_hash('Admin@Omnidesk2026!', PASSWORD_BCRYPT),
-                'role'          => 'admin', // 'admin' | 'employee'
-                'designation'   => 'Master Administrator',
+                'role'          => 'admin', // 'admin' | 'lead' | 'member'
+                'designation'   => 'Admin',
                 'phone'         => '',
                 'status'        => 'active', // 'active' | 'suspended'
                 'created_at'    => date('Y-m-d H:i:s'),
@@ -48,8 +48,8 @@ function initUsersStorage($usersFile) {
                 'username'      => 'hamza',
                 'email'         => 'hamza@nunno.cloud',
                 'password_hash' => password_hash('Agent@123', PASSWORD_BCRYPT),
-                'role'          => 'employee',
-                'designation'   => 'Senior Closer',
+                'role'          => 'member',
+                'designation'   => 'Team Member',
                 'phone'         => '+923001234567',
                 'status'        => 'active',
                 'created_at'    => date('Y-m-d H:i:s'),
@@ -230,8 +230,17 @@ switch ($action) {
         $name = trim($data['name'] ?? '');
         $empUsername = strtolower(trim($data['username'] ?? ''));
         $empPassword = trim($data['password'] ?? '');
-        $designation = trim($data['designation'] ?? 'Sales Closer');
-        $empRole = ($data['role'] ?? 'employee') === 'admin' ? 'admin' : 'employee';
+        $rawDesig = trim($data['designation'] ?? ($data['role'] ?? 'Team Member'));
+        if (strcasecmp($rawDesig, 'Admin') === 0 || strcasecmp($rawDesig, 'Administrator') === 0) {
+            $designation = 'Admin';
+            $empRole = 'admin';
+        } elseif (strcasecmp($rawDesig, 'Team Lead') === 0 || strcasecmp($rawDesig, 'Lead') === 0) {
+            $designation = 'Team Lead';
+            $empRole = 'lead';
+        } else {
+            $designation = 'Team Member';
+            $empRole = 'member';
+        }
         $email = trim($data['email'] ?? ($empUsername . '@nunno.cloud'));
         $phone = trim($data['phone'] ?? '');
 

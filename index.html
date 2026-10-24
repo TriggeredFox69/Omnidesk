@@ -337,7 +337,7 @@
           <div class="closer-avatar" id="dossierOwnerAvatar">👨‍💼</div>
           <div class="closer-info">
             <div class="closer-name" id="dossierOwner">Hamza Khan</div>
-            <div class="closer-role" id="dossierOwnerRole">Senior Closer • EMP-101</div>
+            <div class="closer-role" id="dossierOwnerRole">Team Member • EMP-101</div>
           </div>
         </div>
 
@@ -718,11 +718,9 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
             <div class="form-group" style="margin:0;">
               <label class="form-label">Role & Designation</label>
               <select id="newEmpRole" class="form-select">
-                <option value="Senior Closer">💼 Senior Closer (High Intent Leads)</option>
-                <option value="Outreach Specialist">🎯 Outreach Specialist (Cold Database)</option>
-                <option value="Crypto Specialist">📈 Crypto Scalper Specialist</option>
-                <option value="Client Support">💬 Client Support Agent</option>
-                <option value="Administrator">👑 Administrator (Full Admin Rights)</option>
+                <option value="Team Member">👤 Team Member</option>
+                <option value="Team Lead">⚡ Team Lead</option>
+                <option value="Admin">👑 Admin</option>
               </select>
             </div>
 
@@ -923,48 +921,100 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
       <div class="emp-modal-body" style="grid-template-columns:1fr;padding:20px 24px;">
         <!-- TAB 1: User Personal Performance Portal -->
         <div id="viewMyScoreTab">
-          <!-- Top Closer Tier Card -->
+          <!-- User Profile & Designation Card -->
           <div class="perf-hero-card">
             <div class="perf-hero-left">
-              <div class="perf-hero-avatar" id="perfHeroAvatar">👨‍💼</div>
+              <div class="perf-hero-avatar" id="perfHeroAvatar">👤</div>
               <div>
                 <div class="perf-hero-name" id="perfHeroName">Hamza Khan</div>
-                <div class="perf-hero-role" id="perfHeroRole">Senior Closer &bull; EMP-101</div>
+                <div class="perf-hero-role" id="perfHeroRole">Team Member &bull; EMP-101</div>
               </div>
             </div>
             <div class="perf-tier-badge" id="perfTierBadge">
-              <span>🥇 Gold Closer</span>
+              <span>👤 Team Member</span>
             </div>
           </div>
 
-          <!-- 4 Score Cards Grid -->
+          <!-- Monthly Task & Salary Target Milestone (10k Sales -> 10k Salary) -->
+          <div class="salary-milestone-card">
+            <div class="milestone-header">
+              <div class="milestone-title-group">
+                <div class="milestone-title">🎯 Monthly Task Target: PKR 10,000 Sales</div>
+                <div class="milestone-sub">Fulfill PKR 10,000 in customer sales (e.g. 6x Starter, 2x Pro, or 1x Whale) to unlock your PKR 10,000 Base Salary.</div>
+              </div>
+              <div class="milestone-status-badge" id="milestoneStatusBadge">
+                <span id="targetBadgeIcon">⏳</span> <span id="targetBadgeText">Target In Progress</span>
+              </div>
+            </div>
+
+            <!-- Visual Progress Taskbar -->
+            <div class="taskbar-container">
+              <div class="taskbar-track">
+                <div class="taskbar-fill" id="taskbarFill" style="width: 0%;"></div>
+              </div>
+              <div class="taskbar-meta">
+                <span class="mono" id="taskbarCurrent">Rs. 0</span>
+                <span class="mono" id="taskbarPct">0% Completed</span>
+                <span class="mono" id="taskbarGoal">Target: Rs. 10,000</span>
+              </div>
+            </div>
+
+            <!-- Milestone Requirement Feedback Note -->
+            <div class="milestone-feedback" id="milestoneFeedback">
+              Close Rs. 10,000 more in customer sales to qualify for your Rs. 10,000 Base Salary.
+            </div>
+          </div>
+
+          <!-- Earnings Breakdown Grid (Base Salary, Commissions, Take-Home, Sales Volume) -->
           <div class="score-cards-grid">
-            <div class="score-card revenue">
-              <span class="score-card-label">TOTAL REVENUE CLOSED</span>
+            <div class="score-card salary-card">
+              <span class="score-card-label">BASE SALARY</span>
+              <span class="score-card-value" id="myBaseSalary">Rs. 0</span>
+              <span class="score-card-sub" id="myBaseSalarySub">Requires 10k Target</span>
+            </div>
+            <div class="score-card comm-card">
+              <span class="score-card-label">TASK COMMISSIONS</span>
+              <span class="score-card-value" id="myCommissionsEarned">Rs. 0</span>
+              <span class="score-card-sub">From post-target sales</span>
+            </div>
+            <div class="score-card payout-card">
+              <span class="score-card-label">TOTAL TAKE-HOME PAY</span>
+              <span class="score-card-value" id="myTotalPayout">Rs. 0</span>
+              <span class="score-card-sub">Base Salary + Commissions</span>
+            </div>
+            <div class="score-card sales-card">
+              <span class="score-card-label">TOTAL SALES CLOSED</span>
               <span class="score-card-value" id="myTotalRevenue">Rs. 0</span>
-              <span class="score-card-sub">From verified customer payments</span>
-            </div>
-            <div class="score-card closed">
-              <span class="score-card-label">DEALS WON</span>
-              <span class="score-card-value" id="myDealsWon">0</span>
-              <span class="score-card-sub">Paid customers activated</span>
-            </div>
-            <div class="score-card ongoing">
-              <span class="score-card-label">ACTIVE PIPELINE</span>
-              <span class="score-card-value" id="myActivePipeline">0</span>
-              <span class="score-card-sub">Ongoing chats in negotiation</span>
-            </div>
-            <div class="score-card rate">
-              <span class="score-card-label">CONVERSION RATE</span>
-              <span class="score-card-value" id="myConversionRate">0%</span>
-              <span class="score-card-sub">Deals won / Total handled</span>
+              <span class="score-card-sub" id="myDealsWonSub">0 Verified Deals Won</span>
             </div>
           </div>
 
-          <!-- My Recent Closed Deals Table -->
+          <!-- Commission Rate Schedule Banner -->
+          <div class="comm-schedule-card">
+            <div class="comm-schedule-title">💼 Post-Target Task Commission Schedule (Active once 10k Target is Met)</div>
+            <div class="comm-schedule-grid">
+              <div class="comm-tier-box">
+                <span class="comm-tier-plan">⚡ Starter Plan</span>
+                <span class="comm-tier-sale mono">Sale: Rs. 1,700</span>
+                <span class="comm-tier-earn mono">➔ Rs. 700 Commission</span>
+              </div>
+              <div class="comm-tier-box">
+                <span class="comm-tier-plan">💎 Pro Plan</span>
+                <span class="comm-tier-sale mono">Sale: Rs. 5,000</span>
+                <span class="comm-tier-earn mono">➔ Rs. 2,000 Commission</span>
+              </div>
+              <div class="comm-tier-box">
+                <span class="comm-tier-plan">🐋 Whale VIP</span>
+                <span class="comm-tier-sale mono">Sale: Rs. 15,000</span>
+                <span class="comm-tier-earn mono">➔ Rs. 10,000 Commission</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Closed Deals & Commission Audit Ledger -->
           <div class="perf-section-card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-              <h4 style="margin:0;font-size:13.5px;color:#fff;font-weight:700;">My Closed Deals History</h4>
+              <h4 style="margin:0;font-size:13.5px;color:#fff;font-weight:700;">Deals & Task Commission Ledger</h4>
               <span class="text-xs text-muted" id="myDealsCountLabel">0 Closed</span>
             </div>
             <div id="myDealsList" class="perf-deals-table">
@@ -978,20 +1028,20 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           <!-- Organization KPI Summary -->
           <div class="org-summary-grid">
             <div class="org-stat-box">
-              <span class="org-stat-label">TOTAL COMPANY REVENUE</span>
+              <span class="org-stat-label">TOTAL COMPANY SALES</span>
               <span class="org-stat-val" id="orgTotalRevenue">Rs. 0</span>
             </div>
             <div class="org-stat-box">
-              <span class="org-stat-label">TOTAL CLOSED CLIENTS</span>
+              <span class="org-stat-label">TOTAL CLOSED DEALS</span>
               <span class="org-stat-val" id="orgTotalDeals">0</span>
             </div>
             <div class="org-stat-box">
-              <span class="org-stat-label">TOP MVP CLOSER</span>
-              <span class="org-stat-val" id="orgTopCloser" style="color:#fbbf24;">-</span>
+              <span class="org-stat-label">SALARIES QUALIFIED</span>
+              <span class="org-stat-val" id="orgSalariesUnlocked">0 Qualified</span>
             </div>
             <div class="org-stat-box">
-              <span class="org-stat-label">ACTIVE SALES FORCE</span>
-              <span class="org-stat-val" id="orgActiveClosers">0 Closers</span>
+              <span class="org-stat-label">COMMISSIONS PAID</span>
+              <span class="org-stat-val" id="orgCommissionsTotal">Rs. 0</span>
             </div>
           </div>
 
@@ -999,9 +1049,9 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           <div class="perf-section-card" style="margin-top:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
               <h4 style="margin:0;font-size:14px;color:#fff;font-weight:700;display:flex;align-items:center;gap:6px;">
-                <span>🏆 Team Performance Leaderboard</span>
+                <span>🏆 Team Performance, Target & Commission Leaderboard</span>
               </h4>
-              <button type="button" class="btn btn-ghost btn-xs" id="exportLeaderboardBtn">📊 Export Audit CSV</button>
+              <button type="button" class="btn btn-ghost btn-xs" id="exportLeaderboardBtn">📊 Export Payroll & Audit CSV</button>
             </div>
             <div id="teamLeaderboardTable">
               <!-- Dynamically populated -->

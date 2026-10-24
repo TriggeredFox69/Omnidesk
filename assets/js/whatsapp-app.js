@@ -16,12 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   }
 
-  // Default Team Agents
+  // Default Team Agents (Strict Roles: Admin, Team Lead, Team Member)
   const defaultAgents = [
-    { id: 'EMP-101', name: 'Hamza Khan', role: 'Senior Closer', avatar: '👨‍💼', color: '#6366f1' },
-    { id: 'EMP-102', name: 'Bilal Tariq', role: 'Crypto Specialist', avatar: '🧑‍💻', color: '#06b6d4' },
-    { id: 'EMP-103', name: 'Ayesha Noor', role: 'Sales Executive', avatar: '👩‍💼', color: '#ec4899' },
-    { id: 'EMP-104', name: 'Zain Ahmed', role: 'Outreach Rep', avatar: '👨‍🦱', color: '#10b981' }
+    { id: 'EMP-101', name: 'Hamza Khan', role: 'Team Member', avatar: '👨‍💼', color: '#6366f1' },
+    { id: 'EMP-102', name: 'Bilal Tariq', role: 'Team Lead', avatar: '🧑‍💻', color: '#06b6d4' },
+    { id: 'EMP-103', name: 'Ayesha Noor', role: 'Team Member', avatar: '👩‍💼', color: '#ec4899' },
+    { id: 'EMP-104', name: 'Zain Ahmed', role: 'Team Member', avatar: '👨‍🦱', color: '#10b981' }
   ];
 
   // Pre-loaded Pakistani Traders with Traffic-Light Statuses
@@ -390,16 +390,26 @@ document.addEventListener('DOMContentLoaded', () => {
     perfHeroName: document.getElementById('perfHeroName'),
     perfHeroRole: document.getElementById('perfHeroRole'),
     perfTierBadge: document.getElementById('perfTierBadge'),
+    taskbarFill: document.getElementById('taskbarFill'),
+    taskbarCurrent: document.getElementById('taskbarCurrent'),
+    taskbarPct: document.getElementById('taskbarPct'),
+    taskbarGoal: document.getElementById('taskbarGoal'),
+    milestoneStatusBadge: document.getElementById('milestoneStatusBadge'),
+    targetBadgeIcon: document.getElementById('targetBadgeIcon'),
+    targetBadgeText: document.getElementById('targetBadgeText'),
+    milestoneFeedback: document.getElementById('milestoneFeedback'),
+    myBaseSalary: document.getElementById('myBaseSalary'),
+    myBaseSalarySub: document.getElementById('myBaseSalarySub'),
+    myCommissionsEarned: document.getElementById('myCommissionsEarned'),
+    myTotalPayout: document.getElementById('myTotalPayout'),
     myTotalRevenue: document.getElementById('myTotalRevenue'),
-    myDealsWon: document.getElementById('myDealsWon'),
-    myActivePipeline: document.getElementById('myActivePipeline'),
-    myConversionRate: document.getElementById('myConversionRate'),
+    myDealsWonSub: document.getElementById('myDealsWonSub'),
     myDealsCountLabel: document.getElementById('myDealsCountLabel'),
     myDealsList: document.getElementById('myDealsList'),
     orgTotalRevenue: document.getElementById('orgTotalRevenue'),
     orgTotalDeals: document.getElementById('orgTotalDeals'),
-    orgTopCloser: document.getElementById('orgTopCloser'),
-    orgActiveClosers: document.getElementById('orgActiveClosers'),
+    orgSalariesUnlocked: document.getElementById('orgSalariesUnlocked'),
+    orgCommissionsTotal: document.getElementById('orgCommissionsTotal'),
     teamLeaderboardTable: document.getElementById('teamLeaderboardTable'),
     exportLeaderboardBtn: document.getElementById('exportLeaderboardBtn'),
 
@@ -1748,8 +1758,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = (els.newEmpName?.value || '').trim();
     const username = (els.newEmpUsername?.value || '').trim();
     const password = (els.newEmpPassword?.value || '').trim();
-    const designation = (els.newEmpRole?.value || 'Senior Closer');
-    const role = designation.toLowerCase().includes('admin') ? 'admin' : 'employee';
+    const designation = (els.newEmpRole?.value || 'Team Member');
+    const role = designation === 'Admin' ? 'admin' : (designation === 'Team Lead' ? 'lead' : 'member');
     const phone = (els.newEmpPhone?.value || '').trim();
 
     if (!name || !username || !password) {
@@ -1952,8 +1962,8 @@ document.addEventListener('DOMContentLoaded', () => {
       try { return JSON.parse(raw); } catch (e) {}
     }
     return [
-      { id: 'USR-ADMIN-01', name: 'System Administrator', username: 'admin', email: 'admin@nunno.cloud', password: 'Admin@Omnidesk2026!', role: 'admin', designation: 'Master Administrator', status: 'active' },
-      { id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', email: 'hamza@nunno.cloud', password: 'Agent@123', role: 'employee', designation: 'Senior Closer', status: 'active' }
+      { id: 'USR-ADMIN-01', name: 'System Administrator', username: 'admin', email: 'admin@nunno.cloud', password: 'Admin@Omnidesk2026!', role: 'admin', designation: 'Admin', status: 'active' },
+      { id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', email: 'hamza@nunno.cloud', password: 'Agent@123', role: 'member', designation: 'Team Member', status: 'active' }
     ];
   }
 
@@ -2176,12 +2186,102 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.scoreModal) els.scoreModal.classList.remove('open');
   }
 
+  // Helper: Strictly normalize designations/roles to the 3 allowed types: Admin, Team Lead, Team Member
+  function normalizeRole(roleStr = '') {
+    const lower = String(roleStr).toLowerCase();
+    if (lower.includes('admin')) return 'Admin';
+    if (lower.includes('lead')) return 'Team Lead';
+    return 'Team Member';
+  }
+
+  // Helper: Post-target task commission calculator
+  // On Rs. 1,700 sale -> Rs. 700 commission
+  // On Rs. 5,000 sale -> Rs. 2,000 commission
+  // On Rs. 15,000 sale -> Rs. 10,000 commission
+  function getDealCommission(amt, planName = '') {
+    const num = Number(amt) || 0;
+    if (num >= 15000 || (planName && planName.toLowerCase().includes('whale'))) return 10000;
+    if (num >= 5000 || (planName && planName.toLowerCase().includes('pro'))) return 2000;
+    if (num >= 1700 || (planName && planName.toLowerCase().includes('starter'))) return 700;
+    return 0;
+  }
+
+  // Core Calculator: Computes 10k target eligibility, Base Salary, and Post-Target Commissions
+  function calculateCloserPerformance(closerId) {
+    const paidLeads = state.leads.filter(l => 
+      (l.leadState === 'paid' || l.status === 'paid') && 
+      (l.paidDetails?.closedById === closerId || l.ownerId === closerId)
+    );
+
+    const TARGET = 10000;
+    const BASE_SALARY_AMOUNT = 10000;
+
+    let runningSales = 0;
+    let commissionsEarned = 0;
+
+    const dealLedger = paidLeads.map(l => {
+      const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : (l.interest && l.interest.includes('Whale') ? 15000 : 5000));
+      const plan = l.paidDetails?.plan || l.interest || 'Nunno Pro';
+      const method = l.paidDetails?.method || 'EasyPaisa';
+      const email = l.paidDetails?.email || l.email || '';
+      const closedAt = l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive;
+
+      const salesBeforeDeal = runningSales;
+      runningSales += amt;
+
+      let dealCommission = 0;
+      let dealTag = '';
+
+      if (salesBeforeDeal >= TARGET) {
+        // Post-target sale: awards task commission
+        dealCommission = getDealCommission(amt, plan);
+        commissionsEarned += dealCommission;
+        dealTag = `💰 Commission: +Rs. ${dealCommission.toLocaleString()}`;
+      } else if (runningSales >= TARGET) {
+        // Milestone deal that passed the 10,000 sales target
+        dealTag = `🎯 10k Target Met (Unlocked Rs. 10k Salary!)`;
+      } else {
+        const pct = Math.round((runningSales / TARGET) * 100);
+        dealTag = `🎯 Funded 10k Target (${pct}%)`;
+      }
+
+      return {
+        id: l.id,
+        name: l.name,
+        display: l.display || l.phone,
+        email,
+        plan,
+        amt,
+        method,
+        closedAt,
+        dealCommission,
+        dealTag
+      };
+    });
+
+    const totalSales = runningSales;
+    const isTargetAchieved = totalSales >= TARGET;
+    const baseSalary = isTargetAchieved ? BASE_SALARY_AMOUNT : 0;
+    const totalPayout = baseSalary + commissionsEarned;
+
+    return {
+      paidLeads,
+      dealLedger,
+      totalSales,
+      isTargetAchieved,
+      baseSalary,
+      commissionsEarned,
+      totalPayout
+    };
+  }
+
   function renderScoreData(activeTab = 'my') {
     const user = state.currentUser;
     const currentId = user ? user.id : state.currentAgent.id;
     const currentName = user ? user.name : state.currentAgent.name;
-    const currentRole = (user && user.designation) || (user && user.role) || state.currentAgent.role || 'Senior Closer';
-    const isAdmin = user && user.role === 'admin';
+    const currentRawRole = (user && user.designation) || (user && user.role) || state.currentAgent.role || 'Team Member';
+    const currentRole = normalizeRole(currentRawRole);
+    const isAdmin = currentRole === 'Admin';
 
     // Toggle tab display
     if (els.tabMyScore && els.tabTeamScores && els.viewMyScoreTab && els.viewTeamScoresTab) {
@@ -2199,65 +2299,86 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- TAB 1: User Personal Performance Portal ---
-    const myPaidLeads = state.leads.filter(l => 
-      (l.leadState === 'paid' || l.status === 'paid') && 
-      (l.paidDetails?.closedById === currentId || l.ownerId === currentId)
-    );
+    const myPerf = calculateCloserPerformance(currentId);
+    const myRevenue = myPerf.totalSales;
+    const myDealsWon = myPerf.paidLeads.length;
 
-    const myRevenue = myPaidLeads.reduce((sum, l) => {
-      const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : 5000);
-      return sum + amt;
-    }, 0);
-
-    const myDealsWon = myPaidLeads.length;
-    const myActivePipeline = state.leads.filter(l => l.leadState === 'ongoing' && l.ownerId === currentId).length;
-    const myTotalHandled = state.leads.filter(l => l.ownerId === currentId).length;
-    const myWinRate = myTotalHandled > 0 ? Math.round((myDealsWon / myTotalHandled) * 100) : 0;
-
-    let tierBadge = '⚡ Active Closer';
-    if (myRevenue >= 25000) tierBadge = '🏆 Diamond Closer';
-    else if (myRevenue >= 10000) tierBadge = '🥇 Gold Closer';
-    else if (myRevenue >= 3000) tierBadge = '🥈 Silver Closer';
-
-    if (els.perfHeroAvatar) els.perfHeroAvatar.textContent = isAdmin ? '👑' : '👨‍💼';
+    if (els.perfHeroAvatar) els.perfHeroAvatar.textContent = isAdmin ? '👑' : (currentRole === 'Team Lead' ? '⚡' : '👤');
     if (els.perfHeroName) els.perfHeroName.textContent = currentName;
     if (els.perfHeroRole) els.perfHeroRole.textContent = `${currentRole} • ${currentId}`;
-    if (els.perfTierBadge) els.perfTierBadge.innerHTML = `<span>${tierBadge}</span>`;
+    if (els.perfTierBadge) {
+      els.perfTierBadge.innerHTML = `<span>${currentRole === 'Admin' ? '👑 Admin' : (currentRole === 'Team Lead' ? '⚡ Team Lead' : '👤 Team Member')}</span>`;
+    }
 
+    // Visual Progress Taskbar
+    const pct = Math.min(100, Math.round((myRevenue / 10000) * 100));
+    if (els.taskbarFill) {
+      els.taskbarFill.style.width = `${pct}%`;
+      els.taskbarFill.classList.toggle('target-met', myPerf.isTargetAchieved);
+    }
+    if (els.taskbarCurrent) els.taskbarCurrent.textContent = `Rs. ${myRevenue.toLocaleString()}`;
+    if (els.taskbarPct) els.taskbarPct.textContent = `${pct}% Completed`;
+    if (els.taskbarGoal) els.taskbarGoal.textContent = `Target: Rs. 10,000`;
+
+    // Milestone Badge
+    if (els.milestoneStatusBadge) {
+      if (myPerf.isTargetAchieved) {
+        els.milestoneStatusBadge.className = 'milestone-status-badge unlocked';
+        if (els.targetBadgeIcon) els.targetBadgeIcon.textContent = '✅';
+        if (els.targetBadgeText) els.targetBadgeText.textContent = '10k Target Achieved (Unlocked)';
+      } else {
+        els.milestoneStatusBadge.className = 'milestone-status-badge';
+        if (els.targetBadgeIcon) els.targetBadgeIcon.textContent = '⏳';
+        if (els.targetBadgeText) els.targetBadgeText.textContent = `Target In Progress (${pct}%)`;
+      }
+    }
+
+    // Milestone Feedback Note
+    if (els.milestoneFeedback) {
+      if (myPerf.isTargetAchieved) {
+        els.milestoneFeedback.className = 'milestone-feedback unlocked';
+        els.milestoneFeedback.innerHTML = `🎉 <strong>Milestone Achieved!</strong> You have successfully passed the PKR 10,000 monthly sales target. Your <strong>Rs. 10,000 Base Salary</strong> is fully unlocked, and task commissions are actively paid on every additional sale!`;
+      } else {
+        els.milestoneFeedback.className = 'milestone-feedback';
+        const remaining = 10000 - myRevenue;
+        els.milestoneFeedback.innerHTML = `Close <strong>Rs. ${remaining.toLocaleString()}</strong> more in customer sales to pass your milestone and unlock your <strong>Rs. 10,000 Base Salary</strong>.`;
+      }
+    }
+
+    // Financial Breakdown Cards
+    if (els.myBaseSalary) els.myBaseSalary.textContent = `Rs. ${myPerf.baseSalary.toLocaleString()}`;
+    if (els.myBaseSalarySub) els.myBaseSalarySub.textContent = myPerf.isTargetAchieved ? '✅ Target Passed (Qualified)' : 'Requires 10k Target';
+    if (els.myCommissionsEarned) els.myCommissionsEarned.textContent = `Rs. ${myPerf.commissionsEarned.toLocaleString()}`;
+    if (els.myTotalPayout) els.myTotalPayout.textContent = `Rs. ${myPerf.totalPayout.toLocaleString()}`;
     if (els.myTotalRevenue) els.myTotalRevenue.textContent = `Rs. ${myRevenue.toLocaleString()}`;
-    if (els.myDealsWon) els.myDealsWon.textContent = myDealsWon;
-    if (els.myActivePipeline) els.myActivePipeline.textContent = myActivePipeline;
-    if (els.myConversionRate) els.myConversionRate.textContent = `${myWinRate}%`;
+    if (els.myDealsWonSub) els.myDealsWonSub.textContent = `${myDealsWon} Verified Deals Won`;
     if (els.myDealsCountLabel) els.myDealsCountLabel.textContent = `${myDealsWon} Deals Won`;
 
-    // Render my closed deals table
+    // Render Deals & Commission Audit Ledger
     if (els.myDealsList) {
-      if (myPaidLeads.length === 0) {
+      if (myPerf.dealLedger.length === 0) {
         els.myDealsList.innerHTML = `
           <div style="text-align:center;padding:24px;color:var(--text-dim);font-size:12px;">
-            No closed deals yet. Claim fresh leads from the Red pool and close your first subscription!
+            No closed deals yet. Claim fresh leads from the Red pool and close your first subscription to begin funding your 10k sales target!
           </div>
         `;
       } else {
-        els.myDealsList.innerHTML = myPaidLeads.map(l => {
-          const plan = l.paidDetails?.plan || l.interest || 'Nunno Pro';
-          const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : 5000;
-          const method = l.paidDetails?.method || 'EasyPaisa';
-          const email = l.paidDetails?.email || l.email || '';
-          const closedAt = l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive;
-
+        els.myDealsList.innerHTML = myPerf.dealLedger.map(deal => {
           return `
             <div class="perf-deal-row">
               <div class="perf-deal-client">
-                <div class="perf-deal-name">${escapeHtml(l.name)}</div>
-                <div class="perf-deal-sub mono">${escapeHtml(l.display || l.phone)}${email ? ' &bull; ' + escapeHtml(email) : ''}</div>
+                <div class="perf-deal-name">${escapeHtml(deal.name)}</div>
+                <div class="perf-deal-sub mono">${escapeHtml(deal.display)}${deal.email ? ' &bull; ' + escapeHtml(deal.email) : ''}</div>
               </div>
               <div class="perf-deal-plan">
-                <span class="badge-role-admin" style="font-size:10px;">${escapeHtml(plan)}</span>
-                <span class="text-xs text-muted" style="margin-left:4px;">${escapeHtml(method)}</span>
+                <span class="badge-role-admin" style="font-size:10px;background:#161d28;border-color:#2a3942;color:#38bdf8;">${escapeHtml(deal.plan)}</span>
+                <span class="text-xs text-muted" style="margin-left:4px;">${escapeHtml(deal.method)}</span>
               </div>
-              <div class="perf-deal-amount mono">Rs. ${amt.toLocaleString()}</div>
-              <div class="perf-deal-date text-xs text-muted">${closedAt}</div>
+              <div style="text-align:right;">
+                <div class="perf-deal-amount mono">Rs. ${deal.amt.toLocaleString()}</div>
+                <div class="text-xs" style="font-weight:600;color:${deal.dealCommission > 0 ? '#10b981' : '#fbbf24'};">${deal.dealTag}</div>
+              </div>
+              <div class="perf-deal-date text-xs text-muted">${deal.closedAt}</div>
             </div>
           `;
         }).join('');
@@ -2279,12 +2400,8 @@ document.addEventListener('DOMContentLoaded', () => {
       closersMap.set(a.id, {
         id: a.id,
         name: a.name,
-        role: a.role,
-        avatar: a.avatar,
-        revenue: 0,
-        dealsWon: 0,
-        pipeline: 0,
-        handled: 0
+        role: normalizeRole(a.role),
+        avatar: a.avatar || '👤'
       });
     });
 
@@ -2292,12 +2409,8 @@ document.addEventListener('DOMContentLoaded', () => {
       closersMap.set(e.id, {
         id: e.id,
         name: e.name,
-        role: e.designation || e.role,
-        avatar: e.role === 'admin' ? '👑' : '👨‍💼',
-        revenue: 0,
-        dealsWon: 0,
-        pipeline: 0,
-        handled: 0
+        role: normalizeRole(e.designation || e.role),
+        avatar: normalizeRole(e.designation || e.role) === 'Admin' ? '👑' : (normalizeRole(e.designation || e.role) === 'Team Lead' ? '⚡' : '👤')
       });
     });
 
@@ -2305,95 +2418,86 @@ document.addEventListener('DOMContentLoaded', () => {
       closersMap.set(user.id, {
         id: user.id,
         name: user.name,
-        role: user.designation || user.role,
-        avatar: user.role === 'admin' ? '👑' : '👨‍💼',
-        revenue: 0,
-        dealsWon: 0,
-        pipeline: 0,
-        handled: 0
+        role: normalizeRole(user.designation || user.role),
+        avatar: isAdmin ? '👑' : '👤'
       });
     }
 
-    // Aggregate metrics from leads
-    state.leads.forEach(l => {
-      const ownerId = l.paidDetails?.closedById || l.ownerId;
-      if (!ownerId) return;
+    // Compute metrics for all team members
+    let orgSalariesUnlocked = 0;
+    let orgCommissionsTotal = 0;
 
-      if (!closersMap.has(ownerId)) {
-        closersMap.set(ownerId, {
-          id: ownerId,
-          name: l.paidDetails?.closedBy || l.ownerName || ownerId,
-          role: 'Closer',
-          avatar: '👨‍💼',
-          revenue: 0,
-          dealsWon: 0,
-          pipeline: 0,
-          handled: 0
-        });
-      }
+    const rankedClosers = Array.from(closersMap.values()).map(c => {
+      const perf = calculateCloserPerformance(c.id);
+      if (perf.isTargetAchieved) orgSalariesUnlocked++;
+      orgCommissionsTotal += perf.commissionsEarned;
 
-      const closer = closersMap.get(ownerId);
-      closer.handled++;
-
-      if (l.leadState === 'paid' || l.status === 'paid') {
-        closer.dealsWon++;
-        const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : 5000);
-        closer.revenue += amt;
-      } else if (l.leadState === 'ongoing') {
-        closer.pipeline++;
-      }
+      return {
+        id: c.id,
+        name: c.name,
+        role: c.role,
+        avatar: c.avatar,
+        dealsWon: perf.paidLeads.length,
+        revenue: perf.totalSales,
+        isTargetAchieved: perf.isTargetAchieved,
+        baseSalary: perf.baseSalary,
+        commissions: perf.commissionsEarned,
+        totalPayout: perf.totalPayout
+      };
+    }).sort((a, b) => {
+      if (b.totalPayout !== a.totalPayout) return b.totalPayout - a.totalPayout;
+      return b.revenue - a.revenue;
     });
-
-    // Rank closers by Revenue DESC, then Deals Won DESC
-    const rankedClosers = Array.from(closersMap.values()).sort((a, b) => {
-      if (b.revenue !== a.revenue) return b.revenue - a.revenue;
-      return b.dealsWon - a.dealsWon;
-    });
-
-    const topMvp = rankedClosers.find(c => c.revenue > 0) || rankedClosers[0];
 
     if (els.orgTotalRevenue) els.orgTotalRevenue.textContent = `Rs. ${orgTotalRevenue.toLocaleString()}`;
     if (els.orgTotalDeals) els.orgTotalDeals.textContent = orgTotalDeals;
-    if (els.orgTopCloser) els.orgTopCloser.textContent = topMvp ? `${topMvp.name} (${topMvp.revenue.toLocaleString()} PKR)` : '-';
-    if (els.orgActiveClosers) els.orgActiveClosers.textContent = `${rankedClosers.length} Closers`;
+    if (els.orgSalariesUnlocked) els.orgSalariesUnlocked.textContent = `${orgSalariesUnlocked} / ${rankedClosers.length} Qualified`;
+    if (els.orgCommissionsTotal) els.orgCommissionsTotal.textContent = `Rs. ${orgCommissionsTotal.toLocaleString()}`;
 
-    // Render Leaderboard Rows
+    // Render Leaderboard Rows with 10k Target, Salary, and Commission
     if (els.teamLeaderboardTable) {
       els.teamLeaderboardTable.innerHTML = `
-        <div class="leaderboard-table-header">
-          <span style="width:40px;">Rank</span>
-          <span style="flex:1;">Closer & Team Member</span>
-          <span style="width:90px;text-align:center;">Deals Won</span>
-          <span style="width:90px;text-align:center;">Pipeline</span>
-          <span style="width:80px;text-align:center;">Win Rate</span>
-          <span style="width:130px;text-align:right;">Total Revenue</span>
+        <div class="leaderboard-table-header" style="display:grid;grid-template-columns:40px 1.4fr 110px 80px 100px 90px 90px 110px;gap:8px;padding:10px 14px;background:#161d28;border-radius:8px;font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">
+          <span>Rank</span>
+          <span>Team Member & Role</span>
+          <span style="text-align:center;">10k Target</span>
+          <span style="text-align:center;">Deals</span>
+          <span style="text-align:right;">Total Sales</span>
+          <span style="text-align:right;">Salary</span>
+          <span style="text-align:right;">Commission</span>
+          <span style="text-align:right;">Take-Home Pay</span>
         </div>
         ${rankedClosers.map((c, idx) => {
           const isCurrentUser = c.id === currentId;
-          const winRate = c.handled > 0 ? Math.round((c.dealsWon / c.handled) * 100) : 0;
+          const targetPct = Math.min(100, Math.round((c.revenue / 10000) * 100));
           let rankBadge = `#${idx + 1}`;
           if (idx === 0) rankBadge = '🥇';
           else if (idx === 1) rankBadge = '🥈';
           else if (idx === 2) rankBadge = '🥉';
 
           return `
-            <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}">
-              <div class="leaderboard-rank mono">${rankBadge}</div>
-              <div class="leaderboard-closer">
-                <div class="agent-avatar" style="width:32px;height:32px;font-size:16px;">${c.avatar || '👨‍💼'}</div>
-                <div>
-                  <div class="leaderboard-closer-name">
+            <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}" style="display:grid;grid-template-columns:40px 1.4fr 110px 80px 100px 90px 90px 110px;gap:8px;align-items:center;padding:11px 14px;background:#11161f;border:1px solid #1f2836;border-radius:8px;margin-bottom:6px;font-size:12px;">
+              <div class="leaderboard-rank mono" style="font-weight:800;">${rankBadge}</div>
+              <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+                <div style="width:28px;height:28px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${c.avatar || '👤'}</div>
+                <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                  <div style="font-weight:700;color:#fff;">
                     ${escapeHtml(c.name)}
-                    ${idx === 0 && c.revenue > 0 ? '<span class="badge-role-admin" style="font-size:9px;background:rgba(234,179,8,0.2);color:#fbbf24;border-color:rgba(234,179,8,0.3);margin-left:4px;">MVP</span>' : ''}
-                    ${isCurrentUser ? '<span class="brand-badge" style="font-size:8px;margin-left:4px;">You</span>' : ''}
+                    ${isCurrentUser ? '<span style="font-size:9px;background:#062b1e;color:#34d399;border:1px solid #047857;padding:1px 5px;border-radius:4px;margin-left:4px;">You</span>' : ''}
                   </div>
-                  <div class="leaderboard-closer-sub">${escapeHtml(c.role)} &bull; <span class="mono">${escapeHtml(c.id)}</span></div>
+                  <div style="font-size:10.5px;color:#8696a0;">${escapeHtml(c.role)} &bull; <span class="mono">${escapeHtml(c.id)}</span></div>
                 </div>
               </div>
-              <div class="leaderboard-stat mono" style="font-weight:700;color:#10b981;">${c.dealsWon}</div>
-              <div class="leaderboard-stat mono" style="color:#fbbf24;">${c.pipeline}</div>
-              <div class="leaderboard-stat mono">${winRate}%</div>
-              <div class="leaderboard-revenue mono">Rs. ${c.revenue.toLocaleString()}</div>
+              <div style="text-align:center;">
+                <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:${c.isTargetAchieved ? '#062b1e' : '#241c09'};color:${c.isTargetAchieved ? '#34d399' : '#fbbf24'};border:1px solid ${c.isTargetAchieved ? '#047857' : '#78350f'};">
+                  ${c.isTargetAchieved ? '✅ Unlocked' : `⏳ ${targetPct}%`}
+                </span>
+              </div>
+              <div class="mono" style="text-align:center;font-weight:700;color:#e2e8f0;">${c.dealsWon}</div>
+              <div class="mono" style="text-align:right;font-weight:700;color:#38bdf8;">Rs. ${c.revenue.toLocaleString()}</div>
+              <div class="mono" style="text-align:right;color:${c.baseSalary > 0 ? '#38bdf8' : '#64748b'};font-weight:600;">Rs. ${c.baseSalary.toLocaleString()}</div>
+              <div class="mono" style="text-align:right;color:${c.commissions > 0 ? '#a855f7' : '#64748b'};font-weight:600;">Rs. ${c.commissions.toLocaleString()}</div>
+              <div class="mono" style="text-align:right;font-weight:900;color:#10b981;font-size:13px;">Rs. ${c.totalPayout.toLocaleString()}</div>
             </div>
           `;
         }).join('')}
@@ -2403,42 +2507,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Export Leaderboard CSV Audit
   function exportLeaderboardCsv() {
-    let csv = 'Rank,Closer ID,Closer Name,Role,Deals Won,Active Pipeline,Total Revenue (PKR)\n';
+    let csv = 'Rank,Employee ID,Employee Name,Role,Deals Won,Total Sales (PKR),10k Target Status,Base Salary (PKR),Commissions (PKR),Total Take-Home Pay (PKR)\n';
     const closersMap = new Map();
 
-    defaultAgents.forEach(a => { closersMap.set(a.id, { id: a.id, name: a.name, role: a.role, revenue: 0, dealsWon: 0, pipeline: 0 }); });
-    state.employees.forEach(e => { closersMap.set(e.id, { id: e.id, name: e.name, role: e.designation || e.role, revenue: 0, dealsWon: 0, pipeline: 0 }); });
+    defaultAgents.forEach(a => { closersMap.set(a.id, { id: a.id, name: a.name, role: normalizeRole(a.role) }); });
+    state.employees.forEach(e => { closersMap.set(e.id, { id: e.id, name: e.name, role: normalizeRole(e.designation || e.role) }); });
 
-    state.leads.forEach(l => {
-      const ownerId = l.paidDetails?.closedById || l.ownerId;
-      if (!ownerId) return;
-      if (!closersMap.has(ownerId)) {
-        closersMap.set(ownerId, { id: ownerId, name: l.paidDetails?.closedBy || l.ownerName || ownerId, role: 'Closer', revenue: 0, dealsWon: 0, pipeline: 0 });
-      }
-      const c = closersMap.get(ownerId);
-      if (l.leadState === 'paid' || l.status === 'paid') {
-        c.dealsWon++;
-        const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : 5000);
-        c.revenue += amt;
-      } else if (l.leadState === 'ongoing') {
-        c.pipeline++;
-      }
-    });
+    const ranked = Array.from(closersMap.values()).map(c => {
+      const perf = calculateCloserPerformance(c.id);
+      return {
+        id: c.id,
+        name: c.name,
+        role: c.role,
+        dealsWon: perf.paidLeads.length,
+        revenue: perf.totalSales,
+        status: perf.isTargetAchieved ? 'Target Met (Unlocked)' : 'Target In Progress',
+        baseSalary: perf.baseSalary,
+        commissions: perf.commissionsEarned,
+        totalPayout: perf.totalPayout
+      };
+    }).sort((a, b) => b.totalPayout - a.totalPayout);
 
-    const ranked = Array.from(closersMap.values()).sort((a, b) => b.revenue - a.revenue);
     ranked.forEach((c, idx) => {
-      csv += `${idx + 1},"${c.id}","${c.name}","${c.role}",${c.dealsWon},${c.pipeline},${c.revenue}\n`;
+      csv += `${idx + 1},"${c.id}","${c.name}","${c.role}",${c.dealsWon},${c.revenue},"${c.status}",${c.baseSalary},${c.commissions},${c.totalPayout}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Omnidesk_Team_Leaderboard_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `Nunno_Payroll_Target_Commission_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('📊 Exported team audit CSV report!');
+    showToast('📊 Exported payroll and task commission audit CSV!');
   }
 
   // Performance Score Modal Event Listeners
