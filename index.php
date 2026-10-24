@@ -184,10 +184,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
         </div>
 
         <div class="chat-header-actions">
-          <button type="button" class="btn btn-ghost btn-xs dossier-toggle-btn" id="dossierToggleBtn" title="View Lead CRM Details">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span>CRM</span>
-          </button>
+          <button class="btn btn-claim btn-xs" id="chatClaimBtn" style="display:none;">✋ Take Lead</button>
 
           <button class="btn btn-paid btn-xs" id="markPaidHeaderBtn" title="Mark client as Paid">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -208,17 +205,23 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
             <span>Can't Handle</span>
           </button>
 
-          <button class="btn btn-secondary btn-xs" id="simClientAudioBtn" title="Simulate incoming voice message">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            <span>+ Client Audio</span>
-          </button>
-
           <button class="btn btn-useless btn-xs" id="markUselessHeaderBtn" title="Mark as Won't Pay">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
             <span>Won't Pay</span>
           </button>
 
-          <button class="btn btn-claim btn-xs" id="chatClaimBtn" style="display:none;">✋ Take Lead</button>
+          <button class="btn btn-secondary btn-xs" id="simClientAudioBtn" title="Simulate incoming voice message">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <span>+ Audio</span>
+          </button>
+
+          <div class="header-action-divider"></div>
+
+          <button type="button" class="btn btn-crm-toggle" id="dossierToggleBtn" title="Open / Close Lead CRM Panel" aria-expanded="false">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Lead CRM</span>
+            <svg class="crm-toggle-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
         </div>
       </div>
 
@@ -293,11 +296,11 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
     <!-- Pane 3: Lead CRM Dossier -->
     <aside class="lead-dossier-col" id="leadDossierCol">
       <div class="dossier-drawer-header" id="dossierDrawerHeader">
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div class="dossier-drawer-title">
           <div class="widget-icon-pill">⚡</div>
-          <span style="font-weight:700;color:#fff;font-size:13px;">Lead CRM & Sales Control</span>
+          <span>Lead CRM & Sales Control</span>
         </div>
-        <button type="button" class="btn btn-ghost btn-xs" id="closeDossierDrawerBtn">✕</button>
+        <button type="button" class="dossier-close-btn" id="closeDossierDrawerBtn" title="Close CRM Panel (Esc)">✕</button>
       </div>
 
       <!-- WIDGET 1: Status Matrix -->

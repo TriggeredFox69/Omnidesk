@@ -896,6 +896,13 @@ document.addEventListener('DOMContentLoaded', () => {
         statusBadgeHtml = `<span class="status-pill-clean useless">🔵 Won't Pay</span>`;
       }
 
+      const rawText = lastMsg.text || '';
+      const cleanPreview = rawText.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+
+      const previewHtml = lastMsg.type === 'audio'
+        ? `<span class="conv-preview-text is-audio"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice note (${lastMsg.duration || '0:20'})</span>`
+        : `<span class="conv-preview-text" title="${escapeHtml(cleanPreview)}">${escapeHtml(cleanPreview)}</span>`;
+
       const item = document.createElement('div');
       item.className = `conv-item state-${leadState} ${isSelected ? 'active' : ''}`;
       item.onclick = () => selectLead(lead.id);
@@ -912,7 +919,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="conv-timestamp">${lastMsg.time || lead.lastActive}</span>
           </div>
           <div class="conv-preview-row">
-            <span class="text-xs text-muted" style="${lastMsg.type === 'audio' ? 'color:#53bdeb;display:inline-flex;align-items:center;gap:4px;' : ''}">${lastMsg.type === 'audio' ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice note (${lastMsg.duration || '0:20'})` : escapeHtml(lastMsg.text)}</span>
+            ${previewHtml}
           </div>
           <div class="conv-bottom-row">
             <span class="mono text-xs text-muted">${lead.display}</span>
@@ -936,6 +943,11 @@ document.addEventListener('DOMContentLoaded', () => {
       els.viewInbox.classList.add('mobile-chat-open');
     }
     document.body.classList.add('mobile-in-chat');
+
+    // On drawer screens, close the drawer when a new lead is selected so chat is visible
+    if (window.innerWidth <= 1180) {
+      toggleDossierDrawer(false);
+    }
 
     renderConversationsList();
     renderActiveChat();
@@ -2244,21 +2256,64 @@ document.addEventListener('DOMContentLoaded', () => {
   // MOBILE & TABLET RESPONSIVE DRAWER CONTROLS
   // ==========================================
 
-  // Toggle Lead CRM Drawer (Tablet & Mobile)
+  // Toggle Lead CRM Drawer & Panel (Desktop, Tablet & Mobile)
   function toggleDossierDrawer(forceState) {
     if (!els.leadDossierCol) return;
-    const shouldOpen = typeof forceState === 'boolean'
-      ? forceState
-      : !els.leadDossierCol.classList.contains('drawer-open');
+    const isDrawerMode = window.innerWidth <= 1180;
+
+    let isCurrentlyOpen;
+    if (isDrawerMode) {
+      isCurrentlyOpen = els.leadDossierCol.classList.contains('drawer-open') || els.leadDossierCol.classList.contains('open');
+    } else {
+      isCurrentlyOpen = !els.leadDossierCol.classList.contains('closed');
+    }
+
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !isCurrentlyOpen;
 
     if (shouldOpen) {
-      els.leadDossierCol.classList.add('drawer-open');
-      if (els.dossierBackdrop) els.dossierBackdrop.classList.add('active');
+      els.leadDossierCol.classList.remove('closed');
+      els.leadDossierCol.classList.add('drawer-open', 'open');
+      if (els.dossierBackdrop && isDrawerMode) {
+        els.dossierBackdrop.classList.add('active');
+      }
+      if (els.dossierToggleBtn) {
+        els.dossierToggleBtn.classList.add('active');
+        els.dossierToggleBtn.setAttribute('aria-expanded', 'true');
+        els.dossierToggleBtn.title = 'Close Lead CRM Panel';
+      }
     } else {
-      els.leadDossierCol.classList.remove('drawer-open');
-      if (els.dossierBackdrop) els.dossierBackdrop.classList.remove('active');
+      if (isDrawerMode) {
+        els.leadDossierCol.classList.remove('drawer-open', 'open');
+        if (els.dossierBackdrop) {
+          els.dossierBackdrop.classList.remove('active');
+        }
+      } else {
+        els.leadDossierCol.classList.add('closed');
+        els.leadDossierCol.classList.remove('drawer-open', 'open');
+      }
+      if (els.dossierToggleBtn) {
+        els.dossierToggleBtn.classList.remove('active');
+        els.dossierToggleBtn.setAttribute('aria-expanded', 'false');
+        els.dossierToggleBtn.title = 'Open Lead CRM Panel';
+      }
     }
   }
+
+  function syncDossierUiState() {
+    if (!els.leadDossierCol || !els.dossierToggleBtn) return;
+    const isDrawerMode = window.innerWidth <= 1180;
+    if (isDrawerMode) {
+      const isOpen = els.leadDossierCol.classList.contains('drawer-open') || els.leadDossierCol.classList.contains('open');
+      els.dossierToggleBtn.classList.toggle('active', isOpen);
+      els.dossierToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    } else {
+      const isClosed = els.leadDossierCol.classList.contains('closed');
+      els.dossierToggleBtn.classList.toggle('active', !isClosed);
+      els.dossierToggleBtn.setAttribute('aria-expanded', isClosed ? 'false' : 'true');
+    }
+  }
+
+  window.addEventListener('resize', syncDossierUiState);
 
   // Mobile Back Button: Return from Active Chat to Conversations List
   if (els.chatBackBtn) {
@@ -4231,6 +4286,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderConnectedNumber();
   renderConversationsList();
   renderActiveChat();
+  syncDossierUiState();
   fetchServerLeads();
   updateCampaignPreview();
   renderCampaignAudienceUI();
