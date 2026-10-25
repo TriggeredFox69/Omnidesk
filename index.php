@@ -1136,7 +1136,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/live-inbox.js?v=1"></script>
+  <script src="assets/js/live-inbox.js?v=2"></script>
   <script src="assets/js/whatsapp-app.js?v=6.3"></script>
 </body>
 </html>
