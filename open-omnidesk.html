@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Open OmniDesk</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f3f7f5;color:#213b34;font:16px/1.6 system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}
+    main{max-width:620px;background:white;border:1px solid #dce8e2;border-radius:20px;padding:36px;box-shadow:0 12px 50px #19382c0a}
+    h1{margin:0 0 12px;font-size:28px}p{margin:12px 0}a{color:#157e68}.open{display:block;background:#157e68;color:white;text-align:center;text-decoration:none;padding:14px;border-radius:10px;font-weight:600;margin:24px 0}
+    li{margin:10px 0}code{background:#edf4f0;padding:3px 6px;border-radius:4px}details{border-top:1px solid #e3ebe7;padding-top:18px;margin-top:24px}summary{cursor:pointer}small{color:#60766d}
+  </style>
+</head>
+<body><main>
+  <h1>Open your live OmniDesk</h1>
+  <p>Real messages, replies, attachments, and delivery receipts run through the local WhatsApp server. Opening the HTML file alone cannot connect to WhatsApp.</p>
+  <a class="open" href="http://127.0.0.1:8080/">Open live OmniDesk</a>
+  <p>If the page cannot connect:</p>
+  <ol>
+    <li>Open this project folder in File Explorer.</li>
+    <li>Double-click <code>start-local-whatsapp.cmd</code>.</li>
+    <li>Keep its terminal open. It opens OmniDesk in your browser.</li>
+  </ol>
+  <small>This is the same local app you use inside Codex. Your saved WhatsApp link is reused; scan a QR only when linking is required. Internet is needed for real messages.</small>
+  <details><summary>Offline demo only</summary>
+    <p>The demo uses sample data and simulated sends. It cannot receive replies or send any messages.</p>
+    <a href="index.html?offline=1">Open offline simulation</a>
+  </details>
+</main></body>
+</html>

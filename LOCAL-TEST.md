@@ -2,7 +2,7 @@
 
 ## Completely offline — simulated messages
 
-Double-click **index.html**. No PHP, Node, login, or internet connection is required.
+Double-click **index.html**, expand **Offline demo only**, and choose **Open offline simulation**. No PHP, Node, login, or internet connection is required for that explicit demo. Opening index.html normally shows the live-app launcher so simulated sends cannot be mistaken for real messages.
 Open Campaign Studio, import or paste test numbers, and click Start Campaign.
 The normal queue, delays, pause/resume, and CRM conversation flow run locally.
 The yellow OFFLINE TEST banner and simulated message labels mean **nothing is sent to WhatsApp**.

@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script>
+    if (location.protocol === 'file:' && new URLSearchParams(location.search).get('offline') !== '1') {
+      location.replace(new URL('open-omnidesk.html', location.href).href);
+    }
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Nunno Omni-Desk — WhatsApp CRM & Campaign Hub</title>
   <meta name="description" content="Premium multi-agent WhatsApp CRM and campaign studio for Nunno Cloud. Anti-theft lead locking, glassmorphism UI, real-time team inbox.">
