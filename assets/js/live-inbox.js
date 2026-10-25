@@ -45,7 +45,7 @@
       return mediaRequests.get(message.waMessageId);
     }
     async function poll() {
-      if (busy || !state.currentUser || !state.senderConfigured || window.NUNNO_OFFLINE_PREVIEW) return;
+      if (busy || !state.currentUser || window.NUNNO_OFFLINE_PREVIEW) return;
       busy = true;
       try {
         const result = await api('get_events', { after: cursor });
@@ -57,6 +57,14 @@
         }
         cursor = result.cursor;
         if (result.messages?.length) { renderList(); if (activeChanged) renderChat(); }
+        // Saved history is available while WhatsApp reconnects. Only live operations
+        // need a linked sender; hiding the history made a restart look like data loss.
+        if (!state.senderConfigured) {
+          activePhone = '';
+          const el = document.getElementById('chatPresence');
+          if (el) { el.textContent = 'Saved history · reconnect WhatsApp for live updates'; el.className = 'chat-presence'; }
+          return;
+        }
         const lead = getLead(state.activeLeadId);
         if (lead && state.currentTab === 'inbox') {
           if (activePhone !== lead.phone) {

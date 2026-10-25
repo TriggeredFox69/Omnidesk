@@ -6,7 +6,12 @@ deployment:
     # 1. Primary deployment to subdomain root
     - export DEPLOYPATH=/home/dailygol/omnidesk.lalagpt.pk/
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -R * $DEPLOYPATH
+    # Copy application files explicitly. Never overwrite runtime data, sessions,
+    # or installed Node dependencies from a deployment checkout.
+    - /bin/cp -R api assets $DEPLOYPATH
+    - /bin/cp -f index.php index.html login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/bridge
+    - /bin/cp -f bridge/*.js bridge/package.json bridge/package-lock.json $DEPLOYPATH/bridge/
     - /bin/cp -f .htaccess $DEPLOYPATH 2>/dev/null || true
     - /bin/mkdir -p $DEPLOYPATH/data
     - /bin/chmod 755 $DEPLOYPATH 2>/dev/null || true
@@ -14,7 +19,10 @@ deployment:
     # 2. Mirror deployment to public_html/omnidesk
     - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
     - /bin/mkdir -p $DEPLOYPATH2
-    - /bin/cp -R * $DEPLOYPATH2
+    - /bin/cp -R api assets $DEPLOYPATH2
+    - /bin/cp -f index.php index.html login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH2
+    - /bin/mkdir -p $DEPLOYPATH2/bridge
+    - /bin/cp -f bridge/*.js bridge/package.json bridge/package-lock.json $DEPLOYPATH2/bridge/
     - /bin/cp -f .htaccess $DEPLOYPATH2 2>/dev/null || true
     - /bin/mkdir -p $DEPLOYPATH2/data
     - /bin/chmod 775 $DEPLOYPATH2/data 2>/dev/null || true

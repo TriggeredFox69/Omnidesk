@@ -3,8 +3,11 @@
 function whatsappBridgeRequest(string $path, ?array $body = null): array {
     $tokenFile = __DIR__ . '/../data/whatsapp-bridge/token';
     $token = getenv('WHATSAPP_BRIDGE_TOKEN') ?: (is_readable($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
-    if ($token === '' || !function_exists('curl_init')) {
-        return ['success' => false, 'state' => 'offline', 'message' => 'The WhatsApp linking service is not running yet. Start the Node bridge on the server and enable PHP cURL, then click Connect again.'];
+    if (!function_exists('curl_init')) {
+        return ['success' => false, 'state' => 'offline', 'message' => 'PHP cURL is disabled on this server. Enable the cURL extension in cPanel PHP settings, then connect again.'];
+    }
+    if ($token === '') {
+        return ['success' => false, 'state' => 'offline', 'message' => 'This hosted app has no WhatsApp bridge token. Start and configure the Node bridge on the server. Your PC connection and saved chats do not transfer with a Git deployment.'];
     }
     $base = rtrim(getenv('WHATSAPP_BRIDGE_URL') ?: 'http://127.0.0.1:3210', '/');
     $curl = curl_init($base . $path);

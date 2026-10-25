@@ -22,6 +22,9 @@ The local launcher is a single-user test workspace bound only to this computer.
 It signs you in as Local Tester and does not read or update the hosted CRM or its employees.
 Campaign and CRM assignment test data stay in memory and reset when the launcher closes. Synced message metadata is retained across restarts.
 The linked-device session is saved privately under `data/whatsapp-bridge/local/`.
+Saved chat and voice-message records load even while the phone is reconnecting.
+Voice recordings themselves are downloaded from WhatsApp when played; expired
+attachments may need to be resent.
 Remove “Nunno Local Test” from Linked devices on your phone to unlink it.
 
 If port 8080 is in use, run in PowerShell:
@@ -32,6 +35,25 @@ node bridge/local.js
 ```
 
 The offline simulator never needs the Node bridge. Real WhatsApp sending cannot work without internet.
+
+## Moving from this PC to cPanel
+
+Git transfers the app code, not private history or the linked-device session.
+The local inbox is `data/whatsapp-bridge/local/inbox.json`; the hosted bridge uses
+`data/whatsapp-bridge/inbox.json`. Keep a private backup before any migration.
+Do not commit either file, the token, or the authentication directory to Git.
+
+The server needs Node.js 22+, Chromium dependencies, PHP cURL, and a persistent
+process running `node bridge/server.js`. Uploading PHP files does not start it.
+If the hosting plan does not support this, run the bridge on a suitable server
+and configure the PHP bridge URL and matching private token as described in README.
+Link the hosted bridge with WhatsApp, then let it sync recent chats. Migrating
+saved local history requires a private, deduplicated merge into the hosted inbox
+while its bridge is stopped; do not overwrite an existing hosted inbox.
+
+The cPanel deployment recipe copies application files only and leaves `data/`
+and installed bridge dependencies in place. The two deployment roots have
+separate data directories unless explicitly configured to share a backend.
 
 ## Live inbox, attachments, and presence
 
