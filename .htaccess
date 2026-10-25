@@ -15,6 +15,7 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^data/.*$ - [F,L]
+    RewriteRule ^bridge/.*$ - [F,L]
 </IfModule>
 
 # 4. Enable Gzip Compression for Fast Assets Delivery

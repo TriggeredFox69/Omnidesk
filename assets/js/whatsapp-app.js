@@ -260,8 +260,9 @@ document.addEventListener('DOMContentLoaded', () => {
     inboxFilter: 'all', // 'all', 'unread', 'replied', 'sent', 'mine', 'unclaimed'
     searchQuery: '',
 
-    // WhatsApp Business Cloud API sender
-    connectedWaNumber: localStorage.getItem('nunno_connected_wa_number') || '+92 304 6588806',
+    // Linked-device sender; connection state always comes from the server.
+    connectedWaNumber: '',
+    senderConfigured: false,
 
     // Campaign Studio queue state
     campaignQueue: [...initialLeads],
@@ -324,7 +325,9 @@ document.addEventListener('DOMContentLoaded', () => {
     closeConnectWaModalBtn: document.getElementById('closeConnectWaModalBtn'),
     cancelConnectWaBtn: document.getElementById('cancelConnectWaBtn'),
     saveConnectedWaBtn: document.getElementById('saveConnectedWaBtn'),
-    inputConnectedWaNumber: document.getElementById('inputConnectedWaNumber'),
+    waConnectionStatus: document.getElementById('waConnectionStatus'),
+    waQrImage: document.getElementById('waQrImage'),
+    waPendingCampaign: document.getElementById('waPendingCampaign'),
 
     // Modal
     agentModal: document.getElementById('agentModal'),
@@ -604,49 +607,95 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update Connected Direct WhatsApp Number in Subbar
   function renderConnectedNumber() {
     if (!els.connectedNumberText) return;
-    if (state.connectedWaNumber) {
-      els.connectedNumberText.textContent = state.connectedWaNumber;
+    if (state.senderConfigured) {
+      els.connectedNumberText.textContent = state.connectedWaNumber || 'Business API configured';
       els.connectedNumberText.style.color = 'var(--c-wa)';
     } else {
-      els.connectedNumberText.textContent = 'Pending Setup (Click to Set)';
+      els.connectedNumberText.textContent = 'Sender not connected (Click to set up)';
       els.connectedNumberText.style.color = '#94a3b8';
     }
   }
 
-  function openConnectWaModal() {
-    if (els.inputConnectedWaNumber) {
-      els.inputConnectedWaNumber.value = state.connectedWaNumber || '';
+  let waPollTimer = null;
+  let waModalGeneration = 0;
+  let pendingCampaignStart = false;
+
+  function renderSenderConnection(result) {
+    state.senderConfigured = result.is_configured === true;
+    state.connectedWaNumber = result.connected_number || '';
+    renderConnectedNumber();
+    const labels = {
+      idle: 'Ready to link. Click Connect WhatsApp.',
+      starting: 'Starting WhatsApp… the QR code will appear here.',
+      qr: 'Scan this code with WhatsApp on your phone.',
+      authenticated: 'Phone linked. Waiting for WhatsApp to finish syncing…',
+      ready: 'WhatsApp connected' + (state.connectedWaNumber ? ': +' + state.connectedWaNumber : '')
+    };
+    if (els.waConnectionStatus) els.waConnectionStatus.textContent = result.message || labels[result.state] || (state.senderConfigured ? 'WhatsApp connected.' : 'WhatsApp is not connected.');
+    if (els.waQrImage) {
+      const validQr = typeof result.qr === 'string' && result.qr.startsWith('data:image/png;base64,');
+      els.waQrImage.hidden = !validQr;
+      if (validQr) els.waQrImage.src = result.qr;
+      else els.waQrImage.removeAttribute('src');
     }
+    if (els.saveConnectedWaBtn) {
+      els.saveConnectedWaBtn.disabled = ['starting', 'qr', 'authenticated', 'ready'].includes(result.state);
+      els.saveConnectedWaBtn.textContent = state.senderConfigured ? 'Connected' : 'Connect WhatsApp';
+    }
+  }
+
+  async function refreshSenderConnection() {
+    const response = await fetch('api/direct_sender.php?action=get_sender_info', { cache: 'no-store' });
+    const result = await response.json();
+    renderSenderConnection(result);
+    if (!response.ok || !result.success) throw new Error(result.message || 'Could not check WhatsApp connection.');
+    return state.senderConfigured;
+  }
+
+  async function pollWhatsAppConnection(generation) {
+    if (generation !== waModalGeneration || !els.connectWaModal?.classList.contains('open')) return;
+    try {
+      await refreshSenderConnection();
+      if (generation !== waModalGeneration) return;
+      if (state.senderConfigured && pendingCampaignStart) {
+        closeConnectWaModal();
+        startCampaign();
+        return;
+      }
+    } catch (_) { /* The status panel displays service errors and allows a retry. */ }
+    if (generation === waModalGeneration && els.connectWaModal?.classList.contains('open')) {
+      waPollTimer = setTimeout(() => pollWhatsAppConnection(generation), 2000);
+    }
+  }
+
+  function openConnectWaModal() {
     if (els.connectWaModal) els.connectWaModal.classList.add('open');
+    if (els.waPendingCampaign) els.waPendingCampaign.hidden = !pendingCampaignStart;
+    clearTimeout(waPollTimer);
+    pollWhatsAppConnection(++waModalGeneration);
   }
 
   function closeConnectWaModal() {
+    pendingCampaignStart = false;
+    waModalGeneration++;
+    clearTimeout(waPollTimer);
     if (els.connectWaModal) els.connectWaModal.classList.remove('open');
   }
 
-  function saveConnectedWaNumber() {
-    const val = els.inputConnectedWaNumber ? els.inputConnectedWaNumber.value.trim() : '';
-    if (!val) {
-      state.connectedWaNumber = '';
-      localStorage.removeItem('nunno_connected_wa_number');
-      renderConnectedNumber();
-      closeConnectWaModal();
-      showToast('Connected WhatsApp number cleared. You can provide it anytime.');
-      return;
+  async function saveConnectedWaNumber() {
+    if (els.saveConnectedWaBtn) els.saveConnectedWaBtn.disabled = true;
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'connect_whatsapp' })
+      });
+      const result = await response.json();
+      renderSenderConnection(result);
+      if (!response.ok || !result.success) throw new Error(result.message || 'Could not start WhatsApp linking.');
+    } catch (error) {
+      if (els.waConnectionStatus) els.waConnectionStatus.textContent = describeSendError(error);
+      if (els.saveConnectedWaBtn) els.saveConnectedWaBtn.disabled = false;
     }
-
-    state.connectedWaNumber = val;
-    localStorage.setItem('nunno_connected_wa_number', val);
-    renderConnectedNumber();
-    closeConnectWaModal();
-    showToast(`✅ Direct WhatsApp sender set to: ${val}`);
-
-    // Sync with backend direct_sender.php
-    fetch('api/direct_sender.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'set_sender_number', phone_number: val })
-    }).catch(() => {});
   }
 
   // ==========================================
@@ -1193,7 +1242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isInbound = msg.sender === 'lead';
         bubble.className = `msg-bubble ${isInbound ? 'msg-inbound' : 'msg-outbound'}`;
         const deliveryMarkup = isInbound ? '' : (msg.deliveryStatus === 'accepted'
-          ? '<span title="WhatsApp API accepted; awaiting delivery receipt" style="color:#b7791f;font-size:11px;">◷</span>'
+          ? '<span title="WhatsApp Submitted; awaiting delivery receipt" style="color:#b7791f;font-size:11px;">◷</span>'
           : (msg.deliveryStatus === 'sent'
             ? '<span title="Sent by WhatsApp; awaiting recipient" style="color:#b7791f;font-size:11px;">✓</span>'
             : (msg.deliveryStatus === 'delivered' || msg.deliveryStatus === 'read'
@@ -1443,7 +1492,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch('api/direct_sender.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send_direct', phone: lead.phone, message: text })
+        body: JSON.stringify({ action: 'send_direct', phone: lead.phone, message: text, request_id: crypto.randomUUID() })
       });
       sendResult = await response.json();
       if (!response.ok || !sendResult.success) throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
@@ -1910,7 +1959,8 @@ document.addEventListener('DOMContentLoaded', () => {
     campaignState.maxDelay = parseInt(els.campaignDelayMax.value, 10) || 12;
   }
 
-  function startCampaign() {
+  async function startCampaign() {
+    if (campaignState.isStarting || campaignState.inFlight) return;
     if (campaignState.isRunning && !campaignState.isPaused) return;
 
     if (campaignState.audience.length === 0) {
@@ -1922,6 +1972,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!msg) {
       showToast('⚠️ Please write a campaign message!');
       return;
+    }
+
+    campaignState.isStarting = true;
+    if (els.startCampaignBtn) els.startCampaignBtn.disabled = true;
+    try {
+      if (!await refreshSenderConnection()) {
+        logCampaignTerminal('Connect a WhatsApp sender before launching. Your audience is ready; no messages have been attempted.', 'warn');
+        if (els.campaignStatusBadge) els.campaignStatusBadge.textContent = 'Sender setup required';
+        pendingCampaignStart = true;
+        openConnectWaModal();
+        saveConnectedWaNumber();
+        return;
+      }
+    } catch (error) {
+      pendingCampaignStart = true;
+      openConnectWaModal();
+      showToast(describeSendError(error));
+      return;
+    } finally {
+      campaignState.isStarting = false;
+      if (els.startCampaignBtn) els.startCampaignBtn.disabled = false;
     }
 
     const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'Nunno Outreach';
@@ -2037,7 +2108,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function watchCampaignDelivery(contact, attempt) {
     if (!contact.messageId || attempt >= 60) {
       if (attempt >= 60 && contact.isCampaign && ['accepted', 'sent'].includes(contact.status) && els.campaignTerminalLog) {
-        logCampaignTerminal(`ℹ️ No delivery receipt received yet for <strong>${escapeHtml(contact.display)}</strong>. Check WhatsApp Manager for status.`, 'warn');
+        logCampaignTerminal(`ℹ️ No delivery receipt received yet for <strong>${escapeHtml(contact.display)}</strong>. Check the linked WhatsApp chat for status.`, 'warn');
       }
       return;
     }
@@ -2099,7 +2170,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function dispatchNextCampaignMessage() {
-    if (!campaignState.isRunning || campaignState.isPaused) return;
+    if (!campaignState.isRunning || campaignState.isPaused || campaignState.inFlight) return;
 
     while (campaignState.currentIndex < campaignState.audience.length &&
            ['accepted', 'sent', 'delivered', 'read'].includes(campaignState.audience[campaignState.currentIndex].status)) {
@@ -2128,12 +2199,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusEl = document.getElementById(`c_status_${contact.id}`);
     if (statusEl) statusEl.innerHTML = '<span style="color:#eab308;">⏳ Sending...</span>';
 
+    campaignState.inFlight = true;
+    contact.requestId ||= crypto.randomUUID();
+    contact.preparedMessage ||= personalizedMsg;
     let sendResult;
     try {
       const response = await fetch('api/direct_sender.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send_direct', phone: contact.phone, message: personalizedMsg })
+        body: JSON.stringify({ action: 'send_direct', phone: contact.phone, message: contact.preparedMessage, request_id: contact.requestId })
       });
       sendResult = await response.json();
       if (!response.ok || !sendResult.success) {
@@ -2157,6 +2231,8 @@ document.addEventListener('DOMContentLoaded', () => {
       logCampaignTerminal(`❌ Could not send to <strong>${escapeHtml(contact.display)}</strong>: ${escapeHtml(sendError)}`, 'error');
       showToast(`❌ WhatsApp send failed: ${sendError}`);
       return;
+    } finally {
+      campaignState.inFlight = false;
     }
 
     const assignMode = els.campaignAssignSelect ? els.campaignAssignSelect.value : 'pool';
@@ -2169,7 +2245,7 @@ document.addEventListener('DOMContentLoaded', () => {
       deliveryStatus: 'accepted',
       sender: 'agent',
       agentName: currentCloser ? currentCloser.name : 'System Outreach',
-      text: personalizedMsg,
+      text: contact.preparedMessage,
       time: timeNow
     };
 
@@ -2227,6 +2303,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     campaignState.currentIndex++;
+    if (!campaignState.isRunning || campaignState.isPaused) return;
 
     if (campaignState.currentIndex >= campaignState.audience.length) {
       finishCampaign();
@@ -2729,6 +2806,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyUserSession(user) {
     state.currentUser = user;
+    refreshSenderConnection().catch(() => {});
     localStorage.setItem('nunno_active_session', JSON.stringify(user));
     hideAuthOverlay();
 
@@ -4522,6 +4600,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkAuthSession();
   renderAgentProfile();
   renderConnectedNumber();
+  refreshSenderConnection().catch(() => {});
   renderConversationsList();
   renderActiveChat();
   syncDossierUiState();

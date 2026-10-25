@@ -22,3 +22,7 @@ data/users.json
 .env
 .env.local
 *.log
+
+# Private linked-device session and Node dependencies
+data/whatsapp-bridge/
+bridge/node_modules/

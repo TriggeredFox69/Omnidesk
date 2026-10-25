@@ -1,7 +1,7 @@
 <?php
 /**
  * Nunno WhatsApp — Direct WhatsApp Sender Engine
- * WhatsApp Business Cloud API sender
+ * Linked WhatsApp Web sender, with an optional Business Cloud API mode.
  */
 
 header('Content-Type: application/json');
@@ -28,12 +28,24 @@ $cloudConfigured = !empty($cloudToken) && !empty(getenv('WHATSAPP_PHONE_NUMBER_I
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 $action = $input['action'] ?? $_GET['action'] ?? '';
 
+// Regular WhatsApp via a linked device is the default. Cloud API remains opt-in.
+if ((getenv('WHATSAPP_SEND_MODE') ?: 'whatsapp_web') !== 'cloud_api' &&
+    in_array($action, ['get_sender_info', 'connect_whatsapp', 'send_direct', 'get_send_status'], true)) {
+    require_once __DIR__ . '/whatsapp_bridge.php';
+    handleWhatsAppBridge($action, $input);
+}
+if ($action === 'connect_whatsapp') {
+    http_response_code(409);
+    echo json_encode(['success' => false, 'message' => 'This server is set to Cloud API mode. Set WHATSAPP_SEND_MODE=whatsapp_web on the PHP server to use QR linking.']);
+    exit;
+}
+
 // 1. Get Sender Info
 if ($action === 'get_sender_info') {
     echo json_encode([
         'success'          => true,
         'connected_number' => $currentNumber,
-        'is_connected'     => !empty($currentNumber),
+        'is_connected'     => $cloudConfigured,
         'mode'             => $cloudConfigured ? 'whatsapp_cloud_api' : 'not_configured',
         'is_configured'    => $cloudConfigured
     ]);

@@ -6,13 +6,13 @@ deployment:
     # 1. Primary deployment to subdomain root
     - export DEPLOYPATH=/home/dailygol/omnidesk.lalagpt.pk/
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -R * $DEPLOYPATH
+    - /usr/bin/rsync -a --exclude=".git/" --exclude="data/" --exclude="bridge/node_modules/" ./ $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/data
     - /bin/chmod 755 $DEPLOYPATH
     - /bin/chmod 775 $DEPLOYPATH/data
     # 2. Mirror deployment to public_html/omnidesk
     - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
     - /bin/mkdir -p $DEPLOYPATH2
-    - /bin/cp -R * $DEPLOYPATH2
+    - /usr/bin/rsync -a --exclude=".git/" --exclude="data/" --exclude="bridge/node_modules/" ./ $DEPLOYPATH2
     - /bin/mkdir -p $DEPLOYPATH2/data
     - /bin/chmod 775 $DEPLOYPATH2/data

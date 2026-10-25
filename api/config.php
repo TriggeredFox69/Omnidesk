@@ -14,10 +14,10 @@ return [
     'support_email'   => 'numeniousnexus@gmail.com',
     'official_wa'     => '+923000000000',
 
-    // WhatsApp Business Cloud API sender (credentials are set in PHP server environment)
-    'connected_whatsapp_number' => '+923046588806',
+    // The actual sender number comes from the linked WhatsApp session.
+    'connected_whatsapp_number' => '',
     'sender_engine' => [
-        'mode'               => 'whatsapp_cloud_api',
+        'mode'               => 'whatsapp_web',
         'anti_ban_delay_min' => 4,               // Anti-ban delay min (seconds)
         'anti_ban_delay_max' => 8,               // Anti-ban delay max (seconds)
     ],
@@ -82,7 +82,7 @@ return [
             'name'     => 'Gold (XAUUSD) & Forex Scalper Pitch',
             'category' => 'Forex & Commodities',
             'lang'     => 'Hybrid Urdu/English',
-            'body'     => "{Salam|Hello} {name|Trader}!\n\nAgar aap Gold ($XAUUSD) ya Forex trade karte hain, toh US Session wicks aur manipulated breakouts se safe rehne ka solution ab available hai.\n\n⚡ *Nunno Cloud 12-Layer Market Engine:*\n1. Real-time institutional order flow alerts\n2. London & New York session liquidation heatmaps\n3. 92% accurate reversal signals\n\nAccess {plan|Nunno Pro} starting at just Rs. {price|1,700}/mo.\n\nCheck live platform: {link|https://nunno.cloud}\nCoupon Code: *{coupon|GOLDPRO}*\n\n_Agar aap message nahi chahte toh reply STOP karein._",
+            'body'     => "{Salam|Hello} {name|Trader}!\n\nAgar aap Gold (\$XAUUSD) ya Forex trade karte hain, toh US Session wicks aur manipulated breakouts se safe rehne ka solution ab available hai.\n\n⚡ *Nunno Cloud 12-Layer Market Engine:*\n1. Real-time institutional order flow alerts\n2. London & New York session liquidation heatmaps\n3. 92% accurate reversal signals\n\nAccess {plan|Nunno Pro} starting at just Rs. {price|1,700}/mo.\n\nCheck live platform: {link|https://nunno.cloud}\nCoupon Code: *{coupon|GOLDPRO}*\n\n_Agar aap message nahi chahte toh reply STOP karein._",
         ],
         [
             'id'       => 'flash_discount_easypaisa',

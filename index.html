@@ -138,7 +138,7 @@
         <span class="kpi-label">My Leads</span>
         <span class="kpi-count" id="myLeadsCountBadge">2</span>
       </button>
-      <div class="status-chip">Engine: <strong>WhatsApp Cloud API</strong></div>
+      <div class="status-chip">Engine: <strong>WhatsApp Linked Device</strong></div>
       <div class="status-chip">Anti-Ban: <strong style="color:var(--cyan);">4-8s Jitter</strong></div>
     </div>
   </div>
@@ -547,7 +547,7 @@
             <span class="mono text-xs" style="color:var(--cyan);">Sender: +92 304 6588806</span>
           </div>
           <p class="text-xs text-muted" style="margin:5px 0 0;line-height:1.4;">
-            Messages are sent by the WhatsApp Business Cloud API. Connect the API on the PHP server to send from this app.
+            Link your WhatsApp once by scanning a QR code. Start Campaign sends each message automatically from your linked account. Keep this page open while the campaign runs.
           </p>
         </div>
 
@@ -674,17 +674,15 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         </div>
         <button class="btn btn-ghost btn-xs" id="closeConnectWaModalBtn">✕</button>
       </div>
-      <p class="text-xs text-muted" style="margin-top:4px;margin-bottom:16px;">Messages send from this app through the WhatsApp Business Cloud API. Configure the API credentials on the PHP server; saving a number below only updates its display label.</p>
-
-      <div class="form-group">
-        <label class="form-label">Your WhatsApp Phone Number</label>
-        <input type="text" id="inputConnectedWaNumber" class="form-input mono" placeholder="e.g. 0300 1234567 or +923001234567">
-        <span class="text-xs text-dim">This is the sender number shown in the app. Delivery is confirmed by WhatsApp status receipts.</span>
+      <p class="text-xs text-muted" style="margin-top:4px;margin-bottom:16px;">On your phone, open WhatsApp → Settings → Linked devices → Link a device, then scan the code below. Your account stays linked for future campaigns.</p>
+      <div id="waConnectionStatus" role="status" aria-live="polite" style="margin:12px 0;">Click Connect to generate your QR code.</div>
+      <div style="text-align:center;">
+        <img id="waQrImage" alt="Scan this QR code using WhatsApp Linked devices" width="280" height="280" hidden style="max-width:100%;background:#fff;border-radius:10px;">
       </div>
-
+      <p id="waPendingCampaign" class="text-xs text-muted" hidden>Your campaign will start automatically once your phone is linked. Cancel to stop this pending launch.</p>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
         <button class="btn btn-ghost btn-sm" id="cancelConnectWaBtn">Cancel</button>
-        <button class="btn btn-wa btn-sm" id="saveConnectedWaBtn">Save & Set Number</button>
+        <button class="btn btn-wa btn-sm" id="saveConnectedWaBtn">Connect WhatsApp</button>
       </div>
     </div>
   </div>
@@ -1139,6 +1137,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/whatsapp-app.js?v=5.9"></script>
+  <script src="assets/js/whatsapp-app.js?v=6.0"></script>
 </body>
 </html>
