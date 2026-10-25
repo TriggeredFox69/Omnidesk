@@ -103,6 +103,12 @@ php -S localhost:8080 -t .
 Navigate to `http://localhost:8080/index.php`, start the Node bridge, and link WhatsApp using the QR flow above.
 
 ### Option 2: Upload to cPanel
+The main `index.php` entry point renders the same `index.html` page used by
+`http://127.0.0.1:8080/`, with server-side campaign configuration. Edit that shared
+HTML file for interface changes in both versions. The local automatic test login
+is not enabled on the public site. Real WhatsApp still requires the bridge below;
+sharing the interface does not transfer a PC session or make PHP run Node.js.
+
 1. Upload the `nunno_whatsapp` folder to your server (e.g. `public_html/whatsapp` or as a subdomain `whatsapp.nunno.cloud`).
 2. Sibling linking is pre-configured to `nunno_sales` and `nunno_marketing`.
 3. Install the bridge dependencies and run the Node service persistently on a Chromium-capable host. Follow the QR setup above. Keep the bridge token server-side.
