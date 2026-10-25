@@ -11,10 +11,17 @@ Sending automated unsolicited bulk messages to scraped databases on personal Wha
 2. **High Block & Report Rates**: When unknown recipients receive unsolicited messages, recipient reports immediately result in automated permanent phone number blacklisting.
 3. **Telecommunications Regulations**: Telecommunications authorities enforce strict anti-spam regulations on commercial electronic messages.
 
-### The Nunno Solution: Direct WhatsApp Sender Engine
-- **Direct Number Dispatch**: No Meta Cloud API, no Graph API tokens, and no Meta verification needed.
-- **Anti-Ban Cadence Engine**: Dispatches with randomized 4-8s jitter delays to mimic natural human typing and avoid automated bot detection.
-- **Connect Your Number**: Set your custom WhatsApp phone number directly in the app settings, allowing your team to outreach seamlessly from your own connected number.
+### Automatic Campaign Sending
+Campaign messages are sent through the official WhatsApp Business Cloud API. The campaign waits for the API response before recording a message as accepted or adding it to the CRM. Configure these environment variables on the PHP server (keep the access token private; do not put it in browser code or commit it):
+
+- `WHATSAPP_PHONE_NUMBER_ID`: Meta's Cloud API phone number ID.
+- `WHATSAPP_ACCESS_TOKEN`: a server-side access token with WhatsApp messaging permissions.
+- `WHATSAPP_GRAPH_API_VERSION`: a currently supported Graph API version, for example `vNN.N` (keep it current with Meta's supported versions).
+- `WHATSAPP_DISPLAY_PHONE_NUMBER`: optional sender number shown in logs.
+- `WHATSAPP_TEMPLATE_NAME` and `WHATSAPP_TEMPLATE_LANGUAGE`: optional approved template for outbound campaigns. When configured, the personalized campaign message is passed as the template's first body parameter; use a matching approved template. Without a template, the sender uses a text message, which WhatsApp only permits during an active customer service window.
+- `WHATSAPP_WEBHOOK_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET`: required to verify delivery callbacks. Set the Meta webhook callback URL to `https://your-domain/api/whatsapp_webhook.php` and subscribe the WhatsApp product to the `messages` webhook field.
+
+If the required send credentials are missing or WhatsApp rejects a message, the campaign stops at that contact and reports the API error. API acceptance is shown as pending; the campaign updates to delivered, read, or failed only after a signed status webhook arrives. Without webhook configuration, the app cannot confirm delivery.
 
 ---
 
@@ -62,7 +69,7 @@ nunno_whatsapp/
 │   ├── blacklist.json      # Unsubscribed / opted-out phone numbers
 │   └── campaign_logs.json  # Audit log of sent campaigns
 ├── index.php               # Dynamic PHP interface (cPanel ready)
-├── index.html              # Standalone web interface (runs locally / offline)
+├── index.html              # Static interface preview; PHP sending requires index.php
 └── README.md
 ```
 
@@ -71,13 +78,13 @@ nunno_whatsapp/
 ## 🛠️ How to Deploy & Use
 
 ### Option 1: Local Usage
-Open `index.html` or run a local PHP server:
+For campaign sending, run the PHP app. Opening `index.html` directly or using a static preview does not execute the PHP sender API:
 ```bash
-php -S localhost:8080 -t d:\ANTIGRAVITY\nunno_whatsapp
+php -S localhost:8080 -t .
 ```
-Navigate to `http://localhost:8080` in your browser.
+Navigate to `http://localhost:8080/index.php` and configure the WhatsApp environment variables in PHP before sending.
 
 ### Option 2: Upload to cPanel
 1. Upload the `nunno_whatsapp` folder to your server (e.g. `public_html/whatsapp` or as a subdomain `whatsapp.nunno.cloud`).
 2. Sibling linking is pre-configured to `nunno_sales` and `nunno_marketing`.
-3. To configure Meta Cloud API (optional), edit `api/config.php` and insert your Phone Number ID and System User Access Token.
+3. Configure the WhatsApp environment variables listed above in the server's PHP environment. Do not put access tokens in `api/config.php` or browser code.

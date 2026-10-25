@@ -236,6 +236,17 @@ if ($action === 'update_lead') {
                 if (!isset($lead['messages'])) $lead['messages'] = [];
                 $lead['messages'][] = $input['newMessage'];
             }
+            if (isset($input['updateMessage']) && is_array($input['updateMessage'])) {
+                $update = $input['updateMessage'];
+                foreach (($lead['messages'] ?? []) as &$message) {
+                    if (($message['waMessageId'] ?? '') === ($update['waMessageId'] ?? '')) {
+                        if (isset($update['deliveryStatus'])) $message['deliveryStatus'] = $update['deliveryStatus'];
+                        if (array_key_exists('deliveryError', $update)) $message['deliveryError'] = $update['deliveryError'];
+                        break;
+                    }
+                }
+                unset($message);
+            }
             $found = true;
             break;
         }

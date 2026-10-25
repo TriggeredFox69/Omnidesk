@@ -134,7 +134,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
         <span class="kpi-label">My Leads</span>
         <span class="kpi-count" id="myLeadsCountBadge">2</span>
       </button>
-      <div class="status-chip">Engine: <strong>Direct Device</strong></div>
+      <div class="status-chip">Engine: <strong>WhatsApp Cloud API</strong></div>
       <div class="status-chip">Anti-Ban: <strong style="color:var(--cyan);">4-8s Jitter</strong></div>
     </div>
   </div>
@@ -422,7 +422,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
           <span style="font-size:22px;">🚀</span>
           <span class="grad-text">WhatsApp Campaign Outreach Studio</span>
         </h2>
-        <p class="text-xs text-muted" style="margin-top:4px;">Launch personalized human-cadence outreach campaigns with anti-ban jitter delays.</p>
+        <p class="text-xs text-muted" style="margin-top:4px;">Send personalized campaigns through WhatsApp Business Cloud API.</p>
       </div>
       <div id="campaignStatusBadge" class="panel-badge">⚪ Ready to Launch</div>
     </div>
@@ -521,7 +521,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
             <span class="mono text-xs" style="color:var(--cyan);">Sender: +92 304 6588806</span>
           </div>
           <p class="text-xs text-muted" style="margin:5px 0 0;line-height:1.4;">
-            Messages are dispatched automatically in the background with anti-ban jitter delays. No browser redirects or manual clicking required.
+            Messages send automatically through the configured WhatsApp Business API. Use an approved template for outbound messages outside the customer service window.
           </p>
         </div>
 
@@ -670,12 +670,12 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         </div>
         <button class="btn btn-ghost btn-xs" id="closeConnectWaModalBtn">✕</button>
       </div>
-      <p class="text-xs text-muted" style="margin-top:4px;margin-bottom:16px;">Sends messages directly from your WhatsApp with anti-ban human cadence. No Meta API required.</p>
+      <p class="text-xs text-muted" style="margin-top:4px;margin-bottom:16px;">Campaign sending uses the WhatsApp Business Cloud API configured on the server.</p>
 
       <div class="form-group">
         <label class="form-label">Your WhatsApp Phone Number</label>
         <input type="text" id="inputConnectedWaNumber" class="form-input mono" placeholder="e.g. 0300 1234567 or +923001234567">
-        <span class="text-xs text-dim">Direct device session — 100% delivery, no template rejections.</span>
+        <span class="text-xs text-dim">Delivery is confirmed only when WhatsApp sends a delivered or read receipt.</span>
       </div>
 
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
@@ -1137,6 +1137,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/whatsapp-app.js?v=5.5"></script>
+  <script src="assets/js/whatsapp-app.js?v=5.9"></script>
 </body>
 </html>

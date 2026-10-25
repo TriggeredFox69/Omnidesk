@@ -260,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     inboxFilter: 'all', // 'all', 'unread', 'replied', 'sent', 'mine', 'unclaimed'
     searchQuery: '',
 
-    // Direct Connected WhatsApp Sender (Direct Device Mode — Zero Meta API)
+    // WhatsApp Business Cloud API sender
     connectedWaNumber: localStorage.getItem('nunno_connected_wa_number') || '+92 304 6588806',
 
     // Campaign Studio queue state
@@ -1192,6 +1192,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = document.createElement('div');
         const isInbound = msg.sender === 'lead';
         bubble.className = `msg-bubble ${isInbound ? 'msg-inbound' : 'msg-outbound'}`;
+        const deliveryMarkup = isInbound ? '' : (msg.deliveryStatus === 'accepted'
+          ? '<span title="WhatsApp API accepted; awaiting delivery receipt" style="color:#b7791f;font-size:11px;">◷</span>'
+          : (msg.deliveryStatus === 'sent'
+            ? '<span title="Sent by WhatsApp; awaiting recipient" style="color:#b7791f;font-size:11px;">✓</span>'
+            : (msg.deliveryStatus === 'delivered' || msg.deliveryStatus === 'read'
+              ? '<span title="Delivered to recipient" style="color:#53bdeb;font-weight:700;font-size:11px;">✓✓</span>'
+              : (msg.deliveryStatus === 'failed'
+                ? `<span title="Delivery failed${msg.deliveryError ? `: ${escapeHtml(msg.deliveryError)}` : ''}" style="color:#ef4444;font-weight:700;font-size:11px;">!</span>`
+                : '<span title="This CRM message has no WhatsApp delivery confirmation" style="color:#87949c;font-size:10px;">unverified</span>'))));
 
         if (msg.type === 'audio') {
           bubble.classList.add('msg-audio-bubble');
@@ -1228,7 +1237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="msg-meta-row">
               <span>${escapeHtml(msg.time)}</span>
-              ${!isInbound ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#53bdeb" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 14.5 17.5"/></svg>` : ''}
+              ${deliveryMarkup}
             </div>
           `;
         } else {
@@ -1237,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div>${formatText(msg.text)}</div>
             <div class="msg-meta-row">
               <span>${escapeHtml(msg.time)}</span>
-              ${!isInbound ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#53bdeb" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 14.5 17.5"/></svg>` : ''}
+              ${deliveryMarkup}
             </div>
           `;
         }
@@ -1399,7 +1408,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Send Message in Active Chat
-  function sendMessage() {
+  function describeSendError(error) {
+    const message = error && error.message ? error.message : 'Unknown network error';
+    if (message === 'Failed to fetch' || message.includes('NetworkError')) {
+      if (window.location.protocol === 'file:') {
+        return 'This page is opened as a local file, so it cannot reach the PHP sender. Run the app through PHP (index.php) on localhost or your HTTPS host.';
+      }
+      return 'Could not reach api/direct_sender.php. Open the app through its PHP/HTTPS host and confirm that the PHP API endpoint is online.';
+    }
+    return message;
+  }
+
+  async function sendMessage() {
+    if (els.sendMsgBtn && els.sendMsgBtn.disabled) return;
     const lead = getLead(state.activeLeadId);
     if (!lead) return;
 
@@ -1416,6 +1437,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = els.chatInput.value.trim();
     if (!text) return;
 
+    if (els.sendMsgBtn) els.sendMsgBtn.disabled = true;
+    let sendResult;
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_direct', phone: lead.phone, message: text })
+      });
+      sendResult = await response.json();
+      if (!response.ok || !sendResult.success) throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
+    } catch (error) {
+      showToast(`❌ WhatsApp message was not sent: ${describeSendError(error)}`);
+      return;
+    } finally {
+      if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
+    }
+
     // If unclaimed, automatically claim when agent responds
     if (!lead.ownerId) {
       lead.ownerId = myId;
@@ -1426,12 +1464,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    lead.messages.push({
+    const crmMessage = {
+      id: `msg_${Date.now()}`,
+      waMessageId: sendResult.message_id,
+      deliveryStatus: 'accepted',
       sender: 'agent',
       agentName: myName,
       text: text,
       time: now
-    });
+    };
+    lead.messages.push(crmMessage);
 
     lead.status = 'replied';
     lead.lastActive = 'Just now';
@@ -1439,7 +1481,16 @@ document.addEventListener('DOMContentLoaded', () => {
     els.chatInput.value = '';
     renderConversationsList();
     renderActiveChat();
-    syncLeadToServer(lead, { newMessage: lead.messages[lead.messages.length - 1] });
+    syncLeadToServer(lead, { newMessage: crmMessage });
+    watchCampaignDelivery({
+      id: crmMessage.id,
+      phone: lead.phone,
+      display: lead.display || lead.phone,
+      name: lead.name,
+      messageId: sendResult.message_id,
+      isCampaign: false
+    }, 0);
+    showToast('WhatsApp accepted the message; waiting for delivery confirmation.');
   }
 
   // Quick Macro Chips
@@ -1801,10 +1852,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (els.campaignAudienceList) {
       els.campaignAudienceList.innerHTML = campaignState.audience.map((c) => {
-        const dotBg = c.status === 'sent' ? '#10b981' : (c.status === 'sending' ? '#eab308' : '#64748b');
-        const statusLabel = c.status === 'sent'
-          ? `<span style="color:#10b981;font-weight:700;">✓ Sent (${c.sentAt || ''})</span>`
-          : (c.status === 'sending' ? '<span style="color:#eab308;">⏳ Sending...</span>' : '<span style="color:#8696a0;">Pending</span>');
+        const delivered = c.status === 'delivered' || c.status === 'read';
+        const dotBg = delivered ? '#10b981' : (c.status === 'sending' ? '#eab308' : (c.status === 'failed' ? '#ef4444' : (c.status === 'accepted' || c.status === 'sent' ? '#b7791f' : '#64748b')));
+        const statusLabel = delivered
+          ? `<span style="color:#10b981;font-weight:700;">✓ ${c.status === 'read' ? 'Read' : 'Delivered'} (${c.sentAt || ''})</span>`
+          : (c.status === 'sent' ? '<span style="color:#b7791f;font-weight:700;">✓ Sent by WhatsApp; awaiting recipient</span>' : (c.status === 'accepted' ? '<span style="color:#b7791f;font-weight:700;">⏳ API accepted; awaiting delivery receipt</span>' : (c.status === 'sending' ? '<span style="color:#eab308;">⏳ Sending...</span>' : (c.status === 'failed' ? `<span style="color:#ef4444;font-weight:700;">✕ Failed${c.deliveryError ? `: ${escapeHtml(c.deliveryError)}` : ''}</span>` : '<span style="color:#8696a0;">Pending</span>'))));
 
         return `
           <div class="campaign-audience-item" id="c_item_${c.id}">
@@ -1952,8 +2004,8 @@ document.addEventListener('DOMContentLoaded', () => {
       els.campaignStatusBadge.innerHTML = `⏹️ Stopped (${campaignState.totalSent} Sent)`;
     }
 
-    logCampaignTerminal(`⏹️ Campaign halted by operator. Total delivered: ${campaignState.totalSent} of ${campaignState.audience.length}.`, 'warn');
-    showToast(`⏹️ Campaign stopped. ${campaignState.totalSent} messages dispatched.`);
+    logCampaignTerminal(`⏹️ Campaign halted by operator. WhatsApp accepted ${campaignState.totalSent} of ${campaignState.audience.length} messages.`, 'warn');
+    showToast(`⏹️ Campaign stopped. WhatsApp accepted ${campaignState.totalSent} messages.`);
   }
 
   function finishCampaign() {
@@ -1975,18 +2027,82 @@ document.addEventListener('DOMContentLoaded', () => {
       els.campaignStatusBadge.style.color = '#00a884';
       els.campaignStatusBadge.style.background = '#0a332c';
       els.campaignStatusBadge.style.borderColor = '#00a884';
-      els.campaignStatusBadge.innerHTML = `✅ All ${campaignState.totalSent} Messages Delivered`;
+      els.campaignStatusBadge.innerHTML = `✅ WhatsApp accepted ${campaignState.totalSent} messages`;
     }
 
-    logCampaignTerminal(`🎉 All ${campaignState.totalSent} campaign messages dispatched successfully! All leads registered in CRM.`, 'success');
-    showToast(`🎉 Campaign completed! ${campaignState.totalSent} leads reached.`);
+    logCampaignTerminal(`🎉 WhatsApp accepted all ${campaignState.totalSent} campaign messages. All leads registered in CRM.`, 'success');
+    showToast(`🎉 Campaign completed! WhatsApp accepted ${campaignState.totalSent} messages.`);
   }
 
-  function dispatchNextCampaignMessage() {
+  function watchCampaignDelivery(contact, attempt) {
+    if (!contact.messageId || attempt >= 60) {
+      if (attempt >= 60 && contact.isCampaign && ['accepted', 'sent'].includes(contact.status) && els.campaignTerminalLog) {
+        logCampaignTerminal(`ℹ️ No delivery receipt received yet for <strong>${escapeHtml(contact.display)}</strong>. Check WhatsApp Manager for status.`, 'warn');
+      }
+      return;
+    }
+
+    setTimeout(async () => {
+      try {
+        const response = await fetch('api/direct_sender.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_send_status', message_id: contact.messageId })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Status lookup failed');
+
+        if (['sent', 'delivered', 'read', 'failed'].includes(result.status)) {
+          contact.status = result.status;
+          contact.deliveryError = result.error || '';
+          const lead = state.leads.find(item => item.phone === contact.phone);
+          const message = lead && lead.messages.find(item => item.waMessageId === contact.messageId);
+          if (message) {
+            message.deliveryStatus = result.status;
+            message.deliveryError = contact.deliveryError;
+            syncLeadToServer(lead, { updateMessage: {
+              waMessageId: contact.messageId,
+              deliveryStatus: result.status,
+              deliveryError: contact.deliveryError
+            } });
+            if (state.activeLeadId === lead.id) renderActiveChat();
+          }
+          const statusEl = document.getElementById(`c_status_${contact.id}`);
+          if (statusEl) {
+            if (result.status === 'failed') {
+              statusEl.innerHTML = `<span style="color:#ef4444;font-weight:700;">✕ Delivery failed${contact.deliveryError ? `: ${escapeHtml(contact.deliveryError)}` : ''}</span>`;
+            } else if (result.status === 'sent') {
+              statusEl.innerHTML = '<span style="color:#b7791f;font-weight:700;">✓ Sent by WhatsApp; awaiting recipient</span>';
+            } else {
+              statusEl.innerHTML = `<span style="color:#10b981;font-weight:700;">✓ ${result.status === 'read' ? 'Read' : 'Delivered'}</span>`;
+            }
+          }
+          const itemEl = document.getElementById(`c_item_${contact.id}`);
+          const dot = itemEl && itemEl.querySelector('div[style*="border-radius:50%"]');
+          if (dot) dot.style.background = result.status === 'failed' ? '#ef4444' : (result.status === 'sent' ? '#b7791f' : '#10b981');
+          if (result.status === 'failed' && contact.isCampaign) {
+            logCampaignTerminal(`❌ WhatsApp could not deliver to <strong>${escapeHtml(contact.display)}</strong>${contact.deliveryError ? `: ${escapeHtml(contact.deliveryError)}` : '.'}`, 'error');
+          } else if ((result.status === 'delivered' || result.status === 'read') && contact.isCampaign) {
+            logCampaignTerminal(`✅ WhatsApp ${result.status} the message for <strong>${escapeHtml(contact.display)}</strong>.`, 'success');
+          } else if (result.status === 'failed') {
+            showToast(`❌ WhatsApp could not deliver the message${contact.deliveryError ? `: ${contact.deliveryError}` : '.'}`);
+          } else if (result.status === 'delivered' || result.status === 'read') {
+            showToast(`✅ WhatsApp ${result.status} the message to ${contact.name}.`);
+          }
+          if (result.status !== 'sent') return;
+        }
+      } catch (_) {
+        // A transient status lookup error should not change the message outcome.
+      }
+      watchCampaignDelivery(contact, attempt + 1);
+    }, 5000);
+  }
+
+  async function dispatchNextCampaignMessage() {
     if (!campaignState.isRunning || campaignState.isPaused) return;
 
     while (campaignState.currentIndex < campaignState.audience.length &&
-           campaignState.audience[campaignState.currentIndex].status === 'sent') {
+           ['accepted', 'sent', 'delivered', 'read'].includes(campaignState.audience[campaignState.currentIndex].status)) {
       campaignState.currentIndex++;
     }
 
@@ -2012,20 +2128,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusEl = document.getElementById(`c_status_${contact.id}`);
     if (statusEl) statusEl.innerHTML = '<span style="color:#eab308;">⏳ Sending...</span>';
 
+    let sendResult;
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_direct', phone: contact.phone, message: personalizedMsg })
+      });
+      sendResult = await response.json();
+      if (!response.ok || !sendResult.success) {
+        throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
+      }
+    } catch (error) {
+      contact.status = 'failed';
+      campaignState.isRunning = false;
+      campaignState.isPaused = false;
+      if (statusEl) statusEl.innerHTML = '<span style="color:#ef4444;font-weight:700;">✕ Failed</span>';
+      if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
+      if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
+      if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
+      if (els.campaignStatusBadge) {
+        els.campaignStatusBadge.style.color = '#ef4444';
+        els.campaignStatusBadge.style.background = '#311417';
+        els.campaignStatusBadge.style.borderColor = '#ef4444';
+        els.campaignStatusBadge.textContent = '⚠️ Sending Failed';
+      }
+      const sendError = describeSendError(error);
+      logCampaignTerminal(`❌ Could not send to <strong>${escapeHtml(contact.display)}</strong>: ${escapeHtml(sendError)}`, 'error');
+      showToast(`❌ WhatsApp send failed: ${sendError}`);
+      return;
+    }
+
     const assignMode = els.campaignAssignSelect ? els.campaignAssignSelect.value : 'pool';
     const currentCloser = state.currentUser;
     const ownerId = (assignMode === 'mine' && currentCloser) ? currentCloser.id : null;
     const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'Nunno Outreach';
+    const crmMessage = {
+      id: `msg_c_${Date.now()}`,
+      waMessageId: sendResult.message_id,
+      deliveryStatus: 'accepted',
+      sender: 'agent',
+      agentName: currentCloser ? currentCloser.name : 'System Outreach',
+      text: personalizedMsg,
+      time: timeNow
+    };
 
     let existingLead = state.leads.find(l => l.phone === contact.phone);
     if (existingLead) {
-      existingLead.messages.push({
-        id: `msg_c_${Date.now()}`,
-        sender: 'agent',
-        agentName: currentCloser ? currentCloser.name : 'System Outreach',
-        text: personalizedMsg,
-        time: timeNow
-      });
+      existingLead.messages.push(crmMessage);
       existingLead.lastActive = 'Just now';
       existingLead.status = 'sent';
     } else {
@@ -2043,34 +2193,29 @@ document.addEventListener('DOMContentLoaded', () => {
         interest: 'Nunno Pro',
         lastActive: 'Just now',
         notes: `Outreach sent via campaign "${campaignName}". Assign: ${assignMode === 'mine' ? (currentCloser ? currentCloser.name : 'Myself') : 'Open Pool'}.`,
-        messages: [
-          {
-            id: `msg_c_${Date.now()}`,
-            sender: 'agent',
-            agentName: currentCloser ? currentCloser.name : 'System Outreach',
-            text: personalizedMsg,
-            time: timeNow
-          }
-        ]
+        messages: [crmMessage]
       };
       state.leads.unshift(newLead);
       existingLead = newLead;
     }
 
-    contact.status = 'sent';
+    contact.status = 'accepted';
     contact.sentAt = timeNow;
+    contact.messageId = sendResult.message_id;
     campaignState.totalSent++;
 
-    if (statusEl) statusEl.innerHTML = `<span style="color:#10b981;font-weight:700;">✓ Sent (${timeNow})</span>`;
+    if (statusEl) statusEl.innerHTML = '<span style="color:#b7791f;font-weight:700;">⏳ API accepted; awaiting delivery receipt</span>';
     const itemEl = document.getElementById(`c_item_${contact.id}`);
     if (itemEl) {
       const dot = itemEl.querySelector('div[style*="border-radius:50%"]');
-      if (dot) dot.style.background = '#10b981';
+      if (dot) dot.style.background = '#b7791f';
     }
 
+    watchCampaignDelivery({ ...contact, isCampaign: true }, 0);
+
     // Autonomous Background Dispatch Engine: No popups, no redirects, 100% automated
-    logCampaignTerminal(`⚡ [${currentNum}/${total}] Automatically dispatched to <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} • ${contact.network})`, 'success');
-    showToast(`⚡ Dispatched to ${contact.name} (${contact.display})`);
+    logCampaignTerminal(`⚡ [${currentNum}/${total}] WhatsApp accepted the message for <strong>${escapeHtml(contact.display)}</strong> (${escapeHtml(contact.name)} • ${contact.network})`, 'success');
+    showToast(`⚡ WhatsApp accepted message for ${contact.name} (${contact.display})`);
 
     renderConversationsList();
     if (state.activeLeadId === existingLead.id) {
@@ -2078,25 +2223,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     syncLeadToServer(existingLead, {
-      newMessage: {
-        id: `msg_c_${Date.now()}`,
-        sender: 'agent',
-        agentName: currentCloser ? currentCloser.name : 'System Outreach',
-        text: personalizedMsg,
-        time: timeNow
-      }
+      newMessage: crmMessage
     });
-
-    // Notify direct sender backend
-    fetch('api/direct_sender.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'send_direct',
-        phone: contact.phone,
-        message: personalizedMsg
-      })
-    }).catch(() => {});
 
     campaignState.currentIndex++;
 
