@@ -23,6 +23,7 @@ if (!is_array($senderConfig)) $senderConfig = [];
 
 $currentNumber = getenv('WHATSAPP_DISPLAY_PHONE_NUMBER') ?: ($senderConfig['connected_number'] ?? $config['connected_whatsapp_number'] ?? '');
 $cloudToken = getenv('WHATSAPP_ACCESS_TOKEN') ?: '';
+$cloudConfigured = !empty($cloudToken) && !empty(getenv('WHATSAPP_PHONE_NUMBER_ID')) && !empty(getenv('WHATSAPP_GRAPH_API_VERSION'));
 
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 $action = $input['action'] ?? $_GET['action'] ?? '';
@@ -33,8 +34,8 @@ if ($action === 'get_sender_info') {
         'success'          => true,
         'connected_number' => $currentNumber,
         'is_connected'     => !empty($currentNumber),
-        'mode'             => 'whatsapp_cloud_api',
-        'is_configured'    => !empty($cloudToken) && !empty(getenv('WHATSAPP_PHONE_NUMBER_ID')) && !empty(getenv('WHATSAPP_GRAPH_API_VERSION'))
+        'mode'             => $cloudConfigured ? 'whatsapp_cloud_api' : 'whatsapp_handoff',
+        'is_configured'    => $cloudConfigured
     ]);
     exit;
 }
@@ -81,23 +82,17 @@ if ($action === 'send_direct') {
 
     // Clean recipient number
     $cleanRecipient = preg_replace('/\D+/', '', $phone);
-    if (str_starts_with($cleanRecipient, '03') && strlen($cleanRecipient) === 11) {
+    if (substr($cleanRecipient, 0, 4) === '0092') {
+        $cleanRecipient = substr($cleanRecipient, 2);
+    } elseif (substr($cleanRecipient, 0, 2) === '03' && strlen($cleanRecipient) === 11) {
         $cleanRecipient = '92' . substr($cleanRecipient, 1);
+    } elseif (substr($cleanRecipient, 0, 1) === '3' && strlen($cleanRecipient) === 10) {
+        $cleanRecipient = '92' . $cleanRecipient;
     }
 
     $phoneNumberId = getenv('WHATSAPP_PHONE_NUMBER_ID') ?: '';
     $accessToken = getenv('WHATSAPP_ACCESS_TOKEN') ?: '';
     $graphVersion = getenv('WHATSAPP_GRAPH_API_VERSION') ?: '';
-    if (!$phoneNumberId || !$accessToken || !$graphVersion) {
-        http_response_code(503);
-        echo json_encode(['success' => false, 'message' => 'WhatsApp Cloud API is not configured. Set WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN, and WHATSAPP_GRAPH_API_VERSION on the server.']);
-        exit;
-    }
-    if (!preg_match('/^v[0-9]+\\.[0-9]+$/', $graphVersion)) {
-        http_response_code(503);
-        echo json_encode(['success' => false, 'message' => 'WHATSAPP_GRAPH_API_VERSION must use the format vNN.N.']);
-        exit;
-    }
     if ($message === '') {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Message text is required.']);
@@ -109,6 +104,24 @@ if ($action === 'send_direct') {
         exit;
     }
 
+    // When Cloud API credentials are absent, hand off to the user's real WhatsApp
+    // session with a prefilled chat. WhatsApp requires the user to press Send.
+    if (!$phoneNumberId || !$accessToken || !$graphVersion) {
+        $waUrl = 'https://wa.me/' . rawurlencode($cleanRecipient) . '?text=' . rawurlencode($message);
+        echo json_encode([
+            'success' => true,
+            'dispatch_mode' => 'whatsapp_handoff',
+            'to_number' => $cleanRecipient,
+            'wa_url' => $waUrl,
+            'message' => 'WhatsApp opened with your message. Press Send in WhatsApp to deliver it.'
+        ]);
+        exit;
+    }
+    if (!preg_match('/^v[0-9]+\\.[0-9]+$/', $graphVersion)) {
+        http_response_code(503);
+        echo json_encode(['success' => false, 'message' => 'WHATSAPP_GRAPH_API_VERSION must use the format vNN.N.']);
+        exit;
+    }
     $templateName = getenv('WHATSAPP_TEMPLATE_NAME') ?: '';
     $payload = ['messaging_product' => 'whatsapp', 'to' => $cleanRecipient];
     if ($templateName !== '') {

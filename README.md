@@ -12,7 +12,7 @@ Sending automated unsolicited bulk messages to scraped databases on personal Wha
 3. **Telecommunications Regulations**: Telecommunications authorities enforce strict anti-spam regulations on commercial electronic messages.
 
 ### Automatic Campaign Sending
-Campaign messages are sent through the official WhatsApp Business Cloud API. The campaign waits for the API response before recording a message as accepted or adding it to the CRM. Configure these environment variables on the PHP server (keep the access token private; do not put it in browser code or commit it):
+Individual inbox messages use the official WhatsApp Business Cloud API when it is configured. Without Cloud API credentials, the app opens a prefilled chat in the user's WhatsApp session; the operator must press **Send** in WhatsApp. The campaign studio uses the Cloud API for automatic dispatch and falls back to an explicit per-contact WhatsApp link when credentials are absent. Configure these environment variables on the PHP server (keep the access token private; do not put it in browser code or commit it):
 
 - `WHATSAPP_PHONE_NUMBER_ID`: Meta's Cloud API phone number ID.
 - `WHATSAPP_ACCESS_TOKEN`: a server-side access token with WhatsApp messaging permissions.
@@ -21,7 +21,7 @@ Campaign messages are sent through the official WhatsApp Business Cloud API. The
 - `WHATSAPP_TEMPLATE_NAME` and `WHATSAPP_TEMPLATE_LANGUAGE`: optional approved template for outbound campaigns. When configured, the personalized campaign message is passed as the template's first body parameter; use a matching approved template. Without a template, the sender uses a text message, which WhatsApp only permits during an active customer service window.
 - `WHATSAPP_WEBHOOK_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET`: required to verify delivery callbacks. Set the Meta webhook callback URL to `https://your-domain/api/whatsapp_webhook.php` and subscribe the WhatsApp product to the `messages` webhook field.
 
-If the required send credentials are missing or WhatsApp rejects a message, the campaign stops at that contact and reports the API error. API acceptance is shown as pending; the campaign updates to delivered, read, or failed only after a signed status webhook arrives. Without webhook configuration, the app cannot confirm delivery.
+If credentials are missing, automatic campaign dispatch is unavailable; the app provides a WhatsApp link for manual sending. If WhatsApp rejects a Cloud API message, the campaign stops at that contact and reports the API error. API acceptance is shown as pending; the campaign updates to delivered, read, or failed only after a signed status webhook arrives. Without webhook configuration, the app cannot confirm delivery.
 
 ---
 

@@ -422,7 +422,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
           <span style="font-size:22px;">🚀</span>
           <span class="grad-text">WhatsApp Campaign Outreach Studio</span>
         </h2>
-        <p class="text-xs text-muted" style="margin-top:4px;">Send personalized campaigns through WhatsApp Business Cloud API.</p>
+        <p class="text-xs text-muted" style="margin-top:4px;">Send through the Business Cloud API, or open a prefilled WhatsApp chat for manual sending.</p>
       </div>
       <div id="campaignStatusBadge" class="panel-badge">⚪ Ready to Launch</div>
     </div>
@@ -521,7 +521,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
             <span class="mono text-xs" style="color:var(--cyan);">Sender: +92 304 6588806</span>
           </div>
           <p class="text-xs text-muted" style="margin:5px 0 0;line-height:1.4;">
-            Messages send automatically through the configured WhatsApp Business API. Use an approved template for outbound messages outside the customer service window.
+            Automatic campaigns require the WhatsApp Business Cloud API. Without it, open each prefilled WhatsApp chat and press Send manually.
           </p>
         </div>
 
