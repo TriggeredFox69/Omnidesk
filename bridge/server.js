@@ -12,6 +12,7 @@ if (!process.env.WHATSAPP_BRIDGE_TOKEN && !fs.existsSync(tokenPath)) {
   fs.writeFileSync(tokenPath, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
 }
 const service = createService({
+  storageFile: path.join(dataPath, 'inbox.json'),
   token: process.env.WHATSAPP_BRIDGE_TOKEN || fs.readFileSync(tokenPath, 'utf8').trim(),
   qrImage: value => QRCode.toDataURL(value, { width: 280, margin: 2 }),
   createClient: () => new Client({

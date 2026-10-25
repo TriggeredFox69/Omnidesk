@@ -17,7 +17,7 @@ function setup() {
     connectWaModal: { classList: { add() { open = true; }, remove() { open = false; }, contains() { return open; } } }
   };
   const campaignState = { audience: [{ phone: '923001234567' }], isRunning: false };
-  const context = vm.createContext({ els, campaignState, state: {},
+  const context = vm.createContext({ els, campaignState, state: {}, window: {},
     renderConnectedNumber() {}, showToast() {}, logCampaignTerminal() {}, escapeHtml: String,
     describeSendError: error => error.message,
     dispatchNextCampaignMessage() { dispatches++; },
@@ -56,6 +56,14 @@ test('Cancel during QR setup prevents automatic campaign launch', async () => {
   const stalePoll = run.timers[0];
   vm.runInContext('closeConnectWaModal()', run.context);
   run.ready(); await stalePoll(); await flush();
+  assert.equal(run.dispatches(), 0);
+});
+
+test('manual linking closes the QR dialog when ready without starting a campaign', async () => {
+  const run = setup();
+  vm.runInContext('openConnectWaModal()', run.context); await flush();
+  run.ready(); await run.timers.shift()(); await flush();
+  assert.equal(run.els.connectWaModal.classList.contains('open'), false);
   assert.equal(run.dispatches(), 0);
 });
 

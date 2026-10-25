@@ -255,8 +255,8 @@ document.addEventListener('DOMContentLoaded', () => {
     employees: [],       // Employee roster
     agents: defaultAgents,
     currentAgent: defaultAgents[0], // EMP-101 Hamza Khan
-    leads: [...initialLeads],
-    activeLeadId: 'lead_1',
+    leads: window.NUNNO_OFFLINE_PREVIEW ? [...initialLeads] : [],
+    activeLeadId: window.NUNNO_OFFLINE_PREVIEW ? 'lead_1' : null,
     inboxFilter: 'all', // 'all', 'unread', 'replied', 'sent', 'mine', 'unclaimed'
     searchQuery: '',
 
@@ -321,6 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connected WhatsApp Direct Number Pill & Modal
     connectedNumberPill: document.getElementById('connectedNumberPill'),
     connectedNumberText: document.getElementById('connectedNumberText'),
+    campaignConnectionStatus: document.getElementById('campaignConnectionStatus'),
     connectWaModal: document.getElementById('connectWaModal'),
     closeConnectWaModalBtn: document.getElementById('closeConnectWaModalBtn'),
     cancelConnectWaBtn: document.getElementById('cancelConnectWaBtn'),
@@ -540,7 +541,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Toast Function
+  function previewLabel(text) {
+    return window.NUNNO_OFFLINE_PREVIEW ? '[OFFLINE TEST] ' + text.replaceAll('WhatsApp accepted', 'Simulation processed').replaceAll('WhatsApp delivered', 'Simulation completed') : text;
+  }
+
+  if (window.NUNNO_OFFLINE_PREVIEW || window.NUNNO_LOCAL_LIVE) {
+    const banner = document.createElement('div');
+    banner.id = 'localTestBanner';
+    banner.setAttribute('role', 'status');
+    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;pointer-events:none;padding:10px;text-align:center;background:#fff3cd;color:#5c4100;font:600 13px sans-serif;';
+    banner.textContent = window.NUNNO_OFFLINE_PREVIEW
+      ? 'OFFLINE TEST — simulated messages only. Nothing is sent to WhatsApp. Test data resets when this page closes.'
+      : 'LOCAL WHATSAPP — real messages will be sent after QR linking. This test workspace is separate from your hosted CRM.';
+    document.body.appendChild(banner);
+  }
+
   function showToast(msg, duration = 3000) {
+    msg = previewLabel(msg);
     if (!els.toast) return;
     els.toastMsg.textContent = msg;
     els.toast.classList.add('show');
@@ -621,9 +638,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let pendingCampaignStart = false;
 
   function renderSenderConnection(result) {
+    const wasConnected = state.senderConfigured;
     state.senderConfigured = result.is_configured === true;
     state.connectedWaNumber = result.connected_number || '';
     renderConnectedNumber();
+    if (els.campaignConnectionStatus) {
+      els.campaignConnectionStatus.textContent = window.NUNNO_OFFLINE_PREVIEW
+        ? '🧪 Offline simulation — no real sends'
+        : state.senderConfigured
+          ? `✓ WhatsApp connected${state.connectedWaNumber ? ' · +' + state.connectedWaNumber : ''} — ready to send`
+          : 'WhatsApp not connected · Click to link';
+    }
+    if (!wasConnected && state.senderConfigured && !window.NUNNO_OFFLINE_PREVIEW) {
+      showToast('✓ WhatsApp connected. Your campaign is ready; click Start Outreach Campaign to send.', 6000);
+    }
     const labels = {
       idle: 'Ready to link. Click Connect WhatsApp.',
       starting: 'Starting WhatsApp… the QR code will appear here.',
@@ -657,9 +685,10 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await refreshSenderConnection();
       if (generation !== waModalGeneration) return;
-      if (state.senderConfigured && pendingCampaignStart) {
+      if (state.senderConfigured) {
+        const launchCampaign = pendingCampaignStart;
         closeConnectWaModal();
-        startCampaign();
+        if (launchCampaign) startCampaign();
         return;
       }
     } catch (_) { /* The status panel displays service errors and allows a retry. */ }
@@ -707,6 +736,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function syncLeadToServer(lead, extraData = {}) {
     if (!lead) return;
     const payload = {
+      ...((window.NUNNO_LOCAL_LIVE || window.NUNNO_OFFLINE_PREVIEW) ? lead : {}),
       action: 'update_lead',
       id: lead.id,
       leadState: lead.leadState,
@@ -729,6 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fetch Centralized Leads on cPanel
   function fetchServerLeads() {
+    if (window.NUNNO_LOCAL_LIVE) return;
     fetch('api/leads_sync.php?action=get_leads')
       .then(res => res.json())
       .then(data => {
@@ -1043,7 +1074,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderActiveChat() {
     const lead = getLead(state.activeLeadId);
-    if (!lead) return;
+    if (!lead) {
+      if (els.chatLeadName) els.chatLeadName.textContent = 'Select a conversation';
+      if (els.chatLeadPhone) els.chatLeadPhone.textContent = '';
+      if (els.chatMessagesArea) els.chatMessagesArea.textContent = 'Connect WhatsApp to sync recent conversations, or start a campaign.';
+      return;
+    }
+    const presenceEl = document.getElementById('chatPresence');
+    if (presenceEl && presenceEl.dataset.phone !== lead.phone) {
+      presenceEl.dataset.phone = lead.phone;
+      presenceEl.textContent = 'Checking online / last seen…'; presenceEl.className = 'chat-presence';
+    }
 
     const leadState = getLeadState(lead);
     const owner = lead.ownerId ? getAgent(lead.ownerId) : null;
@@ -1241,15 +1282,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const bubble = document.createElement('div');
         const isInbound = msg.sender === 'lead';
         bubble.className = `msg-bubble ${isInbound ? 'msg-inbound' : 'msg-outbound'}`;
-        const deliveryMarkup = isInbound ? '' : (msg.deliveryStatus === 'accepted'
-          ? '<span title="WhatsApp Submitted; awaiting delivery receipt" style="color:#b7791f;font-size:11px;">◷</span>'
-          : (msg.deliveryStatus === 'sent'
-            ? '<span title="Sent by WhatsApp; awaiting recipient" style="color:#b7791f;font-size:11px;">✓</span>'
-            : (msg.deliveryStatus === 'delivered' || msg.deliveryStatus === 'read'
-              ? '<span title="Delivered to recipient" style="color:#53bdeb;font-weight:700;font-size:11px;">✓✓</span>'
-              : (msg.deliveryStatus === 'failed'
-                ? `<span title="Delivery failed${msg.deliveryError ? `: ${escapeHtml(msg.deliveryError)}` : ''}" style="color:#ef4444;font-weight:700;font-size:11px;">!</span>`
-                : '<span title="This CRM message has no WhatsApp delivery confirmation" style="color:#87949c;font-size:10px;">unverified</span>'))));
+        const tickState = msg.deliveryStatus;
+        const deliveryMarkup = isInbound ? '' : window.NUNNO_OFFLINE_PREVIEW ? '<span>🧪 simulated</span>'
+          : tickState === 'read' ? '<span title="Read" style="color:#53bdeb;font-size:12px;">✓✓</span>'
+          : tickState === 'delivered' ? '<span title="Delivered; not confirmed read" style="color:#8696a0;font-size:12px;">✓✓</span>'
+          : tickState === 'sent' ? '<span title="Sent; not delivered yet" style="color:#8696a0;font-size:12px;">✓</span>'
+          : ['sending','accepted'].includes(tickState) ? '<span title="Submitting; waiting for server acknowledgement" style="color:#8696a0;">◷</span>'
+          : tickState === 'failed' ? '<span title="Sending failed" style="color:#ef4444;">!</span>'
+          : '<span title="No confirmed delivery status" style="color:#8696a0;font-size:10px;">unconfirmed</span>';
 
         if (msg.type === 'audio') {
           bubble.classList.add('msg-audio-bubble');
@@ -1292,6 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           bubble.innerHTML = `
             ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
+            ${msg.type === 'image' ? (msg.imageUrl && /^data:image\/(png|jpeg|webp|gif);base64,/i.test(msg.imageUrl) ? `<a href="${escapeHtml(msg.imageUrl)}" download="whatsapp-image"><img src="${escapeHtml(msg.imageUrl)}" alt="Chat image attachment" style="max-width:280px;max-height:300px;border-radius:10px;display:block;"></a>` : `<div>${escapeHtml(msg.mediaError || 'Loading image…')}</div>`) : ''}
             <div>${formatText(msg.text)}</div>
             <div class="msg-meta-row">
               <span>${escapeHtml(msg.time)}</span>
@@ -1522,7 +1563,7 @@ document.addEventListener('DOMContentLoaded', () => {
       text: text,
       time: now
     };
-    lead.messages.push(crmMessage);
+    if (!lead.messages.some(m => m.waMessageId === crmMessage.waMessageId)) lead.messages.push(crmMessage);
 
     lead.status = 'replied';
     lead.lastActive = 'Just now';
@@ -1759,6 +1800,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function logCampaignTerminal(msg, type = 'info') {
+    msg = previewLabel(msg);
     if (!els.campaignTerminalLog) return;
     campaignState.logEvents++;
     if (els.campaignLogCount) {
@@ -2090,7 +2132,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
     if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
 
-    if (els.campaignCountdown) els.campaignCountdown.textContent = 'Complete';
+    if (els.campaignCountdown) els.campaignCountdown.textContent = window.NUNNO_OFFLINE_PREVIEW ? 'Simulation complete' : 'Complete';
     if (els.campaignProgressPct) els.campaignProgressPct.textContent = '100%';
     if (els.campaignProgressFill) els.campaignProgressFill.style.width = '100%';
 
@@ -2098,7 +2140,7 @@ document.addEventListener('DOMContentLoaded', () => {
       els.campaignStatusBadge.style.color = '#00a884';
       els.campaignStatusBadge.style.background = '#0a332c';
       els.campaignStatusBadge.style.borderColor = '#00a884';
-      els.campaignStatusBadge.innerHTML = `✅ WhatsApp accepted ${campaignState.totalSent} messages`;
+      els.campaignStatusBadge.innerHTML = window.NUNNO_OFFLINE_PREVIEW ? `🧪 Simulated ${campaignState.totalSent} messages — none sent` : `✅ WhatsApp accepted ${campaignState.totalSent} messages`;
     }
 
     logCampaignTerminal(`🎉 WhatsApp accepted all ${campaignState.totalSent} campaign messages. All leads registered in CRM.`, 'success');
@@ -2123,7 +2165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message || 'Status lookup failed');
 
-        if (['sent', 'delivered', 'read', 'failed'].includes(result.status)) {
+        if (['sent', 'delivered', 'read', 'failed', 'simulated'].includes(result.status)) {
           contact.status = result.status;
           contact.deliveryError = result.error || '';
           const lead = state.leads.find(item => item.phone === contact.phone);
@@ -2140,7 +2182,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           const statusEl = document.getElementById(`c_status_${contact.id}`);
           if (statusEl) {
-            if (result.status === 'failed') {
+            if (result.status === 'simulated') {
+              statusEl.textContent = '🧪 Simulated — not sent';
+            } else if (result.status === 'failed') {
               statusEl.innerHTML = `<span style="color:#ef4444;font-weight:700;">✕ Delivery failed${contact.deliveryError ? `: ${escapeHtml(contact.deliveryError)}` : ''}</span>`;
             } else if (result.status === 'sent') {
               statusEl.innerHTML = '<span style="color:#b7791f;font-weight:700;">✓ Sent by WhatsApp; awaiting recipient</span>';
@@ -2160,7 +2204,7 @@ document.addEventListener('DOMContentLoaded', () => {
           } else if (result.status === 'delivered' || result.status === 'read') {
             showToast(`✅ WhatsApp ${result.status} the message to ${contact.name}.`);
           }
-          if (result.status !== 'sent') return;
+          if (['read', 'failed', 'simulated'].includes(result.status)) return;
         }
       } catch (_) {
         // A transient status lookup error should not change the message outcome.
@@ -2173,7 +2217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!campaignState.isRunning || campaignState.isPaused || campaignState.inFlight) return;
 
     while (campaignState.currentIndex < campaignState.audience.length &&
-           ['accepted', 'sent', 'delivered', 'read'].includes(campaignState.audience[campaignState.currentIndex].status)) {
+           ['accepted', 'sent', 'delivered', 'read', 'simulated'].includes(campaignState.audience[campaignState.currentIndex].status)) {
       campaignState.currentIndex++;
     }
 
@@ -2251,7 +2295,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let existingLead = state.leads.find(l => l.phone === contact.phone);
     if (existingLead) {
-      existingLead.messages.push(crmMessage);
+      if (!existingLead.messages.some(m => m.waMessageId === crmMessage.waMessageId)) existingLead.messages.push(crmMessage);
       existingLead.lastActive = 'Just now';
       existingLead.status = 'sent';
     } else {
@@ -3195,6 +3239,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Connect WhatsApp Number Modal Event Listeners
   if (els.connectedNumberPill) els.connectedNumberPill.addEventListener('click', openConnectWaModal);
+  if (els.campaignConnectionStatus) els.campaignConnectionStatus.addEventListener('click', openConnectWaModal);
   if (els.closeConnectWaModalBtn) els.closeConnectWaModalBtn.addEventListener('click', closeConnectWaModal);
   if (els.cancelConnectWaBtn) els.cancelConnectWaBtn.addEventListener('click', closeConnectWaModal);
   if (els.saveConnectedWaBtn) els.saveConnectedWaBtn.addEventListener('click', saveConnectedWaNumber);
@@ -4077,11 +4122,15 @@ document.addEventListener('DOMContentLoaded', () => {
     activeAudio.currentTime = 0;
   }
 
-  function playVoiceNote(msgId) {
+  async function playVoiceNote(msgId) {
     const lead = getLead(state.activeLeadId);
     if (!lead) return;
     const msg = lead.messages.find(m => m.id === msgId);
     if (!msg) return;
+    if (!window.NUNNO_OFFLINE_PREVIEW && !msg.audioUrl) {
+      try { await liveInbox.loadMedia(msg); } catch (error) { showToast(error.message); return; }
+      if (!msg.audioUrl) { showToast('Audio is unavailable; this message has no real attachment.'); return; }
+    }
 
     if (activeAudio.msgId === msgId) {
       // Toggle pause if already playing this message
@@ -4133,6 +4182,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function playSyntheticVoice(msgId, durationSec) {
+    if (!window.NUNNO_OFFLINE_PREVIEW) { stopCurrentAudio(); showToast('Audio could not be played.'); return; }
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) {
@@ -4295,6 +4345,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let audioChunks = [];
   let recordTimer = null;
   let recordingSeconds = 0;
+  let recordingLeadId = null;
   let mediaStream = null;
 
   async function startRecordingAudio() {
@@ -4318,6 +4369,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingLeadId = lead.id;
       audioChunks = [];
       recordingSeconds = 0;
 
@@ -4389,6 +4441,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const durationSec = Math.max(1, recordingSeconds);
+    const targetLeadId = recordingLeadId;
     const durationStr = formatSeconds(durationSec);
 
     if (recordTimer) {
@@ -4407,7 +4460,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const audioDataUrl = reader.result;
-        dispatchOutgoingAudioMessage(audioDataUrl, durationStr, durationSec);
+        dispatchOutgoingAudioMessage(audioDataUrl, durationStr, durationSec, targetLeadId);
       };
       reader.readAsDataURL(audioBlob);
 
@@ -4419,7 +4472,10 @@ document.addEventListener('DOMContentLoaded', () => {
     mediaRecorder.stop();
   }
 
-  function dispatchOutgoingAudioMessage(audioUrl, durationStr, durationSeconds) {
+  function dispatchOutgoingAudioMessage(audioUrl, durationStr, durationSeconds, leadId) {
+    if (!window.NUNNO_OFFLINE_PREVIEW) {
+      return liveInbox.sendMedia(audioUrl, { voice: true, duration: durationSeconds, filename: 'voice-note.webm', leadId });
+    }
     const lead = getLead(state.activeLeadId);
     if (!lead) return;
 
@@ -4459,6 +4515,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fallbackSimulatedOrUploadAudio() {
+    if (!window.NUNNO_OFFLINE_PREVIEW) {
+      showToast('Microphone unavailable. Choose an audio file to send instead.');
+      els.audioFileInput?.click();
+      return;
+    }
     const confirmDemo = confirm(
       "Microphone access is not available or blocked in this browser.\n\n" +
       "• Click OK to send a simulated Voice Note ('0:18' Nunno Trading Breakdown)\n" +
@@ -4531,6 +4592,27 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }
 
+  const liveInbox = window.NunnoLiveInbox({ state, getLead, renderList: renderConversationsList, renderChat: renderActiveChat, toast: showToast, stopAudio: stopCurrentAudio });
+  if (!window.NUNNO_OFFLINE_PREVIEW && els.simClientAudioBtn) { els.simClientAudioBtn.hidden = true; els.simClientAudioBtn.style.display = 'none'; }
+  const photoInput = document.createElement('input');
+  photoInput.type = 'file'; photoInput.accept = 'image/png,image/jpeg,image/webp,image/gif'; photoInput.hidden = true;
+  document.body.appendChild(photoInput);
+  const photoButton = document.createElement('button');
+  photoButton.type = 'button'; photoButton.className = 'btn-composer-icon'; photoButton.textContent = '📷'; photoButton.title = 'Send an image';
+  photoButton.setAttribute('aria-label', 'Send an image');
+  els.audioUploadBtn?.after(photoButton);
+  photoButton.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files?.[0]; photoInput.value = '';
+    if (!file) return;
+    if (window.NUNNO_OFFLINE_PREVIEW) { showToast('Image delivery requires the connected local app.'); return; }
+    if (file.size > 10*1024*1024) { showToast('Choose an image up to 10 MB.'); return; }
+    const leadId = state.activeLeadId;
+    const reader = new FileReader();
+    reader.onload = () => liveInbox.sendMedia(reader.result, { filename: file.name, leadId });
+    reader.readAsDataURL(file);
+  });
+
   // Audio Recording & Upload Event Listeners
   if (els.voiceRecordBtn) els.voiceRecordBtn.addEventListener('click', startRecordingAudio);
   if (els.cancelRecordBtn) els.cancelRecordBtn.addEventListener('click', cancelRecordingAudio);
@@ -4601,6 +4683,13 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAgentProfile();
   renderConnectedNumber();
   refreshSenderConnection().catch(() => {});
+  setInterval(() => {
+    if (state.currentUser && !document.hidden && !els.connectWaModal?.classList.contains('open')) {
+      refreshSenderConnection().catch(() => {
+        renderSenderConnection({ is_configured: false, message: 'Cannot reach the WhatsApp service.' });
+      });
+    }
+  }, 10000);
   renderConversationsList();
   renderActiveChat();
   syncDossierUiState();

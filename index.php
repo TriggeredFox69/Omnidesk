@@ -92,7 +92,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
       <div class="connected-number-pill" id="connectedNumberPill" title="Click to view or change your connected WhatsApp number">
         <div class="pulse-circle online"></div>
         <span class="conn-label">Direct WA:</span>
-        <span class="conn-number mono" id="connectedNumberText">+92 304 6588806</span>
+        <span class="conn-number mono" id="connectedNumberText">Checking connection…</span>
       </div>
       <div class="kpi-widget-group">
         <button type="button" class="kpi-stat-pill active" data-filter="all" id="kpiFilterAll">
@@ -184,6 +184,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
             </div>
             <div class="chat-lead-meta">
               <span class="mono text-xs" id="chatLeadPhone">+92 300 8472910</span>
+              <span id="chatPresence" class="chat-presence" aria-live="polite">Online / last seen unavailable</span>
               <span class="lead-closer-text" id="chatLeadCloser">🔒 Hamza Khan</span>
             </div>
           </div>
@@ -422,7 +423,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
           <span style="font-size:22px;">🚀</span>
           <span class="grad-text">WhatsApp Campaign Outreach Studio</span>
         </h2>
-        <p class="text-xs text-muted" style="margin-top:4px;">Send messages from this app through your connected WhatsApp Business number.</p>
+        <p class="text-xs text-muted" style="margin-top:4px;">Link your WhatsApp account, then click Start Outreach Campaign to send your queued messages.</p>
       </div>
       <div id="campaignStatusBadge" class="panel-badge">⚪ Ready to Launch</div>
     </div>
@@ -518,7 +519,7 @@ $templatesJson = json_encode(array_column($config['default_templates'], null, 'i
               <span>⚡ Autonomous Background Outreach Engine</span>
               <span class="badge-role-admin" style="font-size:9.5px;padding:1px 6px;">100% Automated</span>
             </div>
-            <span class="mono text-xs" style="color:var(--cyan);">Sender: +92 304 6588806</span>
+            <button type="button" id="campaignConnectionStatus" class="btn btn-ghost btn-xs" aria-live="polite">Checking WhatsApp connection…</button>
           </div>
           <p class="text-xs text-muted" style="margin:5px 0 0;line-height:1.4;">
             Link your WhatsApp once by scanning a QR code. Start Campaign sends each message automatically from your linked account. Keep this page open while the campaign runs.
@@ -1135,6 +1136,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/whatsapp-app.js?v=6.0"></script>
+  <script src="assets/js/live-inbox.js?v=1"></script>
+  <script src="assets/js/whatsapp-app.js?v=6.3"></script>
 </body>
 </html>

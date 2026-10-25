@@ -1,14 +1,19 @@
 'use strict';
 const http = require('node:http');
 const { timingSafeEqual } = require('node:crypto');
+const { submitOnce } = require('./submit');
+const { installMessageIdCompatibility } = require('./compatibility');
+const { createInbox } = require('./inbox');
+const { readPresence } = require('./presence');
 
 // Dependency injection keeps tests independent of a real WhatsApp account.
-function createService({ createClient, qrImage, token }) {
+function createService({ createClient, qrImage, token, storageFile, makeMedia }) {
   if (!token || token.length < 32) throw new Error('A private bridge token of at least 32 characters is required.');
   let client, starting, phase = 'idle', qr = null, number = '', error = '';
   let sendQueue = Promise.resolve();
   const receipts = new Map();
   const requests = new Map();
+  const inbox = createInbox({ getClient: () => client, storageFile });
   const ackStatus = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';
   const remember = (map, key, value) => {
     map.set(key, value);
@@ -33,15 +38,26 @@ function createService({ createClient, qrImage, token }) {
         } catch (_) { phase = 'error'; error = 'Could not generate the QR code. Try connecting again.'; }
       });
       client.on('authenticated', () => { phase = 'authenticated'; qr = null; });
-      client.on('ready', () => {
-        phase = 'ready'; qr = null; error = '';
-        number = client.info?.wid?.user || '';
+      client.on('ready', async () => {
+        try {
+          await installMessageIdCompatibility(active);
+          if (client !== active) return;
+          phase = 'ready'; qr = null; error = '';
+          number = active.info?.wid?.user || '';
+          inbox.syncRecent().catch(err => console.error('Inbox sync:', err.message));
+        } catch (err) {
+          phase = 'error'; qr = null;
+          error = 'Could not initialize WhatsApp message tracking. Reconnect the sender.';
+          console.error('WhatsApp message adapter failed:', err.message);
+        }
       });
       client.on('auth_failure', () => { phase = 'error'; qr = null; number = ''; error = 'WhatsApp authentication failed. Link your phone again.'; });
       client.on('disconnected', () => { phase = 'disconnected'; qr = null; number = ''; error = 'WhatsApp disconnected. Reconnect to continue.'; });
       client.on('message_ack', (message, ack) => {
         if (message.id?.fromMe) remember(receipts, message.id._serialized, { status: ackStatus(ack), error: ack < 0 ? 'WhatsApp reported delivery failure.' : null });
+        inbox.ingest(message).then(() => inbox.ack(message, ack)).catch(err => console.error('Inbox receipt:', err.message));
       });
+      client.on('message_create', message => { inbox.ingest(message).catch(err => console.error('Inbox message:', err.message)); });
       await client.initialize();
     })().catch(err => {
       phase = 'error'; qr = null;
@@ -52,13 +68,18 @@ function createService({ createClient, qrImage, token }) {
 
   async function send(body) {
     if (typeof body.phone !== 'string' || !/^\d{10,15}$/.test(body.phone) ||
-        typeof body.message !== 'string' || !body.message.trim() || body.message.length > 4096) {
+        typeof body.message !== 'string' || (!body.message.trim() && !body.media) || body.message.length > 4096) {
       throw Object.assign(new Error('A valid recipient and message (1–4096 characters) are required.'), { status: 400 });
+    }
+    if (body.media && (typeof body.media.data !== 'string' || body.media.data.length > 14*1024*1024 ||
+        !/^[A-Za-z0-9+/]+={0,2}$/.test(body.media.data) ||
+        !/^(image\/(png|jpeg|webp|gif)|audio\/[a-z0-9.+-]+)(;.*)?$/i.test(body.media.mimetype || ''))) {
+      throw Object.assign(new Error('Use an image or audio attachment up to 10 MB.'), { status: 400 });
     }
     if (typeof body.request_id !== 'string' || !/^[a-zA-Z0-9_-]{8,120}$/.test(body.request_id)) {
       throw Object.assign(new Error('A send request ID is required.'), { status: 400 });
     }
-    const signature = JSON.stringify([body.phone, body.message]);
+    const signature = require('node:crypto').createHash('sha256').update(JSON.stringify([body.phone, body.message, body.media])).digest('hex');
     if (requests.has(body.request_id)) {
       const prior = requests.get(body.request_id);
       if (prior.signature !== signature) throw Object.assign(new Error('Request ID already used for another message.'), { status: 409 });
@@ -74,8 +95,10 @@ function createService({ createClient, qrImage, token }) {
         requests.delete(body.request_id);
         throw Object.assign(new Error('This number is not registered on WhatsApp.'), { status: 400 });
       }
-      const sent = await client.sendMessage(recipient._serialized, body.message, { sendSeen: false });
-      if (!sent?.id?._serialized) throw new Error('WhatsApp did not confirm message submission. Check the chat before retrying.');
+      const content = body.media ? (makeMedia ? makeMedia(body.media) : new (require('whatsapp-web.js').MessageMedia)(body.media.mimetype, body.media.data, body.media.filename || 'attachment')) : body.message;
+      const sent = await submitOnce(client, recipient._serialized, content, 60000,
+        body.media ? { sendAudioAsVoice: Boolean(body.media.voice && body.media.mimetype.startsWith('audio/')), caption: body.message } : {});
+      await inbox.ingest(sent, body.phone);
       const id = sent.id._serialized;
       if (!receipts.has(id)) remember(receipts, id, { status: ackStatus(sent.ack || 0), error: null });
       return { success: true, dispatch_mode: 'whatsapp_web', from_number: number, to_number: body.phone, message_id: id };
@@ -98,6 +121,9 @@ function createService({ createClient, qrImage, token }) {
     try {
       const url = new URL(req.url, 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/status') { reply(200, snapshot()); return; }
+      if (req.method === 'GET' && url.pathname === '/events') { reply(200, inbox.events(url.searchParams.get('after'))); return; }
+      if (req.method === 'GET' && url.pathname === '/media') { reply(200, await inbox.media(url.searchParams.get('id'))); return; }
+      if (req.method === 'GET' && url.pathname === '/presence') { reply(200, await readPresence(client, url.searchParams.get('phone') || '')); return; }
       if (req.method === 'GET' && url.pathname === '/receipt') {
         const id = url.searchParams.get('id');
         let receipt = receipts.get(id);
@@ -111,12 +137,13 @@ function createService({ createClient, qrImage, token }) {
       let raw = '';
       for await (const chunk of req) {
         raw += chunk;
-        if (Buffer.byteLength(raw) > 32768) throw Object.assign(new Error('Request too large.'), { status: 413 });
+        if (Buffer.byteLength(raw) > 15*1024*1024) throw Object.assign(new Error('Request too large.'), { status: 413 });
       }
       let body;
       try { body = JSON.parse(raw || '{}'); } catch (_) { throw Object.assign(new Error('Invalid JSON.'), { status: 400 }); }
       if (!body || typeof body !== 'object') throw Object.assign(new Error('Invalid request.'), { status: 400 });
       if (url.pathname === '/connect') { connect(); reply(200, snapshot()); return; }
+      if (url.pathname === '/sync-chat') { await inbox.syncChat(body.phone); reply(200, { success: true }); return; }
       if (url.pathname === '/send') { reply(200, await send(body)); return; }
       reply(404, { success: false, message: 'Unknown route.' });
     } catch (err) { reply(err.status || 502, { success: false, message: err.message }); }

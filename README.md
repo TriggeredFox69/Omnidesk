@@ -92,7 +92,11 @@ nunno_whatsapp/
 ## 🛠️ How to Deploy & Use
 
 ### Option 1: Local Usage
-For campaign sending, run the PHP app. Opening `index.html` directly or using a static preview does not execute the PHP sender API:
+
+For offline simulation, double-click `index.html`. For real QR-linked sending without PHP, double-click `start-local-whatsapp.cmd`. See [LOCAL-TEST.md](LOCAL-TEST.md).
+
+For the original PHP-based setup:
+Opening `index.html` directly now runs the offline simulator; it sends no real messages. To test the PHP backend instead:
 ```bash
 php -S localhost:8080 -t .
 ```

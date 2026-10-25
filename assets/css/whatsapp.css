@@ -3176,3 +3176,8 @@ body.theme-dark .chat-transition-spinner { border-color:#38393d;border-top-color
   .dossier-backdrop { z-index:840; }
   .lead-dossier-col { z-index:850; }
 }
+
+.chat-presence{font-size:11px;color:#8696a0;display:block;}
+.presence-online,.presence-typing,.presence-recording{color:#128c7e;}
+.presence-typing::after,.presence-recording::after{content:' ● ● ●';display:inline-block;animation:wa-presence-pulse 1s ease-in-out infinite;}
+@keyframes wa-presence-pulse{50%{opacity:.25;transform:translateY(-2px)}}

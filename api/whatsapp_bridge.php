@@ -9,7 +9,7 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
     $base = rtrim(getenv('WHATSAPP_BRIDGE_URL') ?: 'http://127.0.0.1:3210', '/');
     $curl = curl_init($base . $path);
     curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 3,
-        CURLOPT_TIMEOUT => $path === '/send' ? 90 : 15,
+        CURLOPT_TIMEOUT => $path === '/send' ? 90 : (str_starts_with($path, '/media') ? 35 : 15),
         CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Content-Type: application/json']]);
     if ($body !== null) curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($body)]);
     $raw = curl_exec($curl);
@@ -45,6 +45,14 @@ function handleWhatsAppBridge(string $action, array $input): void {
         if (!$admin) unset($result['qr']);
     } elseif ($action === 'get_send_status') {
         $result = whatsappBridgeRequest('/receipt?id=' . rawurlencode((string) ($input['message_id'] ?? '')));
+    } elseif ($action === 'get_events') {
+        $result = whatsappBridgeRequest('/events?after=' . (int) ($input['after'] ?? 0));
+    } elseif ($action === 'get_media') {
+        $result = whatsappBridgeRequest('/media?id=' . rawurlencode((string) ($input['message_id'] ?? '')));
+    } elseif ($action === 'get_presence') {
+        $result = whatsappBridgeRequest('/presence?phone=' . rawurlencode((string) ($input['phone'] ?? '')));
+    } elseif ($action === 'sync_chat') {
+        $result = whatsappBridgeRequest('/sync-chat', ['phone' => (string) ($input['phone'] ?? '')]);
     } else {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
@@ -56,6 +64,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
         elseif (str_starts_with($phone, '3') && strlen($phone) === 10) $phone = '92' . $phone;
         $result = whatsappBridgeRequest('/send', ['phone' => $phone,
             'message' => (string) ($input['message'] ?? ''),
+            'media' => $input['media'] ?? null,
             'request_id' => (string) ($input['request_id'] ?? '')]);
         if (!empty($result['success'])) {
             $handle = fopen(__DIR__ . '/../data/campaign_logs.json', 'c+');
