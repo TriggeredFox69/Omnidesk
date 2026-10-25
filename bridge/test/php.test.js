@@ -29,14 +29,14 @@ test('PHP adapter authenticates, restricts QR access, normalizes numbers and log
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => server.close());
-  async function run(user, input) {
+  async function run(user, input, useConnectionFile = false) {
     const encode = value => Buffer.from(JSON.stringify(value)).toString('base64');
     fs.writeFileSync(path.join(dir, 'test.php'), `<?php session_start(); $_SESSION['omnidesk_user']=json_decode(base64_decode('${encode(user)}'),true); $_SERVER['REQUEST_METHOD']='POST'; $_POST=json_decode(base64_decode('${encode(input)}'),true); require __DIR__.'/api/direct_sender.php';`);
     const args = process.env.PHP_TEST_EXT_DIR ? ['-d', `extension_dir=${process.env.PHP_TEST_EXT_DIR}`, '-d', 'extension=curl'] : [];
     return new Promise((resolve, reject) => {
       const child = spawn(process.env.PHP_TEST_BIN, [...args, path.join(dir, 'test.php')], {
         windowsHide: true, env: { ...process.env, WHATSAPP_SEND_MODE: 'whatsapp_web',
-          WHATSAPP_BRIDGE_TOKEN: token, WHATSAPP_BRIDGE_URL: `http://127.0.0.1:${server.address().port}` }
+          WHATSAPP_BRIDGE_TOKEN: useConnectionFile ? '' : token, WHATSAPP_BRIDGE_URL: useConnectionFile ? '' : `http://127.0.0.1:${server.address().port}` }
       });
       let out = '', err = '';
       child.stdout.on('data', chunk => out += chunk); child.stderr.on('data', chunk => err += chunk);
@@ -50,6 +50,10 @@ test('PHP adapter authenticates, restricts QR access, normalizes numbers and log
   assert.equal((await run({ role: 'member' }, { action: 'connect_whatsapp' })).success, false);
   assert.equal((await run({ role: 'member' }, { action: 'get_sender_info' })).qr, undefined);
   assert.match((await run({ role: 'admin' }, { action: 'get_sender_info' })).qr, /^data:image/);
+  fs.mkdirSync(path.join(dir, 'data/whatsapp-bridge'));
+  fs.writeFileSync(path.join(dir, 'data/whatsapp-bridge/connection.php'),
+    `<?php return ['url'=>'http://127.0.0.1:${server.address().port}', 'token'=>'${token}'];`);
+  assert.match((await run({ role: 'admin' }, { action: 'get_sender_info' }, true)).qr, /^data:image/);
   assert.equal((await run({ role: 'admin' }, { action: 'send_direct', phone: '03001234567', message: 'Test', request_id: 'test-request' })).success, true);
   assert.equal(recipient, '923001234567');
   assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'data/campaign_logs.json'))).length, 1);

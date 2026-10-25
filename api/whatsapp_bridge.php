@@ -1,15 +1,25 @@
 <?php
 /** Private PHP-to-Node adapter. Never expose the bridge token to the browser. */
 function whatsappBridgeRequest(string $path, ?array $body = null): array {
+    // Private per-server configuration, uploaded separately from Git.
+    $connectionFile = __DIR__ . '/../data/whatsapp-bridge/connection.php';
+    $connection = is_readable($connectionFile) ? require $connectionFile : [];
+    if (!is_array($connection)) $connection = [];
     $tokenFile = __DIR__ . '/../data/whatsapp-bridge/token';
-    $token = getenv('WHATSAPP_BRIDGE_TOKEN') ?: (is_readable($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    $token = getenv('WHATSAPP_BRIDGE_TOKEN') ?: ($connection['token'] ?? (is_readable($tokenFile) ? trim(file_get_contents($tokenFile)) : ''));
     if (!function_exists('curl_init')) {
         return ['success' => false, 'state' => 'offline', 'message' => 'PHP cURL is disabled on this server. Enable the cURL extension in cPanel PHP settings, then connect again.'];
     }
     if ($token === '') {
         return ['success' => false, 'state' => 'offline', 'message' => 'This hosted app has no WhatsApp bridge token. Start and configure the Node bridge on the server. Your PC connection and saved chats do not transfer with a Git deployment.'];
     }
-    $base = rtrim(getenv('WHATSAPP_BRIDGE_URL') ?: 'http://127.0.0.1:3210', '/');
+    $base = rtrim(getenv('WHATSAPP_BRIDGE_URL') ?: ($connection['url'] ?? 'http://127.0.0.1:3210'), '/');
+    $parts = parse_url($base);
+    $local = in_array($parts['host'] ?? '', ['127.0.0.1', 'localhost', '::1'], true);
+    if (!$parts || empty($parts['host']) || isset($parts['user']) || isset($parts['pass']) ||
+        (!(($parts['scheme'] ?? '') === 'https') && !($local && ($parts['scheme'] ?? '') === 'http'))) {
+        return ['success' => false, 'state' => 'offline', 'message' => 'The remote WhatsApp bridge requires a valid HTTPS address.'];
+    }
     $curl = curl_init($base . $path);
     curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 3,
         CURLOPT_TIMEOUT => $path === '/send' ? 90 : (str_starts_with($path, '/media') ? 35 : 15),

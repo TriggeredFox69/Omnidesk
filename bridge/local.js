@@ -8,7 +8,7 @@ const { spawn } = require('node:child_process');
 const { createService } = require('./service');
 const root = path.resolve(__dirname, '..');
 
-async function startLocal({ createClient, qrImage, port = 8080, openBrowser = true } = {}) {
+async function startLocal({ createClient, qrImage, port = 8080, openBrowser = true, bridgePort = 0, bridgeToken } = {}) {
   let restoreSession = false;
   if (!createClient) {
     const { Client, LocalAuth } = require('whatsapp-web.js');
@@ -21,11 +21,14 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       puppeteer: { headless: true, ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {}) } });
     qrImage = value => QRCode.toDataURL(value, { width: 280, margin: 2 });
   }
-  const token = randomBytes(32).toString('hex');
+  const token = bridgeToken || randomBytes(32).toString('hex');
   const session = randomBytes(32).toString('hex');
   const bridge = createService({ createClient, qrImage, token,
     storageFile: openBrowser === false && port === 0 ? undefined : path.join(root, 'data/whatsapp-bridge/local/inbox.json') });
-  await new Promise(resolve => bridge.server.listen(0, '127.0.0.1', resolve));
+  await new Promise((resolve, reject) => {
+    bridge.server.once('error', reject);
+    bridge.server.listen(bridgePort, '127.0.0.1', resolve);
+  });
   if (restoreSession) bridge.connect();
   const bridgeUrl = `http://127.0.0.1:${bridge.server.address().port}`;
   const user = { id: 'local-admin', name: 'Local Tester', username: 'local', role: 'admin' };

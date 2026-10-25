@@ -38,6 +38,23 @@ The offline simulator never needs the Node bridge. Real WhatsApp sending cannot 
 
 ## Moving from this PC to cPanel
 
+### Temporary PC connection for PHP-only hosting
+
+Install Cloudflare's official `cloudflared` executable, either on PATH or at
+`%LOCALAPPDATA%\NunnoTools\cloudflared.exe`. Close the regular local launcher,
+then run `start-online-whatsapp.cmd`. It starts the same local app and saved
+WhatsApp session, with an authenticated bridge on loopback port 3210. Only that
+bridge is tunneled; the local automatic-login page on port 8080 is not exposed.
+
+Deploy the updated `api/whatsapp_bridge.php`, then upload the generated private
+`data/whatsapp-bridge/pc-connection/connection.php` to the website's
+`data/whatsapp-bridge/connection.php`. Do not commit this file or its token to Git.
+The hosted app then reads the PC's saved inbox and uses its linked account.
+Keep the PC awake, online, and the launcher running. Closing it disconnects the
+hosted sender. Quick Tunnel addresses change after a restart; re-upload the newly
+generated connection file each time. This is a temporary workaround without an
+uptime guarantee; a named Cloudflare tunnel is needed for a stable address.
+
 Git transfers the app code, not private history or the linked-device session.
 The local inbox is `data/whatsapp-bridge/local/inbox.json`; the hosted bridge uses
 `data/whatsapp-bridge/inbox.json`. Keep a private backup before any migration.
