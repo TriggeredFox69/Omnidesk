@@ -1438,9 +1438,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!text) return;
 
     if (els.sendMsgBtn) els.sendMsgBtn.disabled = true;
-    // Reserve a tab during the click gesture so browser popup blockers do not
-    // prevent the WhatsApp handoff after the API request completes.
-    const whatsappTab = window.open('about:blank', '_blank');
     let sendResult;
     try {
       const response = await fetch('api/direct_sender.php', {
@@ -1450,15 +1447,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       sendResult = await response.json();
       if (!response.ok || !sendResult.success) throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
-      if (sendResult.dispatch_mode === 'whatsapp_handoff' && sendResult.wa_url) {
-        if (whatsappTab) whatsappTab.location.href = sendResult.wa_url;
-        else window.location.href = sendResult.wa_url;
-        showToast('WhatsApp opened with your message. Press Send in WhatsApp to deliver it.');
-        return;
-      }
-      if (whatsappTab) whatsappTab.close();
     } catch (error) {
-      if (whatsappTab) whatsappTab.close();
       showToast(`❌ WhatsApp message was not sent: ${describeSendError(error)}`);
       return;
     } finally {
@@ -2167,22 +2156,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const sendError = describeSendError(error);
       logCampaignTerminal(`❌ Could not send to <strong>${escapeHtml(contact.display)}</strong>: ${escapeHtml(sendError)}`, 'error');
       showToast(`❌ WhatsApp send failed: ${sendError}`);
-      return;
-    }
-
-    // A campaign runs outside a browser click gesture, so browsers may block
-    // automatic WhatsApp tabs. Stop here and give the operator an explicit link.
-    if (sendResult.dispatch_mode === 'whatsapp_handoff' && sendResult.wa_url) {
-      campaignState.isRunning = false;
-      campaignState.isPaused = false;
-      contact.status = 'ready';
-      if (statusEl) statusEl.innerHTML = '<span style="color:#eab308;font-weight:700;">Awaiting WhatsApp send</span>';
-      if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
-      if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
-      if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
-      if (els.campaignStatusBadge) els.campaignStatusBadge.textContent = 'WhatsApp handoff required';
-      logCampaignTerminal(`📲 <strong>${escapeHtml(contact.display)}</strong>: <a href="${escapeHtml(sendResult.wa_url)}" target="_blank" rel="noopener">Open WhatsApp and send this message</a>. Campaign sending requires the WhatsApp Business Cloud API to run automatically.`, 'warn');
-      showToast('Open the WhatsApp link and press Send. Configure the Cloud API for automatic campaigns.');
       return;
     }
 

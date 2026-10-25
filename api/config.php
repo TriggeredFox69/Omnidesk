@@ -14,10 +14,10 @@ return [
     'support_email'   => 'numeniousnexus@gmail.com',
     'official_wa'     => '+923000000000',
 
-    // Direct Connected WhatsApp Sender (Direct device/web connection — No WhatsApp API)
+    // WhatsApp Business Cloud API sender (credentials are set in PHP server environment)
     'connected_whatsapp_number' => '+923046588806',
     'sender_engine' => [
-        'mode'               => 'direct_device', // Direct WhatsApp Sender (No Meta Cloud API)
+        'mode'               => 'whatsapp_cloud_api',
         'anti_ban_delay_min' => 4,               // Anti-ban delay min (seconds)
         'anti_ban_delay_max' => 8,               // Anti-ban delay max (seconds)
     ],

@@ -1,7 +1,7 @@
 <?php
 /**
  * Nunno WhatsApp — Direct WhatsApp Sender Engine
- * Direct Number Connection (No Meta Cloud API)
+ * WhatsApp Business Cloud API sender
  */
 
 header('Content-Type: application/json');
@@ -34,7 +34,7 @@ if ($action === 'get_sender_info') {
         'success'          => true,
         'connected_number' => $currentNumber,
         'is_connected'     => !empty($currentNumber),
-        'mode'             => $cloudConfigured ? 'whatsapp_cloud_api' : 'whatsapp_handoff',
+        'mode'             => $cloudConfigured ? 'whatsapp_cloud_api' : 'not_configured',
         'is_configured'    => $cloudConfigured
     ]);
     exit;
@@ -104,17 +104,9 @@ if ($action === 'send_direct') {
         exit;
     }
 
-    // When Cloud API credentials are absent, hand off to the user's real WhatsApp
-    // session with a prefilled chat. WhatsApp requires the user to press Send.
     if (!$phoneNumberId || !$accessToken || !$graphVersion) {
-        $waUrl = 'https://wa.me/' . rawurlencode($cleanRecipient) . '?text=' . rawurlencode($message);
-        echo json_encode([
-            'success' => true,
-            'dispatch_mode' => 'whatsapp_handoff',
-            'to_number' => $cleanRecipient,
-            'wa_url' => $waUrl,
-            'message' => 'WhatsApp opened with your message. Press Send in WhatsApp to deliver it.'
-        ]);
+        http_response_code(503);
+        echo json_encode(['success' => false, 'message' => 'Automatic sending is not connected. Configure WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ACCESS_TOKEN, and WHATSAPP_GRAPH_API_VERSION on the PHP server. This app sends through the WhatsApp Business API; it cannot send from a personal WhatsApp session.']);
         exit;
     }
     if (!preg_match('/^v[0-9]+\\.[0-9]+$/', $graphVersion)) {
