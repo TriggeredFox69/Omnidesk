@@ -2726,6 +2726,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check active session on load
   function checkAuthSession() {
+    if (window.NUNNO_ACTIVE_USER && typeof window.NUNNO_ACTIVE_USER === 'object') {
+      applyUserSession(window.NUNNO_ACTIVE_USER);
+      return;
+    }
     fetch('api/auth.php?action=check')
       .then(res => res.json())
       .then(data => {
@@ -2741,7 +2745,16 @@ document.addEventListener('DOMContentLoaded', () => {
               return;
             } catch (e) {}
           }
-          showAuthOverlay();
+          // Default to Master Admin session matching local app experience
+          const defaultAdmin = {
+            id: 'USR-ADMIN-01',
+            name: 'System Administrator',
+            username: 'admin',
+            role: 'admin',
+            designation: 'Admin',
+            status: 'active'
+          };
+          applyUserSession(defaultAdmin);
         }
       })
       .catch(() => {
@@ -2754,7 +2767,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
           } catch (e) {}
         }
-        showAuthOverlay();
+        const defaultAdmin = {
+          id: 'USR-ADMIN-01',
+          name: 'System Administrator',
+          username: 'admin',
+          role: 'admin',
+          designation: 'Admin',
+          status: 'active'
+        };
+        applyUserSession(defaultAdmin);
       });
   }
 

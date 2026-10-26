@@ -48,7 +48,9 @@ $defaultLeads = [
             ['sender' => 'agent', 'agentName' => 'Hamza Khan', 'text' => 'Salam Zeeshan Bhai! Nunno AI Cloud ne Pakistan ke crypto traders ke liye Liquidation Magnet System launch kiya hai jo exact level pehle dikhata hai jahan whales target kar rahi hain. 30% OFF offer available hai!', 'time' => '10:15 AM'],
             ['sender' => 'lead', 'text' => 'Assalam o alaikum bhai, EasyPaisa se payment ho sakti hai? Aur breakout alert kitne symbols pe aata hai?', 'time' => '10:32 AM'],
             ['sender' => 'agent', 'agentName' => 'Hamza Khan', 'text' => 'Ji bilkul Zeeshan Bhai! EasyPaisa, JazzCash aur USDT teenon supported hain. Pro plan mein 12-layer multi-symbol alerts live aate hain.', 'time' => '10:35 AM'],
-            ['sender' => 'lead', 'text' => 'Theek hai, mujhe EasyPaisa account number share kar dein, main abhi activate karwana chahta hoon.', 'time' => '10:40 AM']
+            ['sender' => 'lead', 'text' => 'Theek hai, mujhe EasyPaisa account number share kar dein, main abhi activate karwana chahta hoon.', 'time' => '10:40 AM'],
+            ['id' => 'msg_lead1_vn1', 'sender' => 'lead', 'type' => 'audio', 'duration' => '0:24', 'durationSeconds' => 24, 'text' => '🎙️ Voice note (0:24)', 'time' => '10:41 AM'],
+            ['id' => 'msg_lead1_vn2', 'sender' => 'agent', 'agentName' => 'Hamza Khan', 'type' => 'audio', 'duration' => '0:18', 'durationSeconds' => 18, 'text' => '🎙️ Voice note (0:18)', 'time' => '10:42 AM']
         ]
     ],
     [
@@ -68,7 +70,8 @@ $defaultLeads = [
         'messages' => [
             ['sender' => 'agent', 'agentName' => 'System Outreach', 'text' => '⚡ FLASH 48-HOUR TRADER PASS: Bilal Bhai, Nunno Pro pe flat 40% discount chal raha hai. EasyPaisa / JazzCash instant accepted: nunno.cloud', 'time' => '09:00 AM'],
             ['sender' => 'lead', 'text' => 'AoA bhai, kya isme Gold ($XAUUSD) ke liquidation wicks bhi detect hote hain?', 'time' => '09:45 AM'],
-            ['sender' => 'lead', 'text' => 'Mujhe demo video ya coupon code send karein.', 'time' => '09:46 AM']
+            ['sender' => 'lead', 'text' => 'Mujhe demo video ya coupon code send karein.', 'time' => '09:46 AM'],
+            ['id' => 'msg_lead2_vn1', 'sender' => 'lead', 'type' => 'audio', 'duration' => '0:35', 'durationSeconds' => 35, 'text' => '🎙️ Voice note (0:35)', 'time' => '09:48 AM']
         ]
     ],
     [

