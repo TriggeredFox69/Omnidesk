@@ -356,9 +356,17 @@ switch ($action) {
         ], JSON_PRETTY_PRINT);
         break;
 
+    case 'git_pull':
+        $gitPath = trim((string) @shell_exec('which git 2>&1')) ?: 'git';
+        $cmd = "cd " . escapeshellarg($baseDir) . " && " . escapeshellarg($gitPath) . " pull origin main 2>&1";
+        $out = shell_exec($cmd);
+        echo json_encode(['success' => true, 'output' => trim($out), 'cmd' => $cmd]);
+        break;
+
     case 'test_node':
-        $res = shell_exec(escapeshellarg($nodePath) . " -e \"console.log('Node test: OK, Node version: ' + process.version);\" 2>&1");
-        echo json_encode(['result' => trim($res)]);
+        $nodeVer = shell_exec(escapeshellarg($nodePath) . " -v 2>&1");
+        $ffmpeg = shell_exec("which ffmpeg 2>&1") ?: 'none';
+        echo json_encode(['node' => trim($nodeVer), 'ffmpeg' => trim($ffmpeg)]);
         break;
 
     default:
