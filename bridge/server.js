@@ -6,7 +6,10 @@ const QRCode = require('qrcode');
 const { createService } = require('./service');
 const { BaileysClient } = require('./baileys-client');
 
-const dataPath = path.resolve(__dirname, '../data/whatsapp-bridge');
+const dataPath = process.env.WHATSAPP_DATA_DIR ||
+  (fs.existsSync(path.resolve(__dirname, '../data'))
+    ? path.resolve(__dirname, '../data/whatsapp-bridge')
+    : path.resolve(__dirname, '../../data/whatsapp-bridge'));
 fs.mkdirSync(dataPath, { recursive: true, mode: 0o700 });
 const tokenPath = path.join(dataPath, 'token');
 if (!process.env.WHATSAPP_BRIDGE_TOKEN && !fs.existsSync(tokenPath)) {

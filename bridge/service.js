@@ -67,14 +67,35 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
   }
 
   async function send(body) {
-    if (typeof body.phone !== 'string' || !/^\d{10,15}$/.test(body.phone) ||
-        typeof body.message !== 'string' || (!body.message.trim() && !body.media) || body.message.length > 4096) {
-      throw Object.assign(new Error('A valid recipient and message (1–4096 characters) are required.'), { status: 400 });
+    if (!body || typeof body !== 'object') {
+      throw Object.assign(new Error('Invalid send payload.'), { status: 400 });
     }
-    if (body.media && (typeof body.media.data !== 'string' || body.media.data.length > 14*1024*1024 ||
-        !/^[A-Za-z0-9+/]+={0,2}$/.test(body.media.data) ||
-        !/^(image\/(png|jpeg|webp|gif)|audio\/[a-z0-9.+-]+)(;.*)?$/i.test(body.media.mimetype || ''))) {
-      throw Object.assign(new Error('Use an image or audio attachment up to 10 MB.'), { status: 400 });
+    let cleanPhone = String(body.phone || '').replace(/\D/g, '');
+    if (cleanPhone.startsWith('0092')) cleanPhone = cleanPhone.slice(2);
+    else if (cleanPhone.startsWith('03') && cleanPhone.length === 11) cleanPhone = '92' + cleanPhone.slice(1);
+    else if (cleanPhone.startsWith('3') && cleanPhone.length === 10) cleanPhone = '92' + cleanPhone;
+    body.phone = cleanPhone;
+
+    if (!cleanPhone || !/^\d{10,15}$/.test(cleanPhone)) {
+      throw Object.assign(new Error('A valid recipient phone number (10–15 digits) is required.'), { status: 400 });
+    }
+    if (typeof body.message !== 'string') body.message = '';
+    if (!body.message.trim() && !body.media) {
+      throw Object.assign(new Error('A message or media attachment is required.'), { status: 400 });
+    }
+    if (body.message.length > 4096) {
+      throw Object.assign(new Error('Message text must not exceed 4096 characters.'), { status: 400 });
+    }
+
+    if (body.media) {
+      if (typeof body.media.data !== 'string' || body.media.data.length > 14*1024*1024) {
+        throw Object.assign(new Error('Attachment must be up to 10 MB.'), { status: 400 });
+      }
+      body.media.data = body.media.data.replace(/\s+/g, '');
+      const validMime = /^(image\/(png|jpeg|webp|gif)|audio\/[a-z0-9.+-]+|application\/(pdf|msword|vnd\.[a-z0-9.-]+|zip|octet-stream)|text\/[a-z0-9.+-]+)(;.*)?$/i.test(body.media.mimetype || '');
+      if (!validMime) {
+        throw Object.assign(new Error('Supported attachments: images, voice/audio notes, and documents (PDF, Word, Excel, text) up to 10 MB.'), { status: 400 });
+      }
     }
     if (typeof body.request_id !== 'string' || !/^[a-zA-Z0-9_-]{8,120}$/.test(body.request_id)) {
       throw Object.assign(new Error('A send request ID is required.'), { status: 400 });

@@ -31,6 +31,25 @@ function saveStoredLeads($dataFile, $leads) {
 // Default initial leads if data/leads.json doesn't exist yet
 $defaultLeads = [
     [
+        'id' => 'lead_self',
+        'name' => 'My WhatsApp (Self Test)',
+        'phone' => '923046588806',
+        'display' => '+92 304 6588806',
+        'city' => 'Connected Number',
+        'network' => 'WhatsApp',
+        'ownerId' => 'USR-ADMIN-01',
+        'ownerName' => 'System Administrator',
+        'leadState' => 'ongoing',
+        'status' => 'replied',
+        'unreadCount' => 0,
+        'interest' => 'Live Delivery Verification',
+        'lastActive' => 'Just now',
+        'notes' => 'Personal test chat. Any message, voice memo, or document sent here arrives instantly on your linked phone.',
+        'messages' => [
+            ['sender' => 'lead', 'text' => '⚡ This is your personal linked WhatsApp chat (+92 304 6588806). Send any message, voice memo, or document to see it arrive directly on your phone!', 'time' => '12:00 PM']
+        ]
+    ],
+    [
         'id' => 'lead_1',
         'name' => 'Zeeshan Tariq',
         'phone' => '923008472910',
@@ -220,7 +239,16 @@ if ($action === 'update_lead') {
 
     $found = false;
     foreach ($currentLeads as &$lead) {
-        if ($lead['id'] === $leadId) {
+            if (isset($input['phone'])) {
+                $cleanP = preg_replace('/\D+/', '', $input['phone']);
+                if (str_starts_with($cleanP, '0092')) $cleanP = substr($cleanP, 2);
+                elseif (str_starts_with($cleanP, '03') && strlen($cleanP) === 11) $cleanP = '92' . substr($cleanP, 1);
+                elseif (str_starts_with($cleanP, '3') && strlen($cleanP) === 10) $cleanP = '92' . $cleanP;
+                if (!empty($cleanP)) {
+                    $lead['phone'] = $cleanP;
+                    $lead['display'] = '+' . $cleanP;
+                }
+            }
             if (isset($input['leadState'])) $lead['leadState'] = $input['leadState'];
             if (isset($input['status'])) $lead['status'] = $input['status'];
             if (array_key_exists('ownerId', $input)) $lead['ownerId'] = $input['ownerId'];
@@ -261,6 +289,50 @@ if ($action === 'update_lead') {
     } else {
         echo json_encode(['success' => false, 'message' => 'Lead not found']);
     }
+    exit;
+}
+
+// 2b. Add Custom Lead / Start New Chat
+if ($action === 'add_lead') {
+    $rawPhone = $input['phone'] ?? '';
+    $name = trim($input['name'] ?? 'New Contact');
+    $cleanPhone = preg_replace('/\D+/', '', $rawPhone);
+    if (str_starts_with($cleanPhone, '0092')) $cleanPhone = substr($cleanPhone, 2);
+    elseif (str_starts_with($cleanPhone, '03') && strlen($cleanPhone) === 11) $cleanPhone = '92' . substr($cleanPhone, 1);
+    elseif (str_starts_with($cleanPhone, '3') && strlen($cleanPhone) === 10) $cleanPhone = '92' . $cleanPhone;
+
+    if (strlen($cleanPhone) < 10) {
+        echo json_encode(['success' => false, 'message' => 'Valid phone number is required (at least 10 digits).']);
+        exit;
+    }
+
+    foreach ($currentLeads as $existing) {
+        if ($existing['phone'] === $cleanPhone) {
+            echo json_encode(['success' => true, 'lead' => $existing, 'existing' => true]);
+            exit;
+        }
+    }
+
+    $newLead = [
+        'id' => 'lead_' . bin2hex(random_bytes(6)),
+        'name' => $name,
+        'phone' => $cleanPhone,
+        'display' => '+' . $cleanPhone,
+        'city' => 'Pakistan',
+        'network' => 'WhatsApp',
+        'ownerId' => 'USR-ADMIN-01',
+        'ownerName' => 'System Administrator',
+        'leadState' => 'ongoing',
+        'status' => 'replied',
+        'unreadCount' => 0,
+        'interest' => 'Direct Outreach',
+        'lastActive' => 'Just now',
+        'notes' => 'Custom contact added for direct WhatsApp communication.',
+        'messages' => []
+    ];
+    array_unshift($currentLeads, $newLead);
+    saveStoredLeads($dataFile, $currentLeads);
+    echo json_encode(['success' => true, 'lead' => $newLead, 'message' => 'New chat created successfully!']);
     exit;
 }
 

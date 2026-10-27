@@ -6,7 +6,7 @@
 const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const fs = require('node:fs');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 
 class BaileysClient extends EventEmitter {
@@ -69,16 +69,41 @@ class BaileysClient extends EventEmitter {
         if (!msg.message) continue;
         const fromMe = Boolean(msg.key?.fromMe);
         const jid = msg.key?.remoteJid || '';
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+        const text = msg.message.conversation ||
+          msg.message.extendedTextMessage?.text ||
+          msg.message.imageMessage?.caption ||
+          msg.message.documentMessage?.caption ||
+          msg.message.documentMessage?.title ||
+          '';
+
+        const isAudio = Boolean(msg.message.audioMessage);
+        const isImage = Boolean(msg.message.imageMessage);
+        const isDoc = Boolean(msg.message.documentMessage);
+        const type = isAudio ? 'audio' : (isImage ? 'image' : (isDoc ? 'document' : 'chat'));
 
         const adaptedMsg = {
-          id: { _serialized: msg.key.id, fromMe },
+          id: { _serialized: msg.key.id, fromMe, remote: jid },
           from: jid,
           to: fromMe ? jid : `${this.info.wid.user}@s.whatsapp.net`,
           body: text,
           timestamp: Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)),
-          hasMedia: Boolean(msg.message.imageMessage || msg.message.audioMessage),
-          type: msg.message.audioMessage ? 'audio' : (msg.message.imageMessage ? 'image' : 'chat')
+          hasMedia: Boolean(isAudio || isImage || isDoc),
+          type,
+          downloadMedia: async () => {
+            try {
+              const buffer = await downloadMediaMessage(msg, 'buffer', {});
+              const mime = msg.message.imageMessage?.mimetype ||
+                msg.message.audioMessage?.mimetype ||
+                msg.message.documentMessage?.mimetype ||
+                'application/octet-stream';
+              const filename = msg.message.documentMessage?.fileName ||
+                (type === 'image' ? 'image.jpg' : (type === 'audio' ? 'voice.ogg' : 'document.pdf'));
+              return { data: buffer.toString('base64'), mimetype: mime, filename };
+            } catch (err) {
+              console.error('[Baileys] Media download failed:', err.message);
+              return null;
+            }
+          }
         };
         this.emit('message_create', adaptedMsg);
       }
@@ -90,36 +115,66 @@ class BaileysClient extends EventEmitter {
         if (update.update?.status) {
           const status = update.update.status;
           const ack = status >= 4 ? 3 : (status === 3 ? 2 : 1);
-          this.emit('message_ack', { id: { _serialized: update.key.id, fromMe: update.key.fromMe } }, ack);
+          const remoteJid = update.key?.remoteJid || '';
+          this.emit('message_ack', {
+            id: { _serialized: update.key.id, fromMe: update.key.fromMe, remote: remoteJid },
+            fromMe: update.key.fromMe,
+            from: remoteJid,
+            to: remoteJid
+          }, ack);
         }
       }
     });
   }
 
+  _normalizeJid(jidOrPhone) {
+    let raw = String(jidOrPhone || '').trim();
+    if (raw.endsWith('@s.whatsapp.net') || raw.endsWith('@c.us')) {
+      raw = raw.split('@')[0];
+    }
+    raw = raw.replace(/\D/g, '');
+    if (raw.startsWith('0092')) raw = raw.slice(2);
+    else if (raw.startsWith('03') && raw.length === 11) raw = '92' + raw.slice(1);
+    else if (raw.startsWith('3') && raw.length === 10) raw = '92' + raw;
+    return `${raw}@s.whatsapp.net`;
+  }
+
   async getNumberId(phone) {
     if (!this.sock) return null;
     const cleanPhone = phone.replace(/\D/g, '');
+    let norm = cleanPhone;
+    if (norm.startsWith('0092')) norm = norm.slice(2);
+    else if (norm.startsWith('03') && norm.length === 11) norm = '92' + norm.slice(1);
+    else if (norm.startsWith('3') && norm.length === 10) norm = '92' + norm;
+
     try {
-      const [result] = await this.sock.onWhatsApp(cleanPhone);
-      if (result?.exists) return { _serialized: result.jid };
+      const [result] = await this.sock.onWhatsApp(norm);
+      if (result && result.exists) return { _serialized: result.jid };
+      if (result && result.exists === false) return null;
     } catch (_) {}
-    return { _serialized: `${cleanPhone}@s.whatsapp.net` };
+    return { _serialized: `${norm}@s.whatsapp.net` };
   }
 
   async sendMessage(toJid, content, options = {}) {
     if (!this.sock) throw new Error('WhatsApp connection is not initialized.');
-    const jid = toJid.includes('@') ? toJid : `${toJid}@s.whatsapp.net`;
+    const jid = this._normalizeJid(toJid);
     let sent;
+    const isVoice = Boolean(options.sendAudioAsVoice || (content?.mimetype?.startsWith('audio/') && options.voice));
+
+    console.log(`[Baileys] Sending to ${jid}: ${typeof content === 'string' ? content.slice(0, 40) : (isVoice ? 'Voice Note' : (content?.mimetype || 'media'))}`);
 
     if (typeof content === 'string') {
       sent = await this.sock.sendMessage(jid, { text: content });
     } else if (content && content.data && content.mimetype) {
       const buffer = Buffer.from(content.data, 'base64');
-      const isVoice = Boolean(options.sendAudioAsVoice || (content.mimetype.startsWith('audio/') && options.voice));
       if (isVoice) {
+        // WhatsApp PTT requires audio/ogg; codecs=opus for standard mobile voice message playback
+        const mime = (content.mimetype && content.mimetype.includes('ogg'))
+          ? content.mimetype
+          : 'audio/ogg; codecs=opus';
         sent = await this.sock.sendMessage(jid, {
           audio: buffer,
-          mimetype: 'audio/mp4',
+          mimetype: mime,
           ptt: true
         });
       } else if (content.mimetype.startsWith('image/')) {
@@ -128,10 +183,11 @@ class BaileysClient extends EventEmitter {
           caption: options.caption || ''
         });
       } else {
+        // Document sending (PDF, Word, Excel, text)
         sent = await this.sock.sendMessage(jid, {
           document: buffer,
-          mimetype: content.mimetype,
-          fileName: content.filename || 'attachment',
+          mimetype: content.mimetype || 'application/pdf',
+          fileName: content.filename || 'document.pdf',
           caption: options.caption || ''
         });
       }
@@ -140,8 +196,20 @@ class BaileysClient extends EventEmitter {
     }
 
     const id = sent?.key?.id || `BAIL_${Date.now()}`;
+    const myNum = this.info?.wid?.user || '';
+    console.log(`[Baileys] Message sent successfully! ID: ${id} to ${jid}`);
+
     return {
-      id: { _serialized: id, fromMe: true },
+      id: { _serialized: id, fromMe: true, remote: jid },
+      fromMe: true,
+      from: `${myNum}@s.whatsapp.net`,
+      to: jid,
+      body: typeof content === 'string'
+        ? content
+        : (options.caption || (isVoice ? 'Voice note' : (content.mimetype?.startsWith('image/') ? 'Image' : (content.filename || 'Document')))),
+      type: isVoice ? 'audio' : (content.mimetype?.startsWith('image/') ? 'image' : (content.mimetype ? 'document' : 'chat')),
+      hasMedia: Boolean(content && content.data),
+      timestamp: Math.floor(Date.now() / 1000),
       ack: 1
     };
   }

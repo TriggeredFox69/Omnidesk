@@ -25,12 +25,21 @@ function createInbox({ getClient, storageFile }) {
   }
   async function phoneFor(id) {
     if (!id || /@(g\.us|broadcast|newsletter)$/.test(id)) return null;
-    if (id.endsWith('@c.us')) return id.split('@')[0];
+    if (id.endsWith('@c.us') || id.endsWith('@s.whatsapp.net')) return id.split('@')[0].split(':')[0];
     if (aliases.has(id)) return aliases.get(id);
-    const list = await getClient().getContactLidAndPhone([id]);
-    const pn = list?.[0]?.pn;
-    if (!pn) return null;
-    const phone = pn.split('@')[0]; aliases.set(id, phone); return phone;
+    if (getClient() && typeof getClient().getContactLidAndPhone === 'function') {
+      try {
+        const list = await getClient().getContactLidAndPhone([id]);
+        const pn = list?.[0]?.pn;
+        if (pn) {
+          const phone = pn.split('@')[0].split(':')[0];
+          aliases.set(id, phone);
+          return phone;
+        }
+      } catch (_) {}
+    }
+    const clean = id.split('@')[0].split(':')[0].replace(/\D/g, '');
+    return clean || null;
   }
   async function ingest(message, knownPhone) {
     const id = message.id?._serialized;
@@ -38,11 +47,11 @@ function createInbox({ getClient, storageFile }) {
     const fromMe = Boolean(message.fromMe || message.id.fromMe);
     const phone = knownPhone || await phoneFor(message.id.remote?._serialized || message.id.remote || (fromMe ? message.to : message.from));
     if (!phone || !/^\d{10,15}$/.test(phone)) return;
-    const type = ['ptt', 'audio'].includes(message.type) ? 'audio' : message.type === 'image' ? 'image' : 'text';
+    const type = ['ptt', 'audio'].includes(message.type) ? 'audio' : message.type === 'image' ? 'image' : (message.type === 'document' ? 'document' : 'text');
     const previous = messages.get(id);
     const value = { id: 'wa_' + createHash('sha256').update(id).digest('hex').slice(0,24), waMessageId: id,
       phone, name: message._data?.notifyName || phone, sender: fromMe ? 'agent' : 'lead',
-      agentName: fromMe ? 'WhatsApp' : undefined, type, text: message.body || (type === 'audio' ? 'Voice note' : type === 'image' ? 'Image' : ''),
+      agentName: fromMe ? 'WhatsApp' : undefined, type, text: message.body || (type === 'audio' ? 'Voice note' : type === 'image' ? 'Image' : (type === 'document' ? 'Document' : '')),
       timestamp: Number(message.timestamp) || Math.floor(Date.now()/1000), hasMedia: Boolean(message.hasMedia),
       durationSeconds: Number(message._data?.duration) || 0,
       deliveryStatus: fromMe ? statusOf(message.ack || 0) : undefined };
@@ -66,7 +75,7 @@ function createInbox({ getClient, storageFile }) {
   }
   async function syncRecent() {
     if (!getClient().getChats) return;
-    const chats = (await getClient().getChats()).filter(c => !c.isGroup && /@(c\.us|lid)$/.test(c.id?._serialized || '')).sort((a,b) => b.timestamp-a.timestamp).slice(0,20);
+    const chats = (await getClient().getChats()).filter(c => !c.isGroup && /@(c\.us|lid|s\.whatsapp\.net)$/.test(c.id?._serialized || '')).sort((a,b) => b.timestamp-a.timestamp).slice(0,20);
     for (const chat of chats) {
       try {
         const phone = await phoneFor(chat.id._serialized);
@@ -83,8 +92,8 @@ function createInbox({ getClient, storageFile }) {
     const message = await getClient().getMessageById(id);
     if (!message?.hasMedia) throw new Error('Attachment is unavailable.');
     const m = await downloadAttachment(getClient(), message);
-    if (!m?.data || m.data.length > 14*1024*1024 || !/^(image\/(png|jpeg|webp|gif)|audio\/[a-z0-9.+-]+)(;.*)?$/i.test(m.mimetype)) throw new Error('Attachment is unavailable, unsupported, or exceeds 10 MB.');
-    return { success: true, data_url: `data:${m.mimetype};base64,${m.data}`, filename: m.filename || '' };
+    if (!m?.data || m.data.length > 14*1024*1024) throw new Error('Attachment is unavailable or exceeds 10 MB.');
+    return { success: true, data_url: `data:${m.mimetype || 'application/octet-stream'};base64,${m.data}`, filename: m.filename || '' };
   }
   return { ingest, ack, syncChat, syncRecent, media,
     events: after => ({ success: true, epoch, cursor: revision, messages: [...messages.values()].filter(m => m.revision > Number(after || 0)) }) };

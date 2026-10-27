@@ -30,6 +30,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // GREEN = Closed (Client has paid!)
   const initialLeads = [
     {
+      id: 'lead_self',
+      name: 'My WhatsApp (Self Test)',
+      phone: '923046588806',
+      display: '+92 304 6588806',
+      city: 'Rawalpindi / Islamabad',
+      network: 'Jazz',
+      ownerId: 'USR-ADMIN-01',
+      leadState: 'ongoing',
+      status: 'replied',
+      unreadCount: 0,
+      interest: 'Live Delivery Verification',
+      lastActive: 'Just now',
+      notes: 'Connected phone self-testing chat. Messages, voice notes, and docs sent here deliver straight to your linked phone!',
+      messages: [
+        { sender: 'lead', text: '⚡ This is your personal linked WhatsApp chat (+92 304 6588806). Send any message, voice memo, or document to see it arrive directly on your phone!', time: '12:00 PM' }
+      ]
+    },
+    {
       id: 'lead_1',
       name: 'Zeeshan Tariq',
       phone: '923008472910',
@@ -1333,6 +1351,15 @@ document.addEventListener('DOMContentLoaded', () => {
           bubble.innerHTML = `
             ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
             ${msg.type === 'image' ? (msg.imageUrl && /^data:image\/(png|jpeg|webp|gif);base64,/i.test(msg.imageUrl) ? `<a href="${escapeHtml(msg.imageUrl)}" download="whatsapp-image"><img src="${escapeHtml(msg.imageUrl)}" alt="Chat image attachment" style="max-width:280px;max-height:300px;border-radius:10px;display:block;"></a>` : `<div>${escapeHtml(msg.mediaError || 'Loading image…')}</div>`) : ''}
+            ${msg.type === 'document' ? `
+              <div class="msg-doc-card" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);padding:10px 12px;border-radius:10px;margin-bottom:6px;">
+                <span style="font-size:24px;">📄</span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(msg.filename || msg.text || 'WhatsApp Document')}</div>
+                  <div style="font-size:11px;opacity:0.75;">Document Attachment</div>
+                </div>
+                ${msg.docUrl ? `<a href="${escapeHtml(msg.docUrl)}" download="${escapeHtml(msg.filename || 'document')}" class="btn btn-xs" style="padding:4px 8px;background:rgba(255,255,255,0.15);color:#fff;border-radius:6px;text-decoration:none;">⬇</a>` : ''}
+              </div>` : ''}
             <div>${formatText(msg.text)}</div>
             <div class="msg-meta-row">
               <span>${escapeHtml(msg.time)}</span>
@@ -4640,34 +4667,109 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.sendRecordBtn) els.sendRecordBtn.addEventListener('click', sendRecordingAudio);
   if (els.simClientAudioBtn) els.simClientAudioBtn.addEventListener('click', () => simulateClientAudioMessage());
 
-  if (els.audioUploadBtn && els.audioFileInput) {
+  const composerFileInput = document.getElementById('composerFileInput') || els.audioFileInput;
+  if (els.audioUploadBtn && composerFileInput) {
     els.audioUploadBtn.addEventListener('click', () => {
       const lead = getLead(state.activeLeadId);
       if (!lead) {
         showToast('⚠️ Please select a conversation first.');
         return;
       }
-      els.audioFileInput.click();
+      composerFileInput.click();
     });
 
-    els.audioFileInput.addEventListener('change', (e) => {
+    composerFileInput.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
 
+      if (file.size > 10 * 1024 * 1024) {
+        showToast('⚠️ Attachment exceeds maximum 10 MB limit.');
+        return;
+      }
+
+      const leadId = state.activeLeadId;
       const reader = new FileReader();
       reader.onload = (readEvt) => {
         const dataUrl = readEvt.target.result;
-        const tempAudio = new Audio(dataUrl);
-        tempAudio.onloadedmetadata = () => {
-          const sec = Math.round(tempAudio.duration) || 20;
-          dispatchOutgoingAudioMessage(dataUrl, formatSeconds(sec), sec);
-        };
-        tempAudio.onerror = () => {
-          dispatchOutgoingAudioMessage(dataUrl, '0:25', 25);
-        };
+        if (file.type && file.type.startsWith('audio/')) {
+          const tempAudio = new Audio(dataUrl);
+          tempAudio.onloadedmetadata = () => {
+            const sec = Math.round(tempAudio.duration) || 20;
+            dispatchOutgoingAudioMessage(dataUrl, formatSeconds(sec), sec, leadId);
+          };
+          tempAudio.onerror = () => {
+            dispatchOutgoingAudioMessage(dataUrl, '0:25', 25, leadId);
+          };
+        } else {
+          // Documents (PDF, Word, Excel, text) or Images
+          liveInbox.sendMedia(dataUrl, { filename: file.name, caption: file.name, leadId });
+        }
       };
       reader.readAsDataURL(file);
-      els.audioFileInput.value = '';
+      composerFileInput.value = '';
+    });
+  }
+
+  const newChatBtn = document.getElementById('newChatBtn');
+  if (newChatBtn) {
+    newChatBtn.addEventListener('click', async () => {
+      const phoneInput = prompt('Enter WhatsApp phone number to chat with:\n(e.g. 03046588806 or +923046588806)');
+      if (!phoneInput) return;
+      const clean = phoneInput.replace(/\D/g, '');
+      if (clean.length < 10) {
+        showToast('⚠️ Please enter a valid phone number (at least 10 digits).');
+        return;
+      }
+      const nameInput = prompt('Enter contact name:', 'Client ' + clean.slice(-4)) || ('Contact ' + clean.slice(-4));
+      try {
+        const res = await fetch('api/leads_sync.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add_lead', phone: clean, name: nameInput })
+        });
+        const data = await res.json();
+        if (data.lead) {
+          const exists = state.leads.find(l => l.id === data.lead.id || l.phone === data.lead.phone);
+          if (!exists) {
+            state.leads.unshift(data.lead);
+          }
+          state.activeLeadId = data.lead.id;
+          renderConversationsList();
+          renderActiveChat();
+          showToast(`💬 Chat opened with ${data.lead.name} (${data.lead.display || data.lead.phone})!`);
+        } else {
+          showToast(data.message || 'Could not create new chat.');
+        }
+      } catch (err) {
+        showToast('Error creating chat: ' + err.message);
+      }
+    });
+  }
+
+  const editLeadPhoneBtn = document.getElementById('editLeadPhoneBtn');
+  if (editLeadPhoneBtn) {
+    editLeadPhoneBtn.addEventListener('click', async () => {
+      const lead = getLead(state.activeLeadId);
+      if (!lead) return;
+      const newPhone = prompt(`Change phone number for "${lead.name}":`, lead.phone || '');
+      if (!newPhone) return;
+      const clean = newPhone.replace(/\D/g, '');
+      if (clean.length < 10) {
+        showToast('⚠️ Please enter a valid phone number (at least 10 digits).');
+        return;
+      }
+      lead.phone = clean;
+      lead.display = '+' + clean;
+      renderActiveChat();
+      renderConversationsList();
+      try {
+        await fetch('api/leads_sync.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update_lead', id: lead.id, phone: clean })
+        });
+        showToast(`✅ Number updated to +${clean}! Messages will now deliver here.`);
+      } catch (_) {}
     });
   }
 

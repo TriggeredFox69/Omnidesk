@@ -92,15 +92,16 @@
       if (lead.ownerId && lead.ownerId !== user?.id && user?.role !== 'admin') return toast('This conversation is assigned to another agent.');
       if (sendingMedia) return toast('An attachment is already being sent.');
       const match = /^data:([^,]+);base64,(.+)$/s.exec(dataUrl || '');
-      if (!match || match[2].length > 14*1024*1024) return toast('Choose an audio or image file up to 10 MB.');
-      const type = match[1].startsWith('audio/') ? 'audio' : 'image';
+      if (!match || match[2].length > 14*1024*1024) return toast('Choose an attachment up to 10 MB.');
+      const mime = match[1].toLowerCase();
+      const type = mime.startsWith('audio/') ? 'audio' : (mime.startsWith('image/') ? 'image' : 'document');
       const message = { id: 'media_' + crypto.randomUUID(), sender: 'agent', agentName: user?.name || 'Agent',
-        type, text: caption || (type === 'audio' ? 'Voice note' : 'Image'), deliveryStatus: 'sending',
+        type, text: caption || (type === 'audio' ? 'Voice note' : (type === 'image' ? 'Image' : filename || 'Document')), deliveryStatus: 'sending',
         timestamp: Math.floor(Date.now()/1000), time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
-        durationSeconds: duration, [type === 'audio' ? 'audioUrl' : 'imageUrl']: dataUrl };
+        durationSeconds: duration, [type === 'audio' ? 'audioUrl' : (type === 'image' ? 'imageUrl' : 'docUrl')]: dataUrl, filename };
       lead.messages.push(message); sendingMedia = true; renderList(); renderChat();
       try {
-        const result = await api('send_direct', { phone: lead.phone, message: caption, request_id: message.id,
+        const result = await api('send_direct', { phone: lead.phone, message: caption || '', request_id: message.id,
           media: { mimetype: match[1], data: match[2], filename, voice } });
         const observed = lead.messages.find(m => m !== message && m.waMessageId === result.message_id);
         message.waMessageId = result.message_id; message.deliveryStatus = observed?.deliveryStatus || 'accepted';

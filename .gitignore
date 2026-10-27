@@ -25,4 +25,5 @@ data/users.json
 
 # Private linked-device session and Node dependencies
 data/whatsapp-bridge/
+bridge/data/
 bridge/node_modules/
