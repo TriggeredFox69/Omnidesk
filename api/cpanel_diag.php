@@ -2,14 +2,15 @@
 header('Content-Type: application/json');
 
 $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
-$npmPath = '/opt/alt/alt-nodejs22/root/usr/bin/npm';
 $bridgeDir = realpath(__DIR__ . '/../bridge');
 
-$test = [
-    'bridgeDir' => $bridgeDir,
-    'bridgeDir_writable' => is_writable($bridgeDir),
-    'node_modules_exists' => is_dir($bridgeDir . '/node_modules'),
-    'npm_exec_test' => shell_exec("cd " . escapeshellarg($bridgeDir) . " && " . escapeshellarg($npmPath) . " install qrcode --no-audit 2>&1")
-];
+$modules = [];
+foreach (['qrcode', 'pino', '@whiskeysockets/baileys'] as $mod) {
+    $modules[$mod] = is_dir($bridgeDir . '/node_modules/' . $mod);
+}
 
-echo json_encode($test, JSON_PRETTY_PRINT);
+echo json_encode([
+    'node_modules_dir' => is_dir($bridgeDir . '/node_modules'),
+    'modules' => $modules,
+    'npm_running' => (bool) @exec('pgrep -f "npm" 2>&1')
+], JSON_PRETTY_PRINT);
