@@ -21,18 +21,25 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
         return ['success' => false, 'state' => 'offline', 'message' => 'The remote WhatsApp bridge requires a valid HTTPS address.'];
     }
     $curl = curl_init($base . $path);
-    curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 3,
-        CURLOPT_TIMEOUT => $path === '/send' ? 90 : (str_starts_with($path, '/media') ? 35 : 15),
-        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Content-Type: application/json']]);
+    curl_setopt_array($curl, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 15,
+        CURLOPT_TIMEOUT        => $path === '/send' ? 90 : (str_starts_with($path, '/media') ? 35 : 20),
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token, 'Content-Type: application/json']
+    ]);
     if ($body !== null) curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($body)]);
     $raw = curl_exec($curl);
     $code = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($curl);
     curl_close($curl);
     $result = json_decode((string) $raw, true);
     if ($raw === false || !is_array($result)) {
         return ['success' => false, 'state' => 'offline', 'message' => $path === '/send'
-            ? 'The WhatsApp service did not respond. Delivery is unknown; check the chat before retrying.'
-            : 'Cannot reach the WhatsApp linking service. Start the Node bridge on the server, then reconnect.'];
+            ? 'The WhatsApp service did not respond (' . ($curlErr ?: 'timeout') . '). Delivery is unknown; check the chat before retrying.'
+            : 'Cannot reach WhatsApp bridge: ' . ($curlErr ?: 'HTTP ' . $code . ' / invalid response')];
     }
     if ($code >= 400) $result['success'] = false;
     return $result;
@@ -76,7 +83,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
                 'state'            => 'offline',
                 'connected_number' => '',
                 'mode'             => 'whatsapp_web',
-                'message'          => 'WhatsApp bridge is offline. Start start-online-whatsapp.cmd on your PC to link your phone.'
+                'message'          => $result['message'] ?: 'WhatsApp bridge is offline. Start start-online-whatsapp.cmd on your PC to link your phone.'
             ];
         }
     } elseif ($action === 'get_send_status') {
