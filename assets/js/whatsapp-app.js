@@ -1348,19 +1348,23 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           `;
         } else {
+          const isDoc = msg.type === 'document';
+          const isImg = msg.type === 'image';
+          const hasCustomCaption = msg.text && msg.text !== 'Image' && msg.text !== 'Voice note' && msg.text !== 'Document' && msg.text !== msg.filename;
+
           bubble.innerHTML = `
             ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
-            ${msg.type === 'image' ? (msg.imageUrl && /^data:image\/(png|jpeg|webp|gif);base64,/i.test(msg.imageUrl) ? `<a href="${escapeHtml(msg.imageUrl)}" download="whatsapp-image"><img src="${escapeHtml(msg.imageUrl)}" alt="Chat image attachment" style="max-width:280px;max-height:300px;border-radius:10px;display:block;"></a>` : `<div>${escapeHtml(msg.mediaError || 'Loading image…')}</div>`) : ''}
-            ${msg.type === 'document' ? `
+            ${isImg ? (msg.imageUrl ? `<a href="${escapeHtml(msg.imageUrl)}" target="_blank" download="${escapeHtml(msg.filename || 'image.jpg')}"><img src="${escapeHtml(msg.imageUrl)}" alt="Chat image" style="max-width:280px;max-height:300px;border-radius:10px;display:block;cursor:pointer;"></a>` : `<div>${escapeHtml(msg.mediaError || 'Loading image…')}</div>`) : ''}
+            ${isDoc ? `
               <div class="msg-doc-card" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);padding:10px 12px;border-radius:10px;margin-bottom:6px;">
                 <span style="font-size:24px;">📄</span>
                 <div style="flex:1;min-width:0;">
-                  <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(msg.filename || msg.text || 'WhatsApp Document')}</div>
+                  <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(msg.filename || msg.text || 'Document')}</div>
                   <div style="font-size:11px;opacity:0.75;">Document Attachment</div>
                 </div>
                 ${msg.docUrl ? `<a href="${escapeHtml(msg.docUrl)}" download="${escapeHtml(msg.filename || 'document')}" class="btn btn-xs" style="padding:4px 8px;background:rgba(255,255,255,0.15);color:#fff;border-radius:6px;text-decoration:none;">⬇</a>` : ''}
               </div>` : ''}
-            <div>${formatText(msg.text)}</div>
+            ${hasCustomCaption || (!isDoc && !isImg) ? `<div>${formatText(msg.text)}</div>` : ''}
             <div class="msg-meta-row">
               <span>${escapeHtml(msg.time)}</span>
               ${deliveryMarkup}
@@ -4643,7 +4647,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const liveInbox = window.NunnoLiveInbox({ state, getLead, renderList: renderConversationsList, renderChat: renderActiveChat, toast: showToast, stopAudio: stopCurrentAudio });
   if (!window.NUNNO_OFFLINE_PREVIEW && els.simClientAudioBtn) { els.simClientAudioBtn.hidden = true; els.simClientAudioBtn.style.display = 'none'; }
   const photoInput = document.createElement('input');
-  photoInput.type = 'file'; photoInput.accept = 'image/png,image/jpeg,image/webp,image/gif'; photoInput.hidden = true;
+  photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.hidden = true;
   document.body.appendChild(photoInput);
   const photoButton = document.createElement('button');
   photoButton.type = 'button'; photoButton.className = 'btn-composer-icon'; photoButton.textContent = '📷'; photoButton.title = 'Send an image';
@@ -4653,11 +4657,12 @@ document.addEventListener('DOMContentLoaded', () => {
   photoInput.addEventListener('change', async () => {
     const file = photoInput.files?.[0]; photoInput.value = '';
     if (!file) return;
-    if (window.NUNNO_OFFLINE_PREVIEW) { showToast('Image delivery requires the connected local app.'); return; }
     if (file.size > 10*1024*1024) { showToast('Choose an image up to 10 MB.'); return; }
     const leadId = state.activeLeadId;
+    const caption = (els.chatInput?.value || '').trim();
+    if (els.chatInput) els.chatInput.value = '';
     const reader = new FileReader();
-    reader.onload = () => liveInbox.sendMedia(reader.result, { filename: file.name, leadId });
+    reader.onload = () => liveInbox.sendMedia(reader.result, { filename: file.name, caption, leadId });
     reader.readAsDataURL(file);
   });
 
@@ -4688,6 +4693,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const leadId = state.activeLeadId;
+      const caption = (els.chatInput?.value || '').trim();
+      if (els.chatInput) els.chatInput.value = '';
+
       const reader = new FileReader();
       reader.onload = (readEvt) => {
         const dataUrl = readEvt.target.result;
@@ -4702,7 +4710,7 @@ document.addEventListener('DOMContentLoaded', () => {
           };
         } else {
           // Documents (PDF, Word, Excel, text) or Images
-          liveInbox.sendMedia(dataUrl, { filename: file.name, caption: file.name, leadId });
+          liveInbox.sendMedia(dataUrl, { filename: file.name, caption, leadId });
         }
       };
       reader.readAsDataURL(file);

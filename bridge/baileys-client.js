@@ -8,6 +8,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
+const { ensureOggOpus } = require('./audio');
 
 class BaileysClient extends EventEmitter {
   constructor({ authPath, deviceName = 'Omnidesk Cloud' } = {}) {
@@ -17,6 +18,7 @@ class BaileysClient extends EventEmitter {
     this.sock = null;
     this.info = { wid: { user: '' } };
     this._destroyed = false;
+    this._messageCache = new Map();
   }
 
   async initialize() {
@@ -105,6 +107,10 @@ class BaileysClient extends EventEmitter {
             }
           }
         };
+        this._messageCache.set(msg.key.id, adaptedMsg);
+        if (this._messageCache.size > 500) {
+          this._messageCache.delete(this._messageCache.keys().next().value);
+        }
         this.emit('message_create', adaptedMsg);
       }
     });
@@ -166,15 +172,13 @@ class BaileysClient extends EventEmitter {
     if (typeof content === 'string') {
       sent = await this.sock.sendMessage(jid, { text: content });
     } else if (content && content.data && content.mimetype) {
-      const buffer = Buffer.from(content.data, 'base64');
+      let buffer = Buffer.from(content.data, 'base64');
       if (isVoice) {
-        // WhatsApp PTT requires audio/ogg; codecs=opus for standard mobile voice message playback
-        const mime = (content.mimetype && content.mimetype.includes('ogg'))
-          ? content.mimetype
-          : 'audio/ogg; codecs=opus';
+        // WhatsApp PTT requires genuine OGG OPUS container for native mobile voice note playback
+        buffer = await ensureOggOpus(buffer);
         sent = await this.sock.sendMessage(jid, {
           audio: buffer,
-          mimetype: mime,
+          mimetype: 'audio/ogg; codecs=opus',
           ptt: true
         });
       } else if (content.mimetype.startsWith('image/')) {
@@ -182,8 +186,14 @@ class BaileysClient extends EventEmitter {
           image: buffer,
           caption: options.caption || ''
         });
+      } else if (content.mimetype.startsWith('audio/')) {
+        sent = await this.sock.sendMessage(jid, {
+          audio: buffer,
+          mimetype: content.mimetype,
+          ptt: false
+        });
       } else {
-        // Document sending (PDF, Word, Excel, text)
+        // Document sending (PDF, Word, Excel, text, zip, etc.)
         sent = await this.sock.sendMessage(jid, {
           document: buffer,
           mimetype: content.mimetype || 'application/pdf',
@@ -199,7 +209,7 @@ class BaileysClient extends EventEmitter {
     const myNum = this.info?.wid?.user || '';
     console.log(`[Baileys] Message sent successfully! ID: ${id} to ${jid}`);
 
-    return {
+    const adaptedOut = {
       id: { _serialized: id, fromMe: true, remote: jid },
       fromMe: true,
       from: `${myNum}@s.whatsapp.net`,
@@ -210,12 +220,22 @@ class BaileysClient extends EventEmitter {
       type: isVoice ? 'audio' : (content.mimetype?.startsWith('image/') ? 'image' : (content.mimetype ? 'document' : 'chat')),
       hasMedia: Boolean(content && content.data),
       timestamp: Math.floor(Date.now() / 1000),
-      ack: 1
+      ack: 1,
+      downloadMedia: async () => {
+        if (!content || !content.data) return null;
+        return { data: content.data, mimetype: content.mimetype || 'application/octet-stream', filename: content.filename || 'file' };
+      }
     };
+    this._messageCache.set(id, adaptedOut);
+    if (this._messageCache.size > 500) {
+      this._messageCache.delete(this._messageCache.keys().next().value);
+    }
+
+    return adaptedOut;
   }
 
-  async getMessageById() {
-    return null;
+  async getMessageById(id) {
+    return this._messageCache.get(id) || null;
   }
 
   async destroy() {

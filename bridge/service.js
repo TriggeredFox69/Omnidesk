@@ -92,7 +92,7 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         throw Object.assign(new Error('Attachment must be up to 10 MB.'), { status: 400 });
       }
       body.media.data = body.media.data.replace(/\s+/g, '');
-      const validMime = /^(image\/(png|jpeg|webp|gif)|audio\/[a-z0-9.+-]+|application\/(pdf|msword|vnd\.[a-z0-9.-]+|zip|octet-stream)|text\/[a-z0-9.+-]+)(;.*)?$/i.test(body.media.mimetype || '');
+      const validMime = /^(image|audio|video|application|text)\/[a-z0-9.+-]+(;.*)?$/i.test(body.media.mimetype || '');
       if (!validMime) {
         throw Object.assign(new Error('Supported attachments: images, voice/audio notes, and documents (PDF, Word, Excel, text) up to 10 MB.'), { status: 400 });
       }

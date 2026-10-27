@@ -34,11 +34,14 @@
       return lead;
     }
     async function loadMedia(message) {
-      if (message.audioUrl || message.imageUrl || !message.waMessageId) return;
+      if (message.audioUrl || message.imageUrl || message.docUrl || !message.waMessageId) return;
       if (!mediaRequests.has(message.waMessageId)) {
         mediaRequests.set(message.waMessageId, api('get_media', { message_id: message.waMessageId }).then(result => {
-          if (!/^data:(image\/(png|jpeg|webp|gif)|audio\/[a-z0-9.+-]+)(;[^,]*)?;base64,/i.test(result.data_url)) throw new Error('Unsupported attachment.');
-          message[message.type === 'audio' ? 'audioUrl' : 'imageUrl'] = result.data_url;
+          if (!/^data:(image|audio|video|application|text)\/[a-z0-9.+-]+(;[^,]*)?;base64,/i.test(result.data_url)) throw new Error('Unsupported attachment.');
+          if (message.type === 'audio') message.audioUrl = result.data_url;
+          else if (message.type === 'image') message.imageUrl = result.data_url;
+          else message.docUrl = result.data_url;
+          if (result.filename) message.filename = result.filename;
           message.mediaError = '';
         }).catch(error => { message.mediaError = error.message; throw error; }).finally(() => mediaRequests.delete(message.waMessageId)));
       }
@@ -77,8 +80,8 @@
             presenceEl.textContent = presence.label;
             presenceEl.className = 'chat-presence presence-' + presence.state;
           }
-          const image = lead.messages.find(m => m.type === 'image' && m.hasMedia && !m.imageUrl && !m.mediaError);
-          if (image && !mediaRequests.has(image.waMessageId)) loadMedia(image).catch(() => {}).finally(() => { if (state.activeLeadId === lead.id) renderChat(); });
+          const unhandled = lead.messages.find(m => (m.type === 'image' || m.type === 'document' || m.type === 'audio') && m.hasMedia && !m.imageUrl && !m.docUrl && !m.audioUrl && !m.mediaError);
+          if (unhandled && !mediaRequests.has(unhandled.waMessageId)) loadMedia(unhandled).catch(() => {}).finally(() => { if (state.activeLeadId === lead.id) renderChat(); });
         }
       } catch (_) {
         const el = document.getElementById('chatPresence');
