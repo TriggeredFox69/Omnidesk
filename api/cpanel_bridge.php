@@ -70,8 +70,8 @@ switch ($action) {
 
     case 'clean_install':
     case 'install':
-        set_time_limit(300);
-        $cleanCmd = "cd " . escapeshellarg($bridgeDir) . " && rm -rf node_modules && " . escapeshellarg($npmPath) . " install --omit=dev --no-audit --no-fund 2>&1";
+        set_time_limit(180);
+        $cleanCmd = "cd " . escapeshellarg($bridgeDir) . " && rm -rf node_modules package-lock.json && PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 " . escapeshellarg($npmPath) . " install --omit=dev --omit=optional --no-audit --no-fund 2>&1";
         $output = shell_exec($cleanCmd);
         $hasModules = is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys') && is_dir($bridgeDir . '/node_modules/qrcode');
         echo json_encode([

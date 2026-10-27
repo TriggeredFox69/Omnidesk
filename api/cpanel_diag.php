@@ -2,22 +2,23 @@
 header('Content-Type: application/json');
 
 $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
-$npmPath = '/opt/alt/alt-nodejs22/root/usr/bin/npm';
+$baseDir = realpath(__DIR__ . '/..');
+$bridgeDir = $baseDir . '/bridge';
 
-$info = [
-    'whoami' => @exec('whoami 2>&1'),
-    'pwd' => @exec('pwd 2>&1'),
-    'node_path' => $nodePath,
-    'node_executable' => is_executable($nodePath),
-    'node_version' => @exec($nodePath . ' -v 2>&1'),
-    'npm_path' => $npmPath,
-    'npm_executable' => is_executable($npmPath),
-    'npm_version' => is_executable($npmPath) ? @exec($nodePath . ' ' . $npmPath . ' -v 2>&1') : @exec('which npm 2>&1'),
-    'chromium_check' => @exec('which chromium-browser 2>&1') ?: @exec('which chromium 2>&1') ?: @exec('which google-chrome 2>&1'),
-    'bridge_dir' => realpath(__DIR__ . '/../bridge'),
-    'bridge_node_modules' => is_dir(__DIR__ . '/../bridge/node_modules'),
-    'data_dir_writable' => is_writable(__DIR__ . '/../data'),
-    'open_ports_check' => @exec('netstat -tlpn 2>&1') ?: @exec('ss -tlpn 2>&1') ?: 'unavailable'
-];
+$checks = [];
 
-echo json_encode($info, JSON_PRETTY_PRINT);
+// Check server.js lines
+if (file_exists($bridgeDir . '/server.js')) {
+    $lines = file($bridgeDir . '/server.js');
+    $checks['server_js_head'] = array_slice($lines, 0, 12);
+}
+
+// Check require tests
+$testModules = ['qrcode', 'pino', '@whiskeysockets/baileys', './baileys-client'];
+foreach ($testModules as $mod) {
+    $code = "try { require('$mod'); console.log('OK'); } catch (e) { console.log('ERR: ' + e.message); }";
+    $cmd = "cd " . escapeshellarg($bridgeDir) . " && " . escapeshellarg($nodePath) . " -e " . escapeshellarg($code) . " 2>&1";
+    $checks['require_' . $mod] = trim(shell_exec($cmd));
+}
+
+echo json_encode($checks, JSON_PRETTY_PRINT);

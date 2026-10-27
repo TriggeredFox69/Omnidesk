@@ -95,7 +95,21 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         requests.delete(body.request_id);
         throw Object.assign(new Error('This number is not registered on WhatsApp.'), { status: 400 });
       }
-      const content = body.media ? (makeMedia ? makeMedia(body.media) : new (require('whatsapp-web.js').MessageMedia)(body.media.mimetype, body.media.data, body.media.filename || 'attachment')) : body.message;
+      let content;
+      if (body.media) {
+        if (makeMedia) {
+          content = makeMedia(body.media);
+        } else {
+          try {
+            const { MessageMedia } = require('whatsapp-web.js');
+            content = new MessageMedia(body.media.mimetype, body.media.data, body.media.filename || 'attachment');
+          } catch (_) {
+            content = body.media;
+          }
+        }
+      } else {
+        content = body.message;
+      }
       const sent = await submitOnce(client, recipient._serialized, content, 60000,
         body.media ? { sendAudioAsVoice: Boolean(body.media.voice && body.media.mimetype.startsWith('audio/')), caption: body.message } : {});
       await inbox.ingest(sent, body.phone);
