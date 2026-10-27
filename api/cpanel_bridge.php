@@ -68,11 +68,12 @@ switch ($action) {
         ], JSON_PRETTY_PRINT);
         break;
 
+    case 'clean_install':
     case 'install':
         set_time_limit(300);
-        $cmd = "cd " . escapeshellarg($bridgeDir) . " && " . escapeshellarg($npmPath) . " install --omit=dev 2>&1";
-        $output = shell_exec($cmd);
-        $hasModules = is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys');
+        $cleanCmd = "cd " . escapeshellarg($bridgeDir) . " && rm -rf node_modules && " . escapeshellarg($npmPath) . " install --omit=dev --no-audit --no-fund 2>&1";
+        $output = shell_exec($cleanCmd);
+        $hasModules = is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys') && is_dir($bridgeDir . '/node_modules/qrcode');
         echo json_encode([
             'success' => $hasModules,
             'installed' => $hasModules,
@@ -145,6 +146,11 @@ switch ($action) {
         usleep(500000);
         header('Location: ?action=start');
         exit;
+
+    case 'test_node':
+        $res = shell_exec(escapeshellarg($nodePath) . " -e \"console.log('Node test: OK, Node version: ' + process.version);\" 2>&1");
+        echo json_encode(['result' => trim($res)]);
+        break;
 
     default:
         echo json_encode(['success' => false, 'message' => 'Invalid action.']);
