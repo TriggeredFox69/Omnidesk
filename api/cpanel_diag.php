@@ -1,35 +1,23 @@
 <?php
 header('Content-Type: application/json');
 
-$results = [
-    'php_version' => PHP_VERSION,
-    'uname' => php_uname(),
-    'disabled_functions' => ini_get('disable_functions'),
-    'can_exec' => function_exists('exec'),
-    'can_shell_exec' => function_exists('shell_exec'),
-    'node_path' => null,
-    'node_version' => null,
-    'npm_version' => null,
-    'home_dir' => getenv('HOME') ?: ($_SERVER['HOME'] ?? null),
-    'cloudlinux' => file_exists('/usr/share/cagefs') || file_exists('/etc/cloudlinux-release'),
-    'cpanel_nodejs' => file_exists('/usr/local/cpanel/3rdparty/bin/node') || is_dir('/opt/alt/alt-nodejs20') || is_dir('/opt/alt/alt-nodejs18') || is_dir('/opt/alt/alt-nodejs22')
+$nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+$npmPath = '/opt/alt/alt-nodejs22/root/usr/bin/npm';
+
+$info = [
+    'whoami' => @exec('whoami 2>&1'),
+    'pwd' => @exec('pwd 2>&1'),
+    'node_path' => $nodePath,
+    'node_executable' => is_executable($nodePath),
+    'node_version' => @exec($nodePath . ' -v 2>&1'),
+    'npm_path' => $npmPath,
+    'npm_executable' => is_executable($npmPath),
+    'npm_version' => is_executable($npmPath) ? @exec($nodePath . ' ' . $npmPath . ' -v 2>&1') : @exec('which npm 2>&1'),
+    'chromium_check' => @exec('which chromium-browser 2>&1') ?: @exec('which chromium 2>&1') ?: @exec('which google-chrome 2>&1'),
+    'bridge_dir' => realpath(__DIR__ . '/../bridge'),
+    'bridge_node_modules' => is_dir(__DIR__ . '/../bridge/node_modules'),
+    'data_dir_writable' => is_writable(__DIR__ . '/../data'),
+    'open_ports_check' => @exec('netstat -tlpn 2>&1') ?: @exec('ss -tlpn 2>&1') ?: 'unavailable'
 ];
 
-if (function_exists('exec')) {
-    $node = @exec('which node 2>&1');
-    $results['node_path'] = $node;
-    if ($node && str_starts_with($node, '/')) {
-        $results['node_version'] = @exec($node . ' -v 2>&1');
-    } else {
-        // Check common cPanel / CloudLinux alt-nodejs paths
-        foreach (['/opt/alt/alt-nodejs22/root/usr/bin/node', '/opt/alt/alt-nodejs20/root/usr/bin/node', '/opt/alt/alt-nodejs18/root/usr/bin/node', '/usr/local/cpanel/3rdparty/bin/node', '/usr/bin/node'] as $path) {
-            if (is_executable($path)) {
-                $results['node_path'] = $path;
-                $results['node_version'] = @exec($path . ' -v 2>&1');
-                break;
-            }
-        }
-    }
-}
-
-echo json_encode($results, JSON_PRETTY_PRINT);
+echo json_encode($info, JSON_PRETTY_PRINT);
