@@ -2,20 +2,38 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomBytes } = require('node:crypto');
-const { Client, LocalAuth } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
 const { createService } = require('./service');
+const { BaileysClient } = require('./baileys-client');
+
 const dataPath = path.resolve(__dirname, '../data/whatsapp-bridge');
 fs.mkdirSync(dataPath, { recursive: true, mode: 0o700 });
 const tokenPath = path.join(dataPath, 'token');
 if (!process.env.WHATSAPP_BRIDGE_TOKEN && !fs.existsSync(tokenPath)) {
   fs.writeFileSync(tokenPath, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
 }
-const service = createService({
-  storageFile: path.join(dataPath, 'inbox.json'),
-  token: process.env.WHATSAPP_BRIDGE_TOKEN || fs.readFileSync(tokenPath, 'utf8').trim(),
-  qrImage: value => QRCode.toDataURL(value, { width: 280, margin: 2 }),
-  createClient: () => new Client({
+
+// Detect if Chromium is available
+const customBrowser = process.env.WHATSAPP_BROWSER_PATH;
+const hasChromium = Boolean(customBrowser && fs.existsSync(customBrowser)) ||
+  fs.existsSync('/usr/bin/chromium') ||
+  fs.existsSync('/usr/bin/chromium-browser') ||
+  process.platform === 'win32';
+
+// Prefer Baileys on headless / cPanel / when Chromium is not found, or when explicitly requested
+const forceBaileys = process.env.WHATSAPP_ENGINE === 'baileys' || !hasChromium;
+
+let createClientFn;
+if (forceBaileys) {
+  console.log('⚡ Using pure WebSocket WhatsApp engine (Baileys) — Zero Chromium required, cPanel native.');
+  createClientFn = () => new BaileysClient({
+    authPath: path.join(dataPath, 'baileys_auth'),
+    deviceName: 'Omnidesk cPanel 24/7'
+  });
+} else {
+  const { Client, LocalAuth } = require('whatsapp-web.js');
+  console.log('🌐 Using Headless Chromium WhatsApp engine (whatsapp-web.js).');
+  createClientFn = () => new Client({
     authStrategy: new LocalAuth({ dataPath: path.join(dataPath, 'auth') }),
     webVersionCache: { type: 'local', path: path.join(dataPath, 'cache') },
     deviceName: 'Nunno Campaigns',
@@ -24,7 +42,14 @@ const service = createService({
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
       ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {})
     }
-  })
+  });
+}
+
+const service = createService({
+  storageFile: path.join(dataPath, 'inbox.json'),
+  token: process.env.WHATSAPP_BRIDGE_TOKEN || fs.readFileSync(tokenPath, 'utf8').trim(),
+  qrImage: value => QRCode.toDataURL(value, { width: 280, margin: 2 }),
+  createClient: createClientFn
 });
 const port = Number(process.env.PORT || process.env.WHATSAPP_BRIDGE_PORT || 3210);
 const host = process.env.WHATSAPP_BRIDGE_HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
@@ -70,6 +95,8 @@ service.server.listen(port, host, () => {
   }
 
   // Restore a saved session on startup; a fresh install waits for Connect in the app.
-  if (fs.existsSync(path.join(dataPath, 'auth', 'session'))) service.connect();
+  const hasSavedSession = fs.existsSync(path.join(dataPath, 'auth', 'session')) ||
+    fs.existsSync(path.join(dataPath, 'baileys_auth', 'creds.json'));
+  if (hasSavedSession) service.connect();
 });
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => { await service.close(); process.exit(0); });

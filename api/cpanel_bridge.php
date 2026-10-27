@@ -1,0 +1,151 @@
+<?php
+/**
+ * cPanel Native WhatsApp Bridge Daemon Manager
+ * Allows installing, launching, monitoring, and maintaining the bridge 24/7 on cPanel.
+ */
+header('Content-Type: application/json');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+
+$nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+$npmPath = '/opt/alt/alt-nodejs22/root/usr/bin/npm';
+$baseDir = realpath(__DIR__ . '/..');
+$bridgeDir = $baseDir . '/bridge';
+$dataDir = $baseDir . '/data/whatsapp-bridge';
+$logFile = $dataDir . '/bridge.log';
+$tokenFile = $dataDir . '/token';
+$connFile = $dataDir . '/connection.php';
+$pidFile = $dataDir . '/bridge.pid';
+
+if (!is_dir($dataDir)) @mkdir($dataDir, 0775, true);
+
+// Ensure local bridge token exists
+if (!file_exists($tokenFile) || filesize($tokenFile) < 32) {
+    file_put_contents($tokenFile, bin2hex(random_bytes(32)));
+}
+$token = trim(file_get_contents($tokenFile));
+
+function checkBridgeLive(): ?array {
+    $ch = curl_init('http://127.0.0.1:3210/status');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 2,
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $GLOBALS['token']]
+    ]);
+    $res = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($res !== false && $code === 200) {
+        $data = json_decode($res, true);
+        if (is_array($data)) return $data;
+    }
+    return null;
+}
+
+function findBridgePid(): ?int {
+    $output = @shell_exec('pgrep -f "bridge/server.js" 2>&1');
+    if ($output) {
+        $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
+        if (!empty($pids)) return (int) end($pids);
+    }
+    return null;
+}
+
+$action = $_GET['action'] ?? $_POST['action'] ?? ($argv[1] ?? 'status');
+
+switch ($action) {
+    case 'status':
+        $live = checkBridgeLive();
+        $pid = findBridgePid();
+        $hasModules = is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys');
+        echo json_encode([
+            'success' => true,
+            'is_running' => $live !== null,
+            'pid' => $pid,
+            'modules_installed' => $hasModules,
+            'bridge_status' => $live,
+            'log_tail' => file_exists($logFile) ? implode("\n", array_slice(explode("\n", file_get_contents($logFile)), -15)) : ''
+        ], JSON_PRETTY_PRINT);
+        break;
+
+    case 'install':
+        set_time_limit(300);
+        $cmd = "cd " . escapeshellarg($bridgeDir) . " && " . escapeshellarg($npmPath) . " install --omit=dev 2>&1";
+        $output = shell_exec($cmd);
+        $hasModules = is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys');
+        echo json_encode([
+            'success' => $hasModules,
+            'installed' => $hasModules,
+            'output' => $output
+        ], JSON_PRETTY_PRINT);
+        break;
+
+    case 'start':
+    case 'cron':
+        $live = checkBridgeLive();
+        if ($live !== null) {
+            // Already running
+            // Ensure connection.php points locally to 127.0.0.1:3210
+            file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
+            echo json_encode([
+                'success' => true,
+                'message' => 'Bridge is already running!',
+                'bridge_status' => $live
+            ], JSON_PRETTY_PRINT);
+            break;
+        }
+
+        // Install modules if missing
+        if (!is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys')) {
+            shell_exec("cd " . escapeshellarg($bridgeDir) . " && " . escapeshellarg($npmPath) . " install --omit=dev > /dev/null 2>&1");
+        }
+
+        // Kill any zombie processes
+        $oldPid = findBridgePid();
+        if ($oldPid) @shell_exec("kill -9 $oldPid 2>&1");
+
+        // Set local connection config
+        file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
+
+        // Spawn background node process
+        $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token) . " "
+            . escapeshellarg($nodePath) . " " . escapeshellarg($bridgeDir . '/server.js')
+            . " >> " . escapeshellarg($logFile) . " 2>&1 &";
+
+        shell_exec($startCmd);
+
+        // Wait up to 3 seconds for it to bind
+        $started = null;
+        for ($i = 0; $i < 6; $i++) {
+            usleep(500000);
+            $started = checkBridgeLive();
+            if ($started !== null) break;
+        }
+
+        echo json_encode([
+            'success' => $started !== null,
+            'is_running' => $started !== null,
+            'bridge_status' => $started,
+            'pid' => findBridgePid(),
+            'log_tail' => file_exists($logFile) ? implode("\n", array_slice(explode("\n", file_get_contents($logFile)), -10)) : ''
+        ], JSON_PRETTY_PRINT);
+        break;
+
+    case 'stop':
+        $pid = findBridgePid();
+        if ($pid) {
+            shell_exec("kill -9 $pid 2>&1");
+        }
+        echo json_encode(['success' => true, 'message' => 'Bridge process stopped.']);
+        break;
+
+    case 'restart':
+        $pid = findBridgePid();
+        if ($pid) shell_exec("kill -9 $pid 2>&1");
+        usleep(500000);
+        header('Location: ?action=start');
+        exit;
+
+    default:
+        echo json_encode(['success' => false, 'message' => 'Invalid action.']);
+}
