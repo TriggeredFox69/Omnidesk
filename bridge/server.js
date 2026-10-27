@@ -19,13 +19,40 @@ const service = createService({
     authStrategy: new LocalAuth({ dataPath: path.join(dataPath, 'auth') }),
     webVersionCache: { type: 'local', path: path.join(dataPath, 'cache') },
     deviceName: 'Nunno Campaigns',
-    puppeteer: { headless: true,
-      ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {}) }
+    puppeteer: {
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+      ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {})
+    }
   })
 });
-const port = Number(process.env.WHATSAPP_BRIDGE_PORT || 3210);
-service.server.listen(port, process.env.WHATSAPP_BRIDGE_HOST || '127.0.0.1', () => {
-  console.log(`Nunno WhatsApp bridge listening on port ${port}. Open Connect WhatsApp in the app to link your phone.`);
+const port = Number(process.env.PORT || process.env.WHATSAPP_BRIDGE_PORT || 3210);
+const host = process.env.WHATSAPP_BRIDGE_HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
+service.server.listen(port, host, () => {
+  console.log(`Nunno WhatsApp bridge listening on http://${host}:${port}.`);
+  
+  // If deployed to a cloud host with a public URL, auto-register with Omnidesk
+  const publicUrl = process.env.PUBLIC_BRIDGE_URL;
+  if (publicUrl) {
+    const bridgeToken = process.env.WHATSAPP_BRIDGE_TOKEN || fs.readFileSync(tokenPath, 'utf8').trim();
+    const omnideskTarget = process.env.OMNIDESK_API_URL || 'https://omnidesk.lalagpt.pk/api/direct_sender.php';
+    console.log(`Auto-registering bridge (${publicUrl}) with Omnidesk: ${omnideskTarget}...`);
+    fetch(omnideskTarget, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'register_bridge',
+        url: publicUrl,
+        token: bridgeToken,
+        secret: 'omnidesk_live_bridge_2026'
+      }),
+      signal: AbortSignal.timeout(10000)
+    }).then(r => r.json()).then(res => {
+      if (res.success) console.log('✓ Successfully registered 24/7 cloud bridge with Omnidesk!');
+      else console.warn('Could not auto-register bridge with Omnidesk:', res.message);
+    }).catch(err => console.warn('Bridge auto-registration network notice:', err.message));
+  }
+
   // Restore a saved session on startup; a fresh install waits for Connect in the app.
   if (fs.existsSync(path.join(dataPath, 'auth', 'session'))) service.connect();
 });
