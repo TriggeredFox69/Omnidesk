@@ -365,11 +365,25 @@ switch ($action) {
         ], JSON_PRETTY_PRINT);
         break;
 
+    case 'deploy':
     case 'git_pull':
         $gitPath = trim((string) @shell_exec('which git 2>&1')) ?: 'git';
-        $cmd = "cd " . escapeshellarg($baseDir) . " && " . escapeshellarg($gitPath) . " pull origin main 2>&1";
-        $out = shell_exec($cmd);
-        echo json_encode(['success' => true, 'output' => trim($out), 'cmd' => $cmd]);
+        $search = @shell_exec('find /home/dailygol -maxdepth 4 -name ".git" 2>/dev/null');
+        $lines = array_filter(array_map('trim', explode("\n", (string)$search)));
+        $results = [];
+        foreach ($lines as $gitDir) {
+            $repo = dirname($gitDir);
+            $gitCmd = "cd " . escapeshellarg($repo) . " && " . escapeshellarg($gitPath) . " fetch origin main 2>&1 && " . escapeshellarg($gitPath) . " reset --hard origin/main 2>&1";
+            $gitOut = @shell_exec($gitCmd);
+            $deployCmd = "cd " . escapeshellarg($repo) . " && /bin/cp -R api assets index.php index.html login.php /home/dailygol/omnidesk.lalagpt.pk/ 2>&1 && /bin/cp -R bridge/dist /home/dailygol/omnidesk.lalagpt.pk/bridge/ 2>&1 && /bin/cp -f bridge/*.js /home/dailygol/omnidesk.lalagpt.pk/bridge/ 2>&1";
+            $deployOut = @shell_exec($deployCmd);
+            $results[] = [
+                'repo' => $repo,
+                'git' => trim((string)$gitOut),
+                'deploy' => trim((string)$deployOut)
+            ];
+        }
+        echo json_encode(['success' => !empty($results), 'repos' => $results], JSON_PRETTY_PRINT);
         break;
 
     case 'test_node':
