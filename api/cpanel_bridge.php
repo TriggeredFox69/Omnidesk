@@ -83,6 +83,58 @@ switch ($action) {
         echo $res ?: json_encode(['success' => false, 'message' => 'Connect failed']);
         break;
 
+    case 'relink':
+        // Kill existing bridge processes
+        $pid = findBridgePid();
+        if ($pid) shell_exec("kill -9 $pid 2>&1");
+        shell_exec('pkill -9 -f "dist/index.js" 2>&1');
+        shell_exec('pkill -9 -f "server.js" 2>&1');
+        sleep(1);
+
+        // Clear stale auth sessions causing Bad MAC Signal ratchet errors
+        $primaryAuth = $dataDir . '/whatsapp-bridge/baileys_auth';
+        $secondaryAuth = $bridgeDir . '/data/whatsapp-bridge/baileys_auth';
+        shell_exec("rm -rf " . escapeshellarg($primaryAuth) . " " . escapeshellarg($secondaryAuth) . " 2>&1");
+        @unlink($logFile);
+
+        file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
+
+        $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+        $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+            . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+        shell_exec($startCmd);
+
+        for ($i = 0; $i < 10; $i++) {
+            usleep(500000);
+            $started = checkBridgeLive();
+            if ($started !== null) break;
+        }
+
+        // Trigger /connect to generate fresh QR
+        $ch = curl_init('http://127.0.0.1:3210/connect');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => '{}',
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Content-Type: application/json']
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+
+        sleep(2);
+        $finalStatus = checkBridgeLive();
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Stale session cleared. Scan this QR code with WhatsApp on your phone to link cleanly.',
+            'bridge_status' => $finalStatus,
+            'qr' => $finalStatus['qr'] ?? null
+        ], JSON_PRETTY_PRINT);
+        break;
+
     case 'test_send':
         $phone = preg_replace('/\D+/', '', $_GET['phone'] ?? '923046588806');
         if (str_starts_with($phone, '0092')) $phone = substr($phone, 2);
