@@ -69,6 +69,20 @@ switch ($action) {
         ], JSON_PRETTY_PRINT);
         break;
 
+    case 'connect':
+        $ch = curl_init('http://127.0.0.1:3210/connect');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => '{}',
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Content-Type: application/json']
+        ]);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        echo $res ?: json_encode(['success' => false, 'message' => 'Connect failed']);
+        break;
+
     case 'kill_stuck':
     case 'stop':
         $pid = findBridgePid();
