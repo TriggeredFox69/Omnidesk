@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: omnidesk-whatsapp-bridge
+    env: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /status
+    envVars:
+      - key: OMNIDESK_API_URL
+        value: https://omnidesk.lalagpt.pk/api/direct_sender.php
+      - key: WHATSAPP_BRIDGE_TOKEN
+        generateValue: true

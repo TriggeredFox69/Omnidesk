@@ -31,26 +31,42 @@ const host = process.env.WHATSAPP_BRIDGE_HOST || (process.env.PORT ? '0.0.0.0' :
 service.server.listen(port, host, () => {
   console.log(`Nunno WhatsApp bridge listening on http://${host}:${port}.`);
   
-  // If deployed to a cloud host with a public URL, auto-register with Omnidesk
-  const publicUrl = process.env.PUBLIC_BRIDGE_URL;
+  // Auto-detect cloud host public URL (Render, Railway, or manual PUBLIC_BRIDGE_URL)
+  const publicUrl = process.env.PUBLIC_BRIDGE_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
+
   if (publicUrl) {
     const bridgeToken = process.env.WHATSAPP_BRIDGE_TOKEN || fs.readFileSync(tokenPath, 'utf8').trim();
     const omnideskTarget = process.env.OMNIDESK_API_URL || 'https://omnidesk.lalagpt.pk/api/direct_sender.php';
     console.log(`Auto-registering bridge (${publicUrl}) with Omnidesk: ${omnideskTarget}...`);
-    fetch(omnideskTarget, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'register_bridge',
-        url: publicUrl,
-        token: bridgeToken,
-        secret: 'omnidesk_live_bridge_2026'
-      }),
-      signal: AbortSignal.timeout(10000)
-    }).then(r => r.json()).then(res => {
-      if (res.success) console.log('✓ Successfully registered 24/7 cloud bridge with Omnidesk!');
-      else console.warn('Could not auto-register bridge with Omnidesk:', res.message);
-    }).catch(err => console.warn('Bridge auto-registration network notice:', err.message));
+    (async () => {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const r = await fetch(omnideskTarget, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'register_bridge',
+              url: publicUrl,
+              token: bridgeToken,
+              secret: 'omnidesk_live_bridge_2026'
+            }),
+            signal: AbortSignal.timeout(10000)
+          });
+          const res = await r.json();
+          if (res.success) {
+            console.log('✓ Successfully registered 24/7 cloud bridge with Omnidesk!');
+            break;
+          } else {
+            console.warn(`Bridge registration attempt ${attempt}:`, res.message);
+          }
+        } catch (err) {
+          console.warn(`Bridge registration attempt ${attempt} notice:`, err.message);
+          await new Promise(res => setTimeout(res, 3000));
+        }
+      }
+    })();
   }
 
   // Restore a saved session on startup; a fresh install waits for Connect in the app.
