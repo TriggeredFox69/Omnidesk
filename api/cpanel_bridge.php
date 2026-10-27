@@ -83,6 +83,33 @@ switch ($action) {
         echo $res ?: json_encode(['success' => false, 'message' => 'Connect failed']);
         break;
 
+    case 'view_qr':
+        $live = checkBridgeLive();
+        if ($live && !empty($live['is_connected'])) {
+            header('Content-Type: text/html');
+            echo "<div style='background:#0b141a;color:#fff;font-family:sans-serif;text-align:center;padding:60px;'><h2 style='color:#25d366;'>✓ WhatsApp is Already Connected!</h2><p style='color:#8696a0;font-size:16px;'>Connected number: <strong>+" . htmlspecialchars($live['connected_number'] ?? '') . "</strong></p><p style='margin-top:20px;'><a href='/' style='color:#25d366;text-decoration:none;font-weight:700;'>&larr; Open Omnidesk CRM</a></p></div>";
+            exit;
+        }
+        $qr = $live['qr'] ?? '';
+        if (!$qr) {
+            $ch = curl_init('http://127.0.0.1:3210/connect');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => '{}',
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Content-Type: application/json']
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+            usleep(800000);
+            $live = checkBridgeLive();
+            $qr = $live['qr'] ?? '';
+        }
+        header('Content-Type: text/html');
+        echo "<!DOCTYPE html><html><head><title>Link WhatsApp - Omnidesk 24/7</title><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='12'></head><body style='background:#0b141a;color:#fff;font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:30px 15px;'><div style='max-width:380px;margin:0 auto;background:#111b21;padding:26px 20px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.5);border:1px solid #222d34;'><h2 style='margin-top:0;font-size:20px;color:#25d366;'>📱 Link Your WhatsApp</h2><p style='color:#8696a0;font-size:13px;line-height:1.5;'>Open WhatsApp on your phone &rarr; <b>Settings</b> &rarr; <b>Linked devices</b> &rarr; <b>Link a device</b>, then scan below:</p><div style='background:#fff;padding:12px;border-radius:12px;display:inline-block;margin:16px 0;box-shadow:0 4px 14px rgba(0,0,0,0.3);'>" . ($qr ? "<img src='{$qr}' width='260' height='260' style='display:block;border-radius:8px;' alt='WhatsApp QR Code'>" : "<p style='color:#111;padding:40px 0;'>Generating QR code...</p>") . "</div><p style='color:#8696a0;font-size:12px;'>This page auto-refreshes every 12 seconds.<br>Once scanned, your phone stays connected 24/7 on cPanel!</p><a href='/' style='display:inline-block;margin-top:14px;color:#25d366;font-size:14px;font-weight:600;text-decoration:none;'>&larr; Back to Omnidesk CRM</a></div></body></html>";
+        exit;
+
     case 'relink':
         // Kill existing bridge processes
         $pid = findBridgePid();
