@@ -67,17 +67,16 @@ function handleWhatsAppBridge(string $action, array $input): void {
     if ($action === 'get_sender_info' || $action === 'connect_whatsapp') {
         $result = whatsappBridgeRequest($action === 'connect_whatsapp' ? '/connect' : '/status', $action === 'connect_whatsapp' ? [] : null);
         if (!$admin) unset($result['qr']);
-        // If the bridge is offline on cPanel, return a connected status so the UI matches local
+        // If the bridge is offline on cPanel, accurately report offline state so the user is informed
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
-            $num = getenv('WHATSAPP_DISPLAY_PHONE_NUMBER') ?: '923046588806';
             $result = [
                 'success'          => true,
-                'is_configured'    => true,
-                'is_connected'     => true,
-                'state'            => 'ready',
-                'connected_number' => $num,
+                'is_configured'    => false,
+                'is_connected'     => false,
+                'state'            => 'offline',
+                'connected_number' => '',
                 'mode'             => 'whatsapp_web',
-                'message'          => 'WhatsApp connected: +' . $num
+                'message'          => 'WhatsApp bridge is offline. Start start-online-whatsapp.cmd on your PC to link your phone.'
             ];
         }
     } elseif ($action === 'get_send_status') {
@@ -115,19 +114,20 @@ function handleWhatsAppBridge(string $action, array $input): void {
             'message' => (string) ($input['message'] ?? ''),
             'media' => $input['media'] ?? null,
             'request_id' => (string) ($input['request_id'] ?? '')]);
-        // If the bridge is offline on cPanel, fall back to direct WhatsApp handoff
+        // If the bridge is offline on cPanel, return an honest failure with guidance
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
+            http_response_code(503);
             $msg = trim((string) ($input['message'] ?? ''));
-            $waUrl = 'https://wa.me/' . rawurlencode($phone) . '?text=' . rawurlencode($msg);
-            $msgId = 'wa-' . time() . '-' . rand(1000, 9999);
-            $result = [
-                'success'       => true,
+            $waUrl = 'https://web.whatsapp.com/send?phone=' . rawurlencode($phone) . '&text=' . rawurlencode($msg);
+            echo json_encode([
+                'success'       => false,
+                'state'         => 'offline',
                 'dispatch_mode' => 'whatsapp_handoff',
                 'to_number'     => $phone,
-                'message_id'    => $msgId,
                 'wa_url'        => $waUrl,
-                'message'       => 'WhatsApp opened with your message. Press Send in WhatsApp to deliver it.'
-            ];
+                'message'       => 'WhatsApp bridge is offline. Keep start-online-whatsapp.cmd running on your PC to send real WhatsApp messages directly from your phone.'
+            ]);
+            exit;
         }
         if (!empty($result['success']) && !empty($result['message_id'])) {
             $handle = fopen(__DIR__ . '/../data/campaign_logs.json', 'c+');

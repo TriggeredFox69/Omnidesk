@@ -38,9 +38,32 @@ async function main() {
       const config = `<?php\n// Private PC bridge connection. Do not commit or share this file.\nreturn ['url' => '${url}', 'token' => '${token}'];\n`;
       fs.writeFileSync(path.join(privateDir, 'connection.php'), config, { mode: 0o600 });
       fs.writeFileSync(path.join(privateDir, 'endpoint.json'), JSON.stringify({ url }), { mode: 0o600 });
-      console.log('Private connection.php prepared in data/whatsapp-bridge/pc-connection/.');
-      console.log('Upload it to the hosted data/whatsapp-bridge/ folder, alongside the updated PHP adapter.');
-      console.log('Keep this process running. Restarting the tunnel changes the address; upload the regenerated file after each restart.');
+      console.log('✓ Private tunnel established at: ' + url);
+      console.log('Syncing live bridge with hosted Omnidesk (https://omnidesk.lalagpt.pk)...');
+      
+      const endpoints = [
+        'https://omnidesk.lalagpt.pk/api/direct_sender.php',
+        'https://lalagpt.pk/omnidesk/api/direct_sender.php'
+      ];
+      for (const endpoint of endpoints) {
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'register_bridge',
+            url: url,
+            token: token,
+            secret: 'omnidesk_live_bridge_2026'
+          }),
+          signal: AbortSignal.timeout(10000)
+        }).then(r => r.json()).then(res => {
+          if (res.success) {
+            console.log(`✓ Hosted Omnidesk (${endpoint}) is now successfully CONNECTED to this PC bridge!`);
+            console.log('Real WhatsApp messages sent from omnidesk.lalagpt.pk will now be sent directly from your phone.');
+          }
+        }).catch(() => {});
+      }
+      console.log('Keep this process running while using omnidesk.lalagpt.pk.');
     }
   };
   tunnel.stdout.on('data', capture);

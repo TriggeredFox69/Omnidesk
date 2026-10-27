@@ -28,6 +28,37 @@ $cloudConfigured = !empty($cloudToken) && !empty(getenv('WHATSAPP_PHONE_NUMBER_I
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 $action = $input['action'] ?? $_GET['action'] ?? '';
 
+// Register PC WhatsApp Bridge tunnel URL and token automatically from runner
+if ($action === 'register_bridge') {
+    $url = trim($input['url'] ?? '');
+    $token = trim($input['token'] ?? '');
+    $secret = trim($input['secret'] ?? '');
+    $validSecret = 'omnidesk_live_bridge_2026';
+    if ($secret !== $validSecret && empty($_SESSION['omnidesk_user'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Unauthorized bridge registration.']);
+        exit;
+    }
+    if (empty($url) || empty($token)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Bridge URL and token are required.']);
+        exit;
+    }
+    $parts = parse_url($url);
+    if (($parts['scheme'] ?? '') !== 'https' || empty($parts['host'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Bridge URL must be a valid HTTPS address.']);
+        exit;
+    }
+    $bridgeDir = __DIR__ . '/../data/whatsapp-bridge';
+    if (!is_dir($bridgeDir)) @mkdir($bridgeDir, 0775, true);
+    $connFile = $bridgeDir . '/connection.php';
+    $code = "<?php\n// Authenticated PC bridge connection. Updated automatically by PC runner.\nreturn ['url' => '" . addslashes(rtrim($url, '/')) . "', 'token' => '" . addslashes($token) . "'];\n";
+    file_put_contents($connFile, $code);
+    echo json_encode(['success' => true, 'message' => 'Bridge endpoint registered successfully!', 'url' => $url]);
+    exit;
+}
+
 // Regular WhatsApp via a linked device is the default. Cloud API remains opt-in.
 if ((getenv('WHATSAPP_SEND_MODE') ?: 'whatsapp_web') !== 'cloud_api' &&
     in_array($action, ['get_sender_info', 'connect_whatsapp', 'send_direct', 'get_send_status', 'get_events', 'get_media', 'get_presence', 'sync_chat'], true)) {
