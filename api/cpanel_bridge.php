@@ -70,14 +70,25 @@ switch ($action) {
 
     case 'clean_install':
     case 'install':
-        set_time_limit(180);
-        $cleanCmd = "cd " . escapeshellarg($bridgeDir) . " && rm -rf node_modules package-lock.json && PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 " . escapeshellarg($npmPath) . " install --omit=dev --omit=optional --no-audit --no-fund 2>&1";
-        $output = shell_exec($cleanCmd);
+        $installLog = $dataDir . '/install.log';
+        $npmRunning = (bool) @exec('pgrep -f "npm install" 2>&1');
+        if (!$npmRunning) {
+            $cleanCmd = "cd " . escapeshellarg($bridgeDir) . " && rm -rf node_modules package-lock.json && PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 "
+                . escapeshellarg($npmPath) . " install --omit=dev --omit=optional --no-audit --no-fund > "
+                . escapeshellarg($installLog) . " 2>&1 &";
+            shell_exec($cleanCmd);
+        }
+        for ($i = 0; $i < 6; $i++) {
+            usleep(500000);
+            if (is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys') && is_dir($bridgeDir . '/node_modules/qrcode')) break;
+        }
         $hasModules = is_dir($bridgeDir . '/node_modules/@whiskeysockets/baileys') && is_dir($bridgeDir . '/node_modules/qrcode');
+        $npmStillRunning = (bool) @exec('pgrep -f "npm install" 2>&1');
         echo json_encode([
             'success' => $hasModules,
             'installed' => $hasModules,
-            'output' => $output
+            'in_progress' => $npmStillRunning,
+            'log' => file_exists($installLog) ? file_get_contents($installLog) : ''
         ], JSON_PRETTY_PRINT);
         break;
 

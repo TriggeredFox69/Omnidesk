@@ -16,6 +16,8 @@ deployment:
     - /bin/mkdir -p $DEPLOYPATH/data
     - /bin/chmod 755 $DEPLOYPATH 2>/dev/null || true
     - /bin/chmod 775 $DEPLOYPATH/data 2>/dev/null || true
+    - cd $DEPLOYPATH/bridge && PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 /opt/alt/alt-nodejs22/root/usr/bin/npm install --omit=dev --omit=optional --no-audit 2>&1 || true
+    - /usr/local/bin/php $DEPLOYPATH/api/cpanel_bridge.php cron || true
     # 2. Mirror deployment to public_html/omnidesk
     - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
     - /bin/mkdir -p $DEPLOYPATH2
