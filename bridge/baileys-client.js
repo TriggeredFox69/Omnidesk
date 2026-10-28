@@ -31,7 +31,7 @@ class BaileysClient extends EventEmitter {
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
       browser: [this.deviceName, 'Chrome', '1.0.0'],
-      syncFullHistory: false
+      syncFullHistory: true
     });
 
     this.sock.ev.on('creds.update', saveCreds);
@@ -111,6 +111,55 @@ class BaileysClient extends EventEmitter {
         if (this._messageCache.size > 500) {
           this._messageCache.delete(this._messageCache.keys().next().value);
         }
+        this.emit('message_create', adaptedMsg);
+      }
+    });
+
+    // Handle full chat history sync from newly linked device
+    this.sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
+      console.log(`[Baileys] History sync received: ${chats?.length || 0} chats, ${messages?.length || 0} messages.`);
+      for (const msg of messages || []) {
+        if (!msg.message) continue;
+        const fromMe = Boolean(msg.key?.fromMe);
+        const jid = msg.key?.remoteJid || '';
+        if (jid.endsWith('@g.us') || jid.endsWith('@broadcast') || jid.endsWith('@newsletter')) continue;
+        const text = msg.message.conversation ||
+          msg.message.extendedTextMessage?.text ||
+          msg.message.imageMessage?.caption ||
+          msg.message.documentMessage?.caption ||
+          msg.message.documentMessage?.title ||
+          '';
+
+        const isAudio = Boolean(msg.message.audioMessage);
+        const isImage = Boolean(msg.message.imageMessage);
+        const isDoc = Boolean(msg.message.documentMessage);
+        const type = isAudio ? 'audio' : (isImage ? 'image' : (isDoc ? 'document' : 'chat'));
+
+        const adaptedMsg = {
+          id: { _serialized: msg.key.id, fromMe, remote: jid },
+          from: jid,
+          to: fromMe ? jid : `${this.info.wid.user}@s.whatsapp.net`,
+          body: text,
+          timestamp: Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)),
+          hasMedia: Boolean(isAudio || isImage || isDoc),
+          type,
+          downloadMedia: async () => {
+            try {
+              const buffer = await downloadMediaMessage(msg, 'buffer', {});
+              const mime = msg.message.imageMessage?.mimetype ||
+                msg.message.audioMessage?.mimetype ||
+                msg.message.documentMessage?.mimetype ||
+                'application/octet-stream';
+              const filename = msg.message.documentMessage?.fileName ||
+                (type === 'image' ? 'image.jpg' : (type === 'audio' ? 'voice.ogg' : 'document.pdf'));
+              return { data: buffer.toString('base64'), mimetype: mime, filename };
+            } catch (err) {
+              console.error('[Baileys] Media download failed:', err.message);
+              return null;
+            }
+          }
+        };
+        this._messageCache.set(msg.key.id, adaptedMsg);
         this.emit('message_create', adaptedMsg);
       }
     });

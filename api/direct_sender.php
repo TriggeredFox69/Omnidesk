@@ -75,7 +75,7 @@ if ($action === 'connect_whatsapp') {
 if ($action === 'get_sender_info') {
     echo json_encode([
         'success'          => true,
-        'connected_number' => $currentNumber ?: '923046588806',
+        'connected_number' => $currentNumber ?: '923318036576',
         'is_connected'     => true,
         'mode'             => 'whatsapp_web',
         'is_configured'    => true

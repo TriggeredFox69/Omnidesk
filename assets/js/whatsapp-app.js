@@ -32,10 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
     {
       id: 'lead_self',
       name: 'My WhatsApp (Self Test)',
-      phone: '923046588806',
-      display: '+92 304 6588806',
+      phone: '923318036576',
+      display: '+92 331 8036576',
       city: 'Rawalpindi / Islamabad',
-      network: 'Jazz',
+      network: 'Ufone',
       ownerId: 'USR-ADMIN-01',
       leadState: 'ongoing',
       status: 'replied',
@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lastActive: 'Just now',
       notes: 'Connected phone self-testing chat. Messages, voice notes, and docs sent here deliver straight to your linked phone!',
       messages: [
-        { sender: 'lead', text: '⚡ This is your personal linked WhatsApp chat (+92 304 6588806). Send any message, voice memo, or document to see it arrive directly on your phone!', time: '12:00 PM' }
+        { sender: 'lead', text: '⚡ This is your personal linked WhatsApp chat (+92 331 8036576). Send any message, voice memo, or document to see it arrive directly on your phone!', time: '12:00 PM' }
       ]
     },
     {
@@ -1802,10 +1802,10 @@ document.addEventListener('DOMContentLoaded', () => {
       {
         id: 'c_lead_user_test',
         name: 'Askar (My Number)',
-        phone: '923046588806',
-        display: '+92 304 6588806',
+        phone: '923318036576',
+        display: '+92 331 8036576',
         city: 'Pakistan',
-        network: 'Jazz',
+        network: 'Ufone',
         status: 'pending',
         sentAt: null
       }
@@ -2540,16 +2540,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (els.quickAddMyNumberBtn) {
     els.quickAddMyNumberBtn.addEventListener('click', () => {
-      const userPhone = '923046588806';
+      const userPhone = '923318036576';
       const exists = campaignState.audience.some(c => c.phone === userPhone);
       if (!exists) {
         campaignState.audience.unshift({
           id: `c_lead_my_test_${Date.now()}`,
           name: 'Askar (My Number)',
           phone: userPhone,
-          display: '+92 304 6588806',
+          display: '+92 331 8036576',
           city: 'Pakistan',
-          network: 'Jazz',
+          network: 'Ufone',
           status: 'pending',
           sentAt: null
         });
@@ -4721,7 +4721,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const newChatBtn = document.getElementById('newChatBtn');
   if (newChatBtn) {
     newChatBtn.addEventListener('click', async () => {
-      const phoneInput = prompt('Enter WhatsApp phone number to chat with:\n(e.g. 03046588806 or +923046588806)');
+      const phoneInput = prompt('Enter WhatsApp phone number to chat with:\n(e.g. 03318036576 or +923318036576)');
       if (!phoneInput) return;
       const clean = phoneInput.replace(/\D/g, '');
       if (clean.length < 10) {

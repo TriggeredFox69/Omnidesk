@@ -33,10 +33,10 @@ $defaultLeads = [
     [
         'id' => 'lead_self',
         'name' => 'My WhatsApp (Self Test)',
-        'phone' => '923046588806',
-        'display' => '+92 304 6588806',
+        'phone' => '923318036576',
+        'display' => '+92 331 8036576',
         'city' => 'Connected Number',
-        'network' => 'WhatsApp',
+        'network' => 'Ufone',
         'ownerId' => 'USR-ADMIN-01',
         'ownerName' => 'System Administrator',
         'leadState' => 'ongoing',
@@ -46,7 +46,7 @@ $defaultLeads = [
         'lastActive' => 'Just now',
         'notes' => 'Personal test chat. Any message, voice memo, or document sent here arrives instantly on your linked phone.',
         'messages' => [
-            ['sender' => 'lead', 'text' => '⚡ This is your personal linked WhatsApp chat (+92 304 6588806). Send any message, voice memo, or document to see it arrive directly on your phone!', 'time' => '12:00 PM']
+            ['sender' => 'lead', 'text' => '⚡ This is your personal linked WhatsApp chat (+92 331 8036576). Send any message, voice memo, or document to see it arrive directly on your phone!', 'time' => '12:00 PM']
         ]
     ],
     [

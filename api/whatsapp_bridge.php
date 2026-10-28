@@ -143,7 +143,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
                 if (!is_array($logs)) $logs = [];
                 $exists = false;
                 foreach ($logs as $log) if (($log['message_id'] ?? '') === $result['message_id']) $exists = true;
-                if (!$exists) $logs[] = ['timestamp' => date('Y-m-d H:i:s'), 'from_number' => $result['from_number'] ?? '923046588806',
+                if (!$exists) $logs[] = ['timestamp' => date('Y-m-d H:i:s'), 'from_number' => $result['from_number'] ?? '923318036576',
                     'to_number' => $phone, 'mode' => 'whatsapp_web', 'status' => 'accepted', 'message_id' => $result['message_id']];
                 rewind($handle); ftruncate($handle, 0);
                 fwrite($handle, json_encode(array_slice($logs, -500), JSON_PRETTY_PRINT));

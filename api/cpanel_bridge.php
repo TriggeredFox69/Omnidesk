@@ -124,6 +124,13 @@ switch ($action) {
         shell_exec("rm -rf " . escapeshellarg($primaryAuth) . " " . escapeshellarg($secondaryAuth) . " 2>&1");
         @unlink($logFile);
 
+        $senderConfigFile = $baseDir . '/data/sender_config.json';
+        file_put_contents($senderConfigFile, json_encode([
+            'connected_number' => '923318036576',
+            'display' => '+92 331 8036576',
+            'updated_at' => date('Y-m-d H:i:s')
+        ], JSON_PRETTY_PRINT));
+
         file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
 
         $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
@@ -156,14 +163,14 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
-            'message' => 'Stale session cleared. Scan this QR code with WhatsApp on your phone to link cleanly.',
+            'message' => 'Stale session cleared. Scan this QR code with WhatsApp on your phone (+923318036576) to link cleanly.',
             'bridge_status' => $finalStatus,
             'qr' => $finalStatus['qr'] ?? null
         ], JSON_PRETTY_PRINT);
         break;
 
     case 'test_send':
-        $phone = preg_replace('/\D+/', '', $_GET['phone'] ?? '923046588806');
+        $phone = preg_replace('/\D+/', '', $_GET['phone'] ?? '923318036576');
         if (str_starts_with($phone, '0092')) $phone = substr($phone, 2);
         elseif (str_starts_with($phone, '03') && strlen($phone) === 11) $phone = '92' . substr($phone, 1);
         elseif (str_starts_with($phone, '3') && strlen($phone) === 10) $phone = '92' . $phone;
