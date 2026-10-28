@@ -113,7 +113,11 @@ if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
     $bridgeDir = dirname(__DIR__) . '/bridge';
     $connFile = $dataDir . '/connection.php';
     $conn = file_exists($connFile) ? require($connFile) : [];
-    $token = $conn['token'] ?? '';
+    $tokenFile = $dataDir . '/token';
+    $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    // Ensure connection.php uses local HTTP, not HTTPS, to avoid SSL wrong version error
+    file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
+
     $logFile = $dataDir . '/bridge.log';
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)

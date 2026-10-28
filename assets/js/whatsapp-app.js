@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     agents: defaultAgents,
     currentAgent: defaultAgents[0], // EMP-101 Hamza Khan
     leads: window.NUNNO_OFFLINE_PREVIEW ? [...initialLeads] : [],
-    activeLeadId: window.NUNNO_OFFLINE_PREVIEW ? 'lead_1' : null,
+    activeLeadId: window.NUNNO_OFFLINE_PREVIEW ? 'lead_self' : null,
     inboxFilter: 'all', // 'all', 'unread', 'replied', 'sent', 'mine', 'unclaimed'
     searchQuery: '',
 

@@ -52,8 +52,10 @@ if (isset($_GET['wipe'])) {
 
     $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
     $bridgeDir = $baseDir . '/bridge';
+    $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
-    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($conn['token'] ?? '')
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
         . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
         . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
         . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";

@@ -45,9 +45,10 @@ if ($action === 'register_bridge') {
         exit;
     }
     $parts = parse_url($url);
-    if (($parts['scheme'] ?? '') !== 'https' || empty($parts['host'])) {
+    $local = in_array($parts['host'] ?? '', ['127.0.0.1', 'localhost', '::1'], true);
+    if ((($parts['scheme'] ?? '') !== 'https' && !($local && ($parts['scheme'] ?? '') === 'http')) || empty($parts['host'])) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Bridge URL must be a valid HTTPS address.']);
+        echo json_encode(['success' => false, 'message' => 'Bridge URL must be a valid HTTPS address (or HTTP for localhost).']);
         exit;
     }
     $bridgeDir = __DIR__ . '/../data/whatsapp-bridge';
