@@ -63,6 +63,75 @@ $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 $action = $input['action'] ?? $_GET['action'] ?? 'get_leads';
 
+// Clear all demo data, wipe inboxes, and reset to 03318036576
+if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
+    $selfOnly = [
+        [
+            'id' => 'lead_self',
+            'name' => 'My WhatsApp (Self Test)',
+            'phone' => '923318036576',
+            'display' => '+92 331 8036576',
+            'city' => 'Connected Number',
+            'network' => 'Ufone',
+            'ownerId' => 'USR-ADMIN-01',
+            'ownerName' => 'System Administrator',
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Live WhatsApp Direct Hub',
+            'lastActive' => 'Just now',
+            'notes' => 'Connected phone self-testing chat (+92 331 8036576). Messages, voice notes, and docs deliver straight to your linked phone 24/7!',
+            'messages' => [
+                ['sender' => 'lead', 'text' => '⚡ WhatsApp (+92 331 8036576) is connected 24/7! Send any text, voice note, or document to see it arrive directly on your phone.', 'time' => '12:00 PM']
+            ]
+        ]
+    ];
+    saveStoredLeads($dataFile, $selfOnly);
+
+    // Wipe old inbox messages from both directories
+    $dataDir = dirname(__DIR__) . '/data/whatsapp-bridge';
+    @unlink($dataDir . '/inbox.json');
+    @unlink($dataDir . '/whatsapp-bridge/inbox.json');
+    file_put_contents($dataDir . '/inbox.json', '[]');
+    if (is_dir($dataDir . '/whatsapp-bridge')) {
+        file_put_contents($dataDir . '/whatsapp-bridge/inbox.json', '[]');
+    }
+
+    // Reset campaign logs
+    $campaignLog = dirname(__DIR__) . '/data/campaign_logs.json';
+    if (file_exists($campaignLog)) file_put_contents($campaignLog, '[]');
+
+    // Restart bridge to reload empty inbox while KEEPING baileys_auth session
+    $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+    if ($output) {
+        $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
+        foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
+    }
+    sleep(1);
+
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+    $bridgeDir = dirname(__DIR__) . '/bridge';
+    $connFile = $dataDir . '/connection.php';
+    $conn = file_exists($connFile) ? require($connFile) : [];
+    $token = $conn['token'] ?? '';
+    $logFile = $dataDir . '/bridge.log';
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    shell_exec($startCmd);
+    sleep(2);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'All demo data and old chats wiped cleanly. 24/7 live sync active on 03318036576.',
+        'leads' => $selfOnly,
+        'count' => 1
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 // 1. Get All Leads
 if ($action === 'get_leads') {
     echo json_encode([
