@@ -15,6 +15,7 @@ deployment:
     - /bin/mkdir -p $DEPLOYPATH/data
     - /bin/chmod 755 $DEPLOYPATH 2>/dev/null || true
     - /bin/chmod 775 $DEPLOYPATH/data 2>/dev/null || true
+    - pkill -9 -f "dist/index.js|server.js" 2>/dev/null || true
     # 2. Mirror deployment to public_html/omnidesk
     - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
     - /bin/mkdir -p $DEPLOYPATH2
