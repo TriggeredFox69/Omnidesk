@@ -91,6 +91,7 @@ class BaileysClient extends EventEmitter {
           timestamp: Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)),
           hasMedia: Boolean(isAudio || isImage || isDoc),
           type,
+          _data: { notifyName: msg.pushName || '' },
           downloadMedia: async () => {
             try {
               const buffer = await downloadMediaMessage(msg, 'buffer', {});
@@ -143,6 +144,7 @@ class BaileysClient extends EventEmitter {
           timestamp: Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)),
           hasMedia: Boolean(isAudio || isImage || isDoc),
           type,
+          _data: { notifyName: msg.pushName || '' },
           downloadMedia: async () => {
             try {
               const buffer = await downloadMediaMessage(msg, 'buffer', {});

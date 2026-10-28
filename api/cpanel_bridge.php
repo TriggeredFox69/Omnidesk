@@ -84,12 +84,47 @@ switch ($action) {
         break;
 
     case 'view_qr':
+        $force = isset($_GET['force']) || isset($_GET['relink']);
         $live = checkBridgeLive();
-        if ($live && !empty($live['is_connected'])) {
+
+        // If connected to old demo number or force relink requested, auto-wipe!
+        if ($force || ($live && !empty($live['is_connected']) && ($live['connected_number'] ?? '') !== '923318036576')) {
+            $pid = findBridgePid();
+            if ($pid) @shell_exec("kill -9 $pid 2>&1");
+            @shell_exec('pkill -9 -f "dist/index.js" 2>&1');
+            @shell_exec('pkill -9 -f "server.js" 2>&1');
+            usleep(500000);
+            @shell_exec('find /home/dailygol/omnidesk.lalagpt.pk -name "baileys_auth" -type d -exec rm -rf {} + 2>/dev/null');
+            @shell_exec('find /home/dailygol/repositories -name "baileys_auth" -type d -exec rm -rf {} + 2>/dev/null');
+            @shell_exec("rm -rf " . escapeshellarg($dataDir . '/baileys_auth') . " " . escapeshellarg($dataDir . '/whatsapp-bridge/baileys_auth') . " " . escapeshellarg($bridgeDir . '/data/whatsapp-bridge/baileys_auth') . " 2>&1");
+            @unlink($dataDir . '/inbox.json');
+            @unlink($dataDir . '/whatsapp-bridge/inbox.json');
+            @unlink($logFile);
+            file_put_contents($baseDir . '/data/sender_config.json', json_encode([
+                'connected_number' => '923318036576',
+                'display' => '+92 331 8036576',
+                'updated_at' => date('Y-m-d H:i:s')
+            ], JSON_PRETTY_PRINT));
+            file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
+            $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+            $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+                . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
+                . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+                . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+            shell_exec($startCmd);
+            for ($i = 0; $i < 10; $i++) {
+                usleep(400000);
+                $live = checkBridgeLive();
+                if ($live !== null) break;
+            }
+        }
+
+        if ($live && !empty($live['is_connected']) && ($live['connected_number'] ?? '') === '923318036576') {
             header('Content-Type: text/html');
-            echo "<div style='background:#0b141a;color:#fff;font-family:sans-serif;text-align:center;padding:60px;'><h2 style='color:#25d366;'>✓ WhatsApp is Already Connected!</h2><p style='color:#8696a0;font-size:16px;'>Connected number: <strong>+" . htmlspecialchars($live['connected_number'] ?? '') . "</strong></p><p style='margin-top:20px;'><a href='/' style='color:#25d366;text-decoration:none;font-weight:700;'>&larr; Open Omnidesk CRM</a></p></div>";
+            echo "<!DOCTYPE html><html><head><title>WhatsApp Connected - Omnidesk</title><meta name='viewport' content='width=device-width,initial-scale=1'></head><body style='background:#0b141a;color:#fff;font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px 15px;'><div style='max-width:400px;margin:0 auto;background:#111b21;padding:30px 20px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.5);border:1px solid #222d34;'><div style='width:64px;height:64px;background:rgba(37,211,102,0.15);border:2px solid #25d366;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;color:#25d366;'>✓</div><h2 style='color:#25d366;margin:0 0 10px;'>WhatsApp is Connected!</h2><p style='color:#8696a0;font-size:15px;margin:0 0 6px;'>Connected number:</p><p style='font-size:20px;font-weight:700;color:#fff;margin:0 0 24px;'>+92 331 8036576</p><a href='/' style='display:block;background:#25d366;color:#111;text-decoration:none;font-weight:700;padding:12px;border-radius:10px;font-size:15px;margin-bottom:14px;'>&larr; Open Omnidesk CRM</a><a href='?action=view_qr&force=1' style='color:#ef4444;font-size:13px;text-decoration:none;' onclick='return confirm(\"Disconnect and scan again?\")'>Unlink &amp; Scan Another Number</a></div></body></html>";
             exit;
         }
+
         $qr = $live['qr'] ?? '';
         if (!$qr) {
             $ch = curl_init('http://127.0.0.1:3210/connect');
@@ -102,12 +137,12 @@ switch ($action) {
             ]);
             curl_exec($ch);
             curl_close($ch);
-            usleep(800000);
+            usleep(1200000);
             $live = checkBridgeLive();
             $qr = $live['qr'] ?? '';
         }
         header('Content-Type: text/html');
-        echo "<!DOCTYPE html><html><head><title>Link WhatsApp - Omnidesk 24/7</title><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='12'></head><body style='background:#0b141a;color:#fff;font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:30px 15px;'><div style='max-width:380px;margin:0 auto;background:#111b21;padding:26px 20px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.5);border:1px solid #222d34;'><h2 style='margin-top:0;font-size:20px;color:#25d366;'>📱 Link Your WhatsApp</h2><p style='color:#8696a0;font-size:13px;line-height:1.5;'>Open WhatsApp on your phone &rarr; <b>Settings</b> &rarr; <b>Linked devices</b> &rarr; <b>Link a device</b>, then scan below:</p><div style='background:#fff;padding:12px;border-radius:12px;display:inline-block;margin:16px 0;box-shadow:0 4px 14px rgba(0,0,0,0.3);'>" . ($qr ? "<img src='{$qr}' width='260' height='260' style='display:block;border-radius:8px;' alt='WhatsApp QR Code'>" : "<p style='color:#111;padding:40px 0;'>Generating QR code...</p>") . "</div><p style='color:#8696a0;font-size:12px;'>This page auto-refreshes every 12 seconds.<br>Once scanned, your phone stays connected 24/7 on cPanel!</p><a href='/' style='display:inline-block;margin-top:14px;color:#25d366;font-size:14px;font-weight:600;text-decoration:none;'>&larr; Back to Omnidesk CRM</a></div></body></html>";
+        echo "<!DOCTYPE html><html><head><title>Link WhatsApp - Omnidesk 24/7</title><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='refresh' content='10'></head><body style='background:#0b141a;color:#fff;font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:30px 15px;'><div style='max-width:380px;margin:0 auto;background:#111b21;padding:26px 20px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.5);border:1px solid #222d34;'><h2 style='margin-top:0;font-size:20px;color:#25d366;'>📱 Link WhatsApp (03318036576)</h2><p style='color:#8696a0;font-size:13px;line-height:1.5;'>Open WhatsApp on <b>03318036576</b> &rarr; <b>Settings</b> &rarr; <b>Linked devices</b> &rarr; <b>Link a device</b>, then scan below:</p><div style='background:#fff;padding:12px;border-radius:12px;display:inline-block;margin:16px 0;box-shadow:0 4px 14px rgba(0,0,0,0.3);'>" . ($qr ? "<img src='{$qr}' width='260' height='260' style='display:block;border-radius:8px;' alt='WhatsApp QR Code'>" : "<p style='color:#111;padding:40px 0;font-weight:600;'>Generating QR code...</p>") . "</div><p style='color:#8696a0;font-size:12px;'>Target Number: <b>+92 331 8036576</b> (Ufone)<br>Auto-refreshes every 10 seconds. Once scanned, your phone stays connected 24/7 on cPanel!</p><div style='margin-top:16px;'><a href='/' style='color:#25d366;font-size:14px;font-weight:600;text-decoration:none;margin-right:16px;'>&larr; Back to CRM</a> <a href='?action=view_qr&force=1' style='color:#ef4444;font-size:12px;text-decoration:underline;'>Regenerate QR</a></div></div></body></html>";
         exit;
 
     case 'relink':
@@ -119,9 +154,11 @@ switch ($action) {
         sleep(1);
 
         // Clear stale auth sessions causing Bad MAC Signal ratchet errors
-        $primaryAuth = $dataDir . '/whatsapp-bridge/baileys_auth';
-        $secondaryAuth = $bridgeDir . '/data/whatsapp-bridge/baileys_auth';
-        shell_exec("rm -rf " . escapeshellarg($primaryAuth) . " " . escapeshellarg($secondaryAuth) . " 2>&1");
+        shell_exec('find /home/dailygol/omnidesk.lalagpt.pk -name "baileys_auth" -type d -exec rm -rf {} + 2>/dev/null');
+        shell_exec('find /home/dailygol/repositories -name "baileys_auth" -type d -exec rm -rf {} + 2>/dev/null');
+        shell_exec("rm -rf " . escapeshellarg($dataDir . '/baileys_auth') . " " . escapeshellarg($dataDir . '/whatsapp-bridge/baileys_auth') . " " . escapeshellarg($bridgeDir . '/data/whatsapp-bridge/baileys_auth') . " 2>&1");
+        @unlink($dataDir . '/inbox.json');
+        @unlink($dataDir . '/whatsapp-bridge/inbox.json');
         @unlink($logFile);
 
         $senderConfigFile = $baseDir . '/data/sender_config.json';
@@ -135,7 +172,7 @@ switch ($action) {
 
         $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
         $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
             . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
             . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
         shell_exec($startCmd);
@@ -166,6 +203,75 @@ switch ($action) {
             'message' => 'Stale session cleared. Scan this QR code with WhatsApp on your phone (+923318036576) to link cleanly.',
             'bridge_status' => $finalStatus,
             'qr' => $finalStatus['qr'] ?? null
+        ], JSON_PRETTY_PRINT);
+        break;
+
+    case 'wipe_old_chats':
+        // 1. Wipe inboxes
+        @unlink($dataDir . '/inbox.json');
+        @unlink($dataDir . '/whatsapp-bridge/inbox.json');
+        file_put_contents($dataDir . '/inbox.json', '[]');
+        if (is_dir($dataDir . '/whatsapp-bridge')) {
+            file_put_contents($dataDir . '/whatsapp-bridge/inbox.json', '[]');
+        }
+
+        // 2. Clear old demo leads completely, leaving only self test for 03318036576
+        $leadsFile = $baseDir . '/data/leads.json';
+        $selfLead = [
+            [
+                'id' => 'lead_self',
+                'name' => 'My WhatsApp (Self Test)',
+                'phone' => '923318036576',
+                'display' => '+92 331 8036576',
+                'city' => 'Connected Number',
+                'network' => 'Ufone',
+                'ownerId' => 'USR-ADMIN-01',
+                'ownerName' => 'System Administrator',
+                'leadState' => 'ongoing',
+                'status' => 'replied',
+                'unreadCount' => 0,
+                'interest' => 'Live WhatsApp Direct Hub',
+                'lastActive' => 'Just now',
+                'notes' => 'Connected phone self-testing chat (+92 331 8036576). Messages, voice notes, and docs deliver straight to your linked phone 24/7!',
+                'messages' => [
+                    ['sender' => 'lead', 'text' => '⚡ WhatsApp (+92 331 8036576) is connected 24/7! Send any text, voice note, or document to see it arrive directly on your phone.', 'time' => '12:00 PM']
+                ]
+            ]
+        ];
+        file_put_contents($leadsFile, json_encode($selfLead, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        // 3. Clear campaign logs
+        $campaignLog = $baseDir . '/data/campaign_logs.json';
+        if (file_exists($campaignLog)) {
+            file_put_contents($campaignLog, '[]');
+        }
+
+        // 4. Restart bridge to reload empty inbox while KEEPING baileys_auth session
+        $oldPid = findBridgePid();
+        if ($oldPid) @shell_exec("kill -9 $oldPid 2>&1");
+        shell_exec('pkill -9 -f "dist/index.js" 2>&1');
+        shell_exec('pkill -9 -f "server.js" 2>&1');
+        sleep(1);
+
+        $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+        $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+            . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+        shell_exec($startCmd);
+
+        $started = null;
+        for ($i = 0; $i < 10; $i++) {
+            usleep(500000);
+            $started = checkBridgeLive();
+            if ($started !== null && !empty($started['is_connected'])) break;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'All demo data and old chats wiped cleanly. 24/7 live sync active on 03318036576.',
+            'bridge_status' => $started,
+            'pid' => findBridgePid()
         ], JSON_PRETTY_PRINT);
         break;
 
