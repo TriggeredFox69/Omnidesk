@@ -25,11 +25,11 @@ function createInbox({ getClient, storageFile }) {
   }
   async function phoneFor(id) {
     if (!id || /@(g\.us|broadcast|newsletter)$/.test(id)) return null;
-    if (id.endsWith('@c.us') || id.endsWith('@s.whatsapp.net')) return id.split('@')[0].split(':')[0];
     if (aliases.has(id)) return aliases.get(id);
-    if (getClient() && typeof getClient().getContactLidAndPhone === 'function') {
+    const client = getClient();
+    if (client && typeof client.getContactLidAndPhone === 'function') {
       try {
-        const list = await getClient().getContactLidAndPhone([id]);
+        const list = await client.getContactLidAndPhone([id]);
         const pn = list?.[0]?.pn;
         if (pn) {
           const phone = pn.split('@')[0].split(':')[0];
@@ -37,6 +37,11 @@ function createInbox({ getClient, storageFile }) {
           return phone;
         }
       } catch (_) {}
+    }
+    if (id.endsWith('@c.us') || id.endsWith('@s.whatsapp.net')) {
+      const p = id.split('@')[0].split(':')[0];
+      aliases.set(id, p);
+      return p;
     }
     const clean = id.split('@')[0].split(':')[0].replace(/\D/g, '');
     return clean || null;
@@ -47,11 +52,13 @@ function createInbox({ getClient, storageFile }) {
     const fromMe = Boolean(message.fromMe || message.id.fromMe);
     const phone = knownPhone || await phoneFor(message.id.remote?._serialized || message.id.remote || (fromMe ? message.to : message.from));
     if (!phone || !/^\d{10,15}$/.test(phone)) return;
-    const type = ['ptt', 'audio'].includes(message.type) ? 'audio' : message.type === 'image' ? 'image' : (message.type === 'document' ? 'document' : 'text');
+    const type = ['ptt', 'audio'].includes(message.type) ? 'audio' :
+      message.type === 'image' ? 'image' : message.type === 'video' ? 'video' :
+        (message.type === 'document' ? 'document' : 'text');
     const previous = messages.get(id);
     const value = { id: 'wa_' + createHash('sha256').update(id).digest('hex').slice(0,24), waMessageId: id,
       phone, name: message._data?.notifyName || phone, sender: fromMe ? 'agent' : 'lead',
-      agentName: fromMe ? 'WhatsApp' : undefined, type, text: message.body || (type === 'audio' ? 'Voice note' : type === 'image' ? 'Image' : (type === 'document' ? 'Document' : '')),
+      agentName: fromMe ? 'WhatsApp' : undefined, type, text: message.body || (type === 'audio' ? 'Voice note' : type === 'image' ? 'Image' : (type === 'video' ? 'Video' : (type === 'document' ? 'Document' : ''))),
       timestamp: Number(message.timestamp) || Math.floor(Date.now()/1000), hasMedia: Boolean(message.hasMedia),
       durationSeconds: Number(message._data?.duration) || 0,
       deliveryStatus: fromMe ? statusOf(message.ack || 0) : undefined };

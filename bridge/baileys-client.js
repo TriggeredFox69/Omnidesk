@@ -2,23 +2,85 @@
 /**
  * Baileys WhatsApp Engine for Headless / CloudLinux / cPanel Environments
  * Zero Chromium or browser dependencies required.
+ * Fully compliant with Signal Protocol retry-receipts & 100% full-duplex sync.
  */
 const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const fs = require('node:fs');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage } = require('@whiskeysockets/baileys');
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  downloadMediaMessage,
+  normalizeMessageContent,
+  proto
+} = require('@whiskeysockets/baileys');
 const pino = require('pino');
+const NodeCache = require('@cacheable/node-cache').default || require('@cacheable/node-cache');
 const { ensureOggOpus } = require('./audio');
 
 class BaileysClient extends EventEmitter {
   constructor({ authPath, deviceName = 'Omnidesk Cloud' } = {}) {
     super();
     this.authPath = authPath || path.resolve(__dirname, '../data/whatsapp-bridge/baileys_auth');
+    this.rawStorePath = path.resolve(this.authPath, '../raw_messages.json');
     this.deviceName = deviceName;
     this.sock = null;
     this.info = { wid: { user: '' } };
     this._destroyed = false;
     this._messageCache = new Map();
+    this._rawMessageStore = new Map();
+    this._contacts = new Map();
+    this._lidToPhone = new Map();
+    this._phoneToLid = new Map();
+    this._msgRetryCache = new NodeCache({ stdTTL: 3600, useClones: false });
+    this._loadRawStore();
+  }
+
+  _loadRawStore() {
+    try {
+      if (fs.existsSync(this.rawStorePath)) {
+        const revive = (k, v) => (v && v.type === 'Buffer' && Array.isArray(v.data)) ? Buffer.from(v.data) : v;
+        const data = JSON.parse(fs.readFileSync(this.rawStorePath, 'utf8'), revive);
+        if (data && typeof data === 'object') {
+          for (const [k, v] of Object.entries(data)) {
+            if (typeof v === 'string') {
+              try {
+                this._rawMessageStore.set(k, proto.Message.decode(Buffer.from(v, 'base64')));
+              } catch (_) {}
+            } else if (v && typeof v === 'object') {
+              try {
+                this._rawMessageStore.set(k, proto.Message.fromObject(v));
+              } catch (_) {
+                this._rawMessageStore.set(k, v);
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  _saveRawStore() {
+    clearTimeout(this._saveRawTimer);
+    this._saveRawTimer = setTimeout(() => {
+      try {
+        const obj = {};
+        const entries = [...this._rawMessageStore.entries()].slice(-2000);
+        for (const [k, v] of entries) {
+          try {
+            const buf = proto.Message.encode(proto.Message.fromObject(v)).finish();
+            obj[k] = Buffer.from(buf).toString('base64');
+          } catch (_) {
+            obj[k] = v;
+          }
+        }
+        const tmp = this.rawStorePath + '.tmp';
+        fs.mkdirSync(path.dirname(this.rawStorePath), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(tmp, JSON.stringify(obj), 'utf8');
+        fs.renameSync(tmp, this.rawStorePath);
+      } catch (_) {}
+    }, 1000);
   }
 
   async initialize() {
@@ -31,7 +93,24 @@ class BaileysClient extends EventEmitter {
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
       browser: [this.deviceName, 'Chrome', '1.0.0'],
-      syncFullHistory: true
+      syncFullHistory: true,
+      msgRetryCounterCache: this._msgRetryCache,
+      getMessage: async (key) => {
+        const id = key?.id;
+        if (id && this._rawMessageStore.has(id)) {
+          const raw = this._rawMessageStore.get(id);
+          try {
+            return proto.Message.fromObject(raw);
+          } catch (_) {
+            return raw;
+          }
+        }
+        const cached = this._messageCache.get(id);
+        if (cached?.body) {
+          return { conversation: cached.body };
+        }
+        return undefined;
+      }
     });
 
     this.sock.ev.on('creds.update', saveCreds);
@@ -60,110 +139,127 @@ class BaileysClient extends EventEmitter {
         const rawId = this.sock.user?.id || '';
         const userNum = rawId.split(':')[0] || rawId.split('@')[0];
         this.info.wid.user = userNum;
+        if (this.sock.user?.lid) {
+          const myLid = this.sock.user.lid.split('@')[0].split(':')[0];
+          this._lidToPhone.set(myLid, userNum);
+          this._phoneToLid.set(userNum, myLid);
+        }
         this.emit('authenticated');
         this.emit('ready');
       }
     });
 
-    // Handle incoming messages
-    this.sock.ev.on('messages.upsert', async ({ messages }) => {
-      for (const msg of messages || []) {
-        if (!msg.message) continue;
-        const fromMe = Boolean(msg.key?.fromMe);
-        const jid = msg.key?.remoteJid || '';
-        const text = msg.message.conversation ||
-          msg.message.extendedTextMessage?.text ||
-          msg.message.imageMessage?.caption ||
-          msg.message.documentMessage?.caption ||
-          msg.message.documentMessage?.title ||
-          '';
+    const registerContacts = (contactsList) => {
+      for (const c of contactsList || []) {
+        if (!c) continue;
+        const phone = c.id ? c.id.split('@')[0].split(':')[0] : '';
+        const name = c.name || c.notify || c.verifiedName || '';
+        if (phone && name) {
+          this._contacts.set(phone, name);
+          this._contacts.set(c.id, name);
+        }
+        if (c.lid && phone) {
+          const lidClean = c.lid.split('@')[0].split(':')[0];
+          this._lidToPhone.set(lidClean, phone);
+          this._phoneToLid.set(phone, lidClean);
+        }
+      }
+    };
 
-        const isAudio = Boolean(msg.message.audioMessage);
-        const isImage = Boolean(msg.message.imageMessage);
-        const isDoc = Boolean(msg.message.documentMessage);
-        const type = isAudio ? 'audio' : (isImage ? 'image' : (isDoc ? 'document' : 'chat'));
+    this.sock.ev.on('contacts.upsert', registerContacts);
+    this.sock.ev.on('contacts.update', registerContacts);
 
-        const adaptedMsg = {
-          id: { _serialized: msg.key.id, fromMe, remote: jid },
-          from: jid,
-          to: fromMe ? jid : `${this.info.wid.user}@s.whatsapp.net`,
-          body: text,
-          timestamp: Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)),
-          hasMedia: Boolean(isAudio || isImage || isDoc),
-          type,
-          _data: { notifyName: msg.pushName || '' },
-          downloadMedia: async () => {
-            try {
-              const buffer = await downloadMediaMessage(msg, 'buffer', {});
-              const mime = msg.message.imageMessage?.mimetype ||
-                msg.message.audioMessage?.mimetype ||
-                msg.message.documentMessage?.mimetype ||
-                'application/octet-stream';
-              const filename = msg.message.documentMessage?.fileName ||
-                (type === 'image' ? 'image.jpg' : (type === 'audio' ? 'voice.ogg' : 'document.pdf'));
-              return { data: buffer.toString('base64'), mimetype: mime, filename };
-            } catch (err) {
-              console.error('[Baileys] Media download failed:', err.message);
-              return null;
-            }
+    const adaptMessage = msg => {
+      if (!msg?.message || !msg.key?.id) return null;
+      const content = normalizeMessageContent(msg.message) || msg.message;
+      const fromMe = Boolean(msg.key?.fromMe);
+      let jid = msg.key?.remoteJid || '';
+      const myNum = this.info?.wid?.user || '';
+      const myLid = this.sock?.user?.lid ? this.sock.user.lid.split('@')[0].split(':')[0] : '';
+
+      // Normalize LID to real phone if known
+      if (jid.endsWith('@lid')) {
+        const lidClean = jid.split('@')[0].split(':')[0];
+        if (lidClean === myLid && myNum) {
+          jid = `${myNum}@s.whatsapp.net`;
+        } else if (this._lidToPhone.has(lidClean)) {
+          jid = `${this._lidToPhone.get(lidClean)}@s.whatsapp.net`;
+        }
+      }
+
+      const media = content.imageMessage || content.videoMessage || content.audioMessage || content.documentMessage || content.stickerMessage;
+      const isAudio = Boolean(content.audioMessage);
+      const isImage = Boolean(content.imageMessage || content.stickerMessage);
+      const isVideo = Boolean(content.videoMessage);
+      const isDoc = Boolean(content.documentMessage);
+      const type = isAudio ? 'audio' : (isImage ? 'image' : (isVideo ? 'video' : (isDoc ? 'document' : 'chat')));
+      const text = content.conversation || content.extendedTextMessage?.text ||
+        content.imageMessage?.caption || content.videoMessage?.caption ||
+        content.documentMessage?.caption || content.documentMessage?.title || '';
+      const extension = isVideo ? 'mp4' : (isImage ? (content.stickerMessage ? 'webp' : 'jpg') : (isAudio ? 'ogg' : 'bin'));
+      const filename = content.documentMessage?.fileName || media?.fileName || `${type}.${extension}`;
+
+      const phoneClean = jid.split('@')[0].split(':')[0];
+      const notifyName = msg.pushName || this._contacts.get(phoneClean) || this._contacts.get(jid) || '';
+
+      return {
+        id: { _serialized: msg.key.id, fromMe, remote: jid },
+        from: fromMe ? `${myNum}@s.whatsapp.net` : jid,
+        to: fromMe ? jid : `${myNum}@s.whatsapp.net`,
+        body: text,
+        timestamp: Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)),
+        hasMedia: Boolean(media),
+        type,
+        _data: { notifyName, duration: media?.seconds || 0 },
+        downloadMedia: async () => {
+          try {
+            const buffer = await downloadMediaMessage(msg, 'buffer', {});
+            return { data: buffer.toString('base64'), mimetype: media?.mimetype || (content.stickerMessage ? 'image/webp' : 'application/octet-stream'), filename };
+          } catch (err) {
+            console.error('[Baileys] Media download failed:', err.message);
+            return null;
           }
-        };
+        }
+      };
+    };
+
+    const emitMessages = messages => {
+      for (const msg of messages || []) {
+        const adaptedMsg = adaptMessage(msg);
+        if (!adaptedMsg) continue;
         this._messageCache.set(msg.key.id, adaptedMsg);
-        if (this._messageCache.size > 500) {
+        if (this._messageCache.size > 2000) {
           this._messageCache.delete(this._messageCache.keys().next().value);
         }
         this.emit('message_create', adaptedMsg);
       }
+    };
+
+    // Handle incoming and outgoing live messages
+    this.sock.ev.on('messages.upsert', ({ messages }) => {
+      for (const msg of messages || []) {
+        if (msg.key?.id && msg.message) {
+          this._rawMessageStore.set(msg.key.id, msg.message);
+        }
+      }
+      this._saveRawStore();
+      emitMessages(messages);
     });
 
     // Handle full chat history sync from newly linked device
     this.sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
       console.log(`[Baileys] History sync received: ${chats?.length || 0} chats, ${messages?.length || 0} messages.`);
+      registerContacts(contacts);
       for (const msg of messages || []) {
-        if (!msg.message) continue;
-        const fromMe = Boolean(msg.key?.fromMe);
-        const jid = msg.key?.remoteJid || '';
-        if (jid.endsWith('@g.us') || jid.endsWith('@broadcast') || jid.endsWith('@newsletter')) continue;
-        const text = msg.message.conversation ||
-          msg.message.extendedTextMessage?.text ||
-          msg.message.imageMessage?.caption ||
-          msg.message.documentMessage?.caption ||
-          msg.message.documentMessage?.title ||
-          '';
-
-        const isAudio = Boolean(msg.message.audioMessage);
-        const isImage = Boolean(msg.message.imageMessage);
-        const isDoc = Boolean(msg.message.documentMessage);
-        const type = isAudio ? 'audio' : (isImage ? 'image' : (isDoc ? 'document' : 'chat'));
-
-        const adaptedMsg = {
-          id: { _serialized: msg.key.id, fromMe, remote: jid },
-          from: jid,
-          to: fromMe ? jid : `${this.info.wid.user}@s.whatsapp.net`,
-          body: text,
-          timestamp: Number(msg.messageTimestamp || Math.floor(Date.now() / 1000)),
-          hasMedia: Boolean(isAudio || isImage || isDoc),
-          type,
-          _data: { notifyName: msg.pushName || '' },
-          downloadMedia: async () => {
-            try {
-              const buffer = await downloadMediaMessage(msg, 'buffer', {});
-              const mime = msg.message.imageMessage?.mimetype ||
-                msg.message.audioMessage?.mimetype ||
-                msg.message.documentMessage?.mimetype ||
-                'application/octet-stream';
-              const filename = msg.message.documentMessage?.fileName ||
-                (type === 'image' ? 'image.jpg' : (type === 'audio' ? 'voice.ogg' : 'document.pdf'));
-              return { data: buffer.toString('base64'), mimetype: mime, filename };
-            } catch (err) {
-              console.error('[Baileys] Media download failed:', err.message);
-              return null;
-            }
-          }
-        };
-        this._messageCache.set(msg.key.id, adaptedMsg);
-        this.emit('message_create', adaptedMsg);
+        if (msg.key?.id && msg.message) {
+          this._rawMessageStore.set(msg.key.id, msg.message);
+        }
       }
+      this._saveRawStore();
+      emitMessages((messages || []).filter(msg => {
+        const jid = msg.key?.remoteJid || '';
+        return !jid.endsWith('@g.us') && !jid.endsWith('@broadcast') && !jid.endsWith('@newsletter');
+      }));
     });
 
     // Handle delivery / read receipts
@@ -212,6 +308,69 @@ class BaileysClient extends EventEmitter {
     return { _serialized: `${norm}@s.whatsapp.net` };
   }
 
+  async getContactLidAndPhone(ids) {
+    const results = [];
+    const myLid = this.sock?.user?.lid ? this.sock.user.lid.split('@')[0].split(':')[0] : '';
+    const myNum = this.info?.wid?.user || '';
+    for (const rawId of ids || []) {
+      const id = String(rawId || '').trim();
+      const clean = id.split('@')[0].split(':')[0].replace(/\D/g, '');
+      if (clean === myLid && myNum) {
+        results.push({ lid: `${myLid}@lid`, pn: `${myNum}@s.whatsapp.net` });
+        continue;
+      }
+      if (this._lidToPhone.has(clean)) {
+        const pn = this._lidToPhone.get(clean);
+        results.push({ lid: `${clean}@lid`, pn: `${pn}@s.whatsapp.net` });
+        continue;
+      }
+      if (this._phoneToLid.has(clean)) {
+        const lid = this._phoneToLid.get(clean);
+        results.push({ lid: `${lid}@lid`, pn: `${clean}@s.whatsapp.net` });
+        continue;
+      }
+    }
+    return results;
+  }
+
+  async getChatById(chatId) {
+    const cleanJid = this._normalizeJid(chatId);
+    return {
+      id: { _serialized: cleanJid },
+      fetchMessages: async ({ limit = 50 } = {}) => {
+        const msgs = [];
+        for (const msg of this._messageCache.values()) {
+          if (msg.from === cleanJid || msg.to === cleanJid || msg.id?.remote === cleanJid) {
+            msgs.push(msg);
+          }
+        }
+        return msgs.slice(-limit);
+      }
+    };
+  }
+
+  async getChats() {
+    const chatMap = new Map();
+    for (const msg of this._messageCache.values()) {
+      const remote = msg.id?.remote || (msg.fromMe ? msg.to : msg.from);
+      if (remote && !chatMap.has(remote)) {
+        chatMap.set(remote, {
+          id: { _serialized: remote },
+          isGroup: remote.endsWith('@g.us'),
+          timestamp: msg.timestamp || 0,
+          fetchMessages: async ({ limit = 30 } = {}) => {
+            const msgs = [];
+            for (const m of this._messageCache.values()) {
+              if (m.from === remote || m.to === remote || m.id?.remote === remote) msgs.push(m);
+            }
+            return msgs.slice(-limit);
+          }
+        });
+      }
+    }
+    return [...chatMap.values()];
+  }
+
   async sendMessage(toJid, content, options = {}) {
     if (!this.sock) throw new Error('WhatsApp connection is not initialized.');
     const jid = this._normalizeJid(toJid);
@@ -243,6 +402,12 @@ class BaileysClient extends EventEmitter {
           mimetype: content.mimetype,
           ptt: false
         });
+      } else if (content.mimetype.startsWith('video/')) {
+        sent = await this.sock.sendMessage(jid, {
+          video: buffer,
+          mimetype: content.mimetype,
+          caption: options.caption || ''
+        });
       } else {
         // Document sending (PDF, Word, Excel, text, zip, etc.)
         sent = await this.sock.sendMessage(jid, {
@@ -258,6 +423,13 @@ class BaileysClient extends EventEmitter {
 
     const id = sent?.key?.id || `BAIL_${Date.now()}`;
     const myNum = this.info?.wid?.user || '';
+
+    // CRITICAL: Cache raw message proto so retry requests can decrypt and prevent "Waiting for this message"
+    if (sent?.key?.id && sent?.message) {
+      this._rawMessageStore.set(sent.key.id, sent.message);
+      this._saveRawStore();
+    }
+
     console.log(`[Baileys] Message sent successfully! ID: ${id} to ${jid}`);
 
     const adaptedOut = {
@@ -268,7 +440,7 @@ class BaileysClient extends EventEmitter {
       body: typeof content === 'string'
         ? content
         : (options.caption || (isVoice ? 'Voice note' : (content.mimetype?.startsWith('image/') ? 'Image' : (content.filename || 'Document')))),
-      type: isVoice ? 'audio' : (content.mimetype?.startsWith('image/') ? 'image' : (content.mimetype ? 'document' : 'chat')),
+      type: isVoice ? 'audio' : (content.mimetype?.startsWith('image/') ? 'image' : (content.mimetype?.startsWith('video/') ? 'video' : (content.mimetype ? 'document' : 'chat'))),
       hasMedia: Boolean(content && content.data),
       timestamp: Math.floor(Date.now() / 1000),
       ack: 1,
@@ -278,7 +450,7 @@ class BaileysClient extends EventEmitter {
       }
     };
     this._messageCache.set(id, adaptedOut);
-    if (this._messageCache.size > 500) {
+    if (this._messageCache.size > 2000) {
       this._messageCache.delete(this._messageCache.keys().next().value);
     }
 

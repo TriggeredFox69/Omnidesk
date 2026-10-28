@@ -1,6 +1,7 @@
 <?php
 /** Receive WhatsApp Cloud API delivery status updates. */
 header('Cache-Control: no-cache, no-store, must-revalidate');
+require_once __DIR__ . '/cloud_inbox.php';
 
 $verifyToken = getenv('WHATSAPP_WEBHOOK_VERIFY_TOKEN') ?: '';
 $appSecret = getenv('WHATSAPP_APP_SECRET') ?: '';
@@ -35,6 +36,13 @@ $payload = json_decode($body, true);
 if (!is_array($payload)) {
     http_response_code(400);
     exit('Invalid JSON.');
+}
+
+try {
+    cloudInboxApplyWebhook($payload);
+} catch (Throwable $error) {
+    http_response_code(500);
+    exit('Could not persist WhatsApp inbox event.');
 }
 
 $updates = [];

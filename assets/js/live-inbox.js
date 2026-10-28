@@ -8,16 +8,37 @@
       if (!response.ok || !result.success) throw new Error(result.message || 'WhatsApp request failed.');
       return result;
     }
+    const cleanDigits = p => {
+      let c = String(p || '').replace(/\D/g, '');
+      if (c.startsWith('0092')) c = c.slice(2);
+      else if (c.startsWith('03') && c.length === 11) c = '92' + c.slice(1);
+      else if (c.startsWith('3') && c.length === 10) c = '92' + c;
+      return c;
+    };
     function merge(item) {
-      let lead = state.leads.find(l => l.phone === item.phone);
+      const itemPhone = cleanDigits(item.phone);
+      let lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
       if (!lead) {
-        lead = { id: 'wa_lead_' + item.phone, phone: item.phone, display: '+' + item.phone,
+        lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: '+' + (itemPhone || item.phone),
           name: item.name || item.phone, city: '', network: '', ownerId: null, leadState: 'fresh',
           status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
         state.leads.unshift(lead);
+        // Persist newly discovered WhatsApp conversation to database
+        fetch('api/leads_sync.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add_lead', phone: lead.phone, name: lead.name })
+        }).catch(() => {});
       }
       const previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
-      if (lead.name === lead.phone && item.sender === 'lead' && item.name) lead.name = item.name;
+      if (lead.name === lead.phone && item.sender === 'lead' && item.name) {
+        lead.name = item.name;
+        fetch('api/leads_sync.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update_lead', id: lead.id, name: lead.name })
+        }).catch(() => {});
+      }
       const fields = { ...item, time: new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: item.durationSeconds ? `${Math.floor(item.durationSeconds / 60)}:${String(item.durationSeconds % 60).padStart(2,'0')}` : undefined };
       if (previous) Object.assign(previous, fields, { id: previous.id, agentName: previous.agentName || item.agentName });
@@ -26,6 +47,12 @@
         if (item.sender === 'lead' && (state.activeLeadId !== lead.id || state.currentTab !== 'inbox' || document.hidden)) {
           lead.unreadCount = (lead.unreadCount || 0) + 1; lead.status = 'unread';
         }
+        // Save new message to server database so leads.json stays in full duplex sync
+        fetch('api/leads_sync.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update_lead', id: lead.id, newMessage: fields, lastActive: 'Just now' })
+        }).catch(() => {});
       }
       lead.messages.sort((a,b) => (a.timestamp || 0)-(b.timestamp || 0));
       lead.lastMessageAt = Math.max(lead.lastMessageAt || 0, item.timestamp);
@@ -34,12 +61,13 @@
       return lead;
     }
     async function loadMedia(message) {
-      if (message.audioUrl || message.imageUrl || message.docUrl || !message.waMessageId) return;
+      if (message.audioUrl || message.imageUrl || message.videoUrl || message.docUrl || !message.waMessageId) return;
       if (!mediaRequests.has(message.waMessageId)) {
         mediaRequests.set(message.waMessageId, api('get_media', { message_id: message.waMessageId }).then(result => {
           if (!/^data:(image|audio|video|application|text)\/[a-z0-9.+-]+(;[^,]*)?;base64,/i.test(result.data_url)) throw new Error('Unsupported attachment.');
           if (message.type === 'audio') message.audioUrl = result.data_url;
           else if (message.type === 'image') message.imageUrl = result.data_url;
+          else if (message.type === 'video') message.videoUrl = result.data_url;
           else message.docUrl = result.data_url;
           if (result.filename) message.filename = result.filename;
           message.mediaError = '';
@@ -80,7 +108,7 @@
             presenceEl.textContent = presence.label;
             presenceEl.className = 'chat-presence presence-' + presence.state;
           }
-          const unhandled = lead.messages.find(m => (m.type === 'image' || m.type === 'document' || m.type === 'audio') && m.hasMedia && !m.imageUrl && !m.docUrl && !m.audioUrl && !m.mediaError);
+          const unhandled = lead.messages.find(m => (m.type === 'image' || m.type === 'video' || m.type === 'document' || m.type === 'audio') && m.hasMedia && !m.imageUrl && !m.videoUrl && !m.docUrl && !m.audioUrl && !m.mediaError);
           if (unhandled && !mediaRequests.has(unhandled.waMessageId)) loadMedia(unhandled).catch(() => {}).finally(() => { if (state.activeLeadId === lead.id) renderChat(); });
         }
       } catch (_) {
@@ -97,11 +125,11 @@
       const match = /^data:([^,]+);base64,(.+)$/s.exec(dataUrl || '');
       if (!match || match[2].length > 14*1024*1024) return toast('Choose an attachment up to 10 MB.');
       const mime = match[1].toLowerCase();
-      const type = mime.startsWith('audio/') ? 'audio' : (mime.startsWith('image/') ? 'image' : 'document');
+      const type = mime.startsWith('audio/') ? 'audio' : (mime.startsWith('image/') ? 'image' : (mime.startsWith('video/') ? 'video' : 'document'));
       const message = { id: 'media_' + crypto.randomUUID(), sender: 'agent', agentName: user?.name || 'Agent',
-        type, text: caption || (type === 'audio' ? 'Voice note' : (type === 'image' ? 'Image' : filename || 'Document')), deliveryStatus: 'sending',
+        type, text: caption || (type === 'audio' ? 'Voice note' : (type === 'image' ? 'Image' : (type === 'video' ? 'Video' : filename || 'Document'))), deliveryStatus: 'sending',
         timestamp: Math.floor(Date.now()/1000), time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
-        durationSeconds: duration, [type === 'audio' ? 'audioUrl' : (type === 'image' ? 'imageUrl' : 'docUrl')]: dataUrl, filename };
+        durationSeconds: duration, [type === 'audio' ? 'audioUrl' : (type === 'image' ? 'imageUrl' : (type === 'video' ? 'videoUrl' : 'docUrl'))]: dataUrl, filename };
       lead.messages.push(message); sendingMedia = true; renderList(); renderChat();
       try {
         const result = await api('send_direct', { phone: lead.phone, message: caption || '', request_id: message.id,

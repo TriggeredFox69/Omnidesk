@@ -34,18 +34,26 @@ if (forceBaileys) {
     deviceName: 'Omnidesk cPanel 24/7'
   });
 } else {
-  const { Client, LocalAuth } = require('whatsapp-web.js');
-  console.log('🌐 Using Headless Chromium WhatsApp engine (whatsapp-web.js).');
-  createClientFn = () => new Client({
-    authStrategy: new LocalAuth({ dataPath: path.join(dataPath, 'auth') }),
-    webVersionCache: { type: 'local', path: path.join(dataPath, 'cache') },
-    deviceName: 'Nunno Campaigns',
-    puppeteer: {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
-      ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {})
-    }
-  });
+  try {
+    const { Client, LocalAuth } = require('whatsapp-web.js');
+    console.log('🌐 Using Headless Chromium WhatsApp engine (whatsapp-web.js).');
+    createClientFn = () => new Client({
+      authStrategy: new LocalAuth({ dataPath: path.join(dataPath, 'auth') }),
+      webVersionCache: { type: 'local', path: path.join(dataPath, 'cache') },
+      deviceName: 'Nunno Campaigns',
+      puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+        ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {})
+      }
+    });
+  } catch (_) {
+    console.log('⚡ Using pure WebSocket WhatsApp engine (Baileys) — Zero Chromium required, cPanel native.');
+    createClientFn = () => new BaileysClient({
+      authPath: path.join(dataPath, 'baileys_auth'),
+      deviceName: 'Omnidesk cPanel 24/7'
+    });
+  }
 }
 
 const service = createService({

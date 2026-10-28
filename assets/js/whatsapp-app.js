@@ -1148,11 +1148,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           const isDoc = msg.type === 'document';
           const isImg = msg.type === 'image';
+          const isVideo = msg.type === 'video';
           const hasCustomCaption = msg.text && msg.text !== 'Image' && msg.text !== 'Voice note' && msg.text !== 'Document' && msg.text !== msg.filename;
 
           bubble.innerHTML = `
             ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
             ${isImg ? (msg.imageUrl ? `<a href="${escapeHtml(msg.imageUrl)}" target="_blank" download="${escapeHtml(msg.filename || 'image.jpg')}"><img src="${escapeHtml(msg.imageUrl)}" alt="Chat image" style="max-width:280px;max-height:300px;border-radius:10px;display:block;cursor:pointer;"></a>` : `<div>${escapeHtml(msg.mediaError || 'Loading image…')}</div>`) : ''}
+            ${isVideo ? (msg.videoUrl ? `<video src="${escapeHtml(msg.videoUrl)}" controls preload="metadata" style="max-width:280px;max-height:300px;border-radius:10px;display:block;"></video>` : `<div>${escapeHtml(msg.mediaError || 'Loading video…')}</div>`) : ''}
             ${isDoc ? `
               <div class="msg-doc-card" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);padding:10px 12px;border-radius:10px;margin-bottom:6px;">
                 <span style="font-size:24px;">📄</span>
@@ -1162,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 ${msg.docUrl ? `<a href="${escapeHtml(msg.docUrl)}" download="${escapeHtml(msg.filename || 'document')}" class="btn btn-xs" style="padding:4px 8px;background:rgba(255,255,255,0.15);color:#fff;border-radius:6px;text-decoration:none;">⬇</a>` : ''}
               </div>` : ''}
-            ${hasCustomCaption || (!isDoc && !isImg) ? `<div>${formatText(msg.text)}</div>` : ''}
+            ${hasCustomCaption || (!isDoc && !isImg && !isVideo) ? `<div>${formatText(msg.text)}</div>` : ''}
             <div class="msg-meta-row">
               <span>${escapeHtml(msg.time)}</span>
               ${deliveryMarkup}
@@ -4223,7 +4225,7 @@ document.addEventListener('DOMContentLoaded', () => {
       audioChunks = [];
       recordingSeconds = 0;
 
-      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4'];
+      const mimeTypes = ['audio/ogg;codecs=opus', 'audio/ogg', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
       let selectedMime = '';
       for (const m of mimeTypes) {
         if (MediaRecorder.isTypeSupported(m)) {

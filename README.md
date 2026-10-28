@@ -34,8 +34,12 @@ To unlink, remove **Nunno Campaigns** from Linked devices on your phone. Use Con
 
 Requests are serialized and repeated campaign requests are deduplicated while the bridge process remains running (last 2,000 requests). If a send times out, check the WhatsApp chat before retrying, especially after restarting the bridge. Campaign progress is browser-session state, not a durable background job.
 
-### Optional Cloud API mode
-Set `WHATSAPP_SEND_MODE=cloud_api` in PHP to use the existing Cloud API sender instead. Configure `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, and `WHATSAPP_GRAPH_API_VERSION`. Optional settings are `WHATSAPP_DISPLAY_PHONE_NUMBER`, `WHATSAPP_TEMPLATE_NAME`, and `WHATSAPP_TEMPLATE_LANGUAGE`. Cloud delivery receipts require `WHATSAPP_WEBHOOK_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET`, with `/api/whatsapp_webhook.php` as the Meta webhook callback. QR linking is only available in the default mode.
+### Optional Meta Cloud API / Business App Coexistence
+For an eligible WhatsApp Business App number that must stay active in both the phone app and Omnidesk, onboard using Meta Embedded Signup's Business App Coexistence flow through an eligible Solution Partner or Tech Provider. A normal Cloud API registration is not a substitute: it may require moving the number off the Business App. Do not switch `WHATSAPP_SEND_MODE` until onboarding is complete and the webhook is configured.
+
+Set `WHATSAPP_SEND_MODE=cloud_api` in PHP and configure `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_GRAPH_API_VERSION`, `WHATSAPP_DISPLAY_PHONE_NUMBER`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, and `WHATSAPP_APP_SECRET`. Set Meta's webhook callback to `/api/whatsapp_webhook.php`, verify it, and subscribe the WABA to `messages` and `smb_message_echoes` for two-way inbox updates. The endpoint handles inbound messages/media references, app-sent message echoes, initial history events, delivery receipts, and Cloud API media retrieval. QR linking remains available only in the default linked-device mode.
+
+Meta's current pricing page says service replies during the 24-hour customer-service window are free. Business-initiated marketing templates are charged per delivered message, so campaign sending is not guaranteed to be free. A coexistence provider may also charge. Cloud API supports native voice notes with its `voice` flag when the upload is OGG/Opus; browser recordings in WebM are rejected for that mode.
 
 ---
 
