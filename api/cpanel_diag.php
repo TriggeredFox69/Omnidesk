@@ -75,6 +75,28 @@ $localHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $localErr = curl_error($ch);
 curl_close($ch);
 
+$sendDebug = null;
+if (isset($_GET['test_send'])) {
+    $sendCh = curl_init('http://127.0.0.1:3210/send');
+    curl_setopt_array($sendCh, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . ($conn['token'] ?? ''), 'Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['phone' => '923318036576', 'message' => 'Omnidesk test ping'])
+    ]);
+    $sendRaw = curl_exec($sendCh);
+    $sendCode = curl_getinfo($sendCh, CURLINFO_HTTP_CODE);
+    $sendErr = curl_error($sendCh);
+    curl_close($sendCh);
+    $sendDebug = [
+        'http_code' => $sendCode,
+        'curl_err' => $sendErr,
+        'raw_res' => $sendRaw,
+        'json_res' => json_decode((string)$sendRaw, true)
+    ];
+}
+
 echo json_encode([
     'api_files' => scandir(__DIR__),
     'cpanel_bridge_exists' => file_exists(__DIR__ . '/cpanel_bridge.php'),
@@ -82,5 +104,6 @@ echo json_encode([
     'local_bridge_status' => json_decode($localStatus, true),
     'local_bridge_http' => $localHttp,
     'local_bridge_err' => $localErr,
+    'send_debug' => $sendDebug,
     'recent_log' => file_exists($logFile) ? array_slice(explode("\n", file_get_contents($logFile)), -30) : []
 ], JSON_PRETTY_PRINT);
