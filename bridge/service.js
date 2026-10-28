@@ -23,8 +23,21 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
     is_connected: phase === 'ready', is_configured: phase === 'ready',
     connected_number: number, qr, message: error });
 
-  function connect() {
-    if (starting || ['ready', 'qr', 'authenticated'].includes(phase)) return;
+  async function disconnect(wipe = false) {
+    phase = 'disconnected'; qr = null; number = ''; error = '';
+    if (client) {
+      client.removeAllListeners();
+      if (wipe && typeof client.resetSession === 'function') {
+        await client.resetSession().catch(() => {});
+      } else {
+        await client.destroy().catch(() => {});
+      }
+      client = null;
+    }
+  }
+
+  function connect(force = false) {
+    if (!force && (starting || ['ready', 'qr', 'authenticated'].includes(phase))) return;
     phase = 'starting'; qr = null; number = ''; error = '';
     starting = (async () => {
       if (client) { client.removeAllListeners(); await client.destroy().catch(() => {}); }
@@ -176,8 +189,13 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
       }
       let body;
       try { body = JSON.parse(raw || '{}'); } catch (_) { throw Object.assign(new Error('Invalid JSON.'), { status: 400 }); }
-      if (!body || typeof body !== 'object') throw Object.assign(new Error('Invalid request.'), { status: 400 });
-      if (url.pathname === '/connect') { connect(); reply(200, snapshot()); return; }
+      if (url.pathname === '/connect') { connect(false); reply(200, snapshot()); return; }
+      if (url.pathname === '/reconnect' || url.pathname === '/reset') {
+        await disconnect(true);
+        connect(true);
+        reply(200, { success: true, message: 'Session reset cleanly. Generating fresh QR code.', ...snapshot() });
+        return;
+      }
       if (url.pathname === '/sync-chat') { await inbox.syncChat(body.phone); reply(200, { success: true }); return; }
       if (url.pathname === '/send') { reply(200, await send(body)); return; }
       reply(404, { success: false, message: 'Unknown route.' });

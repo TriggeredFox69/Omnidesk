@@ -71,8 +71,9 @@ function handleWhatsAppBridge(string $action, array $input): void {
     }
     // Avoid blocking status polling behind a long-running send.
     session_write_close();
-    if ($action === 'get_sender_info' || $action === 'connect_whatsapp') {
-        $result = whatsappBridgeRequest($action === 'connect_whatsapp' ? '/connect' : '/status', $action === 'connect_whatsapp' ? [] : null);
+    if ($action === 'get_sender_info' || $action === 'connect_whatsapp' || $action === 'reconnect_whatsapp') {
+        $path = $action === 'reconnect_whatsapp' ? '/reconnect' : ($action === 'connect_whatsapp' ? '/connect' : '/status');
+        $result = whatsappBridgeRequest($path, in_array($action, ['connect_whatsapp', 'reconnect_whatsapp'], true) ? [] : null);
         if (!$admin) unset($result['qr']);
         // If the bridge is offline on cPanel, accurately report offline state so the user is informed
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {

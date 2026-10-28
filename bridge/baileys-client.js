@@ -13,7 +13,9 @@ const {
   DisconnectReason,
   downloadMediaMessage,
   normalizeMessageContent,
-  proto
+  proto,
+  Browsers,
+  fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const NodeCache = require('@cacheable/node-cache').default || require('@cacheable/node-cache');
@@ -87,12 +89,18 @@ class BaileysClient extends EventEmitter {
     this._destroyed = false;
     fs.mkdirSync(this.authPath, { recursive: true, mode: 0o700 });
     const { state, saveCreds } = await useMultiFileAuthState(this.authPath);
+    let version = [2, 3000, 1043857760];
+    try {
+      const v = await fetchLatestBaileysVersion();
+      if (v?.version) version = v.version;
+    } catch (_) {}
 
     this.sock = makeWASocket({
+      version,
       auth: state,
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
-      browser: [this.deviceName, 'Chrome', '1.0.0'],
+      browser: Browsers.ubuntu('Chrome'),
       syncFullHistory: true,
       msgRetryCounterCache: this._msgRetryCache,
       getMessage: async (key) => {
@@ -459,6 +467,26 @@ class BaileysClient extends EventEmitter {
 
   async getMessageById(id) {
     return this._messageCache.get(id) || null;
+  }
+
+  async resetSession() {
+    this._destroyed = true;
+    if (this.sock) {
+      try { this.sock.end(undefined); } catch (_) {}
+      this.sock = null;
+    }
+    this._rawMessageStore.clear();
+    this._messageCache.clear();
+    this._contacts.clear();
+    this._lidToPhone.clear();
+    this._phoneToLid.clear();
+    try {
+      if (fs.existsSync(this.rawStorePath)) fs.unlinkSync(this.rawStorePath);
+      if (fs.existsSync(this.authPath)) {
+        fs.rmSync(this.authPath, { recursive: true, force: true });
+      }
+    } catch (_) {}
+    this._destroyed = false;
   }
 
   async destroy() {

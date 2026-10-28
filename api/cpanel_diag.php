@@ -8,6 +8,32 @@ $logFile = $baseDir . '/data/whatsapp-bridge/bridge.log';
 
 $conn = file_exists($connFile) ? require($connFile) : null;
 
+// Allow executing clean pairing action directly through diag to eliminate stale prekeys
+if (isset($_GET['clean_pair'])) {
+    $authDir = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
+    if (is_dir($authDir)) {
+        @shell_exec('rm -rf ' . escapeshellarg($authDir));
+    }
+    @unlink($baseDir . '/data/whatsapp-bridge/raw_messages.json');
+    @unlink($baseDir . '/data/whatsapp-bridge/whatsapp-bridge/raw_messages.json');
+    $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+    if ($output) {
+        $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
+        foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
+    }
+    sleep(1);
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+    $bridgeDir = $baseDir . '/bridge';
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    shell_exec($startCmd);
+    sleep(3);
+}
+
 // Allow executing wipe action directly through diag
 if (isset($_GET['wipe'])) {
     @unlink($baseDir . '/data/whatsapp-bridge/inbox.json');
