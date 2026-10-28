@@ -135,6 +135,8 @@ if (isset($_GET['test_send'])) {
 }
 
 echo json_encode([
+    'baseDir' => $baseDir,
+    'repo_status' => shell_exec('cd /home/dailygol/repositories/Omnidesk && git status 2>&1'),
     'api_files' => scandir(__DIR__),
     'cpanel_bridge_exists' => file_exists(__DIR__ . '/cpanel_bridge.php'),
     'connection_php' => $conn,
