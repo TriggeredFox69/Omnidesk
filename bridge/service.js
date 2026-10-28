@@ -68,7 +68,7 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
       client.on('disconnected', () => { phase = 'disconnected'; qr = null; number = ''; error = 'WhatsApp disconnected. Reconnect to continue.'; });
       client.on('message_ack', (message, ack) => {
         if (message.id?.fromMe) remember(receipts, message.id._serialized, { status: ackStatus(ack), error: ack < 0 ? 'WhatsApp reported delivery failure.' : null });
-        inbox.ingest(message).then(() => inbox.ack(message, ack)).catch(err => console.error('Inbox receipt:', err.message));
+        inbox.ack(message, ack);
       });
       client.on('message_create', message => { inbox.ingest(message).catch(err => console.error('Inbox message:', err.message)); });
       await client.initialize();

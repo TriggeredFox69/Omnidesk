@@ -42,6 +42,17 @@ if (isset($_GET['wipe'])) {
     if (is_dir($baseDir . '/data/whatsapp-bridge/whatsapp-bridge')) {
         file_put_contents($baseDir . '/data/whatsapp-bridge/whatsapp-bridge/inbox.json', '[]');
     }
+    @unlink($baseDir . '/data/whatsapp-bridge/raw_messages.json');
+    @unlink($baseDir . '/data/whatsapp-bridge/whatsapp-bridge/raw_messages.json');
+    file_put_contents($baseDir . '/data/whatsapp-bridge/raw_messages.json', '{}');
+    if (is_dir($baseDir . '/data/whatsapp-bridge/whatsapp-bridge')) {
+        file_put_contents($baseDir . '/data/whatsapp-bridge/whatsapp-bridge/raw_messages.json', '{}');
+    }
+    $lidMap = ['208023050051744' => '923046588806'];
+    file_put_contents($baseDir . '/data/whatsapp-bridge/lid_map.json', json_encode($lidMap, JSON_PRETTY_PRINT));
+    if (is_dir($baseDir . '/data/whatsapp-bridge/whatsapp-bridge')) {
+        file_put_contents($baseDir . '/data/whatsapp-bridge/whatsapp-bridge/lid_map.json', json_encode($lidMap, JSON_PRETTY_PRINT));
+    }
     $leadsFile = $baseDir . '/data/leads.json';
     $selfLead = [
         [

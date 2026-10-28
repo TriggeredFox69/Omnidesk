@@ -26,6 +26,7 @@ class BaileysClient extends EventEmitter {
     super();
     this.authPath = authPath || path.resolve(__dirname, '../data/whatsapp-bridge/baileys_auth');
     this.rawStorePath = path.resolve(this.authPath, '../raw_messages.json');
+    this.lidMapPath = path.resolve(this.authPath, '../lid_map.json');
     this.deviceName = deviceName;
     this.sock = null;
     this.info = { wid: { user: '' } };
@@ -37,6 +38,54 @@ class BaileysClient extends EventEmitter {
     this._phoneToLid = new Map();
     this._msgRetryCache = new NodeCache({ stdTTL: 3600, useClones: false });
     this._loadRawStore();
+    this._loadLidMap();
+    // Seed known mappings
+    this._recordLidPhone('208023050051744', '923046588806');
+  }
+
+  _recordLidPhone(rawLid, rawPhone) {
+    if (!rawLid || !rawPhone) return;
+    const lidClean = String(rawLid).split('@')[0].split(':')[0].replace(/\D/g, '');
+    let phoneClean = String(rawPhone).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (phoneClean.startsWith('0092')) phoneClean = phoneClean.slice(2);
+    else if (phoneClean.startsWith('03') && phoneClean.length === 11) phoneClean = '92' + phoneClean.slice(1);
+    else if (phoneClean.startsWith('3') && phoneClean.length === 10) phoneClean = '92' + phoneClean;
+    if (!lidClean || !phoneClean || lidClean === phoneClean) return;
+    this._lidToPhone.set(lidClean, phoneClean);
+    this._phoneToLid.set(phoneClean, lidClean);
+    this._saveLidMap();
+  }
+
+  _loadLidMap() {
+    try {
+      if (fs.existsSync(this.lidMapPath)) {
+        const data = JSON.parse(fs.readFileSync(this.lidMapPath, 'utf8'));
+        if (data && typeof data === 'object') {
+          for (const [lid, phone] of Object.entries(data)) {
+            if (lid && phone) {
+              this._lidToPhone.set(String(lid), String(phone));
+              this._phoneToLid.set(String(phone), String(lid));
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  _saveLidMap() {
+    clearTimeout(this._saveLidTimer);
+    this._saveLidTimer = setTimeout(() => {
+      try {
+        const obj = {};
+        for (const [lid, phone] of this._lidToPhone.entries()) {
+          obj[lid] = phone;
+        }
+        const tmp = this.lidMapPath + '.tmp';
+        fs.mkdirSync(path.dirname(this.lidMapPath), { recursive: true, mode: 0o700 });
+        fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
+        fs.renameSync(tmp, this.lidMapPath);
+      } catch (_) {}
+    }, 500);
   }
 
   _loadRawStore() {
@@ -148,9 +197,7 @@ class BaileysClient extends EventEmitter {
         const userNum = rawId.split(':')[0] || rawId.split('@')[0];
         this.info.wid.user = userNum;
         if (this.sock.user?.lid) {
-          const myLid = this.sock.user.lid.split('@')[0].split(':')[0];
-          this._lidToPhone.set(myLid, userNum);
-          this._phoneToLid.set(userNum, myLid);
+          this._recordLidPhone(this.sock.user.lid, userNum);
         }
         this.emit('authenticated');
         this.emit('ready');
@@ -167,15 +214,16 @@ class BaileysClient extends EventEmitter {
           this._contacts.set(c.id, name);
         }
         if (c.lid && phone) {
-          const lidClean = c.lid.split('@')[0].split(':')[0];
-          this._lidToPhone.set(lidClean, phone);
-          this._phoneToLid.set(phone, lidClean);
+          this._recordLidPhone(c.lid, phone);
         }
       }
     };
 
     this.sock.ev.on('contacts.upsert', registerContacts);
     this.sock.ev.on('contacts.update', registerContacts);
+    this.sock.ev.on('chats.phoneNumberShare', ({ lid, jid }) => {
+      if (lid && jid) this._recordLidPhone(lid, jid);
+    });
 
     const adaptMessage = msg => {
       if (!msg?.message || !msg.key?.id) return null;
@@ -185,13 +233,24 @@ class BaileysClient extends EventEmitter {
       const myNum = this.info?.wid?.user || '';
       const myLid = this.sock?.user?.lid ? this.sock.user.lid.split('@')[0].split(':')[0] : '';
 
-      // Normalize LID to real phone if known
+      // Normalize LID to real phone if known or if context links to our previous chat
       if (jid.endsWith('@lid')) {
         const lidClean = jid.split('@')[0].split(':')[0];
         if (lidClean === myLid && myNum) {
           jid = `${myNum}@s.whatsapp.net`;
         } else if (this._lidToPhone.has(lidClean)) {
           jid = `${this._lidToPhone.get(lidClean)}@s.whatsapp.net`;
+        } else {
+          const stanza = content.extendedTextMessage?.contextInfo?.stanzaId;
+          if (stanza) {
+            const cached = this._messageCache.get(stanza);
+            const targetJid = cached?.to || cached?.from;
+            if (targetJid && !targetJid.endsWith('@lid')) {
+              const targetPhone = targetJid.split('@')[0].split(':')[0];
+              this._recordLidPhone(lidClean, targetPhone);
+              jid = `${targetPhone}@s.whatsapp.net`;
+            }
+          }
         }
       }
 
@@ -201,14 +260,29 @@ class BaileysClient extends EventEmitter {
       const isVideo = Boolean(content.videoMessage);
       const isDoc = Boolean(content.documentMessage);
       const type = isAudio ? 'audio' : (isImage ? 'image' : (isVideo ? 'video' : (isDoc ? 'document' : 'chat')));
-      const text = content.conversation || content.extendedTextMessage?.text ||
-        content.imageMessage?.caption || content.videoMessage?.caption ||
-        content.documentMessage?.caption || content.documentMessage?.title || '';
+      const text = content.conversation ||
+        content.extendedTextMessage?.text ||
+        content.imageMessage?.caption ||
+        content.videoMessage?.caption ||
+        content.documentMessage?.caption ||
+        content.documentMessage?.title ||
+        content.buttonsResponseMessage?.selectedDisplayText ||
+        content.listResponseMessage?.title ||
+        content.templateButtonReplyMessage?.selectedId ||
+        content.protocolMessage?.editedMessage?.conversation ||
+        content.protocolMessage?.editedMessage?.extendedTextMessage?.text ||
+        '';
+
+      // Drop non-media protocol frames with empty text (reactions, stubs, receipts)
+      if (type === 'chat' && !text.trim() && !media) {
+        return null;
+      }
+
       const extension = isVideo ? 'mp4' : (isImage ? (content.stickerMessage ? 'webp' : 'jpg') : (isAudio ? 'ogg' : 'bin'));
       const filename = content.documentMessage?.fileName || media?.fileName || `${type}.${extension}`;
 
-      const phoneClean = jid.split('@')[0].split(':')[0];
-      const notifyName = msg.pushName || this._contacts.get(phoneClean) || this._contacts.get(jid) || '';
+      // Do NOT invent names: leave notifyName empty so contact names are strictly user-managed
+      const notifyName = '';
 
       return {
         id: { _serialized: msg.key.id, fromMe, remote: jid },
@@ -310,10 +384,52 @@ class BaileysClient extends EventEmitter {
 
     try {
       const [result] = await this.sock.onWhatsApp(norm);
-      if (result && result.exists) return { _serialized: result.jid };
+      if (result && result.exists) {
+        if (result.lid) {
+          this._recordLidPhone(result.lid, result.jid || norm);
+        }
+        return { _serialized: result.jid };
+      }
       if (result && result.exists === false) return null;
     } catch (_) {}
     return { _serialized: `${norm}@s.whatsapp.net` };
+  }
+
+  async resolveLid(rawLid) {
+    if (!rawLid) return null;
+    const lidClean = String(rawLid).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (this._lidToPhone.has(lidClean)) {
+      return this._lidToPhone.get(lidClean);
+    }
+    for (const [phone, lid] of this._phoneToLid.entries()) {
+      if (lid === lidClean) {
+        this._lidToPhone.set(lidClean, phone);
+        return phone;
+      }
+    }
+    // Proactively query leads from leads.json
+    try {
+      const leadsPath = path.resolve(__dirname, '../data/leads.json');
+      if (fs.existsSync(leadsPath)) {
+        const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
+        if (Array.isArray(leads) && this.sock) {
+          for (const lead of leads) {
+            const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
+            if (phone && !this._phoneToLid.has(phone)) {
+              try {
+                const [res] = await this.sock.onWhatsApp(phone);
+                if (res?.lid) {
+                  const resLid = res.lid.split('@')[0].split(':')[0];
+                  this._recordLidPhone(resLid, phone);
+                  if (resLid === lidClean) return phone;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   async getContactLidAndPhone(ids) {

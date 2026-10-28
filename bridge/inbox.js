@@ -43,6 +43,18 @@ function createInbox({ getClient, storageFile }) {
       aliases.set(id, p);
       return p;
     }
+    if (id.endsWith('@lid') || (id.length >= 14 && id.startsWith('2080'))) {
+      if (client && typeof client.resolveLid === 'function') {
+        try {
+          const resolved = await client.resolveLid(id);
+          if (resolved) {
+            aliases.set(id, resolved);
+            return resolved;
+          }
+        } catch (_) {}
+      }
+      return null;
+    }
     const clean = id.split('@')[0].split(':')[0].replace(/\D/g, '');
     return clean || null;
   }
@@ -52,15 +64,20 @@ function createInbox({ getClient, storageFile }) {
     const fromMe = Boolean(message.fromMe || message.id.fromMe);
     const phone = knownPhone || await phoneFor(message.id.remote?._serialized || message.id.remote || (fromMe ? message.to : message.from));
     if (!phone || !/^\d{10,15}$/.test(phone)) return;
+    const previous = messages.get(id);
     const type = ['ptt', 'audio'].includes(message.type) ? 'audio' :
       message.type === 'image' ? 'image' : message.type === 'video' ? 'video' :
-        (message.type === 'document' ? 'document' : 'text');
-    const previous = messages.get(id);
+        (message.type === 'document' ? 'document' : (previous?.type || 'text'));
+    const bodyText = message.body || (type === 'audio' ? 'Voice note' : type === 'image' ? 'Image' : (type === 'video' ? 'Video' : (type === 'document' ? 'Document' : '')));
+    const text = bodyText || previous?.text || '';
+    const hasMedia = Boolean(message.hasMedia || previous?.hasMedia);
+    if (!text && !hasMedia) return;
+
     const value = { id: 'wa_' + createHash('sha256').update(id).digest('hex').slice(0,24), waMessageId: id,
-      phone, name: message._data?.notifyName || phone, sender: fromMe ? 'agent' : 'lead',
-      agentName: fromMe ? 'WhatsApp' : undefined, type, text: message.body || (type === 'audio' ? 'Voice note' : type === 'image' ? 'Image' : (type === 'video' ? 'Video' : (type === 'document' ? 'Document' : ''))),
-      timestamp: Number(message.timestamp) || Math.floor(Date.now()/1000), hasMedia: Boolean(message.hasMedia),
-      durationSeconds: Number(message._data?.duration) || 0,
+      phone, name: phone, sender: fromMe ? 'agent' : (previous?.sender || 'lead'),
+      agentName: fromMe ? 'WhatsApp' : undefined, type, text,
+      timestamp: Number(message.timestamp) || previous?.timestamp || Math.floor(Date.now()/1000), hasMedia,
+      durationSeconds: Number(message._data?.duration) || previous?.durationSeconds || 0,
       deliveryStatus: fromMe ? statusOf(message.ack || 0) : undefined };
     if (previous && ['delivered','read'].includes(previous.deliveryStatus) && ['accepted','sent'].includes(value.deliveryStatus)) value.deliveryStatus = previous.deliveryStatus;
     if (previous && JSON.stringify({ ...previous, revision: 0 }) === JSON.stringify({ ...value, revision: 0 })) return;
@@ -91,6 +108,10 @@ function createInbox({ getClient, storageFile }) {
     }
   }
   async function media(id) {
+    const client = getClient();
+    if (!client || typeof client.getMessageById !== 'function') {
+      throw Object.assign(new Error('Reconnect WhatsApp to load this attachment.'), { status: 409 });
+    }
     let timer;
     try { return await Promise.race([download(id), new Promise((_,reject) => { timer = setTimeout(() => reject(new Error('Attachment download timed out. It may have expired; ask the sender to resend it.')), 30000); })]); }
     finally { clearTimeout(timer); }

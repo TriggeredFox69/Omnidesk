@@ -1,6 +1,6 @@
 (() => {
   window.NunnoLiveInbox = function ({ state, getLead, renderList, renderChat, toast, stopAudio }) {
-    let cursor = 0, busy = false, epoch = '', activePhone = '', sendingMedia = false;
+    let cursor = 0, busy = false, epoch = '', activePhone = '', sendingMedia = false, lastPresenceAt = 0, hydrated = false;
     const mediaRequests = new Map();
     async function api(action, data = {}) {
       const response = await fetch('api/direct_sender.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...data }), signal: AbortSignal.timeout(action === 'send_direct' ? 90000 : action === 'get_media' ? 35000 : 15000) });
@@ -20,7 +20,7 @@
       let lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
       if (!lead) {
         lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: '+' + (itemPhone || item.phone),
-          name: item.name || item.phone, city: '', network: '', ownerId: null, leadState: 'fresh',
+          name: item.phone, city: '', network: '', ownerId: null, leadState: 'fresh',
           status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
         state.leads.unshift(lead);
         // Persist newly discovered WhatsApp conversation to database
@@ -31,20 +31,13 @@
         }).catch(() => {});
       }
       const previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
-      if (lead.name === lead.phone && item.sender === 'lead' && item.name) {
-        lead.name = item.name;
-        fetch('api/leads_sync.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'update_lead', id: lead.id, name: lead.name })
-        }).catch(() => {});
-      }
+      // Contact names are user-managed only; do not auto-override with WhatsApp push names
       const fields = { ...item, time: new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: item.durationSeconds ? `${Math.floor(item.durationSeconds / 60)}:${String(item.durationSeconds % 60).padStart(2,'0')}` : undefined };
       if (previous) Object.assign(previous, fields, { id: previous.id, agentName: previous.agentName || item.agentName });
       else {
         lead.messages.push(fields);
-        if (item.sender === 'lead' && (state.activeLeadId !== lead.id || state.currentTab !== 'inbox' || document.hidden)) {
+        if (hydrated && item.sender === 'lead' && (state.activeLeadId !== lead.id || state.currentTab !== 'inbox' || document.hidden)) {
           lead.unreadCount = (lead.unreadCount || 0) + 1; lead.status = 'unread';
         }
         // Save new message to server database so leads.json stays in full duplex sync
@@ -80,13 +73,14 @@
       busy = true;
       try {
         const result = await api('get_events', { after: cursor });
-        if (epoch && epoch !== result.epoch) { cursor = 0; epoch = result.epoch; return; }
+        if (epoch && epoch !== result.epoch) { cursor = 0; epoch = result.epoch; hydrated = false; return; }
         epoch = result.epoch;
         let activeChanged = false;
         for (const item of result.messages || []) {
           const lead = merge(item); if (lead.id === state.activeLeadId) activeChanged = true;
         }
         cursor = result.cursor;
+        hydrated = true;
         if (result.messages?.length) { renderList(); if (activeChanged) renderChat(); }
         // Saved history is available while WhatsApp reconnects. Only live operations
         // need a linked sender; hiding the history made a restart look like data loss.
@@ -100,13 +94,20 @@
         if (lead && state.currentTab === 'inbox') {
           if (activePhone !== lead.phone) {
             activePhone = lead.phone;
-            await api('sync_chat', { phone: lead.phone }).catch(() => {});
+            // Request a focused backfill without holding up the live event cursor.
+            api('sync_chat', { phone: lead.phone }).then(() => poll()).catch(() => {});
           }
-          const presence = await api('get_presence', { phone: lead.phone }).catch(() => ({ state: 'unknown', label: 'Online / last seen unavailable' }));
-          const presenceEl = document.getElementById('chatPresence');
-          if (getLead(state.activeLeadId)?.phone === lead.phone && presenceEl) {
-            presenceEl.textContent = presence.label;
-            presenceEl.className = 'chat-presence presence-' + presence.state;
+          // Presence is useful, but polling it on every inbox tick needlessly delays
+          // message sync. Refresh it independently at a relaxed cadence.
+          if (Date.now() - lastPresenceAt > 15000) {
+            lastPresenceAt = Date.now();
+            api('get_presence', { phone: lead.phone }).then(presence => {
+              const presenceEl = document.getElementById('chatPresence');
+              if (getLead(state.activeLeadId)?.phone === lead.phone && presenceEl) {
+                presenceEl.textContent = presence.label;
+                presenceEl.className = 'chat-presence presence-' + presence.state;
+              }
+            }).catch(() => {});
           }
           const unhandled = lead.messages.find(m => (m.type === 'image' || m.type === 'video' || m.type === 'document' || m.type === 'audio') && m.hasMedia && !m.imageUrl && !m.videoUrl && !m.docUrl && !m.audioUrl && !m.mediaError);
           if (unhandled && !mediaRequests.has(unhandled.waMessageId)) loadMedia(unhandled).catch(() => {}).finally(() => { if (state.activeLeadId === lead.id) renderChat(); });
@@ -144,7 +145,9 @@
         message.deliveryError = error.message; toast(error.message);
       } finally { sendingMedia = false; renderList(); if (state.activeLeadId === lead.id) renderChat(); }
     }
-    setInterval(poll, 2000);
+    // The lightweight cursor endpoint is polled frequently for near-live two-way
+    // updates. Media, chat backfills and presence stay off the hot path.
+    setInterval(poll, 800);
     return { poll, loadMedia, sendMedia };
   };
 })();

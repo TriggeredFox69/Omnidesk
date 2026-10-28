@@ -368,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
     banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;pointer-events:none;padding:10px;text-align:center;background:#fff3cd;color:#5c4100;font:600 13px sans-serif;';
     banner.textContent = window.NUNNO_OFFLINE_PREVIEW
       ? 'OFFLINE TEST — simulated messages only. Nothing is sent to WhatsApp. Test data resets when this page closes.'
-      : 'LOCAL WHATSAPP — real messages will be sent after QR linking. This test workspace is separate from your hosted CRM.';
+      : 'LOCAL WORKSPACE — your linked device and saved message history stay on this computer.';
     document.body.appendChild(banner);
   }
 
@@ -466,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
           : 'WhatsApp not connected · Click to link';
     }
     if (!wasConnected && state.senderConfigured && !window.NUNNO_OFFLINE_PREVIEW) {
-      showToast('✓ WhatsApp connected. Your campaign is ready; click Start Outreach Campaign to send.', 6000);
+      showToast('✓ WhatsApp connected. Your campaign is ready; click Start your campaign to send.', 6000);
     }
     const labels = {
       idle: 'Ready to link. Click Connect WhatsApp.',
@@ -718,6 +718,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderConversationsList() {
     if (!els.conversationsScroll) return;
+
+    // Keep the inbox ordered by the latest message, including updates on an
+    // existing chat, so active conversations rise immediately after sync.
+    state.leads.sort((a, b) => {
+      const latest = lead => Number(lead.lastMessageAt || lead.messages?.[lead.messages.length - 1]?.timestamp || 0);
+      return latest(b) - latest(a);
+    });
 
     // Filter leads
     let filtered = state.leads.filter(l => {
@@ -1597,19 +1604,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
 
   const campaignState = {
-    name: 'Nunno VIP Outreach Test',
-    audience: [
-      {
-        id: 'c_lead_user_test',
-        name: 'Askar (My Number)',
-        phone: '923318036576',
-        display: '+92 331 8036576',
-        city: 'Pakistan',
-        network: 'Ufone',
-        status: 'pending',
-        sentAt: null
-      }
-    ],
+    name: 'OmniDesk campaign',
+    audience: [],
     currentIndex: 0,
     isRunning: false,
     isPaused: false,
@@ -1699,7 +1695,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const sampleContact = campaignState.audience.length > 0
       ? campaignState.audience[0]
-      : { name: 'Zeeshan Tariq', phone: '923008472910', display: '+92 300 8472910', city: 'Lahore' };
+      : { name: 'Sample contact', phone: '923000000000', display: '+92 300 0000000', city: 'Lahore' };
 
     const personalized = personalizeMessage(rawTemplate, sampleContact);
 
@@ -1868,7 +1864,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.startCampaignBtn) els.startCampaignBtn.disabled = false;
     }
 
-    const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'Nunno Outreach';
+    const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'OmniDesk campaign';
 
     let minD = parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 6, 10) || 6;
     let maxD = parseInt(els.campaignDelayMax ? els.campaignDelayMax.value : 12, 10) || 12;
@@ -1912,7 +1908,7 @@ document.addEventListener('DOMContentLoaded', () => {
         els.campaignStatusBadge.style.borderColor = '#00a884';
         els.campaignStatusBadge.innerHTML = `🟢 Running (${campaignState.currentIndex + 1}/${campaignState.audience.length})`;
       }
-      logCampaignTerminal(`▶️ Outreach campaign resumed. Dispatching next recipient...`, 'info');
+      logCampaignTerminal(`▶️ Campaign resumed. Dispatching next recipient...`, 'info');
       dispatchNextCampaignMessage();
     } else {
       campaignState.isPaused = true;
@@ -2113,13 +2109,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const assignMode = els.campaignAssignSelect ? els.campaignAssignSelect.value : 'pool';
     const currentCloser = state.currentUser;
     const ownerId = (assignMode === 'mine' && currentCloser) ? currentCloser.id : null;
-    const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'Nunno Outreach';
+    const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'OmniDesk campaign';
     const crmMessage = {
       id: `msg_c_${Date.now()}`,
       waMessageId: sendResult.message_id,
       deliveryStatus: 'accepted',
       sender: 'agent',
-      agentName: currentCloser ? currentCloser.name : 'System Outreach',
+      agentName: currentCloser ? currentCloser.name : 'OmniDesk campaign',
       text: contact.preparedMessage,
       time: timeNow
     };
@@ -4551,6 +4547,29 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (err) {
         showToast('Error creating chat: ' + err.message);
       }
+    });
+  }
+
+  const editLeadNameBtn = document.getElementById('editLeadNameBtn');
+  if (editLeadNameBtn) {
+    editLeadNameBtn.addEventListener('click', async () => {
+      const lead = getLead(state.activeLeadId);
+      if (!lead) return;
+      const currentName = (lead.name === lead.phone || lead.name === lead.display) ? '' : lead.name;
+      const newName = prompt(`Set custom name for ${lead.display || lead.phone}:`, currentName);
+      if (newName === null) return;
+      const trimmed = newName.trim();
+      lead.name = trimmed || lead.phone;
+      renderActiveChat();
+      renderConversationsList();
+      try {
+        await fetch('api/leads_sync.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update_lead', id: lead.id, name: lead.name })
+        });
+        showToast(`✅ Contact name updated to "${lead.name}"`);
+      } catch (_) {}
     });
   }
 

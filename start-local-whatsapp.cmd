@@ -6,7 +6,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-if not exist "bridge\node_modules\whatsapp-web.js\package.json" (
+if not exist "bridge\node_modules\@whiskeysockets\baileys\package.json" (
   echo Installing WhatsApp dependencies. This first step needs internet.
   pushd bridge
   call npm ci

@@ -1,0 +1,96 @@
+/* OmniDesk: focused inbox-first workspace */
+:root { --od-ink:#17211d; --od-muted:#78847e; --od-line:#e9eeeb; --od-green:#16856b; --od-wash:#eff7f3; --topbar-h:62px; }
+html,body { background:#f3f5f4!important;color:var(--od-ink); }
+body { background-image:none!important; }
+.topbar { height:62px;min-height:62px;flex:0 0 62px;padding:0 22px;background:#fff;box-shadow:0 1px 0 #e9eeeb;z-index:10; }
+.brand-wrap { min-width:202px; }
+.brand-mark { width:34px;height:34px;display:grid;place-items:center;border:1px solid #dcece5;border-radius:11px;background:#eef7f2;color:#16785f; }
+.brand-mark svg { width:20px;height:20px;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round; }
+.brand-heading { text-transform:lowercase;font-size:19px;letter-spacing:-.06em; }
+.brand-badge { font-size:8px;letter-spacing:.13em;padding:4px 6px; }
+.brand-info .text-xs { margin-top:2px; }
+.nav-tab-bar { gap:4px; }
+.nav-tab-btn { border-radius:9px;padding:9px 13px; }
+.nav-tab-btn.active,.nav-tab-btn.tab-wa { background:#eef6f2; }
+.btn-header-perf,.btn-header-admin,.btn-header-theme,.btn-header-logout { min-height:34px; }
+.subbar { min-height:43px;height:43px;flex:0 0 43px;padding:0 23px;background:#fafbfa;border-color:#edf0ee; }
+.subbar .kpi-widget-group,.subbar>.status-indicator-group:last-child { display:none; }
+.subbar .status-indicator-group:first-child { width:100%; }
+.connected-number-pill { padding:5px 8px;background:#fff;border:1px solid #e9eeeb;border-radius:8px;font-size:11px; }
+.status-chip { margin-left:auto;padding:5px 10px;font-size:10px; }
+.inbox-view-container { gap:11px;padding:13px 17px;background:#f3f5f4;min-height:0; }
+.conversations-col,.chat-thread-col,.lead-dossier-col { border:1px solid #e6ebe8;border-radius:12px;box-shadow:0 2px 8px rgba(26,48,37,.025); }
+.conversations-col { flex:0 0 322px;width:322px; }
+.conv-header { padding:20px 16px 13px; }
+.conv-title-row { margin-bottom:13px;font-size:18px; }
+.conv-title-row .panel-badge { font-size:10px; }
+.conv-search-input { height:39px;font-size:12px; }
+.inbox-filter-bar { flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:8px 0 1px; }
+.inbox-filter-bar::-webkit-scrollbar { display:none; }
+.inbox-filter-btn { flex:0 0 auto;white-space:nowrap;font-size:10px; }
+.conversations-scroll { padding:6px 8px 14px; }
+.conv-item { min-height:72px;padding:11px 9px!important; }
+.conv-contact-name { font-size:12px; }
+.conv-preview-text { font-size:10px; }
+.conv-bottom-row .status-pill-clean { font-size:8px; }
+.chat-header { min-height:70px;padding:10px 15px; }
+.chat-header-actions { gap:5px; }
+/* Keep the conversation's everyday controls visible; advanced sales state lives in the contact panel. */
+.chat-header-actions #markPaidHeaderBtn,.chat-header-actions #verifyPaidHeaderBtn,.chat-header-actions #rejectPaidHeaderBtn,.chat-header-actions #cantHandleBtn,.chat-header-actions #markUselessHeaderBtn,.chat-header-actions #simClientAudioBtn { display:none!important; }
+.chat-lead-title { font-size:13px; }
+.chat-lead-meta { font-size:10px; }
+/* Edit buttons are visible for user control */
+.chat-presence { font-size:10px; }
+.chat-messages-area { flex:1 1 auto;min-height:0;padding:28px clamp(18px,5vw,76px); }
+.msg-bubble { max-width:min(74%,550px); }
+.chat-composer-bar { padding:12px 17px 14px; }
+.chat-input { min-height:44px!important;font-size:13px; }
+.lead-dossier-col { flex:0 0 270px;width:270px; }
+.dossier-drawer-title { font-size:12px; }
+.lead-dossier-col .dossier-widget { margin:9px;padding:12px; }
+/* Tighten CRM jargon while keeping labels and assignment controls available. */
+#chatLeadCloser { font-size:9px; }
+.view-container { overflow-y:auto; }
+#viewCampaign { background:#f3f5f4; }
+#viewCampaign .campaign-page-header { margin-bottom:18px; }
+#viewCampaign h1,#viewCampaign h2,#viewCampaign h3 { letter-spacing:-.035em; }
+#viewCampaign .campaign-grid { max-width:1260px;gap:14px; }
+#viewCampaign .campaign-grid>section,#viewCampaign .campaign-grid>.panel { border-radius:13px; }
+#viewCampaign .panel-header { padding-bottom:12px; }
+#viewCampaign .form-label { color:#617068; }
+#viewCampaign .campaign-terminal-log { border-radius:10px; }
+#connectWaModal .modal-box { max-width:450px; }
+#connectWaModal .brand-heading { font-size:20px; }
+.toast { z-index:2000; }
+@media(max-width:1180px) {
+  .lead-dossier-col { width:min(300px,86vw); }
+  .conversations-col { flex-basis:300px;width:300px; }
+}
+@media(max-width:750px) {
+  .topbar { padding:0 11px;gap:5px; }
+  .brand-wrap { min-width:0;gap:7px; }
+  .brand-mark { width:30px;height:30px; }
+  .brand-heading { font-size:16px; }
+  .nav-tab-bar { margin-left:auto; }
+  .nav-tab-btn { padding:8px 9px; }
+  .nav-tab-btn span { display:inline; }
+  .nav-tab-btn svg,.nav-tab-btn .unread-badge { display:none; }
+  .btn-header-perf,.btn-header-theme,.btn-header-logout { display:none!important; }
+  .topbar>div:last-child { display:none!important; }
+  .subbar { height:38px;min-height:38px;flex-basis:38px;padding:0 10px; }
+  .subbar .status-chip { display:none; }
+  .inbox-view-container { padding:7px; }
+  .conv-title-row { font-size:16px; }
+  .chat-header { padding:9px 11px; }
+  .chat-header-actions #dossierToggleBtn { padding:7px; }
+  .chat-header-actions #dossierToggleBtn span { display:none; }
+  #chatLeadCloser { display:none; }
+  .chat-composer-bar { padding:9px; }
+}
+@media(max-width:390px) {
+  .brand-info .text-xs { display:none; }
+  .nav-tab-btn { padding:8px 7px;font-size:10px; }
+}
+
+#localTestBanner { background:#f4f7f5!important;color:#718079!important;border-top:1px solid #e6ebe8;font-size:10px!important;font-weight:550!important;padding:7px!important; }
+

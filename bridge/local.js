@@ -11,14 +11,13 @@ const root = path.resolve(__dirname, '..');
 async function startLocal({ createClient, qrImage, port = 8080, openBrowser = true, bridgePort = 0, bridgeToken } = {}) {
   let restoreSession = false;
   if (!createClient) {
-    const { Client, LocalAuth } = require('whatsapp-web.js');
     const QRCode = require('qrcode');
+    const { BaileysClient } = require('./baileys-client');
     const dataPath = path.join(root, 'data/whatsapp-bridge/local');
     fs.mkdirSync(dataPath, { recursive: true, mode: 0o700 });
-    restoreSession = fs.existsSync(path.join(dataPath, 'auth', 'session'));
-    createClient = () => new Client({ authStrategy: new LocalAuth({ dataPath: path.join(dataPath, 'auth') }),
-      webVersionCache: { type: 'local', path: path.join(dataPath, 'cache') }, deviceName: 'Nunno Local Test',
-      puppeteer: { headless: true, ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {}) } });
+    const authPath = path.join(dataPath, 'baileys_auth');
+    restoreSession = fs.existsSync(path.join(authPath, 'creds.json'));
+    createClient = () => new BaileysClient({ authPath, deviceName: 'OmniDesk' });
     qrImage = value => QRCode.toDataURL(value, { width: 280, margin: 2 });
   }
   const token = bridgeToken || randomBytes(32).toString('hex');
