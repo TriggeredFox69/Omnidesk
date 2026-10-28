@@ -37,10 +37,7 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
         sleep(1);
     }
 
-    $nodePath = file_exists('/opt/alt/alt-nodejs22/root/usr/bin/node')
-        ? '/opt/alt/alt-nodejs22/root/usr/bin/node'
-        : (trim((string)@shell_exec('which node')) ?: 'node');
-
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
     $bridgeDir = $baseDir . '/bridge';
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
     $authDir = $dataDir . '/whatsapp-bridge';
@@ -53,7 +50,7 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
 
     shell_exec($startCmd);
     $started = true;
-    sleep(2);
+    sleep(3);
     $bridgeStatus = whatsappBridgeRequest('/status');
 }
 
