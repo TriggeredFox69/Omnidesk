@@ -575,6 +575,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Full-Screen Image Lightbox Viewer
+  function openImageLightbox(src, filename) {
+    const modal = document.getElementById('imageLightboxModal');
+    const img = document.getElementById('lightboxImageEl');
+    const dlBtn = document.getElementById('lightboxDownloadBtn');
+    if (!modal || !img) return;
+    img.src = src;
+    if (dlBtn) {
+      dlBtn.href = src;
+      dlBtn.download = filename || 'whatsapp-image.jpg';
+    }
+    modal.style.display = 'flex';
+  }
+
+  function closeImageLightbox() {
+    const modal = document.getElementById('imageLightboxModal');
+    const img = document.getElementById('lightboxImageEl');
+    if (modal) modal.style.display = 'none';
+    if (img) img.removeAttribute('src');
+  }
+
+  document.getElementById('closeImageLightboxBtn')?.addEventListener('click', closeImageLightbox);
+  document.getElementById('imageLightboxModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeImageLightbox();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeImageLightbox();
+  });
+
   // ==========================================
   // ==========================================
   // LEAD LOCKING, OWNERSHIP & PAYMENT ENGINE
@@ -1195,7 +1224,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
           bubble.innerHTML = `
             ${!isInbound ? `<div class="msg-sender-tag">${escapeHtml(msg.agentName || 'Agent')}</div>` : ''}
-            ${isImg ? (msg.imageUrl ? `<a href="${escapeHtml(msg.imageUrl)}" target="_blank" download="${escapeHtml(msg.filename || 'image.jpg')}"><img src="${escapeHtml(msg.imageUrl)}" alt="Chat image" style="max-width:280px;max-height:300px;border-radius:10px;display:block;cursor:pointer;"></a>` : `<div>${escapeHtml(msg.mediaError || 'Loading image…')}</div>`) : ''}
+            ${isImg ? (msg.imageUrl ? `
+              <div class="chat-img-card" data-img-src="${escapeHtml(msg.imageUrl)}" data-img-name="${escapeHtml(msg.filename || 'image.jpg')}" style="position:relative;display:inline-block;cursor:pointer;border-radius:10px;overflow:hidden;background:rgba(0,0,0,0.12);max-width:320px;">
+                <img src="${escapeHtml(msg.imageUrl)}" alt="Chat image" style="max-width:320px;max-height:360px;width:auto;height:auto;border-radius:10px;display:block;" onload="const p=this.closest('.chat-messages-area');if(p){p.scrollTop=p.scrollHeight;}">
+                <div class="chat-img-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.3);opacity:0;transition:opacity 0.2s;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11.5px;font-weight:700;">
+                  <span style="background:rgba(0,0,0,0.7);padding:4px 12px;border-radius:20px;box-shadow:0 2px 6px rgba(0,0,0,0.4);">🔍 Click to enlarge</span>
+                </div>
+              </div>` : `<div>${escapeHtml(msg.mediaError || 'Loading image…')}</div>`) : ''}
             ${isVideo ? (msg.videoUrl ? `<video src="${escapeHtml(msg.videoUrl)}" controls preload="metadata" style="max-width:280px;max-height:300px;border-radius:10px;display:block;"></video>` : `<div>${escapeHtml(msg.mediaError || 'Loading video…')}</div>`) : ''}
             ${isDoc ? `
               <div class="msg-doc-card" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);padding:10px 12px;border-radius:10px;margin-bottom:6px;">
@@ -1237,10 +1272,27 @@ document.addEventListener('DOMContentLoaded', () => {
           e.stopPropagation();
           const id = track.getAttribute('data-track-id');
           if (id) seekAudio(id, e);
+      els.chatMessagesArea.querySelectorAll('.chat-img-card').forEach(card => {
+        card.addEventListener('mouseenter', () => {
+          const overlay = card.querySelector('.chat-img-overlay');
+          if (overlay) overlay.style.opacity = '1';
+        });
+        card.addEventListener('mouseleave', () => {
+          const overlay = card.querySelector('.chat-img-overlay');
+          if (overlay) overlay.style.opacity = '0';
+        });
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const src = card.getAttribute('data-img-src');
+          const name = card.getAttribute('data-img-name');
+          if (src) openImageLightbox(src, name);
         });
       });
 
       els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
+      requestAnimationFrame(() => {
+        if (els.chatMessagesArea) els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
+      });
     }
 
     // ==============================

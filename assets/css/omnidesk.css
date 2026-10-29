@@ -41,9 +41,11 @@ body { background-image:none!important; }
 .chat-lead-meta { font-size:10px; }
 /* Edit buttons are visible for user control */
 .chat-presence { font-size:10px; }
-.chat-messages-area { flex:1 1 auto;min-height:0;padding:28px clamp(18px,5vw,76px); }
+.chat-messages-area { flex:1 1 auto;min-height:0;padding:24px clamp(18px,5vw,76px) 36px; }
+.msg-bubble:last-child { margin-bottom:16px; }
+.chat-img-card:hover .chat-img-overlay { opacity:1!important; }
 .msg-bubble { max-width:min(74%,550px); }
-.chat-composer-bar { padding:12px 17px 14px; }
+.chat-composer-bar { padding:12px 17px 14px;position:relative;z-index:2; }
 .chat-input { min-height:44px!important;font-size:13px; }
 .lead-dossier-col { flex:0 0 270px;width:270px; }
 .dossier-drawer-title { font-size:12px; }

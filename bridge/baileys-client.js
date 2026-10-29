@@ -582,7 +582,27 @@ class BaileysClient extends EventEmitter {
   }
 
   async getMessageById(id) {
-    return this._messageCache.get(id) || null;
+    if (this._messageCache.has(id)) return this._messageCache.get(id);
+    if (this._rawMessageStore.has(id)) {
+      const raw = this._rawMessageStore.get(id);
+      const fakeMsg = { key: { id }, message: raw };
+      const media = raw.imageMessage || raw.videoMessage || raw.audioMessage || raw.documentMessage || raw.stickerMessage;
+      if (!media) return null;
+      return {
+        id: { _serialized: id },
+        hasMedia: true,
+        downloadMedia: async () => {
+          try {
+            const buffer = await downloadMediaMessage(fakeMsg, 'buffer', {});
+            return { data: buffer.toString('base64'), mimetype: media.mimetype || (raw.stickerMessage ? 'image/webp' : 'application/octet-stream'), filename: media.fileName || '' };
+          } catch (err) {
+            console.error('[Baileys] Media download fallback failed:', err.message);
+            return null;
+          }
+        }
+      };
+    }
+    return null;
   }
 
   async resetSession() {
