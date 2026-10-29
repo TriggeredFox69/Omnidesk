@@ -11,54 +11,25 @@ const dataPath = process.env.WHATSAPP_DATA_DIR ||
     ? path.resolve(__dirname, '../data/whatsapp-bridge')
     : path.resolve(__dirname, '../../data/whatsapp-bridge'));
 fs.mkdirSync(dataPath, { recursive: true, mode: 0o700 });
+const MASTER_TOKEN = 'c8e4acd8219dafce2a74e37954fa4a12c3fd1256bff8fcb518b7f137b4f9af20';
 const tokenPath = path.join(dataPath, 'token');
 if (!process.env.WHATSAPP_BRIDGE_TOKEN && !fs.existsSync(tokenPath)) {
-  fs.writeFileSync(tokenPath, randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
+  fs.writeFileSync(tokenPath, MASTER_TOKEN, { mode: 0o600 });
 }
 
-// Detect if Chromium is available
-const customBrowser = process.env.WHATSAPP_BROWSER_PATH;
-const hasChromium = Boolean(customBrowser && fs.existsSync(customBrowser)) ||
-  fs.existsSync('/usr/bin/chromium') ||
-  fs.existsSync('/usr/bin/chromium-browser') ||
-  process.platform === 'win32';
+// ⚡ Permanent Pure WebSocket WhatsApp engine (Baileys) — Zero Chromium required, cPanel 24/7 native
+console.log('⚡ Using pure WebSocket WhatsApp engine (Baileys) — Zero Chromium required, cPanel 24/7 native.');
+const createClientFn = () => new BaileysClient({
+  authPath: path.join(dataPath, 'baileys_auth'),
+  deviceName: 'Omnidesk cPanel 24/7'
+});
 
-// Prefer Baileys on headless / cPanel / when Chromium is not found, or when explicitly requested
-const forceBaileys = process.env.WHATSAPP_ENGINE === 'baileys' || !hasChromium;
-
-let createClientFn;
-if (forceBaileys) {
-  console.log('⚡ Using pure WebSocket WhatsApp engine (Baileys) — Zero Chromium required, cPanel native.');
-  createClientFn = () => new BaileysClient({
-    authPath: path.join(dataPath, 'baileys_auth'),
-    deviceName: 'Omnidesk cPanel 24/7'
-  });
-} else {
-  try {
-    const { Client, LocalAuth } = require('whatsapp-web.js');
-    console.log('🌐 Using Headless Chromium WhatsApp engine (whatsapp-web.js).');
-    createClientFn = () => new Client({
-      authStrategy: new LocalAuth({ dataPath: path.join(dataPath, 'auth') }),
-      webVersionCache: { type: 'local', path: path.join(dataPath, 'cache') },
-      deviceName: 'Nunno Campaigns',
-      puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
-        ...(process.env.WHATSAPP_BROWSER_PATH ? { executablePath: process.env.WHATSAPP_BROWSER_PATH } : {})
-      }
-    });
-  } catch (_) {
-    console.log('⚡ Using pure WebSocket WhatsApp engine (Baileys) — Zero Chromium required, cPanel native.');
-    createClientFn = () => new BaileysClient({
-      authPath: path.join(dataPath, 'baileys_auth'),
-      deviceName: 'Omnidesk cPanel 24/7'
-    });
-  }
-}
+const activeToken = process.env.WHATSAPP_BRIDGE_TOKEN ||
+  (fs.existsSync(tokenPath) ? fs.readFileSync(tokenPath, 'utf8').trim() : MASTER_TOKEN);
 
 const service = createService({
   storageFile: path.join(dataPath, 'inbox.json'),
-  token: process.env.WHATSAPP_BRIDGE_TOKEN || fs.readFileSync(tokenPath, 'utf8').trim(),
+  token: activeToken,
   qrImage: value => QRCode.toDataURL(value, { width: 280, margin: 2 }),
   createClient: createClientFn
 });

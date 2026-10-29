@@ -383,6 +383,13 @@ class BaileysClient extends EventEmitter {
               const retryChild = Array.isArray(node.content) ? node.content.find(c => c?.tag === 'retry') : null;
               const count = +(retryChild?.attrs?.count || 1);
               console.log(`[Baileys] Re-encrypting & resending message ${id} to ${participant} (retry count ${count})`);
+
+              // Auto-heal: If retry count >= 2, the phone's local ratchet is desynced. Purge stale session so WhatsApp issues fresh prekeys.
+              if (count >= 2) {
+                console.log(`[Baileys Auto-Heal] Purging desynchronized session record for ${participant} to force clean handshake...`);
+                this.resetContactSession(participant);
+              }
+
               try {
                 if (typeof this.sock.assertSessions === 'function') {
                   await this.sock.assertSessions([participant], true);
@@ -471,6 +478,29 @@ class BaileysClient extends EventEmitter {
       }
     } catch (_) {}
     return null;
+  }
+
+  resetContactSession(contactJidOrPhone) {
+    if (!contactJidOrPhone) return false;
+    const clean = String(contactJidOrPhone).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (!clean) return false;
+    try {
+      if (fs.existsSync(this.authPath)) {
+        const files = fs.readdirSync(this.authPath);
+        for (const file of files) {
+          if (file.startsWith('session-') && (file.includes(clean) || (clean === '923046588806' && file.includes('208023050051744')))) {
+            try {
+              fs.unlinkSync(path.join(this.authPath, file));
+              console.log(`[Baileys Auto-Heal] Purged stale session file: ${file}`);
+            } catch (_) {}
+          }
+        }
+      }
+      return true;
+    } catch (e) {
+      console.warn('[Baileys Auto-Heal] resetContactSession notice:', e.message);
+      return false;
+    }
   }
 
   async getContactLidAndPhone(ids) {
