@@ -177,6 +177,17 @@ class BaileysClient extends EventEmitter {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
+        // Clean slate for new login: purge stale contact session files from any previous account
+        try {
+          if (fs.existsSync(this.authPath)) {
+            const files = fs.readdirSync(this.authPath);
+            for (const f of files) {
+              if (f.startsWith('session-')) {
+                try { fs.unlinkSync(path.join(this.authPath, f)); } catch (_) {}
+              }
+            }
+          }
+        } catch (_) {}
         this.emit('qr', qr);
       }
 
@@ -184,6 +195,11 @@ class BaileysClient extends EventEmitter {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
         if (loggedOut) {
+          try {
+            if (fs.existsSync(this.authPath)) {
+              fs.rmSync(this.authPath, { recursive: true, force: true });
+            }
+          } catch (_) {}
           this.emit('auth_failure');
           this.emit('disconnected');
         } else {
