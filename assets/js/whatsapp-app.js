@@ -1272,6 +1272,8 @@ document.addEventListener('DOMContentLoaded', () => {
           e.stopPropagation();
           const id = track.getAttribute('data-track-id');
           if (id) seekAudio(id, e);
+        });
+      });
       els.chatMessagesArea.querySelectorAll('.chat-img-card').forEach(card => {
         card.addEventListener('mouseenter', () => {
           const overlay = card.querySelector('.chat-img-overlay');
