@@ -82,6 +82,9 @@
         }
         cursor = result.cursor;
         hydrated = true;
+        if (result.presences && typeof window.onWhatsAppPresencesUpdate === 'function') {
+          window.onWhatsAppPresencesUpdate(result.presences);
+        }
         if (result.messages?.length) { renderList(); if (activeChanged) renderChat(); }
         // Saved history is available while WhatsApp reconnects. Only live operations
         // need a linked sender; hiding the history made a restart look like data loss.
@@ -95,18 +98,22 @@
         if (lead && state.currentTab === 'inbox') {
           if (activePhone !== lead.phone) {
             activePhone = lead.phone;
+            lastPresenceAt = 0;
             // Request a focused backfill without holding up the live event cursor.
             api('sync_chat', { phone: lead.phone }).then(() => poll()).catch(() => {});
           }
-          // Presence is useful, but polling it on every inbox tick needlessly delays
-          // message sync. Refresh it independently at a relaxed cadence.
-          if (Date.now() - lastPresenceAt > 15000) {
+          // Poll presence for active chat at a responsive cadence (every 3.5s)
+          if (Date.now() - lastPresenceAt > 3500) {
             lastPresenceAt = Date.now();
             api('get_presence', { phone: lead.phone }).then(presence => {
-              const presenceEl = document.getElementById('chatPresence');
-              if (getLead(state.activeLeadId)?.phone === lead.phone && presenceEl) {
-                presenceEl.textContent = presence.label;
-                presenceEl.className = 'chat-presence presence-' + presence.state;
+              if (typeof window.onContactPresenceUpdate === 'function') {
+                window.onContactPresenceUpdate(lead.phone, presence);
+              } else {
+                const presenceEl = document.getElementById('chatPresence');
+                if (getLead(state.activeLeadId)?.phone === lead.phone && presenceEl) {
+                  presenceEl.textContent = presence.label;
+                  presenceEl.className = 'chat-presence presence-' + presence.state;
+                }
               }
             }).catch(() => {});
           }

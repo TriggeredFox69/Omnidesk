@@ -99,8 +99,18 @@ function handleWhatsAppBridge(string $action, array $input): void {
         $result = whatsappBridgeRequest('/media?id=' . rawurlencode((string) ($input['message_id'] ?? '')));
     } elseif ($action === 'get_presence') {
         $result = whatsappBridgeRequest('/presence?phone=' . rawurlencode((string) ($input['phone'] ?? '')));
-        if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
-            $result = ['success' => true, 'state' => 'online', 'label' => 'Active · WhatsApp Online'];
+        if (empty($result['success'])) {
+            $result = ['success' => true, 'state' => 'unknown', 'label' => 'Online / last seen unavailable'];
+        }
+    } elseif ($action === 'send_presence') {
+        $phone = preg_replace('/\D+/', '', (string) ($input['phone'] ?? ''));
+        if (str_starts_with($phone, '0092')) $phone = substr($phone, 2);
+        elseif (str_starts_with($phone, '03') && strlen($phone) === 11) $phone = '92' . substr($phone, 1);
+        elseif (str_starts_with($phone, '3') && strlen($phone) === 10) $phone = '92' . $phone;
+        $type = (string) ($input['type'] ?? 'composing');
+        $result = whatsappBridgeRequest('/presence', ['phone' => $phone, 'type' => $type]);
+        if (empty($result['success'])) {
+            $result = ['success' => true];
         }
     } elseif ($action === 'sync_chat') {
         $result = whatsappBridgeRequest('/sync-chat', ['phone' => (string) ($input['phone'] ?? '')]);

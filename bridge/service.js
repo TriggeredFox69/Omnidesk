@@ -169,7 +169,14 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
     try {
       const url = new URL(req.url, 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/status') { reply(200, snapshot()); return; }
-      if (req.method === 'GET' && url.pathname === '/events') { reply(200, inbox.events(url.searchParams.get('after'))); return; }
+      if (req.method === 'GET' && url.pathname === '/events') {
+        const ev = inbox.events(url.searchParams.get('after'));
+        if (client && typeof client.getRecentPresences === 'function') {
+          ev.presences = client.getRecentPresences();
+        }
+        reply(200, ev);
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/media') { reply(200, await inbox.media(url.searchParams.get('id'))); return; }
       if (req.method === 'GET' && url.pathname === '/presence') { reply(200, await readPresence(client, url.searchParams.get('phone') || '')); return; }
       if (req.method === 'GET' && url.pathname === '/receipt') {
@@ -197,6 +204,15 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         return;
       }
       if (url.pathname === '/sync-chat') { await inbox.syncChat(body.phone); reply(200, { success: true }); return; }
+      if (url.pathname === '/presence') {
+        const phone = body.phone || '';
+        const type = body.type || 'composing';
+        if (client && typeof client.sendPresence === 'function') {
+          await client.sendPresence(phone, type);
+        }
+        reply(200, { success: true });
+        return;
+      }
       if (url.pathname === '/send') { reply(200, await send(body)); return; }
       reply(404, { success: false, message: 'Unknown route.' });
     } catch (err) { reply(err.status || 502, { success: false, message: err.message }); }

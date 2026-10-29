@@ -47,11 +47,29 @@ class BaileysClient extends EventEmitter {
     this._contacts = new Map();
     this._lidToPhone = new Map();
     this._phoneToLid = new Map();
+    this._presences = new Map();
     this._msgRetryCache = new NodeCache({ stdTTL: 3600, useClones: false });
     this._loadRawStore();
     this._loadLidMap();
     // Seed known mappings
     this._recordLidPhone('208023050051744', '923046588806');
+  }
+
+  _resolvePhoneFromJid(jid) {
+    if (!jid) return '';
+    const clean = String(jid).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (String(jid).endsWith('@lid')) {
+      if (this._lidToPhone.has(clean)) return this._lidToPhone.get(clean);
+      for (const [phone, lid] of this._phoneToLid.entries()) {
+        if (lid === clean) return phone;
+      }
+      return clean;
+    }
+    let norm = clean;
+    if (norm.startsWith('0092')) norm = norm.slice(2);
+    else if (norm.startsWith('03') && norm.length === 11) norm = '92' + norm.slice(1);
+    else if (norm.startsWith('3') && norm.length === 10) norm = '92' + norm;
+    return norm;
   }
 
   _recordLidPhone(rawLid, rawPhone) {
@@ -284,6 +302,54 @@ class BaileysClient extends EventEmitter {
     this.sock.ev.on('contacts.update', registerContacts);
     this.sock.ev.on('chats.phoneNumberShare', ({ lid, jid }) => {
       if (lid && jid) this._recordLidPhone(lid, jid);
+    });
+
+    this.sock.ev.on('presence.update', ({ id, presences }) => {
+      if (!id || !presences) return;
+      const primaryPhone = this._resolvePhoneFromJid(id);
+      for (const [participant, p] of Object.entries(presences)) {
+        if (!p) continue;
+        const participantPhone = participant ? this._resolvePhoneFromJid(participant) : '';
+        const targetPhone = participantPhone || primaryPhone;
+        const lkp = p.lastKnownPresence;
+        let state = 'unknown';
+        let label = 'Active on WhatsApp';
+        if (lkp === 'composing') {
+          state = 'typing';
+          label = 'typing...';
+        } else if (lkp === 'recording') {
+          state = 'recording';
+          label = 'recording audio...';
+        } else if (lkp === 'available') {
+          state = 'online';
+          label = 'Active · WhatsApp Online';
+        } else if (lkp === 'unavailable') {
+          state = 'offline';
+          label = p.lastSeen ? `last seen ${new Date(p.lastSeen * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'offline';
+        } else if (lkp === 'paused') {
+          state = 'online';
+          label = 'Active · WhatsApp Online';
+        }
+
+        const entry = {
+          state,
+          label,
+          lastSeen: p.lastSeen || null,
+          timestamp: Date.now()
+        };
+
+        if (targetPhone) {
+          this._presences.set(targetPhone, entry);
+        }
+        const cleanId = String(id).split('@')[0].split(':')[0].replace(/\D/g, '');
+        if (cleanId) {
+          this._presences.set(cleanId, entry);
+        }
+        if (participant) {
+          const cleanPart = String(participant).split('@')[0].split(':')[0].replace(/\D/g, '');
+          if (cleanPart) this._presences.set(cleanPart, entry);
+        }
+      }
     });
 
     const adaptMessage = msg => {
@@ -811,6 +877,102 @@ class BaileysClient extends EventEmitter {
     return null;
   }
 
+  async subscribePresence(phone) {
+    if (!this.sock || !phone) return;
+    try {
+      const clean = String(phone).replace(/\D/g, '');
+      let norm = clean;
+      if (norm.startsWith('0092')) norm = norm.slice(2);
+      else if (norm.startsWith('03') && norm.length === 11) norm = '92' + norm.slice(1);
+      else if (norm.startsWith('3') && norm.length === 10) norm = '92' + norm;
+
+      let jid = '';
+      if (this._phoneToLid.has(norm)) {
+        jid = `${this._phoneToLid.get(norm)}@lid`;
+      } else {
+        jid = `${norm}@s.whatsapp.net`;
+      }
+      if (typeof this.sock.presenceSubscribe === 'function') {
+        await this.sock.presenceSubscribe(jid).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
+  getPresence(phone) {
+    if (!phone) return { success: true, state: 'unknown', label: 'Online / last seen unavailable' };
+    const clean = String(phone).replace(/\D/g, '');
+    let norm = clean;
+    if (norm.startsWith('0092')) norm = norm.slice(2);
+    else if (norm.startsWith('03') && norm.length === 11) norm = '92' + norm.slice(1);
+    else if (norm.startsWith('3') && norm.length === 10) norm = '92' + norm;
+
+    let p = this._presences.get(norm) || this._presences.get(clean);
+    if (!p && this._phoneToLid.has(norm)) {
+      p = this._presences.get(this._phoneToLid.get(norm));
+    }
+
+    if (!p) {
+      return { success: true, state: 'unknown', label: 'Online / last seen unavailable' };
+    }
+
+    // Auto-expire typing and recording states after 12s of inactivity
+    if ((p.state === 'typing' || p.state === 'recording') && (Date.now() - p.timestamp > 12000)) {
+      p = { ...p, state: 'online', label: 'Active · WhatsApp Online' };
+      this._presences.set(norm, p);
+    }
+
+    return {
+      success: true,
+      state: p.state,
+      label: p.label,
+      lastSeen: p.lastSeen,
+      timestamp: p.timestamp
+    };
+  }
+
+  async sendPresence(phone, type = 'composing') {
+    if (!this.sock) return;
+    const clean = String(phone).replace(/\D/g, '');
+    let norm = clean;
+    if (norm.startsWith('0092')) norm = norm.slice(2);
+    else if (norm.startsWith('03') && norm.length === 11) norm = '92' + norm.slice(1);
+    else if (norm.startsWith('3') && norm.length === 10) norm = '92' + norm;
+
+    let targetJid = `${norm}@s.whatsapp.net`;
+    try {
+      const idObj = await this.getNumberId(norm).catch(() => null);
+      if (idObj?._serialized) targetJid = idObj._serialized;
+    } catch (_) {}
+
+    const validTypes = ['composing', 'recording', 'paused', 'available', 'unavailable'];
+    const pType = validTypes.includes(type) ? type : 'composing';
+
+    try {
+      if (typeof this.sock.sendPresenceUpdate === 'function') {
+        await this.sock.sendPresenceUpdate(pType, targetJid);
+        console.log(`[Baileys] Outbound presence '${pType}' sent to ${targetJid}`);
+      }
+    } catch (err) {
+      console.warn(`[Baileys] Outbound sendPresence failed: ${err.message}`);
+    }
+  }
+
+  getRecentPresences() {
+    const now = Date.now();
+    const result = {};
+    for (const [key, p] of this._presences.entries()) {
+      if (!p) continue;
+      if (p.state === 'typing' || p.state === 'recording') {
+        if (now - p.timestamp <= 12000) {
+          result[key] = { state: p.state, label: p.label, timestamp: p.timestamp };
+        }
+      } else if (now - p.timestamp <= 45000) {
+        result[key] = { state: p.state, label: p.label, timestamp: p.timestamp };
+      }
+    }
+    return result;
+  }
+
   async resetSession() {
     this._destroyed = true;
     if (this.sock) {
@@ -822,6 +984,7 @@ class BaileysClient extends EventEmitter {
     this._contacts.clear();
     this._lidToPhone.clear();
     this._phoneToLid.clear();
+    this._presences.clear();
     try {
       if (fs.existsSync(this.rawStorePath)) fs.unlinkSync(this.rawStorePath);
       if (fs.existsSync(this.authPath)) {

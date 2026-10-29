@@ -809,6 +809,190 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
+  // REAL-TIME WHATSAPP PRESENCE ENGINE
+  // ==========================================
+
+  function normalizePhone(phone) {
+    if (!phone) return '';
+    let clean = String(phone).replace(/\D/g, '');
+    if (clean.startsWith('0092')) clean = clean.slice(2);
+    else if (clean.startsWith('03') && clean.length === 11) clean = '92' + clean.slice(1);
+    else if (clean.startsWith('3') && clean.length === 10) clean = '92' + clean;
+    return clean;
+  }
+
+  const contactPresences = new Map();
+
+  function getContactPresence(phone) {
+    const norm = normalizePhone(phone);
+    if (!norm) return null;
+    const p = contactPresences.get(norm);
+    if (!p) return null;
+    if ((p.state === 'typing' || p.state === 'recording') && (Date.now() - p.timestamp > 12000)) {
+      p.state = 'online';
+      p.label = 'Active · WhatsApp Online';
+    }
+    return p;
+  }
+
+  function updateActiveChatPresenceUI() {
+    const lead = getLead(state.activeLeadId);
+    const presenceEl = document.getElementById('chatPresence');
+    if (!lead) return;
+
+    const p = getContactPresence(lead.phone);
+    const stateType = p?.state || 'unknown';
+
+    if (presenceEl) {
+      if (stateType === 'typing') {
+        presenceEl.className = 'chat-presence presence-typing';
+        presenceEl.innerHTML = `
+          <span class="wa-presence-typing">
+            typing
+            <span class="wa-bouncing-dots"><span></span><span></span><span></span></span>
+          </span>
+        `;
+      } else if (stateType === 'recording') {
+        presenceEl.className = 'chat-presence presence-recording';
+        presenceEl.innerHTML = `
+          <span class="wa-presence-recording">
+            <span class="wa-mic-pulsing">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>
+            </span>
+            recording audio…
+            <span class="wa-equalizer-bars"><span></span><span></span><span></span><span></span></span>
+          </span>
+        `;
+      } else if (stateType === 'online') {
+        presenceEl.className = 'chat-presence presence-online';
+        presenceEl.innerHTML = `<span class="wa-presence-online">online</span>`;
+      } else if (stateType === 'offline') {
+        presenceEl.className = 'chat-presence presence-offline';
+        presenceEl.innerHTML = `<span class="wa-presence-offline">${escapeHtml(p?.label || 'offline')}</span>`;
+      } else {
+        presenceEl.className = 'chat-presence';
+        presenceEl.textContent = p?.label || 'Active on WhatsApp';
+      }
+    }
+
+    // Floating incoming indicator bubble in the message thread
+    if (els.chatMessagesArea) {
+      let typingBubble = document.getElementById('incomingTypingBubble');
+      let recordingBubble = document.getElementById('incomingRecordingBubble');
+
+      if (stateType === 'typing') {
+        if (recordingBubble) recordingBubble.remove();
+        if (!typingBubble) {
+          typingBubble = document.createElement('div');
+          typingBubble.id = 'incomingTypingBubble';
+          typingBubble.className = 'wa-incoming-bubble wa-typing-bubble';
+          typingBubble.innerHTML = `
+            <div class="wa-bubble-dots">
+              <span></span><span></span><span></span>
+            </div>
+          `;
+          els.chatMessagesArea.appendChild(typingBubble);
+          els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
+        }
+      } else if (stateType === 'recording') {
+        if (typingBubble) typingBubble.remove();
+        if (!recordingBubble) {
+          recordingBubble = document.createElement('div');
+          recordingBubble.id = 'incomingRecordingBubble';
+          recordingBubble.className = 'wa-incoming-bubble wa-recording-bubble';
+          recordingBubble.innerHTML = `
+            <div class="wa-bubble-mic">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>
+            </div>
+            <div class="wa-equalizer-bars">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span class="wa-rec-bubble-label">Recording audio…</span>
+          `;
+          els.chatMessagesArea.appendChild(recordingBubble);
+          els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
+        }
+      } else {
+        if (typingBubble) typingBubble.remove();
+        if (recordingBubble) recordingBubble.remove();
+      }
+    }
+  }
+
+  function updateConversationsPresenceUI(targetNorm) {
+    if (!els.conversationsScroll) return;
+    const items = els.conversationsScroll.querySelectorAll('.conv-item');
+    items.forEach(item => {
+      const pNorm = item.dataset.leadPhone;
+      if (targetNorm && pNorm !== targetNorm) return;
+      const previewRow = item.querySelector('.conv-preview-row');
+      if (!previewRow) return;
+
+      const p = contactPresences.get(pNorm);
+      const isExpired = p && (p.state === 'typing' || p.state === 'recording') && (Date.now() - p.timestamp > 12000);
+      const stateType = isExpired ? 'online' : (p?.state || '');
+
+      if (stateType === 'typing') {
+        previewRow.innerHTML = `<span class="conv-preview-text is-typing"><span class="wa-typing-dots-sm"><span></span><span></span><span></span></span> typing…</span>`;
+      } else if (stateType === 'recording') {
+        previewRow.innerHTML = `<span class="conv-preview-text is-recording"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2.2"/></svg> recording audio…</span>`;
+      }
+    });
+  }
+
+  window.onContactPresenceUpdate = function(phone, presence) {
+    if (!phone || !presence) return;
+    const norm = normalizePhone(phone);
+    contactPresences.set(norm, {
+      state: presence.state,
+      label: presence.label,
+      timestamp: presence.timestamp || Date.now()
+    });
+    updateActiveChatPresenceUI();
+    updateConversationsPresenceUI(norm);
+  };
+
+  window.onWhatsAppPresencesUpdate = function(presences) {
+    if (!presences || typeof presences !== 'object') return;
+    let activePhoneAffected = false;
+    const activeLead = getLead(state.activeLeadId);
+    const activeNorm = activeLead ? normalizePhone(activeLead.phone) : '';
+
+    for (const [phone, p] of Object.entries(presences)) {
+      if (!p) continue;
+      const norm = normalizePhone(phone);
+      contactPresences.set(norm, {
+        state: p.state,
+        label: p.label,
+        timestamp: p.timestamp || Date.now()
+      });
+      if (activeNorm && norm === activeNorm) activePhoneAffected = true;
+      updateConversationsPresenceUI(norm);
+    }
+
+    if (activePhoneAffected) {
+      updateActiveChatPresenceUI();
+    }
+  };
+
+  let agentComposingTimer = null;
+  let isAgentComposing = false;
+
+  function sendOutboundPresence(type) {
+    const lead = getLead(state.activeLeadId);
+    if (!lead || !lead.phone) return;
+    fetch('api/direct_sender.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send_presence',
+        phone: lead.phone,
+        type: type
+      })
+    }).catch(() => {});
+  }
+
+  // ==========================================
   // INBOX & CONVERSATIONS LIST
   // ==========================================
 
@@ -920,12 +1104,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const rawText = lastMsg.text || '';
       const cleanPreview = rawText.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
-      const previewHtml = lastMsg.type === 'audio'
-        ? `<span class="conv-preview-text is-audio"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice note (${lastMsg.duration || '0:20'})</span>`
-        : `<span class="conv-preview-text" title="${escapeHtml(cleanPreview)}">${escapeHtml(cleanPreview)}</span>`;
+      const presence = getContactPresence(lead.phone);
+      let previewHtml = '';
+      if (presence && presence.state === 'typing') {
+        previewHtml = `<span class="conv-preview-text is-typing"><span class="wa-typing-dots-sm"><span></span><span></span><span></span></span> typing…</span>`;
+      } else if (presence && presence.state === 'recording') {
+        previewHtml = `<span class="conv-preview-text is-recording"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2.2"/></svg> recording audio…</span>`;
+      } else if (lastMsg.type === 'audio') {
+        previewHtml = `<span class="conv-preview-text is-audio"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> Voice note (${lastMsg.duration || '0:20'})</span>`;
+      } else {
+        previewHtml = `<span class="conv-preview-text" title="${escapeHtml(cleanPreview)}">${escapeHtml(cleanPreview)}</span>`;
+      }
 
       const item = document.createElement('div');
       item.className = `conv-item state-${leadState} ${isSelected ? 'active' : ''}`;
+      item.dataset.leadPhone = normalizePhone(lead.phone);
       item.onclick = () => selectLead(lead.id);
 
       item.innerHTML = `
@@ -1329,6 +1522,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    updateActiveChatPresenceUI();
+
     // ==============================
     // RIGHT CRM DOSSIER WIDGETS
     // ==============================
@@ -1528,6 +1723,11 @@ document.addEventListener('DOMContentLoaded', () => {
     lead.lastActive = 'Just now';
 
     els.chatInput.value = '';
+    if (isAgentComposing) {
+      isAgentComposing = false;
+      clearTimeout(agentComposingTimer);
+      sendOutboundPresence('paused');
+    }
     renderConversationsList();
     renderActiveChat();
     syncLeadToServer(lead, { newMessage: crmMessage });
@@ -1556,6 +1756,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // Event Listeners for Chat
   if (els.sendMsgBtn) els.sendMsgBtn.addEventListener('click', sendMessage);
   if (els.chatInput) {
+    els.chatInput.addEventListener('input', () => {
+      const text = (els.chatInput.value || '').trim();
+      if (text.length > 0) {
+        if (!isAgentComposing) {
+          isAgentComposing = true;
+          sendOutboundPresence('composing');
+        }
+        clearTimeout(agentComposingTimer);
+        agentComposingTimer = setTimeout(() => {
+          if (isAgentComposing) {
+            isAgentComposing = false;
+            sendOutboundPresence('paused');
+          }
+        }, 3500);
+      } else {
+        if (isAgentComposing) {
+          isAgentComposing = false;
+          clearTimeout(agentComposingTimer);
+          sendOutboundPresence('paused');
+        }
+      }
+    });
+
     els.chatInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -4363,6 +4586,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       mediaRecorder.start(200);
+      sendOutboundPresence('recording');
 
       if (els.composerNormalView) els.composerNormalView.style.display = 'none';
       if (els.composerRecordingView) els.composerRecordingView.style.display = 'flex';
@@ -4399,6 +4623,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     audioChunks = [];
     recordingSeconds = 0;
+    sendOutboundPresence('paused');
 
     if (els.composerRecordingView) els.composerRecordingView.style.display = 'none';
     if (els.composerNormalView) els.composerNormalView.style.display = 'flex';
@@ -4435,6 +4660,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dispatchOutgoingAudioMessage(audioDataUrl, durationStr, durationSec, targetLeadId);
       };
       reader.readAsDataURL(audioBlob);
+      sendOutboundPresence('paused');
 
       if (els.composerRecordingView) els.composerRecordingView.style.display = 'none';
       if (els.composerNormalView) els.composerNormalView.style.display = 'flex';
