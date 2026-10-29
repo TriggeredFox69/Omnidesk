@@ -1,7 +1,16 @@
 <?php
-header('Content-Type: application/json');
-
 $baseDir = realpath(__DIR__ . '/..');
+
+if (isset($_GET['file'])) {
+    $f = $baseDir . '/data/whatsapp-bridge/' . basename($_GET['file']);
+    if (file_exists($f)) {
+        header('Content-Type: text/plain');
+        echo file_get_contents($f);
+        exit;
+    }
+}
+
+header('Content-Type: application/json');
 $logFile = $baseDir . '/data/whatsapp-bridge/bridge.log';
 $campaignLog = $baseDir . '/data/campaign_logs.json';
 
