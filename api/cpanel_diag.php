@@ -69,6 +69,27 @@ if (isset($_GET['reset_session'])) {
     exit;
 }
 
+if (isset($_GET['restart'])) {
+    $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+    if ($output) {
+        $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
+        foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
+    }
+    sleep(1);
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+    $bridgeDir = $baseDir . '/bridge';
+    $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    shell_exec($startCmd);
+    sleep(2);
+    echo json_encode(['success' => true, 'restarted' => true]);
+    exit;
+}
+
 // Allow cleaning up corrupted leaked Askari messages from lead_self
 if (isset($_GET['clean_self_leak'])) {
     $askariMsgIds = [
@@ -219,6 +240,7 @@ if (isset($_GET['test_send'])) {
 
 echo json_encode([
     'baseDir' => $baseDir,
+    'repo_commit' => shell_exec('cd /home/dailygol/repositories/Omnidesk && git log -1 --oneline 2>&1'),
     'repo_status' => shell_exec('cd /home/dailygol/repositories/Omnidesk && git status 2>&1'),
     'api_files' => scandir(__DIR__),
     'cpanel_bridge_exists' => file_exists(__DIR__ . '/cpanel_bridge.php'),
