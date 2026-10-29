@@ -34,6 +34,41 @@ if (isset($_GET['clean_pair'])) {
     sleep(3);
 }
 
+// Allow targeted session reset for a single phone/LID to eliminate "Waiting for this message"
+if (isset($_GET['reset_session'])) {
+    $target = preg_replace('/\D/', '', $_GET['reset_session']);
+    $authDir = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
+    $purged = [];
+    if (is_dir($authDir) && !empty($target)) {
+        $files = scandir($authDir);
+        foreach ($files as $file) {
+            if (str_contains($file, $target) || (str_contains($file, '208023050051744') && $target === '923046588806')) {
+                @unlink($authDir . '/' . $file);
+                $purged[] = $file;
+            }
+        }
+    }
+    // Graceful reload without touching login
+    $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+    if ($output) {
+        $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
+        foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
+    }
+    sleep(1);
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+    $bridgeDir = $baseDir . '/bridge';
+    $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    shell_exec($startCmd);
+    sleep(2);
+    echo json_encode(['success' => true, 'purged_sessions' => $purged]);
+    exit;
+}
+
 // Allow executing wipe action directly through diag
 if (isset($_GET['wipe'])) {
     @unlink($baseDir . '/data/whatsapp-bridge/inbox.json');

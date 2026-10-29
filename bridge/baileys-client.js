@@ -360,6 +360,47 @@ class BaileysClient extends EventEmitter {
         }
       }
     });
+
+    // Intercept retry receipts directly from the socket to eliminate "Waiting for this message"
+    if (this.sock.ws) {
+      this.sock.ws.on('CB:receipt', async (node) => {
+        try {
+          if (node?.attrs?.type === 'retry' && node?.attrs?.id) {
+            const id = node.attrs.id;
+            const from = node.attrs.from || '';
+            const participant = node.attrs.participant || from;
+            console.log(`[Baileys] Socket retry receipt received for msg ${id} from ${participant}`);
+
+            let rawMsg = null;
+            if (this._rawMessageStore.has(id)) {
+              rawMsg = this._rawMessageStore.get(id);
+            } else if (this._messageCache.has(id)) {
+              const c = this._messageCache.get(id);
+              if (c?.body) rawMsg = { conversation: c.body };
+            }
+
+            if (rawMsg) {
+              const retryChild = Array.isArray(node.content) ? node.content.find(c => c?.tag === 'retry') : null;
+              const count = +(retryChild?.attrs?.count || 1);
+              console.log(`[Baileys] Re-encrypting & resending message ${id} to ${participant} (retry count ${count})`);
+              try {
+                if (typeof this.sock.assertSessions === 'function') {
+                  await this.sock.assertSessions([participant], true);
+                }
+              } catch (_) {}
+
+              await this.sock.relayMessage(from, rawMsg, {
+                messageId: id,
+                participant: { jid: participant, count }
+              });
+              console.log(`[Baileys] Re-relay completed successfully for msg ${id} to ${participant}`);
+            }
+          }
+        } catch (err) {
+          console.error('[Baileys] Error in socket retry receipt handler:', err?.message || err);
+        }
+      });
+    }
   }
 
   _normalizeJid(jidOrPhone) {
