@@ -19,7 +19,7 @@ const {
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const NodeCache = require('@cacheable/node-cache').default || require('@cacheable/node-cache');
-const { ensureOggOpus } = require('./audio');
+const { ensureOggOpus, isOgg } = require('./audio');
 
 class BaileysClient extends EventEmitter {
   constructor({ authPath, deviceName = 'Omnidesk Cloud' } = {}) {
@@ -597,10 +597,11 @@ class BaileysClient extends EventEmitter {
       if (isVoice) {
         // WhatsApp PTT requires genuine OGG OPUS container for native mobile voice note playback
         buffer = await ensureOggOpus(buffer);
+        const validPtt = isOgg(buffer);
         sent = await this.sock.sendMessage(jid, {
           audio: buffer,
-          mimetype: 'audio/ogg; codecs=opus',
-          ptt: true
+          mimetype: validPtt ? 'audio/ogg; codecs=opus' : (content.mimetype || 'audio/mp4'),
+          ptt: validPtt
         });
       } else if (content.mimetype.startsWith('image/')) {
         sent = await this.sock.sendMessage(jid, {

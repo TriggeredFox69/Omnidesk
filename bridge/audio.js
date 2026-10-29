@@ -99,6 +99,44 @@ function readElementId(buf, offset) {
   return { value, length };
 }
 
+function getOpusSamplesPerFrame(tocByte) {
+  const config = (tocByte >> 3) & 0x1F;
+  if (config >= 16) {
+    const mode = config & 3;
+    if (mode === 0) return 120;
+    if (mode === 1) return 240;
+    if (mode === 2) return 480;
+    return 960;
+  } else if (config >= 12) {
+    return (config & 1) === 0 ? 480 : 960;
+  } else {
+    const sub = config & 3;
+    if (sub === 0) return 480;
+    if (sub === 1) return 960;
+    if (sub === 2) return 1920;
+    return 2880;
+  }
+}
+
+function getOpusPacketSamples(packet) {
+  if (!packet || packet.length < 1) return 960;
+  const toc = packet[0];
+  const samplesPerFrame = getOpusSamplesPerFrame(toc);
+  const code = toc & 3;
+  let frameCount = 1;
+
+  if (code === 0) {
+    frameCount = 1;
+  } else if (code === 1 || code === 2) {
+    frameCount = 2;
+  } else if (code === 3) {
+    if (packet.length < 2) return samplesPerFrame;
+    frameCount = packet[1] & 0x3F;
+  }
+
+  return samplesPerFrame * frameCount;
+}
+
 const CONTAINER_IDS = new Set([
   0x1A45DFA3, // EBML
   0x18538067, // Segment
@@ -107,7 +145,8 @@ const CONTAINER_IDS = new Set([
   0x1654AE6B, // Tracks
   0xAE,       // TrackEntry
   0xE1,       // Audio
-  0x1F43B675  // Cluster
+  0x1F43B675, // Cluster
+  0xA0        // BlockGroup
 ]);
 
 function extractOpusPacketsFromWebm(webmBuf) {
@@ -128,7 +167,8 @@ function extractOpusPacketsFromWebm(webmBuf) {
     offset += size.length;
 
     const dataStart = offset;
-    const isUnknownSize = (size.length === 8 && size.value === 0x00FFFFFFFFFFFF);
+    const isUnknownSize = (size.length === 8 && (size.value === 0x00FFFFFFFFFFFF || size.value === 0x01FFFFFFFFFFFFFF)) ||
+                          (size.length <= 6 && size.value === (Math.pow(2, 7 * size.length) - 1));
     const dataEnd = isUnknownSize ? webmBuf.length : Math.min(webmBuf.length, offset + size.value);
 
     if (CONTAINER_IDS.has(el.value)) {
@@ -138,8 +178,8 @@ function extractOpusPacketsFromWebm(webmBuf) {
     if (el.value === 0x63A2) {
       // CodecPrivate: OpusHead
       opusHead = webmBuf.subarray(dataStart, dataEnd);
-    } else if (el.value === 0xA3) {
-      // SimpleBlock
+    } else if (el.value === 0xA3 || el.value === 0xA1) {
+      // SimpleBlock (0xA3) or Block (0xA1)
       const tr = readVint(webmBuf, dataStart);
       if (tr) {
         // Skip track number + 2 bytes timecode + 1 byte flags
@@ -168,16 +208,20 @@ function webmToOggOpus(webmBuf) {
 
     // Page 0: OpusHead
     let headPayload = extracted.opusHead;
+    let preSkip = 0;
     if (!headPayload || headPayload.length < 19 || headPayload.subarray(0, 8).toString('ascii') !== 'OpusHead') {
       headPayload = Buffer.from([
         0x4F, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64, // 'OpusHead'
         0x01,                                           // version 1
         0x01,                                           // 1 channel (mono)
-        0x38, 0x01,                                     // pre-skip 312 LE
+        0x00, 0x00,                                     // pre-skip 0 LE
         0x80, 0xBB, 0x00, 0x00,                         // 48000 Hz LE
         0x00, 0x00,                                     // output gain 0
         0x00                                            // channel mapping 0
       ]);
+      preSkip = 0;
+    } else {
+      preSkip = headPayload.readUInt16LE(10);
     }
     pages.push(createOggPage(0x02, 0, serial, 0, [headPayload]));
 
@@ -190,14 +234,14 @@ function webmToOggOpus(webmBuf) {
     tagsPayload.writeUInt32LE(0, 12 + vendor.length);
     pages.push(createOggPage(0x00, 0, serial, 1, [tagsPayload]));
 
-    // Audio pages: 20ms @ 48kHz = 960 samples per frame
-    let granulePos = 0;
+    // Audio pages: compute true cumulative granule position from Opus packets (RFC 7845)
+    let granulePos = preSkip;
     let pageSeq = 2;
-    const frameSamples = 960;
 
     for (let i = 0; i < extracted.packets.length; i++) {
       const isLast = (i === extracted.packets.length - 1);
-      granulePos += frameSamples;
+      const samples = getOpusPacketSamples(extracted.packets[i]);
+      granulePos += samples;
       const headerType = isLast ? 0x04 : 0x00;
       pages.push(createOggPage(headerType, granulePos, serial, pageSeq++, [extracted.packets[i]]));
     }
@@ -319,5 +363,7 @@ module.exports = {
   convertWithFfmpeg,
   findFfmpeg,
   createOggPage,
-  oggCrc
+  oggCrc,
+  getOpusSamplesPerFrame,
+  getOpusPacketSamples
 };
