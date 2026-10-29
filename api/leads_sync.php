@@ -138,6 +138,20 @@ if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
 
 // 1. Get All Leads
 if ($action === 'get_leads') {
+    $modified = false;
+    foreach ($currentLeads as &$lead) {
+        $curName = trim($lead['name'] ?? '');
+        $lower = strtolower($curName);
+        if ($lower === 'trader' || $lower === 'alishba' || empty($curName)) {
+            $p = preg_replace('/\D+/', '', $lead['phone'] ?? '');
+            $lead['name'] = !empty($p) ? ('+' . $p) : ($lead['display'] ?? 'Contact');
+            $modified = true;
+        }
+    }
+    unset($lead);
+    if ($modified) {
+        saveStoredLeads($dataFile, $currentLeads);
+    }
     echo json_encode([
         'success' => true,
         'leads'   => $currentLeads,
@@ -181,8 +195,8 @@ if ($action === 'update_lead') {
             if (isset($input['status'])) $lead['status'] = $input['status'];
             if (array_key_exists('ownerId', $input)) $lead['ownerId'] = $input['ownerId'];
             if (array_key_exists('ownerName', $input)) $lead['ownerName'] = $input['ownerName'];
-            if (isset($input['name']) && !empty($input['name']) && (($lead['name'] ?? '') === ($lead['phone'] ?? '') || empty($lead['name']))) {
-                $lead['name'] = $input['name'];
+            if (isset($input['name']) && trim($input['name']) !== '') {
+                $lead['name'] = trim($input['name']);
             }
             if (isset($input['email'])) $lead['email'] = $input['email'];
             if (isset($input['paidDetails'])) $lead['paidDetails'] = $input['paidDetails'];
@@ -228,7 +242,9 @@ if ($action === 'update_lead') {
 
     if (!$found && (!empty($inputPhone) || !empty($leadId))) {
         $targetPhone = !empty($inputPhone) ? $inputPhone : preg_replace('/\D+/', '', $leadId);
-        $contactName = $input['name'] ?? ('+' . $targetPhone);
+        $rawContactName = trim($input['name'] ?? '');
+        $lowerC = strtolower($rawContactName);
+        $contactName = (!empty($rawContactName) && $lowerC !== 'trader' && $lowerC !== 'alishba' && $lowerC !== 'new contact') ? $rawContactName : ('+' . $targetPhone);
         $newLead = [
             'id' => !empty($leadId) ? $leadId : ('lead_' . bin2hex(random_bytes(6))),
             'name' => $contactName,
@@ -262,7 +278,6 @@ if ($action === 'update_lead') {
 // 2b. Add Custom Lead / Start New Chat
 if ($action === 'add_lead') {
     $rawPhone = $input['phone'] ?? '';
-    $name = trim($input['name'] ?? 'New Contact');
     $cleanPhone = preg_replace('/\D+/', '', $rawPhone);
     if (str_starts_with($cleanPhone, '0092')) $cleanPhone = substr($cleanPhone, 2);
     elseif (str_starts_with($cleanPhone, '03') && strlen($cleanPhone) === 11) $cleanPhone = '92' . substr($cleanPhone, 1);
@@ -272,6 +287,10 @@ if ($action === 'add_lead') {
         echo json_encode(['success' => false, 'message' => 'Valid phone number is required (at least 10 digits).']);
         exit;
     }
+
+    $rawName = trim($input['name'] ?? '');
+    $lower = strtolower($rawName);
+    $name = (!empty($rawName) && $lower !== 'trader' && $lower !== 'alishba' && $lower !== 'new contact') ? $rawName : ('+' . $cleanPhone);
 
     foreach ($currentLeads as &$existing) {
         if ($existing['phone'] === $cleanPhone) {

@@ -64,6 +64,31 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'fresh';
   }
 
+  // Display name helper: default strictly to phone number, never default to Trader or Alishba
+  function getContactDisplayName(lead) {
+    if (!lead) return '';
+    const rawName = (lead.name || '').trim();
+    const lower = rawName.toLowerCase();
+    if (!rawName || lower === 'trader' || lower === 'alishba' || lower === 'new contact' || lower === 'unknown' || lower === 'lead') {
+      return lead.display || (lead.phone ? '+' + lead.phone : '');
+    }
+    return rawName;
+  }
+
+  function getContactAvatarInitials(lead) {
+    const displayName = getContactDisplayName(lead);
+    if (!displayName) return 'WA';
+    if (displayName.startsWith('+')) {
+      const digits = displayName.replace(/\D/g, '');
+      return digits.slice(-2) || 'WA';
+    }
+    const parts = displayName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return displayName.slice(0, 2).toUpperCase();
+  }
+
   // App Master State
   const state = {
     currentTab: 'inbox', // 'inbox', 'campaign', 'directory'
@@ -641,7 +666,14 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(res => res.json())
       .then(data => {
         if (data && data.success && Array.isArray(data.leads) && data.leads.length > 0) {
-          state.leads = data.leads;
+          state.leads = data.leads.map(l => {
+            const raw = (l.name || '').trim();
+            const lower = raw.toLowerCase();
+            if (!raw || lower === 'trader' || lower === 'alishba' || lower === 'new contact' || lower === 'unknown') {
+              l.name = l.display || (l.phone ? '+' + l.phone : '');
+            }
+            return l;
+          });
           if (!state.activeLeadId || !state.leads.some(l => l.id === state.activeLeadId)) {
             state.activeLeadId = state.leads[0].id;
           }
@@ -866,9 +898,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const lastMsg = lead.messages.length ? lead.messages[lead.messages.length - 1] : { text: 'No messages', time: '' };
       const owner = lead.ownerId ? getAgent(lead.ownerId) : null;
       const leadState = getLeadState(lead);
-
-      // Clean initials for avatar
-      const initials = lead.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      const contactDisplayName = getContactDisplayName(lead);
+      const initials = getContactAvatarInitials(lead);
 
       // Clean 5-State Badge
       let statusBadgeHtml = '';
@@ -905,14 +936,14 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="conv-body">
           <div class="conv-top-row">
-            <span class="conv-contact-name">${lead.name}</span>
+            <span class="conv-contact-name">${escapeHtml(contactDisplayName)}</span>
             <span class="conv-timestamp">${lastMsg.time || lead.lastActive}</span>
           </div>
           <div class="conv-preview-row">
             ${previewHtml}
           </div>
           <div class="conv-bottom-row">
-            <span class="mono text-xs text-muted">${lead.display}</span>
+            <span class="mono text-xs text-muted">${lead.display || ('+' + lead.phone)}</span>
             ${statusBadgeHtml}
           </div>
         </div>
@@ -975,13 +1006,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const leadState = getLeadState(lead);
     const owner = lead.ownerId ? getAgent(lead.ownerId) : null;
-    const initials = lead.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const contactDisplayName = getContactDisplayName(lead);
+    const initials = getContactAvatarInitials(lead);
 
     // Header Info
     if (els.chatLeadAvatar) els.chatLeadAvatar.textContent = initials;
     if (els.chatLeadDot) els.chatLeadDot.className = `lead-status-dot status-${leadState}`;
-    if (els.chatLeadName) els.chatLeadName.textContent = lead.name;
-    if (els.chatLeadPhone) els.chatLeadPhone.textContent = lead.display;
+    if (els.chatLeadName) els.chatLeadName.textContent = contactDisplayName;
+    if (els.chatLeadPhone) els.chatLeadPhone.textContent = lead.display || (lead.phone ? '+' + lead.phone : '');
 
     if (els.chatLeadStatusBadge) {
       if (leadState === 'fresh') {
@@ -1750,15 +1782,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let msg = resolveSpintax(template);
 
     msg = msg.replace(/\{name(?:\|([^{}]+))?\}/gi, (match, fallback) => {
-      if (contact && contact.name && contact.name !== 'Trader') return contact.name;
+      const cName = getContactDisplayName(contact);
+      if (cName && !cName.startsWith('+')) return cName;
       if (fallback) {
         const fbParts = fallback.split('|');
         return fbParts[Math.floor(Math.random() * fbParts.length)].trim();
       }
-      return 'Trader';
+      return cName || (contact && (contact.display || contact.phone)) || '';
     });
 
-    const contactName = (contact && contact.name) ? contact.name : 'Trader';
+    const contactName = getContactDisplayName(contact) || (contact && (contact.display || contact.phone)) || '';
     const contactPhone = (contact && contact.display) ? contact.display : ((contact && contact.phone) ? contact.phone : '+92 300 1234567');
     const contactCity = (contact && contact.city) ? contact.city : 'Pakistan';
 
@@ -1812,11 +1845,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!line) return;
       const parts = line.split(/[,\t;|]+/);
       const rawPhone = parts[0] ? parts[0].trim() : '';
-      const rawName = parts[1] ? parts[1].trim() : 'Trader';
-      const rawCity = parts[2] ? parts[2].trim() : 'Pakistan';
-
       const clean = cleanNumber(rawPhone);
       if (!clean) return;
+
+      const formattedNumber = `+92 ${clean.substring(2, 5)} ${clean.substring(5)}`;
+      const rawName = (parts[1] && parts[1].trim() && parts[1].trim().toLowerCase() !== 'trader') ? parts[1].trim() : formattedNumber;
+      const rawCity = parts[2] ? parts[2].trim() : 'Pakistan';
 
       if (campaignState.audience.some(c => c.phone === clean)) return;
 
@@ -1824,7 +1858,7 @@ document.addEventListener('DOMContentLoaded', () => {
         id: `c_lead_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
         name: rawName,
         phone: clean,
-        display: `+92 ${clean.substring(2, 5)} ${clean.substring(5)}`,
+        display: formattedNumber,
         city: rawCity,
         network: getNetwork(clean),
         status: 'pending',
@@ -4645,20 +4679,22 @@ document.addEventListener('DOMContentLoaded', () => {
     editLeadNameBtn.addEventListener('click', async () => {
       const lead = getLead(state.activeLeadId);
       if (!lead) return;
-      const currentName = (lead.name === lead.phone || lead.name === lead.display) ? '' : lead.name;
-      const newName = prompt(`Set custom name for ${lead.display || lead.phone}:`, currentName);
+      const curDisplayName = getContactDisplayName(lead);
+      const isCustom = curDisplayName && curDisplayName !== lead.phone && curDisplayName !== lead.display && !curDisplayName.startsWith('+');
+      const currentPromptVal = isCustom ? curDisplayName : '';
+      const newName = prompt(`Set custom name for ${lead.display || ('+' + lead.phone)}:`, currentPromptVal);
       if (newName === null) return;
       const trimmed = newName.trim();
-      lead.name = trimmed || lead.phone;
+      lead.name = trimmed || (lead.display || ('+' + lead.phone));
       renderActiveChat();
       renderConversationsList();
       try {
         await fetch('api/leads_sync.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'update_lead', id: lead.id, name: lead.name })
+          body: JSON.stringify({ action: 'update_lead', id: lead.id, phone: lead.phone, name: lead.name })
         });
-        showToast(`✅ Contact name updated to "${lead.name}"`);
+        showToast(`✅ Contact name saved as "${lead.name}"`);
       } catch (_) {}
     });
   }

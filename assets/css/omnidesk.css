@@ -3,12 +3,11 @@
 html,body { background:#f3f5f4!important;color:var(--od-ink); }
 body { background-image:none!important; }
 .topbar { height:62px;min-height:62px;flex:0 0 62px;padding:0 22px;background:#fff;box-shadow:0 1px 0 #e9eeeb;z-index:10; }
-.brand-wrap { min-width:202px; }
-.brand-mark { width:34px;height:34px;display:grid;place-items:center;border:1px solid #dcece5;border-radius:11px;background:#eef7f2;color:#16785f; }
-.brand-mark svg { width:20px;height:20px;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round; }
-.brand-heading { text-transform:lowercase;font-size:19px;letter-spacing:-.06em; }
-.brand-badge { font-size:8px;letter-spacing:.13em;padding:4px 6px; }
-.brand-info .text-xs { margin-top:2px; }
+.brand-wrap { min-width:202px; display:flex; align-items:center; gap:10px; }
+.brand-logo-img { width:34px; height:34px; border-radius:10px; object-fit:contain; flex-shrink:0; }
+.brand-heading { font-size:17px; font-weight:800; display:flex; align-items:center; gap:6px; letter-spacing:-.02em; }
+.brand-badge { font-size:8px; font-weight:700; letter-spacing:.09em; padding:3px 7px; border-radius:5px; background:#e8f4ee; color:#16785f; text-transform:uppercase; }
+.brand-info .text-xs { margin-top:2px; font-size:10px; color:#78847e; }
 .nav-tab-bar { gap:4px; }
 .nav-tab-btn { border-radius:9px;padding:9px 13px; }
 .nav-tab-btn.active,.nav-tab-btn.tab-wa { background:#eef6f2; }
@@ -34,9 +33,9 @@ body { background-image:none!important; }
 .conv-preview-text { font-size:10px; }
 .conv-bottom-row .status-pill-clean { font-size:8px; }
 .chat-header { min-height:70px;padding:10px 15px; }
-.chat-header-actions { gap:5px; }
-/* Keep the conversation's everyday controls visible; advanced sales state lives in the contact panel. */
-.chat-header-actions #markPaidHeaderBtn,.chat-header-actions #verifyPaidHeaderBtn,.chat-header-actions #rejectPaidHeaderBtn,.chat-header-actions #cantHandleBtn,.chat-header-actions #markUselessHeaderBtn,.chat-header-actions #simClientAudioBtn { display:none!important; }
+.chat-header-actions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.chat-header-actions .btn { font-size:11px; font-weight:600; padding:5px 10px; border-radius:7px; display:inline-flex; align-items:center; gap:5px; }
+.chat-header-actions #simClientAudioBtn { display:none!important; }
 .chat-lead-title { font-size:13px; }
 .chat-lead-meta { font-size:10px; }
 /* Edit buttons are visible for user control */
@@ -71,7 +70,7 @@ body { background-image:none!important; }
 @media(max-width:750px) {
   .topbar { padding:0 11px;gap:5px; }
   .brand-wrap { min-width:0;gap:7px; }
-  .brand-mark { width:30px;height:30px; }
+  .brand-logo-img { width:30px;height:30px;border-radius:8px; }
   .brand-heading { font-size:16px; }
   .nav-tab-bar { margin-left:auto; }
   .nav-tab-btn { padding:8px 9px; }

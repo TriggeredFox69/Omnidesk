@@ -19,9 +19,9 @@
       const itemPhone = cleanDigits(item.phone);
       let lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
       if (!lead) {
-        const contactName = (item.name && item.name !== item.phone) ? item.name : (itemPhone ? '+' + itemPhone : item.phone);
-        lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: '+' + (itemPhone || item.phone),
-          name: contactName, city: '', network: '', ownerId: null, leadState: 'fresh',
+        const defaultNumber = itemPhone ? ('+' + itemPhone) : (item.phone ? '+' + cleanDigits(item.phone) : '');
+        lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: defaultNumber,
+          name: defaultNumber, city: '', network: '', ownerId: null, leadState: 'fresh',
           status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
         state.leads.unshift(lead);
         // Persist newly discovered WhatsApp conversation to database

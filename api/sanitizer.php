@@ -113,15 +113,17 @@ $networkStats = [
 
 foreach ($rawContacts as $item) {
     $rawPhone = is_array($item) ? ($item['phone'] ?? $item['number'] ?? '') : (string)$item;
-    $name     = is_array($item) ? ($item['name'] ?? 'Trader') : 'Trader';
-    $city     = is_array($item) ? ($item['city'] ?? 'Pakistan') : 'Pakistan';
-    $custom   = is_array($item) ? ($item['custom'] ?? '') : '';
-
     $clean = normalize_pk_number($rawPhone);
     if (!$clean) {
         $invalidCount++;
         continue;
     }
+
+    $rawName  = is_array($item) ? trim($item['name'] ?? '') : '';
+    $lowerN   = strtolower($rawName);
+    $name     = (!empty($rawName) && $lowerN !== 'trader' && $lowerN !== 'alishba') ? $rawName : ('+' . $clean);
+    $city     = is_array($item) ? ($item['city'] ?? 'Pakistan') : 'Pakistan';
+    $custom   = is_array($item) ? ($item['custom'] ?? '') : '';
 
     if (isset($seenNumbers[$clean])) {
         $duplicatesCount++;
