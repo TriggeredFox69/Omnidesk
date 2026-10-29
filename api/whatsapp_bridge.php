@@ -118,12 +118,13 @@ function handleWhatsAppBridge(string $action, array $input): void {
         if (str_starts_with($phone, '0092')) $phone = substr($phone, 2);
         elseif (str_starts_with($phone, '03') && strlen($phone) === 11) $phone = '92' . substr($phone, 1);
         elseif (str_starts_with($phone, '3') && strlen($phone) === 10) $phone = '92' . $phone;
+        $requestId = !empty($input['request_id']) ? (string) $input['request_id'] : ('req_' . bin2hex(random_bytes(10)));
         $result = whatsappBridgeRequest('/send', ['phone' => $phone,
             'message' => (string) ($input['message'] ?? ''),
             'media' => $input['media'] ?? null,
-            'request_id' => (string) ($input['request_id'] ?? '')]);
-        // If the bridge is offline on cPanel, return an honest failure with guidance
-        if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
+            'request_id' => $requestId]);
+        // If the bridge is truly offline on cPanel (daemon not responding), return offline guidance
+        if (($result['state'] ?? '') === 'offline') {
             http_response_code(503);
             $msg = trim((string) ($input['message'] ?? ''));
             $waUrl = 'https://web.whatsapp.com/send?phone=' . rawurlencode($phone) . '&text=' . rawurlencode($msg);
@@ -133,7 +134,15 @@ function handleWhatsAppBridge(string $action, array $input): void {
                 'dispatch_mode' => 'whatsapp_handoff',
                 'to_number'     => $phone,
                 'wa_url'        => $waUrl,
-                'message'       => 'WhatsApp bridge is offline. Keep start-online-whatsapp.cmd running on your PC to send real WhatsApp messages directly from your phone.'
+                'message'       => 'WhatsApp bridge service is not running on the server. Please check bridge status.'
+            ]);
+            exit;
+        }
+        if (empty($result['success'])) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => $result['message'] ?: 'Failed to send WhatsApp message. Please check recipient number.'
             ]);
             exit;
         }

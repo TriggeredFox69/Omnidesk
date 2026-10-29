@@ -142,6 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
     closeConnectWaModalBtn: document.getElementById('closeConnectWaModalBtn'),
     cancelConnectWaBtn: document.getElementById('cancelConnectWaBtn'),
     saveConnectedWaBtn: document.getElementById('saveConnectedWaBtn'),
+    reconnectWaBtn: document.getElementById('reconnectWaBtn'),
+    waConnectedBox: document.getElementById('waConnectedBox'),
+    waModalConnectedNum: document.getElementById('waModalConnectedNum'),
     waConnectionStatus: document.getElementById('waConnectionStatus'),
     waQrImage: document.getElementById('waQrImage'),
     waPendingCampaign: document.getElementById('waPendingCampaign'),
@@ -482,9 +485,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (validQr) els.waQrImage.src = result.qr;
       else els.waQrImage.removeAttribute('src');
     }
+    if (els.waConnectedBox) {
+      els.waConnectedBox.style.display = state.senderConfigured ? 'block' : 'none';
+    }
+    if (els.waModalConnectedNum) {
+      els.waModalConnectedNum.textContent = state.connectedWaNumber ? '+' + state.connectedWaNumber : (result.connected_number ? '+' + result.connected_number : 'Connected');
+    }
     if (els.saveConnectedWaBtn) {
       els.saveConnectedWaBtn.disabled = ['starting', 'qr', 'authenticated', 'ready'].includes(result.state);
       els.saveConnectedWaBtn.textContent = state.senderConfigured ? 'Connected' : 'Connect WhatsApp';
+      els.saveConnectedWaBtn.style.display = state.senderConfigured ? 'none' : 'inline-block';
     }
   }
 
@@ -501,10 +511,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await refreshSenderConnection();
       if (generation !== waModalGeneration) return;
-      if (state.senderConfigured) {
-        const launchCampaign = pendingCampaignStart;
+      if (state.senderConfigured && pendingCampaignStart) {
         closeConnectWaModal();
-        if (launchCampaign) startCampaign();
+        startCampaign();
         return;
       }
     } catch (_) { /* The status panel displays service errors and allows a retry. */ }
@@ -540,6 +549,29 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       if (els.waConnectionStatus) els.waConnectionStatus.textContent = describeSendError(error);
       if (els.saveConnectedWaBtn) els.saveConnectedWaBtn.disabled = false;
+    }
+  }
+
+  async function reconnectWhatsApp() {
+    if (els.reconnectWaBtn) els.reconnectWaBtn.disabled = true;
+    if (els.waConnectionStatus) els.waConnectionStatus.textContent = 'Unlinking previous WhatsApp session and generating new QR code…';
+    if (els.waConnectedBox) els.waConnectedBox.style.display = 'none';
+    if (els.waQrImage) { els.waQrImage.hidden = true; els.waQrImage.removeAttribute('src'); }
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reconnect_whatsapp' })
+      });
+      const result = await response.json();
+      state.senderConfigured = false;
+      state.connectedWaNumber = '';
+      renderConnectedNumber();
+      renderSenderConnection(result);
+      showToast('🔄 Scan the QR code with WhatsApp on your phone to link.');
+    } catch (error) {
+      if (els.waConnectionStatus) els.waConnectionStatus.textContent = describeSendError(error);
+    } finally {
+      if (els.reconnectWaBtn) els.reconnectWaBtn.disabled = false;
     }
   }
 
@@ -581,6 +613,9 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(data => {
         if (data && data.success && Array.isArray(data.leads) && data.leads.length > 0) {
           state.leads = data.leads;
+          if (!state.activeLeadId || !state.leads.some(l => l.id === state.activeLeadId)) {
+            state.activeLeadId = state.leads[0].id;
+          }
           renderConversationsList();
           renderActiveChat();
           renderAgentProfile();
@@ -3091,6 +3126,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.closeConnectWaModalBtn) els.closeConnectWaModalBtn.addEventListener('click', closeConnectWaModal);
   if (els.cancelConnectWaBtn) els.cancelConnectWaBtn.addEventListener('click', closeConnectWaModal);
   if (els.saveConnectedWaBtn) els.saveConnectedWaBtn.addEventListener('click', saveConnectedWaNumber);
+  if (els.reconnectWaBtn) els.reconnectWaBtn.addEventListener('click', reconnectWhatsApp);
 
   // Authentication & Employee Modal Event Listeners
   if (els.authForm) els.authForm.addEventListener('submit', handleLogin);
