@@ -215,6 +215,7 @@ class BaileysClient extends EventEmitter {
         if (this.sock.user?.lid) {
           this._recordLidPhone(this.sock.user.lid, userNum);
         }
+        this._syncLeadsLids().catch(() => {});
         this.emit('authenticated');
         this.emit('ready');
       }
@@ -297,8 +298,8 @@ class BaileysClient extends EventEmitter {
       const extension = isVideo ? 'mp4' : (isImage ? (content.stickerMessage ? 'webp' : 'jpg') : (isAudio ? 'ogg' : 'bin'));
       const filename = content.documentMessage?.fileName || media?.fileName || `${type}.${extension}`;
 
-      // Do NOT invent names: leave notifyName empty so contact names are strictly user-managed
-      const notifyName = '';
+      // Use sender WhatsApp pushName for contact display
+      const notifyName = msg.pushName || '';
 
       return {
         id: { _serialized: msg.key.id, fromMe, remote: jid },
@@ -428,14 +429,52 @@ class BaileysClient extends EventEmitter {
 
   _normalizeJid(jidOrPhone) {
     let raw = String(jidOrPhone || '').trim();
-    if (raw.endsWith('@s.whatsapp.net') || raw.endsWith('@c.us')) {
+    if (raw.endsWith('@s.whatsapp.net') || raw.endsWith('@c.us') || raw.endsWith('@lid')) {
       raw = raw.split('@')[0];
     }
     raw = raw.replace(/\D/g, '');
     if (raw.startsWith('0092')) raw = raw.slice(2);
     else if (raw.startsWith('03') && raw.length === 11) raw = '92' + raw.slice(1);
     else if (raw.startsWith('3') && raw.length === 10) raw = '92' + raw;
+    if (this._phoneToLid.has(raw)) {
+      return `${this._phoneToLid.get(raw)}@lid`;
+    }
+    if (raw.startsWith('2080') && raw.length >= 14) {
+      return `${raw}@lid`;
+    }
     return `${raw}@s.whatsapp.net`;
+  }
+
+  async _syncLeadsLids() {
+    if (!this.sock) return;
+    try {
+      const candidatePaths = [
+        path.resolve(__dirname, '../data/leads.json'),
+        path.resolve(__dirname, '../../data/leads.json'),
+        path.resolve(this.authPath, '../../../data/leads.json'),
+        path.resolve(this.authPath, '../../leads.json')
+      ];
+      for (const leadsPath of candidatePaths) {
+        if (fs.existsSync(leadsPath)) {
+          const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
+          if (Array.isArray(leads)) {
+            for (const lead of leads) {
+              const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
+              if (phone && !this._phoneToLid.has(phone)) {
+                try {
+                  const [res] = await this.sock.onWhatsApp(phone);
+                  if (res?.lid) {
+                    const resLid = res.lid.split('@')[0].split(':')[0];
+                    this._recordLidPhone(resLid, phone);
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+          break;
+        }
+      }
+    } catch (_) {}
   }
 
   async getNumberId(phone) {
@@ -473,23 +512,31 @@ class BaileysClient extends EventEmitter {
     }
     // Proactively query leads from leads.json
     try {
-      const leadsPath = path.resolve(__dirname, '../data/leads.json');
-      if (fs.existsSync(leadsPath)) {
-        const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
-        if (Array.isArray(leads) && this.sock) {
-          for (const lead of leads) {
-            const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
-            if (phone && !this._phoneToLid.has(phone)) {
-              try {
-                const [res] = await this.sock.onWhatsApp(phone);
-                if (res?.lid) {
-                  const resLid = res.lid.split('@')[0].split(':')[0];
-                  this._recordLidPhone(resLid, phone);
-                  if (resLid === lidClean) return phone;
-                }
-              } catch (_) {}
+      const candidatePaths = [
+        path.resolve(__dirname, '../data/leads.json'),
+        path.resolve(__dirname, '../../data/leads.json'),
+        path.resolve(this.authPath, '../../../data/leads.json'),
+        path.resolve(this.authPath, '../../leads.json')
+      ];
+      for (const leadsPath of candidatePaths) {
+        if (fs.existsSync(leadsPath)) {
+          const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
+          if (Array.isArray(leads) && this.sock) {
+            for (const lead of leads) {
+              const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
+              if (phone && !this._phoneToLid.has(phone)) {
+                try {
+                  const [res] = await this.sock.onWhatsApp(phone);
+                  if (res?.lid) {
+                    const resLid = res.lid.split('@')[0].split(':')[0];
+                    this._recordLidPhone(resLid, phone);
+                    if (resLid === lidClean) return phone;
+                  }
+                } catch (_) {}
+              }
             }
           }
+          break;
         }
       }
     } catch (_) {}
@@ -551,7 +598,8 @@ class BaileysClient extends EventEmitter {
       fetchMessages: async ({ limit = 50 } = {}) => {
         const msgs = [];
         for (const msg of this._messageCache.values()) {
-          if (msg.from === cleanJid || msg.to === cleanJid || msg.id?.remote === cleanJid) {
+          const remote = (typeof msg.id?.remote === 'string' ? msg.id.remote : msg.id?.remote?._serialized) || '';
+          if (remote === cleanJid) {
             msgs.push(msg);
           }
         }
@@ -563,7 +611,7 @@ class BaileysClient extends EventEmitter {
   async getChats() {
     const chatMap = new Map();
     for (const msg of this._messageCache.values()) {
-      const remote = msg.id?.remote || (msg.fromMe ? msg.to : msg.from);
+      const remote = (typeof msg.id?.remote === 'string' ? msg.id.remote : msg.id?.remote?._serialized) || (msg.fromMe ? msg.to : msg.from);
       if (remote && !chatMap.has(remote)) {
         chatMap.set(remote, {
           id: { _serialized: remote },
@@ -572,7 +620,8 @@ class BaileysClient extends EventEmitter {
           fetchMessages: async ({ limit = 30 } = {}) => {
             const msgs = [];
             for (const m of this._messageCache.values()) {
-              if (m.from === remote || m.to === remote || m.id?.remote === remote) msgs.push(m);
+              const r = (typeof m.id?.remote === 'string' ? m.id.remote : m.id?.remote?._serialized) || '';
+              if (r === remote) msgs.push(m);
             }
             return msgs.slice(-limit);
           }

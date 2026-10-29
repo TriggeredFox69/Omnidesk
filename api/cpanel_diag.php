@@ -69,6 +69,54 @@ if (isset($_GET['reset_session'])) {
     exit;
 }
 
+// Allow cleaning up corrupted leaked Askari messages from lead_self
+if (isset($_GET['clean_self_leak'])) {
+    $askariMsgIds = [
+        '3EB012E0A5466F178C3E54',
+        'A510420E19E135CE02944E7C0B5FF584',
+        'A53A72E4E265174553DB775BF560C6AA',
+        '3EB0278D152C856A62B937',
+        '3EB03FA0234C194BAC8FE1',
+        '3EB0F70FC1E22B9463C6FE'
+    ];
+    $leadsFile = $baseDir . '/data/leads.json';
+    if (file_exists($leadsFile)) {
+        $leads = json_decode(file_get_contents($leadsFile), true);
+        if (is_array($leads)) {
+            foreach ($leads as &$lead) {
+                if (($lead['id'] ?? '') === 'lead_self' && isset($lead['messages'])) {
+                    $lead['messages'] = array_values(array_filter($lead['messages'], function($m) use ($askariMsgIds) {
+                        return !in_array($m['waMessageId'] ?? '', $askariMsgIds);
+                    }));
+                }
+            }
+            unset($lead);
+            file_put_contents($leadsFile, json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+    }
+    $inboxFiles = [
+        $baseDir . '/data/whatsapp-bridge/inbox.json',
+        $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/inbox.json'
+    ];
+    foreach ($inboxFiles as $ibFile) {
+        if (file_exists($ibFile)) {
+            $ib = json_decode(file_get_contents($ibFile), true);
+            if (is_array($ib)) {
+                foreach ($ib as &$msg) {
+                    if (in_array($msg['waMessageId'] ?? '', $askariMsgIds)) {
+                        $msg['phone'] = '923046588806';
+                        $msg['name'] = '923046588806';
+                    }
+                }
+                unset($msg);
+                file_put_contents($ibFile, json_encode($ib, JSON_PRETTY_PRINT));
+            }
+        }
+    }
+    echo json_encode(['success' => true, 'cleaned_leads' => true]);
+    exit;
+}
+
 // Allow executing wipe action directly through diag
 if (isset($_GET['wipe'])) {
     @unlink($baseDir . '/data/whatsapp-bridge/inbox.json');
@@ -179,5 +227,6 @@ echo json_encode([
     'local_bridge_http' => $localHttp,
     'local_bridge_err' => $localErr,
     'send_debug' => $sendDebug,
+    'grep_923' => file_exists($baseDir . '/data/whatsapp-bridge/grep_923.txt') ? file_get_contents($baseDir . '/data/whatsapp-bridge/grep_923.txt') : null,
     'recent_log' => file_exists($logFile) ? array_slice(explode("\n", file_get_contents($logFile)), -30) : []
 ], JSON_PRETTY_PRINT);

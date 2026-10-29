@@ -10,8 +10,9 @@ test('saved voice history loads before linking; reconnect resumes live chat sync
   const presence = {};
   const context = vm.createContext({ window: {}, setInterval() {}, AbortSignal,
     document: { hidden: false, getElementById: () => presence },
-    fetch: async (_, options) => {
-      const request = JSON.parse(options.body); calls.push(request.action);
+    fetch: async (url, options) => {
+      const request = JSON.parse(options.body);
+      if (!url || String(url).includes('direct_sender.php')) calls.push(request.action);
       return { ok: true, json: async () => request.action === 'get_events'
         ? { success: true, epoch: 'saved', cursor: 1, messages: request.after ? [] : [
           { id: 'voice', waMessageId: 'voice-id', phone: '923001234567', type: 'audio', sender: 'lead', timestamp: 100, hasMedia: true }
@@ -29,5 +30,5 @@ test('saved voice history loads before linking; reconnect resumes live chat sync
   state.senderConfigured = true;
   await inbox.poll();
   assert.equal(state.leads[0].messages.length, 1);
-  assert.deepEqual(calls.slice(1), ['get_events', 'sync_chat', 'get_presence']);
+  assert.deepEqual(calls.slice(1), ['get_events', 'sync_chat', 'get_presence', 'get_media']);
 });

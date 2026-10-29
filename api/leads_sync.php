@@ -147,16 +147,26 @@ if ($action === 'get_leads') {
 }
 
 // 2. Update Lead State, Ownership, or Notes
+// 2. Update Lead State, Ownership, or Notes
 if ($action === 'update_lead') {
     $leadId = $input['id'] ?? '';
-    if (empty($leadId)) {
-        echo json_encode(['success' => false, 'message' => 'Lead ID required']);
+    $inputPhone = isset($input['phone']) ? preg_replace('/\D+/', '', $input['phone']) : '';
+    if (str_starts_with($inputPhone, '0092')) $inputPhone = substr($inputPhone, 2);
+    elseif (str_starts_with($inputPhone, '03') && strlen($inputPhone) === 11) $inputPhone = '92' . substr($inputPhone, 1);
+    elseif (str_starts_with($inputPhone, '3') && strlen($inputPhone) === 10) $inputPhone = '92' . $inputPhone;
+    if (empty($inputPhone) && str_starts_with($leadId, 'wa_lead_')) {
+        $inputPhone = preg_replace('/\D+/', '', substr($leadId, 8));
+    }
+
+    if (empty($leadId) && empty($inputPhone)) {
+        echo json_encode(['success' => false, 'message' => 'Lead ID or phone required']);
         exit;
     }
 
     $found = false;
     foreach ($currentLeads as &$lead) {
-        if (($lead['id'] ?? '') === $leadId) {
+        $leadPhone = preg_replace('/\D+/', '', $lead['phone'] ?? '');
+        if (($lead['id'] ?? '') === $leadId || (!empty($inputPhone) && $leadPhone === $inputPhone)) {
             if (isset($input['phone'])) {
                 $cleanP = preg_replace('/\D+/', '', $input['phone']);
                 if (str_starts_with($cleanP, '0092')) $cleanP = substr($cleanP, 2);
@@ -171,7 +181,9 @@ if ($action === 'update_lead') {
             if (isset($input['status'])) $lead['status'] = $input['status'];
             if (array_key_exists('ownerId', $input)) $lead['ownerId'] = $input['ownerId'];
             if (array_key_exists('ownerName', $input)) $lead['ownerName'] = $input['ownerName'];
-            if (isset($input['name'])) $lead['name'] = $input['name'];
+            if (isset($input['name']) && !empty($input['name']) && (($lead['name'] ?? '') === ($lead['phone'] ?? '') || empty($lead['name']))) {
+                $lead['name'] = $input['name'];
+            }
             if (isset($input['email'])) $lead['email'] = $input['email'];
             if (isset($input['paidDetails'])) $lead['paidDetails'] = $input['paidDetails'];
             if (isset($input['notes'])) $lead['notes'] = $input['notes'];
@@ -183,7 +195,19 @@ if ($action === 'update_lead') {
             if (isset($input['lastActive'])) $lead['lastActive'] = $input['lastActive'];
             if (isset($input['newMessage'])) {
                 if (!isset($lead['messages'])) $lead['messages'] = [];
-                $lead['messages'][] = $input['newMessage'];
+                $newMsg = $input['newMessage'];
+                $exists = false;
+                if (!empty($newMsg['waMessageId'])) {
+                    foreach ($lead['messages'] as $m) {
+                        if (($m['waMessageId'] ?? '') === $newMsg['waMessageId']) {
+                            $exists = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$exists) {
+                    $lead['messages'][] = $newMsg;
+                }
             }
             if (isset($input['updateMessage']) && is_array($input['updateMessage'])) {
                 $update = $input['updateMessage'];
@@ -199,6 +223,31 @@ if ($action === 'update_lead') {
             $found = true;
             break;
         }
+    }
+    unset($lead);
+
+    if (!$found && (!empty($inputPhone) || !empty($leadId))) {
+        $targetPhone = !empty($inputPhone) ? $inputPhone : preg_replace('/\D+/', '', $leadId);
+        $contactName = $input['name'] ?? ('+' . $targetPhone);
+        $newLead = [
+            'id' => !empty($leadId) ? $leadId : ('lead_' . bin2hex(random_bytes(6))),
+            'name' => $contactName,
+            'phone' => $targetPhone,
+            'display' => '+' . $targetPhone,
+            'city' => 'Inbound',
+            'network' => 'WhatsApp',
+            'ownerId' => 'USR-ADMIN-01',
+            'ownerName' => 'System Administrator',
+            'leadState' => 'fresh',
+            'status' => 'unread',
+            'unreadCount' => 1,
+            'interest' => 'Direct WhatsApp',
+            'lastActive' => 'Just now',
+            'notes' => 'Inbound contact automatically synchronized.',
+            'messages' => isset($input['newMessage']) ? [$input['newMessage']] : []
+        ];
+        array_unshift($currentLeads, $newLead);
+        $found = true;
     }
 
     if ($found) {
@@ -224,15 +273,21 @@ if ($action === 'add_lead') {
         exit;
     }
 
-    foreach ($currentLeads as $existing) {
+    foreach ($currentLeads as &$existing) {
         if ($existing['phone'] === $cleanPhone) {
+            if (!empty($name) && $name !== $cleanPhone && (($existing['name'] ?? '') === $cleanPhone || empty($existing['name']))) {
+                $existing['name'] = $name;
+                saveStoredLeads($dataFile, $currentLeads);
+            }
             echo json_encode(['success' => true, 'lead' => $existing, 'existing' => true]);
             exit;
         }
     }
+    unset($existing);
 
+    $leadId = $input['id'] ?? ('lead_' . bin2hex(random_bytes(6)));
     $newLead = [
-        'id' => 'lead_' . bin2hex(random_bytes(6)),
+        'id' => $leadId,
         'name' => $name,
         'phone' => $cleanPhone,
         'display' => '+' . $cleanPhone,

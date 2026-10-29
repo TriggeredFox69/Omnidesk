@@ -89,8 +89,8 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
     else if (cleanPhone.startsWith('3') && cleanPhone.length === 10) cleanPhone = '92' + cleanPhone;
     body.phone = cleanPhone;
 
-    if (!cleanPhone || !/^\d{10,15}$/.test(cleanPhone)) {
-      throw Object.assign(new Error('A valid recipient phone number (10–15 digits) is required.'), { status: 400 });
+    if (!cleanPhone || !/^\d{10,18}$/.test(cleanPhone)) {
+      throw Object.assign(new Error('A valid recipient phone number (10–18 digits) is required.'), { status: 400 });
     }
     if (typeof body.message !== 'string') body.message = '';
     if (!body.message.trim() && !body.media) {
@@ -105,7 +105,7 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         throw Object.assign(new Error('Attachment must be up to 10 MB.'), { status: 400 });
       }
       body.media.data = body.media.data.replace(/\s+/g, '');
-      const validMime = /^(image|audio|video|application|text)\/[a-z0-9.+-]+(;.*)?$/i.test(body.media.mimetype || '');
+      const validMime = /^(image\/(jpeg|png|webp|gif)|audio\/[a-z0-9.+-]+|video\/(mp4|3gpp)|application\/(pdf|msword|vnd\.[a-z0-9.-]+|zip|octet-stream)|text\/(plain|csv))$/i.test(body.media.mimetype || '');
       if (!validMime) {
         throw Object.assign(new Error('Supported attachments: images, voice/audio notes, and documents (PDF, Word, Excel, text) up to 10 MB.'), { status: 400 });
       }

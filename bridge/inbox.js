@@ -53,17 +53,28 @@ function createInbox({ getClient, storageFile }) {
           }
         } catch (_) {}
       }
+      const cleanLid = id.split('@')[0].split(':')[0].replace(/\D/g, '');
+      if (cleanLid) {
+        aliases.set(id, cleanLid);
+        return cleanLid;
+      }
       return null;
     }
     const clean = id.split('@')[0].split(':')[0].replace(/\D/g, '');
-    return clean || null;
+    if (clean) {
+      aliases.set(id, clean);
+      return clean;
+    }
+    return null;
   }
   async function ingest(message, knownPhone) {
     const id = message.id?._serialized;
     if (!id) return;
     const fromMe = Boolean(message.fromMe || message.id.fromMe);
-    const phone = knownPhone || await phoneFor(message.id.remote?._serialized || message.id.remote || (fromMe ? message.to : message.from));
-    if (!phone || !/^\d{10,15}$/.test(phone)) return;
+    const remote = message.id?.remote?._serialized || message.id?.remote || '';
+    const resolvedRemotePhone = remote ? await phoneFor(remote) : null;
+    const phone = resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
+    if (!phone || !/^\d{10,18}$/.test(phone)) return;
     const previous = messages.get(id);
     const type = ['ptt', 'audio'].includes(message.type) ? 'audio' :
       message.type === 'image' ? 'image' : message.type === 'video' ? 'video' :
@@ -73,8 +84,9 @@ function createInbox({ getClient, storageFile }) {
     const hasMedia = Boolean(message.hasMedia || previous?.hasMedia);
     if (!text && !hasMedia) return;
 
+    const contactName = message._data?.notifyName || previous?.name || phone;
     const value = { id: 'wa_' + createHash('sha256').update(id).digest('hex').slice(0,24), waMessageId: id,
-      phone, name: phone, sender: fromMe ? 'agent' : (previous?.sender || 'lead'),
+      phone, name: contactName, sender: fromMe ? 'agent' : (previous?.sender || 'lead'),
       agentName: fromMe ? 'WhatsApp' : undefined, type, text,
       timestamp: Number(message.timestamp) || previous?.timestamp || Math.floor(Date.now()/1000), hasMedia,
       durationSeconds: Number(message._data?.duration) || previous?.durationSeconds || 0,
@@ -90,12 +102,12 @@ function createInbox({ getClient, storageFile }) {
     if (item && item.deliveryStatus !== statusOf(value)) { item.deliveryStatus = statusOf(value); item.revision = ++revision; save(); }
   }
   async function syncChat(phone) {
-    if (!/^\d{10,15}$/.test(phone)) throw new Error('Invalid phone number.');
+    if (!/^\d{10,18}$/.test(phone)) throw new Error('Invalid phone number.');
     const client = getClient();
     const id = await client.getNumberId(phone);
     if (!id) return;
     const chat = await client.getChatById(id._serialized);
-    for (const message of await chat.fetchMessages({ limit: 50 })) await ingest(message, phone);
+    for (const message of await chat.fetchMessages({ limit: 50 })) await ingest(message);
   }
   async function syncRecent() {
     if (!getClient().getChats) return;

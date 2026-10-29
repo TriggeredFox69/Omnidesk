@@ -19,15 +19,16 @@
       const itemPhone = cleanDigits(item.phone);
       let lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
       if (!lead) {
+        const contactName = (item.name && item.name !== item.phone) ? item.name : (itemPhone ? '+' + itemPhone : item.phone);
         lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: '+' + (itemPhone || item.phone),
-          name: item.phone, city: '', network: '', ownerId: null, leadState: 'fresh',
+          name: contactName, city: '', network: '', ownerId: null, leadState: 'fresh',
           status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
         state.leads.unshift(lead);
         // Persist newly discovered WhatsApp conversation to database
         fetch('api/leads_sync.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'add_lead', phone: lead.phone, name: lead.name })
+          body: JSON.stringify({ action: 'add_lead', id: lead.id, phone: lead.phone, name: lead.name })
         }).catch(() => {});
       }
       const previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
@@ -44,7 +45,7 @@
         fetch('api/leads_sync.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'update_lead', id: lead.id, newMessage: fields, lastActive: 'Just now' })
+          body: JSON.stringify({ action: 'update_lead', id: lead.id, phone: lead.phone, newMessage: fields, lastActive: 'Just now' })
         }).catch(() => {});
       }
       lead.messages.sort((a,b) => (a.timestamp || 0)-(b.timestamp || 0));
