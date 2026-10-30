@@ -39,18 +39,20 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
 
     $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
     $bridgeDir = $baseDir . '/bridge';
-    $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
-    $authDir = $dataDir . '/whatsapp-bridge';
-    if (!is_dir($authDir)) @mkdir($authDir, 0775, true);
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    if (!is_dir($dataDir)) @mkdir($dataDir, 0775, true);
+    if (file_exists($dataDir . '/whatsapp-bridge/baileys_auth/creds.json') && !file_exists($dataDir . '/baileys_auth/creds.json')) {
+        @rename($dataDir . '/whatsapp-bridge/baileys_auth', $dataDir . '/baileys_auth');
+    }
 
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($authDir) . " WHATSAPP_ENGINE=baileys "
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
         . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
         . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
 
     shell_exec($startCmd);
     $started = true;
-    for ($i = 0; $i < 8; $i++) {
+    for ($i = 0; $i < 12; $i++) {
         usleep(500000);
         $bridgeStatus = whatsappBridgeRequest('/status');
         if (!empty($bridgeStatus['success'])) break;

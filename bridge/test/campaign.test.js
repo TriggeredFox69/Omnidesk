@@ -13,11 +13,12 @@ function setup() {
   const els = {
     campaignCustomMsg: { value: 'Hello' }, startCampaignBtn: { style: {} },
     campaignStatusBadge: { style: {} }, waPendingCampaign: {}, waConnectionStatus: {},
-    saveConnectedWaBtn: {}, waQrImage: { removeAttribute() {} },
+    saveConnectedWaBtn: { style: {} }, waQrImage: { removeAttribute() {} },
     connectWaModal: { classList: { add() { open = true; }, remove() { open = false; }, contains() { return open; } } }
   };
   const campaignState = { audience: [{ phone: '923001234567' }], isRunning: false };
-  const context = vm.createContext({ els, campaignState, state: {}, window: {},
+  const context = vm.createContext({ els, campaignState, state: {}, window: { addEventListener() {} },
+    document: { getElementById() { return null; }, addEventListener() {} },
     renderConnectedNumber() {}, showToast() {}, logCampaignTerminal() {}, escapeHtml: String,
     describeSendError: error => error.message,
     dispatchNextCampaignMessage() { dispatches++; },

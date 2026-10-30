@@ -510,7 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (validQr) els.waQrImage.src = result.qr;
       else els.waQrImage.removeAttribute('src');
     }
-    if (els.waConnectedBox) {
+    if (els.waConnectedBox && els.waConnectedBox.style) {
       els.waConnectedBox.style.display = state.senderConfigured ? 'block' : 'none';
     }
     if (els.waModalConnectedNum) {
@@ -519,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.saveConnectedWaBtn) {
       els.saveConnectedWaBtn.disabled = ['starting', 'qr', 'authenticated', 'ready'].includes(result.state);
       els.saveConnectedWaBtn.textContent = state.senderConfigured ? 'Connected' : 'Connect WhatsApp';
-      els.saveConnectedWaBtn.style.display = state.senderConfigured ? 'none' : 'inline-block';
+      if (els.saveConnectedWaBtn.style) els.saveConnectedWaBtn.style.display = state.senderConfigured ? 'none' : 'inline-block';
     }
   }
 
@@ -536,9 +536,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await refreshSenderConnection();
       if (generation !== waModalGeneration) return;
-      if (state.senderConfigured && pendingCampaignStart) {
+      if (state.senderConfigured) {
+        const shouldStart = pendingCampaignStart;
         closeConnectWaModal();
-        startCampaign();
+        if (shouldStart) {
+          startCampaign();
+        }
         return;
       }
     } catch (_) { /* The status panel displays service errors and allows a retry. */ }

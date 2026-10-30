@@ -106,7 +106,7 @@ switch ($action) {
                 'updated_at' => date('Y-m-d H:i:s')
             ], JSON_PRETTY_PRINT));
             file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
-            $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
+            $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
             $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
                 . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
                 . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
@@ -170,7 +170,7 @@ switch ($action) {
 
         file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
 
-        $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
+        $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
         $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
             . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
             . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
@@ -253,9 +253,9 @@ switch ($action) {
         shell_exec('pkill -9 -f "server.js" 2>&1');
         sleep(1);
 
-        $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
+        $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
         $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
             . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
             . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
         shell_exec($startCmd);
@@ -397,12 +397,12 @@ switch ($action) {
         // Set local connection config
         file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
 
-        // Determine executable script (server.js Baileys engine or legacy dist)
-        $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
+        // Determine executable script (dist/index.js pre-compiled bundle or server.js)
+        $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
 
         // Spawn background node process with stdio closed
         $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
             . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
             . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
 
@@ -443,9 +443,9 @@ switch ($action) {
         sleep(1);
 
         file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
-        $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
+        $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
         $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
             . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
             . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
         shell_exec($startCmd);
