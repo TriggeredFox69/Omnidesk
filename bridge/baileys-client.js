@@ -17,8 +17,20 @@ const {
   Browsers,
   fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const NodeCache = require('@cacheable/node-cache').default || require('@cacheable/node-cache');
+let pino;
+try {
+  pino = require('pino');
+} catch (_) {
+  pino = () => ({ level: 'silent', trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, fatal: () => {}, child: () => pino() });
+}
+let NodeCache;
+try {
+  NodeCache = require('@cacheable/node-cache').default || require('@cacheable/node-cache');
+} catch (_) {
+  try { NodeCache = require('node-cache'); } catch (__) {
+    NodeCache = class { constructor() { this.m = new Map(); } get(k) { return this.m.get(k); } set(k, v) { this.m.set(k, v); } del(k) { this.m.delete(k); } has(k) { return this.m.has(k); } flushAll() { this.m.clear(); } };
+  }
+}
 const { ensureOggOpus, isOgg } = require('./audio');
 
 function hasOpenSignalSession(sess) {

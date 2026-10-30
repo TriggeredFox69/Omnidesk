@@ -2,7 +2,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomBytes } = require('node:crypto');
-const QRCode = require('qrcode');
+let QRCode = null;
+try { QRCode = require('qrcode'); } catch (_) {}
 const { createService } = require('./service');
 const { BaileysClient } = require('./baileys-client');
 
@@ -30,7 +31,12 @@ const activeToken = process.env.WHATSAPP_BRIDGE_TOKEN ||
 const service = createService({
   storageFile: path.join(dataPath, 'inbox.json'),
   token: activeToken,
-  qrImage: value => QRCode.toDataURL(value, { width: 280, margin: 2 }),
+  qrImage: async value => {
+    if (QRCode && typeof QRCode.toDataURL === 'function') {
+      try { return await QRCode.toDataURL(value, { width: 280, margin: 2 }); } catch (_) {}
+    }
+    return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=2&data=${encodeURIComponent(value)}`;
+  },
   createClient: createClientFn
 });
 const port = Number(process.env.PORT || process.env.WHATSAPP_BRIDGE_PORT || 3210);

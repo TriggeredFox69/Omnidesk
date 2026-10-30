@@ -50,8 +50,11 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
 
     shell_exec($startCmd);
     $started = true;
-    sleep(3);
-    $bridgeStatus = whatsappBridgeRequest('/status');
+    for ($i = 0; $i < 8; $i++) {
+        usleep(500000);
+        $bridgeStatus = whatsappBridgeRequest('/status');
+        if (!empty($bridgeStatus['success'])) break;
+    }
 }
 
 echo json_encode([
