@@ -119,7 +119,7 @@ if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
     file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
 
     $logFile = $dataDir . '/bridge.log';
-    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
         . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir . '/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
         . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)

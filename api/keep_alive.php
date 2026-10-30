@@ -39,7 +39,7 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
 
     $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
     $bridgeDir = $baseDir . '/bridge';
-    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $scriptPath = file_exists($bridgeDir . '/server.js') ? ($bridgeDir . '/server.js') : ($bridgeDir . '/dist/index.js');
     $authDir = $dataDir . '/whatsapp-bridge';
     if (!is_dir($authDir)) @mkdir($authDir, 0775, true);
 
