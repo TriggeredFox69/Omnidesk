@@ -3,6 +3,7 @@
 function whatsappBridgeRequest(string $path, ?array $body = null): array {
     // Private per-server configuration, uploaded separately from Git.
     $connectionFile = __DIR__ . '/../data/whatsapp-bridge/connection.php';
+    $tokenFile = __DIR__ . '/../data/whatsapp-bridge/token';
     $connection = is_readable($connectionFile) ? require $connectionFile : [];
     if (!is_array($connection)) $connection = [];
     $masterToken = 'c8e4acd8219dafce2a74e37954fa4a12c3fd1256bff8fcb518b7f137b4f9af20';
