@@ -8,6 +8,20 @@ $logFile = $baseDir . '/data/whatsapp-bridge/bridge.log';
 
 $conn = file_exists($connFile) ? require($connFile) : null;
 
+// Allow 1-click git pull and cPanel deployment
+if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
+    $repoDir = '/home/dailygol/repositories/Omnidesk';
+    $targetDir = '/home/dailygol/omnidesk.lalagpt.pk';
+    $pullOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && git fetch origin main 2>&1 && git reset --hard origin/main 2>&1");
+    $deployOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && /bin/cp -R api assets index.php index.html login.php open-omnidesk.html " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -R bridge/dist " . escapeshellarg($targetDir) . "/bridge/ 2>/dev/null || true && /bin/cp -f bridge/*.js " . escapeshellarg($targetDir) . "/bridge/ 2>&1");
+    echo json_encode([
+        'success' => true,
+        'git_pull' => trim((string)$pullOut),
+        'deploy' => trim((string)$deployOut)
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 // Allow executing clean pairing action directly through diag to eliminate stale prekeys
 if (isset($_GET['clean_pair'])) {
     $authDir = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
