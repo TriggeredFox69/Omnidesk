@@ -62,7 +62,14 @@ body { background-image:none!important; }
 #viewCampaign .campaign-terminal-log { border-radius:10px; }
 #connectWaModal .modal-box { max-width:450px; }
 #connectWaModal .brand-heading { font-size:20px; }
-.toast { z-index:2000; }
+.toast {
+  top: 76px;
+  left: 50%;
+  bottom: auto;
+  right: auto;
+  border-radius: 9999px;
+  z-index: 10000;
+}
 @media(max-width:1180px) {
   .lead-dossier-col { width:min(300px,86vw); }
   .conversations-col { flex-basis:300px;width:300px; }

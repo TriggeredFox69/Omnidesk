@@ -400,12 +400,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(banner);
   }
 
+  let toastDismissTimer = null;
   function showToast(msg, duration = 3000) {
     msg = previewLabel(msg);
     if (!els.toast) return;
     els.toastMsg.textContent = msg;
     els.toast.classList.add('show');
-    setTimeout(() => els.toast.classList.remove('show'), duration);
+    if (toastDismissTimer) clearTimeout(toastDismissTimer);
+    toastDismissTimer = setTimeout(() => {
+      els.toast.classList.remove('show');
+      toastDismissTimer = null;
+    }, duration);
   }
 
   // Helper: Find Lead by ID
@@ -5014,6 +5019,17 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.cancelCantHandleBtn) els.cancelCantHandleBtn.addEventListener('click', closeCantHandleModal);
   if (els.cantHandleForm) els.cantHandleForm.addEventListener('submit', handleCantHandleSubmit);
   if (els.confirmCantHandleBtn) els.confirmCantHandleBtn.addEventListener('click', handleCantHandleSubmit);
+
+
+  if (els.toast) {
+    els.toast.addEventListener('click', () => {
+      els.toast.classList.remove('show');
+      if (toastDismissTimer) {
+        clearTimeout(toastDismissTimer);
+        toastDismissTimer = null;
+      }
+    });
+  }
 
   // Initialize App
   checkAuthSession();
