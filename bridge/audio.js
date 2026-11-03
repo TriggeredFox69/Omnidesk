@@ -294,7 +294,10 @@ function convertWithFfmpeg(buffer) {
       '-i', inputPath,
       '-vn',
       '-c:a', 'libopus',
-      '-b:a', '32k',
+      '-b:a', '96k',
+      '-vbr', 'on',
+      '-compression_level', '10',
+      '-application', 'voip',
       '-ac', '1',
       '-ar', '48000',
       outputPath

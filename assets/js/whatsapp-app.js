@@ -4566,7 +4566,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // High-Fidelity Audio Constraints: Mono, 48kHz (native WhatsApp Opus standard), full dynamic range
+      const audioConstraints = {
+        channelCount: { ideal: 1 },
+        sampleRate: { ideal: 48000 },
+        sampleSize: { ideal: 16 },
+        echoCancellation: { ideal: true },
+        noiseSuppression: { ideal: false }, // Avoid aggressive clipping/muffling so voice stays natural, warm, and crisp
+        autoGainControl: { ideal: true }
+      };
+
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      } catch (_) {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
       recordingLeadId = lead.id;
       audioChunks = [];
       recordingSeconds = 0;
@@ -4574,13 +4589,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const mimeTypes = ['audio/ogg;codecs=opus', 'audio/ogg', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
       let selectedMime = '';
       for (const m of mimeTypes) {
-        if (MediaRecorder.isTypeSupported(m)) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) {
           selectedMime = m;
           break;
         }
       }
 
-      mediaRecorder = selectedMime ? new MediaRecorder(mediaStream, { mimeType: selectedMime }) : new MediaRecorder(mediaStream);
+      // Studio-grade 128 kbps Opus bitrate (eliminates robotic / muffled 16-32 kbps default)
+      const recorderOptions = {
+        audioBitsPerSecond: 128000
+      };
+      if (selectedMime) recorderOptions.mimeType = selectedMime;
+
+      try {
+        mediaRecorder = new MediaRecorder(mediaStream, recorderOptions);
+      } catch (err) {
+        try {
+          mediaRecorder = selectedMime
+            ? new MediaRecorder(mediaStream, { mimeType: selectedMime, audioBitsPerSecond: 64000 })
+            : new MediaRecorder(mediaStream);
+        } catch (_) {
+          mediaRecorder = new MediaRecorder(mediaStream);
+        }
+      }
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -4588,7 +4619,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
 
-      mediaRecorder.start(200);
+      // 1000ms chunk interval allows Opus encoder full-frame lookahead and continuous VBR optimization
+      mediaRecorder.start(1000);
       sendOutboundPresence('recording');
 
       if (els.composerNormalView) els.composerNormalView.style.display = 'none';
