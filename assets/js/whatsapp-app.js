@@ -180,6 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
     agentListContainer: document.getElementById('agentListContainer'),
 
     // Inbox Controls
+    convTitleText: document.getElementById('convTitleText'),
+    myOngoingsBtn: document.getElementById('myOngoingsBtn'),
+    myOngoingCountBadge: document.getElementById('myOngoingCountBadge'),
     convSearchInput: document.getElementById('convSearchInput'),
     inboxFilterBtns: document.querySelectorAll('.inbox-filter-btn'),
     conversationsScroll: document.getElementById('conversationsScroll'),
@@ -1028,6 +1031,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Traffic-light filter tabs
       if (state.inboxFilter === 'all') return true;
+      if (state.inboxFilter === 'my_ongoing') {
+        const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+        const isOwner = l.ownerId === myId || (state.currentUser?.role === 'admin' && (l.ownerId === 'USR-ADMIN-01' || l.ownerId === 'local-admin' || l.ownerId === myId));
+        return isOwner && lState === 'ongoing';
+      }
       if (state.inboxFilter === 'fresh') return lState === 'fresh';
       if (state.inboxFilter === 'ongoing') return lState === 'ongoing';
       if (state.inboxFilter === 'pending_verification' || state.inboxFilter === 'pending') return lState === 'pending_verification';
@@ -1060,6 +1068,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.pendingVerifCount) els.pendingVerifCount.textContent = countPending;
     if (els.pendingAuditHeaderCount) els.pendingAuditHeaderCount.textContent = `${countPending} Pending Deals`;
     if (els.convTotalBadge) els.convTotalBadge.textContent = `${filtered.length} Leads`;
+
+    const countMyOngoing = state.leads.filter(l => {
+      const lState = getLeadState(l);
+      const isOwner = l.ownerId === currentUserId || (state.currentUser?.role === 'admin' && (l.ownerId === 'USR-ADMIN-01' || l.ownerId === 'local-admin' || l.ownerId === currentUserId));
+      return isOwner && lState === 'ongoing';
+    }).length;
+
+    if (els.myOngoingCountBadge) els.myOngoingCountBadge.textContent = countMyOngoing;
+    if (els.myOngoingsBtn) els.myOngoingsBtn.classList.toggle('active', state.inboxFilter === 'my_ongoing');
+    if (els.convTitleText) els.convTitleText.textContent = state.inboxFilter === 'my_ongoing' ? 'My Ongoings' : 'All chats';
 
     // Sync active class on filter buttons & KPI pills
     if (els.inboxFilterBtns) {
@@ -4901,6 +4919,13 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       reader.readAsDataURL(file);
       composerFileInput.value = '';
+    });
+  }
+
+  if (els.myOngoingsBtn) {
+    els.myOngoingsBtn.addEventListener('click', () => {
+      state.inboxFilter = (state.inboxFilter === 'my_ongoing') ? 'all' : 'my_ongoing';
+      renderConversationsList();
     });
   }
 

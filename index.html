@@ -179,9 +179,12 @@
     <aside class="conversations-col">
       <div class="conv-header">
         <div class="conv-title-row">
-          <span>All chats</span>
+          <span id="convTitleText">All chats</span>
           <div style="display:flex;align-items:center;gap:6px;">
-            <button type="button" class="btn btn-emerald btn-xs" id="newChatBtn" title="Start chat with any real WhatsApp number" style="padding:3px 8px;font-size:11px;font-weight:700;">+ New Chat</button>
+            <button type="button" class="btn btn-xs btn-my-ongoings" id="myOngoingsBtn" title="Show all your ongoing leads">
+              <span>🟡 My Ongoings</span>
+              <span class="badge-count" id="myOngoingCountBadge">0</span>
+            </button>
             <span class="panel-badge" id="convTotalBadge">8 Leads</span>
           </div>
         </div>

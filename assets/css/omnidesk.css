@@ -325,3 +325,55 @@ body.dark-mode .wa-recording-bubble,
 }
 
 
+
+
+/* ─── MY ONGOINGS HEADER FILTER BUTTON ─────────────────────── */
+.btn-my-ongoings {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.btn-my-ongoings:hover {
+  background: #fde68a;
+  color: #78350f;
+}
+.btn-my-ongoings.active {
+  background: #f59e0b;
+  border-color: #d97706;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
+}
+.btn-my-ongoings .badge-count {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 10px;
+}
+.btn-my-ongoings.active .badge-count {
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+body.theme-dark .btn-my-ongoings {
+  background: #2a2415;
+  border-color: #49391a;
+  color: #fbbf24;
+}
+body.theme-dark .btn-my-ongoings:hover {
+  background: #3b301c;
+  color: #fde68a;
+}
+body.theme-dark .btn-my-ongoings.active {
+  background: #d97706;
+  border-color: #f59e0b;
+  color: #ffffff;
+}
