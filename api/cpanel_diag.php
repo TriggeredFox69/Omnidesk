@@ -469,6 +469,8 @@ echo json_encode([
         'auth2_creds' => file_exists($auth2 . '/creds.json') ? filesize($auth2 . '/creds.json') : false,
         'auth2_files_count' => is_dir($auth2) ? count(scandir($auth2)) : 0,
         'python_version' => trim((string)shell_exec('python3 --version 2>&1')),
+        'trash_check' => trim((string)shell_exec('ls -la /home/dailygol/.trash 2>&1')),
+        'trash_find' => trim((string)shell_exec('find /home/dailygol/.trash -name "*creds*" -o -name "*baileys*" 2>/dev/null')),
         'home_ls' => trim((string)shell_exec('ls -la /home/dailygol 2>&1')),
         'home_creds_find' => trim((string)shell_exec('find /home/dailygol -maxdepth 6 -name "*creds*" 2>/dev/null')),
         'maps_readable' => is_readable('/proc/1993418/maps'),
