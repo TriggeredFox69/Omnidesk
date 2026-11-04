@@ -83,9 +83,6 @@ if (isset($_GET['restore_session'])) {
     ], JSON_PRETTY_PRINT);
     exit;
 }
-    ], JSON_PRETTY_PRINT);
-    exit;
-}
 
 // Allow executing clean pairing action directly through diag to eliminate stale prekeys
 if (isset($_GET['clean_pair'])) {
