@@ -22,115 +22,7 @@ if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
     exit;
 }
 
-if (isset($_GET['recover_py'])) {
-    $out = shell_exec('python3 ' . escapeshellarg(__DIR__ . '/recover_creds.py') . (isset($_GET['save']) ? ' --save' : '') . ' 2>&1');
-    echo $out;
-    exit;
-}
-
-if (isset($_GET['extract_py'])) {
-    $out = shell_exec('python3 ' . escapeshellarg(__DIR__ . '/extract_creds.py') . ' 2>&1');
-    echo $out;
-    exit;
-}
-
-// Memory scanner to recover creds.json from running node process (PID 1993418)
-if (isset($_GET['search_mem'])) {
-    $pid = 1993418;
-    // Check if process exists
-    if (!file_exists("/proc/$pid/maps")) {
-        $foundPid = trim((string)shell_exec('pgrep -f "dist/index.js|server.js" | head -n 1'));
-        if ($foundPid) $pid = (int)$foundPid;
-    }
-    $maps = @file_get_contents("/proc/$pid/maps");
-    $matches = [];
-    $credsJsonCandidate = null;
-
-    if ($maps) {
-        $lines = explode("\n", $maps);
-        $mem = @fopen("/proc/$pid/mem", 'rb');
-        if ($mem) {
-            foreach ($lines as $line) {
-                if (!preg_match('/^([0-9a-f]+)-([0-9a-f]+)\s+([rwxp-]+)/', $line, $m)) continue;
-                $start = hexdec($m[1]);
-                $end = hexdec($m[2]);
-                $perms = $m[3];
-                // Only inspect readable and writable private anonymous/heap mappings
-                if (strpos($perms, 'r') === false || strpos($perms, 'w') === false) continue;
-                $len = $end - $start;
-                if ($len <= 0 || $len > 50 * 1024 * 1024) continue; // Skip huge mappings
-
-                if (@fseek($mem, $start) === 0) {
-                    $buf = @fread($mem, $len);
-                    if ($buf) {
-                        // Search for "noiseKey" and "registrationId" in this chunk
-                        if (strpos($buf, '"noiseKey"') !== false && strpos($buf, '"registrationId"') !== false) {
-                            $offset = 0;
-                            while (($pos = strpos($buf, '{"noiseKey"', $offset)) !== false) {
-                                // Extract candidate JSON up to 15KB
-                                $snippet = substr($buf, $pos, 15000);
-                                // Find matching closing brace
-                                $braceCount = 0;
-                                $endPos = -1;
-                                $inString = false;
-                                for ($i = 0; $i < strlen($snippet); $i++) {
-                                    $ch = $snippet[$i];
-                                    if ($ch === '"' && ($i === 0 || $snippet[$i-1] !== '\\')) {
-                                        $inString = !$inString;
-                                    } elseif (!$inString) {
-                                        if ($ch === '{') $braceCount++;
-                                        elseif ($ch === '}') {
-                                            $braceCount--;
-                                            if ($braceCount === 0) {
-                                                $endPos = $i + 1;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                if ($endPos > 50) {
-                                    $candidate = substr($snippet, 0, $endPos);
-                                    $decoded = json_decode($candidate, true);
-                                    if ($decoded && isset($decoded['noiseKey']) && isset($decoded['registrationId'])) {
-                                        $matches[] = [
-                                            'registered' => $decoded['registered'] ?? false,
-                                            'me' => $decoded['me'] ?? null,
-                                            'length' => strlen($candidate)
-                                        ];
-                                        if (!empty($decoded['registered']) && !empty($decoded['me'])) {
-                                            $credsJsonCandidate = $candidate;
-                                            break 2;
-                                        }
-                                    }
-                                }
-                                $offset = $pos + 10;
-                            }
-                        }
-                    }
-                }
-            }
-            fclose($mem);
-        }
-    }
-
-    $saved = false;
-    if ($credsJsonCandidate && isset($_GET['save'])) {
-        $authDir = $baseDir . '/data/whatsapp-bridge/baileys_auth';
-        @mkdir($authDir, 0775, true);
-        file_put_contents($authDir . '/creds.json', $credsJsonCandidate);
-        $saved = true;
-    }
-
-    echo json_encode([
-        'success' => true,
-        'pid' => $pid,
-        'matches_count' => count($matches),
-        'matches' => $matches,
-        'found_full_creds' => !empty($credsJsonCandidate),
-        'saved' => $saved
-    ], JSON_PRETTY_PRINT);
-    exit;
-}
+// Session auto-healer & restorer: consolidate creds.json into standard directory and restart
 if (isset($_GET['restore_session'])) {
     $authDir1 = $baseDir . '/data/whatsapp-bridge/baileys_auth';
     $authDir2 = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
@@ -143,27 +35,17 @@ if (isset($_GET['restore_session'])) {
     } elseif (file_exists($authDir2 . '/creds.json') && filesize($authDir2 . '/creds.json') > 100) {
         $sourceCreds = $authDir2 . '/creds.json';
         $sourceDir = $authDir2;
-    } else {
-        // Look for any creds.json in repo or omnidesk
-        $found = trim((string)shell_exec('find /home/dailygol/omnidesk.lalagpt.pk /home/dailygol/repositories -maxdepth 5 -name "creds.json" 2>/dev/null'));
-        if ($found) {
-            $lines = array_filter(explode("\n", $found));
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if (file_exists($line) && filesize($line) > 100) {
-                    $sourceCreds = $line;
-                    $sourceDir = dirname($line);
-                    break;
-                }
-            }
-        }
+    } elseif (file_exists($baseDir . '/data/whatsapp-bridge/creds.json.bak')) {
+        @mkdir($authDir1, 0775, true);
+        @copy($baseDir . '/data/whatsapp-bridge/creds.json.bak', $authDir1 . '/creds.json');
+        $sourceCreds = $authDir1 . '/creds.json';
+        $sourceDir = $authDir1;
     }
 
     $copyResults = [];
     if ($sourceDir && is_dir($sourceDir)) {
         @mkdir($authDir1, 0775, true);
         @mkdir($authDir2, 0775, true);
-        // Sync source to both authDir1 and authDir2 so regardless of path used, creds exist
         $targetDirs = array_unique([$authDir1, $authDir2]);
         foreach ($targetDirs as $td) {
             if ($td !== $sourceDir) {
@@ -173,7 +55,7 @@ if (isset($_GET['restore_session'])) {
         }
     }
 
-    // Kill any running bridge
+    // Kill running bridge processes
     $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
     if ($output) {
         $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
@@ -181,7 +63,7 @@ if (isset($_GET['restore_session'])) {
     }
     sleep(1);
 
-    // Restart daemon pointing to standard data directory
+    // Restart daemon pointing strictly to standard data directory
     $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
     $bridgeDir = $baseDir . '/bridge';
     $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
@@ -198,6 +80,9 @@ if (isset($_GET['restore_session'])) {
         'sourceDir' => $sourceDir,
         'sourceCreds' => $sourceCreds,
         'copyResults' => $copyResults
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
     ], JSON_PRETTY_PRINT);
     exit;
 }
@@ -465,23 +350,8 @@ echo json_encode([
         'auth1_exists' => is_dir($auth1),
         'auth1_creds' => file_exists($auth1 . '/creds.json') ? filesize($auth1 . '/creds.json') : false,
         'auth1_files_count' => is_dir($auth1) ? count(scandir($auth1)) : 0,
-        'auth2_exists' => is_dir($auth2),
-        'auth2_creds' => file_exists($auth2 . '/creds.json') ? filesize($auth2 . '/creds.json') : false,
-        'auth2_files_count' => is_dir($auth2) ? count(scandir($auth2)) : 0,
-        'python_version' => trim((string)shell_exec('python3 --version 2>&1')),
-        'sub_whatsapp_bridge_ls' => trim((string)shell_exec('ls -la ' . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . ' 2>&1')),
-        'trash_check' => trim((string)shell_exec('ls -la /home/dailygol/.trash 2>&1')),
-        'trash_find' => trim((string)shell_exec('find /home/dailygol/.trash -name "*creds*" -o -name "*baileys*" 2>/dev/null')),
-        'home_ls' => trim((string)shell_exec('ls -la /home/dailygol 2>&1')),
-        'home_creds_find' => trim((string)shell_exec('find /home/dailygol -maxdepth 6 -name "*creds*" 2>/dev/null')),
-        'maps_readable' => is_readable('/proc/1993418/maps'),
-        'maps_sample' => is_readable('/proc/1993418/maps') ? substr(file_get_contents('/proc/1993418/maps'), 0, 500) : null,
-        'all_creds_find' => trim((string)shell_exec('find /home/dailygol/omnidesk.lalagpt.pk /home/dailygol/repositories -maxdepth 5 -name "creds.json" -ls 2>/dev/null')),
+        'backup_creds_exists' => file_exists($baseDir . '/data/whatsapp-bridge/creds.json.bak') ? filesize($baseDir . '/data/whatsapp-bridge/creds.json.bak') : false,
         'creds_preview' => $credsPreview,
-        'pid_environ' => @file_get_contents('/proc/1993418/environ') ? str_replace("\0", "\n", @file_get_contents('/proc/1993418/environ')) : null,
-        'pid_cwd' => @readlink('/proc/1993418/cwd'),
-        'pid_fds' => trim((string)shell_exec('ls -l /proc/1993418/fd 2>&1')),
-        'data_dir_ls' => trim((string)shell_exec('ls -la ' . escapeshellarg($baseDir . '/data/whatsapp-bridge') . ' 2>&1')),
         'running_processes' => trim((string)shell_exec('ps aux | grep -E "node|index.js|server.js" | grep -v grep 2>&1'))
     ],
     'grep_923' => file_exists($baseDir . '/data/whatsapp-bridge/grep_923.txt') ? file_get_contents($baseDir . '/data/whatsapp-bridge/grep_923.txt') : null,

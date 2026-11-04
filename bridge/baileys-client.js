@@ -178,6 +178,21 @@ class BaileysClient extends EventEmitter {
   async initialize() {
     this._destroyed = false;
     fs.mkdirSync(this.authPath, { recursive: true, mode: 0o700 });
+
+    // Auto-restore credentials from backup if main creds.json was deleted or corrupted
+    const credsFile = path.join(this.authPath, 'creds.json');
+    const backupFile = path.join(this.authPath, '../creds.json.bak');
+    const altBackup = path.join(this.authPath + '.bak', 'creds.json');
+    if (!fs.existsSync(credsFile) || fs.statSync(credsFile).size < 50) {
+      if (fs.existsSync(backupFile) && fs.statSync(backupFile).size > 100) {
+        console.log('[Baileys] Restoring creds.json from automatic backup...');
+        try { fs.copyFileSync(backupFile, credsFile); } catch (_) {}
+      } else if (fs.existsSync(altBackup) && fs.statSync(altBackup).size > 100) {
+        console.log('[Baileys] Restoring creds.json from alternate backup...');
+        try { fs.copyFileSync(altBackup, credsFile); } catch (_) {}
+      }
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState(this.authPath);
     let version = [2, 3000, 1043857760];
     try {
@@ -244,7 +259,19 @@ class BaileysClient extends EventEmitter {
       }
     });
 
-    this.sock.ev.on('creds.update', saveCreds);
+    const safeSaveCreds = async () => {
+      await saveCreds();
+      try {
+        if (fs.existsSync(credsFile) && fs.statSync(credsFile).size > 100) {
+          fs.copyFileSync(credsFile, backupFile);
+          const altDir = path.dirname(altBackup);
+          fs.mkdirSync(altDir, { recursive: true, mode: 0o700 });
+          fs.copyFileSync(credsFile, altBackup);
+        }
+      } catch (_) {}
+    };
+
+    this.sock.ev.on('creds.update', safeSaveCreds);
 
     this.sock.ev.on('connection.update', async (update) => {
       if (this._destroyed) return;
@@ -270,6 +297,11 @@ class BaileysClient extends EventEmitter {
         const loggedOut = statusCode === DisconnectReason.loggedOut;
         if (loggedOut) {
           try {
+            const credsFile = path.join(this.authPath, 'creds.json');
+            const backupFile = path.join(this.authPath, '../creds.json.bak');
+            if (fs.existsSync(credsFile)) {
+              try { fs.copyFileSync(credsFile, backupFile); } catch (_) {}
+            }
             if (fs.existsSync(this.authPath)) {
               fs.rmSync(this.authPath, { recursive: true, force: true });
             }

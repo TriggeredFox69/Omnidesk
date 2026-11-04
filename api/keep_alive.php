@@ -44,6 +44,10 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
     if (file_exists($dataDir . '/whatsapp-bridge/baileys_auth/creds.json') && !file_exists($dataDir . '/baileys_auth/creds.json')) {
         @rename($dataDir . '/whatsapp-bridge/baileys_auth', $dataDir . '/baileys_auth');
     }
+    if (!file_exists($dataDir . '/baileys_auth/creds.json') && file_exists($dataDir . '/creds.json.bak')) {
+        @mkdir($dataDir . '/baileys_auth', 0775, true);
+        @copy($dataDir . '/creds.json.bak', $dataDir . '/baileys_auth/creds.json');
+    }
 
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
         . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "

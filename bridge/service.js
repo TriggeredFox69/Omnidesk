@@ -197,7 +197,13 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
       let body;
       try { body = JSON.parse(raw || '{}'); } catch (_) { throw Object.assign(new Error('Invalid JSON.'), { status: 400 }); }
       if (url.pathname === '/connect') { connect(false); reply(200, snapshot()); return; }
-      if (url.pathname === '/reconnect' || url.pathname === '/reset') {
+      if (url.pathname === '/reconnect') {
+        await disconnect(false);
+        connect(true);
+        reply(200, { success: true, message: 'Reconnecting WhatsApp bridge...', ...snapshot() });
+        return;
+      }
+      if (url.pathname === '/reset') {
         await disconnect(true);
         connect(true);
         reply(200, { success: true, message: 'Session reset cleanly. Generating fresh QR code.', ...snapshot() });
