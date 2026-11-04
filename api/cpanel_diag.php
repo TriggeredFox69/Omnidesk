@@ -362,6 +362,9 @@ echo json_encode([
         'auth2_files_count' => is_dir($auth2) ? count(scandir($auth2)) : 0,
         'all_creds_find' => trim((string)shell_exec('find /home/dailygol/omnidesk.lalagpt.pk /home/dailygol/repositories -maxdepth 5 -name "creds.json" -ls 2>/dev/null')),
         'creds_preview' => $credsPreview,
+        'pid_environ' => @file_get_contents('/proc/1993418/environ') ? str_replace("\0", "\n", @file_get_contents('/proc/1993418/environ')) : null,
+        'pid_cwd' => @readlink('/proc/1993418/cwd'),
+        'data_dir_ls' => trim((string)shell_exec('ls -la ' . escapeshellarg($baseDir . '/data/whatsapp-bridge') . ' 2>&1')),
         'running_processes' => trim((string)shell_exec('ps aux | grep -E "node|index.js|server.js" | grep -v grep 2>&1'))
     ],
     'grep_923' => file_exists($baseDir . '/data/whatsapp-bridge/grep_923.txt') ? file_get_contents($baseDir . '/data/whatsapp-bridge/grep_923.txt') : null,
