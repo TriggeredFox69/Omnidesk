@@ -1034,6 +1034,10 @@ class BaileysClient extends EventEmitter {
       if (fs.existsSync(this.authPath)) {
         fs.rmSync(this.authPath, { recursive: true, force: true });
       }
+      const parentBak = path.join(this.authPath, '../creds.json.bak');
+      if (fs.existsSync(parentBak)) try { fs.unlinkSync(parentBak); } catch (_) {}
+      const altBak = this.authPath + '.bak';
+      if (fs.existsSync(altBak)) try { fs.rmSync(altBak, { recursive: true, force: true }); } catch (_) {}
     } catch (_) {}
     this._destroyed = false;
   }
