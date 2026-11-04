@@ -596,13 +596,14 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const response = await fetch('api/direct_sender.php', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset_whatsapp' })
+        body: JSON.stringify({ action: 'reconnect_whatsapp' })
       });
       const result = await response.json();
       state.senderConfigured = false;
       state.connectedWaNumber = '';
       renderConnectedNumber();
       renderSenderConnection(result);
+      if (typeof pollSenderQr === 'function') pollSenderQr();
       showToast('🔄 Scan the QR code with WhatsApp on your phone to link.');
     } catch (error) {
       if (els.waConnectionStatus) els.waConnectionStatus.textContent = describeSendError(error);
