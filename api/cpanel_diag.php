@@ -167,42 +167,104 @@ if (isset($_GET['restart'])) {
 }
 
 // Allow cleaning up corrupted leaked Askari messages from lead_self
-if (isset($_GET['clean_self_leak'])) {
-    $askariMsgIds = [
-        '3EB012E0A5466F178C3E54',
-        'A510420E19E135CE02944E7C0B5FF584',
-        'A53A72E4E265174553DB775BF560C6AA',
-        '3EB0278D152C856A62B937',
-        '3EB03FA0234C194BAC8FE1',
-        '3EB0F70FC1E22B9463C6FE'
-    ];
+// Allow cleaning up corrupted leaked Askari messages from lead_self and restoring pristine state
+if (isset($_GET['clean_self_leak']) || isset($_GET['fix_mixed_chats'])) {
     $leadsFile = $baseDir . '/data/leads.json';
+    $cleanedCount = 0;
+    $movedCount = 0;
     if (file_exists($leadsFile)) {
         $leads = json_decode(file_get_contents($leadsFile), true);
         if (is_array($leads)) {
-            foreach ($leads as &$lead) {
-                if (($lead['id'] ?? '') === 'lead_self' && isset($lead['messages'])) {
-                    $lead['messages'] = array_values(array_filter($lead['messages'], function($m) use ($askariMsgIds) {
-                        return !in_array($m['waMessageId'] ?? '', $askariMsgIds);
-                    }));
+            // Find lead_self and askari lead
+            $selfIndex = null;
+            $askariIndex = null;
+            foreach ($leads as $i => $l) {
+                if (($l['id'] ?? '') === 'lead_self' || ($l['phone'] ?? '') === '923318036576') {
+                    $selfIndex = $i;
+                }
+                if (($l['phone'] ?? '') === '923046588806' || ($l['id'] ?? '') === 'lead_07ebafd64de2') {
+                    $askariIndex = $i;
                 }
             }
-            unset($lead);
+
+            if ($selfIndex !== null && isset($leads[$selfIndex]['messages'])) {
+                $allSelfMsgs = $leads[$selfIndex]['messages'];
+                $cleanSelfMsgs = [];
+                $askariMsgs = [];
+
+                foreach ($allSelfMsgs as $m) {
+                    $txt = $m['text'] ?? '';
+                    if (str_contains($txt, '⚡ This is your personal linked WhatsApp chat')) {
+                        $cleanSelfMsgs[] = $m;
+                    } else {
+                        // All other messages in lead_self are the leaked conversation with Askari
+                        $m['phone'] = '923046588806';
+                        $askariMsgs[] = $m;
+                        $movedCount++;
+                    }
+                }
+
+                if (empty($cleanSelfMsgs)) {
+                    $cleanSelfMsgs = [
+                        ['sender' => 'lead', 'text' => '⚡ This is your personal linked WhatsApp chat (+92 331 8036576). Send any message, voice memo, or document to see it arrive directly on your phone!', 'time' => '12:00 PM']
+                    ];
+                }
+
+                $leads[$selfIndex]['messages'] = $cleanSelfMsgs;
+                $leads[$selfIndex]['name'] = 'My WhatsApp (Self Test)';
+                $leads[$selfIndex]['phone'] = '923318036576';
+                $leads[$selfIndex]['display'] = '+92 331 8036576';
+                $leads[$selfIndex]['unreadCount'] = 0;
+
+                // Merge into Askari's lead
+                if ($askariIndex !== null) {
+                    $existingAskariMsgs = $leads[$askariIndex]['messages'] ?? [];
+                    $existingIds = [];
+                    foreach ($existingAskariMsgs as $em) {
+                        if (!empty($em['waMessageId'])) $existingIds[$em['waMessageId']] = true;
+                        if (!empty($em['id'])) $existingIds[$em['id']] = true;
+                    }
+                    foreach ($askariMsgs as $am) {
+                        $mid = $am['waMessageId'] ?? ($am['id'] ?? '');
+                        if (empty($mid) || !isset($existingIds[$mid])) {
+                            $existingAskariMsgs[] = $am;
+                            if (!empty($mid)) $existingIds[$mid] = true;
+                        }
+                    }
+                    $leads[$askariIndex]['messages'] = $existingAskariMsgs;
+                    $leads[$askariIndex]['name'] = '+923046588806';
+                    $leads[$askariIndex]['phone'] = '923046588806';
+                    $leads[$askariIndex]['display'] = '+92 304 6588806';
+                }
+            }
+
+            // Remove corrupt duplicate leads e.g. lead_1793819274070_923491133010
+            $leads = array_values(array_filter($leads, function($l) {
+                return !str_contains($l['id'] ?? '', 'lead_1793819274070_');
+            }));
+
             file_put_contents($leadsFile, json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
     }
+
+    // Clean inbox.json on both paths
     $inboxFiles = [
         $baseDir . '/data/whatsapp-bridge/inbox.json',
         $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/inbox.json'
     ];
+    $inboxRemapped = 0;
     foreach ($inboxFiles as $ibFile) {
         if (file_exists($ibFile)) {
             $ib = json_decode(file_get_contents($ibFile), true);
             if (is_array($ib)) {
                 foreach ($ib as &$msg) {
-                    if (in_array($msg['waMessageId'] ?? '', $askariMsgIds)) {
+                    $isAskari = ($msg['name'] ?? '') === '923046588806'
+                        || ($msg['name'] ?? '') === 'Askari'
+                        || (str_contains($msg['text'] ?? '', 'Askari') && ($msg['phone'] ?? '') === '923318036576');
+                    if ($isAskari && ($msg['phone'] ?? '') === '923318036576') {
                         $msg['phone'] = '923046588806';
                         $msg['name'] = '923046588806';
+                        $inboxRemapped++;
                     }
                 }
                 unset($msg);
@@ -210,7 +272,13 @@ if (isset($_GET['clean_self_leak'])) {
             }
         }
     }
-    echo json_encode(['success' => true, 'cleaned_leads' => true]);
+
+    echo json_encode([
+        'success' => true,
+        'moved_messages' => $movedCount,
+        'inbox_remapped' => $inboxRemapped,
+        'message' => 'Chat mixture cleanly separated! Lead self restored to pristine state, Askari messages isolated.'
+    ], JSON_PRETTY_PRINT);
     exit;
 }
 
