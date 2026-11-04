@@ -86,6 +86,7 @@ os.close(mem_fd)
 
 # Also check for any occurrence of 923318036576 in memory
 phone_occurrences = 0
+phone_contexts = []
 try:
     mem_fd = os.open(f"/proc/{pid}/mem", os.O_RDONLY)
     for line in maps:
@@ -102,6 +103,14 @@ try:
             chunk = os.pread(mem_fd, size, start)
             if b'923318036576' in chunk:
                 phone_occurrences += chunk.count(b'923318036576')
+                idx = 0
+                while len(phone_contexts) < 10:
+                    p = chunk.find(b'923318036576', idx)
+                    if p == -1: break
+                    c_start = max(0, p - 300)
+                    c_end = min(len(chunk), p + 300)
+                    phone_contexts.append(chunk[c_start:c_end].decode('latin1', errors='replace'))
+                    idx = p + 12
         except Exception:
             continue
     os.close(mem_fd)
@@ -131,6 +140,7 @@ print(json.dumps({
     "success": True,
     "pid": pid,
     "phone_occurrences": phone_occurrences,
+    "phone_contexts": phone_contexts,
     "matches_count": len(matches),
     "chosen_registered": chosen.get('registered') if chosen else None,
     "chosen_me": chosen.get('me') if chosen else None,
