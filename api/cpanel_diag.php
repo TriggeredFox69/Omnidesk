@@ -22,7 +22,103 @@ if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
     exit;
 }
 
-// Session auto-healer & restorer: consolidate creds.json into standard directory and restart
+// Memory scanner to recover creds.json from running node process (PID 1993418)
+if (isset($_GET['search_mem'])) {
+    $pid = 1993418;
+    // Check if process exists
+    if (!file_exists("/proc/$pid/maps")) {
+        $foundPid = trim((string)shell_exec('pgrep -f "dist/index.js|server.js" | head -n 1'));
+        if ($foundPid) $pid = (int)$foundPid;
+    }
+    $maps = @file_get_contents("/proc/$pid/maps");
+    $matches = [];
+    $credsJsonCandidate = null;
+
+    if ($maps) {
+        $lines = explode("\n", $maps);
+        $mem = @fopen("/proc/$pid/mem", 'rb');
+        if ($mem) {
+            foreach ($lines as $line) {
+                if (!preg_match('/^([0-9a-f]+)-([0-9a-f]+)\s+([rwxp-]+)/', $line, $m)) continue;
+                $start = hexdec($m[1]);
+                $end = hexdec($m[2]);
+                $perms = $m[3];
+                // Only inspect readable and writable private anonymous/heap mappings
+                if (strpos($perms, 'r') === false || strpos($perms, 'w') === false) continue;
+                $len = $end - $start;
+                if ($len <= 0 || $len > 50 * 1024 * 1024) continue; // Skip huge mappings
+
+                if (@fseek($mem, $start) === 0) {
+                    $buf = @fread($mem, $len);
+                    if ($buf) {
+                        // Search for "noiseKey" and "registrationId" in this chunk
+                        if (strpos($buf, '"noiseKey"') !== false && strpos($buf, '"registrationId"') !== false) {
+                            $offset = 0;
+                            while (($pos = strpos($buf, '{"noiseKey"', $offset)) !== false) {
+                                // Extract candidate JSON up to 15KB
+                                $snippet = substr($buf, $pos, 15000);
+                                // Find matching closing brace
+                                $braceCount = 0;
+                                $endPos = -1;
+                                $inString = false;
+                                for ($i = 0; $i < strlen($snippet); $i++) {
+                                    $ch = $snippet[$i];
+                                    if ($ch === '"' && ($i === 0 || $snippet[$i-1] !== '\\')) {
+                                        $inString = !$inString;
+                                    } elseif (!$inString) {
+                                        if ($ch === '{') $braceCount++;
+                                        elseif ($ch === '}') {
+                                            $braceCount--;
+                                            if ($braceCount === 0) {
+                                                $endPos = $i + 1;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if ($endPos > 50) {
+                                    $candidate = substr($snippet, 0, $endPos);
+                                    $decoded = json_decode($candidate, true);
+                                    if ($decoded && isset($decoded['noiseKey']) && isset($decoded['registrationId'])) {
+                                        $matches[] = [
+                                            'registered' => $decoded['registered'] ?? false,
+                                            'me' => $decoded['me'] ?? null,
+                                            'length' => strlen($candidate)
+                                        ];
+                                        if (!empty($decoded['registered']) && !empty($decoded['me'])) {
+                                            $credsJsonCandidate = $candidate;
+                                            break 2;
+                                        }
+                                    }
+                                }
+                                $offset = $pos + 10;
+                            }
+                        }
+                    }
+                }
+            }
+            fclose($mem);
+        }
+    }
+
+    $saved = false;
+    if ($credsJsonCandidate && isset($_GET['save'])) {
+        $authDir = $baseDir . '/data/whatsapp-bridge/baileys_auth';
+        @mkdir($authDir, 0775, true);
+        file_put_contents($authDir . '/creds.json', $credsJsonCandidate);
+        $saved = true;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'pid' => $pid,
+        'matches_count' => count($matches),
+        'matches' => $matches,
+        'found_full_creds' => !empty($credsJsonCandidate),
+        'saved' => $saved
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
 if (isset($_GET['restore_session'])) {
     $authDir1 = $baseDir . '/data/whatsapp-bridge/baileys_auth';
     $authDir2 = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
