@@ -22,6 +22,78 @@ if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
     exit;
 }
 
+// Session auto-healer & restorer: consolidate creds.json into standard directory and restart
+if (isset($_GET['restore_session'])) {
+    $authDir1 = $baseDir . '/data/whatsapp-bridge/baileys_auth';
+    $authDir2 = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
+    $sourceCreds = null;
+    $sourceDir = null;
+
+    if (file_exists($authDir1 . '/creds.json') && filesize($authDir1 . '/creds.json') > 100) {
+        $sourceCreds = $authDir1 . '/creds.json';
+        $sourceDir = $authDir1;
+    } elseif (file_exists($authDir2 . '/creds.json') && filesize($authDir2 . '/creds.json') > 100) {
+        $sourceCreds = $authDir2 . '/creds.json';
+        $sourceDir = $authDir2;
+    } else {
+        // Look for any creds.json in repo or home
+        $found = trim((string)shell_exec('find /home/dailygol/ -name "creds.json" 2>/dev/null'));
+        if ($found) {
+            $lines = array_filter(explode("\n", $found));
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (file_exists($line) && filesize($line) > 100) {
+                    $sourceCreds = $line;
+                    $sourceDir = dirname($line);
+                    break;
+                }
+            }
+        }
+    }
+
+    $copyResults = [];
+    if ($sourceDir && is_dir($sourceDir)) {
+        @mkdir($authDir1, 0775, true);
+        @mkdir($authDir2, 0775, true);
+        // Sync source to both authDir1 and authDir2 so regardless of path used, creds exist
+        $targetDirs = array_unique([$authDir1, $authDir2]);
+        foreach ($targetDirs as $td) {
+            if ($td !== $sourceDir) {
+                $cp = @shell_exec("/bin/cp -R " . escapeshellarg($sourceDir) . "/* " . escapeshellarg($td) . "/ 2>&1");
+                $copyResults[$td] = trim((string)$cp);
+            }
+        }
+    }
+
+    // Kill any running bridge
+    $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+    if ($output) {
+        $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
+        foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
+    }
+    sleep(1);
+
+    // Restart daemon pointing to standard data directory
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+    $bridgeDir = $baseDir . '/bridge';
+    $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    shell_exec($startCmd);
+    sleep(2);
+
+    echo json_encode([
+        'success' => true,
+        'sourceDir' => $sourceDir,
+        'sourceCreds' => $sourceCreds,
+        'copyResults' => $copyResults
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 // Allow executing clean pairing action directly through diag to eliminate stale prekeys
 if (isset($_GET['clean_pair'])) {
     $authDir = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
@@ -41,7 +113,7 @@ if (isset($_GET['clean_pair'])) {
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
     $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
         . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
         . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
     shell_exec($startCmd);
@@ -74,7 +146,7 @@ if (isset($_GET['reset_session'])) {
     $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
         . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
         . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
     shell_exec($startCmd);
@@ -95,7 +167,7 @@ if (isset($_GET['restart'])) {
     $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
         . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
         . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
     shell_exec($startCmd);
@@ -211,7 +283,7 @@ if (isset($_GET['wipe'])) {
     file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
     $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
         . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
         . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
     shell_exec($startCmd);
@@ -252,6 +324,24 @@ if (isset($_GET['test_send'])) {
     ];
 }
 
+$auth1 = $baseDir . '/data/whatsapp-bridge/baileys_auth';
+$auth2 = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
+$credsPreview = null;
+foreach ([$auth1 . '/creds.json', $auth2 . '/creds.json'] as $cp) {
+    if (file_exists($cp)) {
+        $cdata = json_decode(@file_get_contents($cp), true);
+        if ($cdata) {
+            $credsPreview = [
+                'path' => $cp,
+                'registered' => $cdata['registered'] ?? false,
+                'me' => $cdata['me'] ?? null,
+                'filesize' => filesize($cp)
+            ];
+            break;
+        }
+    }
+}
+
 echo json_encode([
     'baseDir' => $baseDir,
     'repo_commit' => shell_exec('cd /home/dailygol/repositories/Omnidesk && git log -1 --oneline 2>&1'),
@@ -263,6 +353,17 @@ echo json_encode([
     'local_bridge_http' => $localHttp,
     'local_bridge_err' => $localErr,
     'send_debug' => $sendDebug,
+    'auth_summary' => [
+        'auth1_exists' => is_dir($auth1),
+        'auth1_creds' => file_exists($auth1 . '/creds.json') ? filesize($auth1 . '/creds.json') : false,
+        'auth1_files_count' => is_dir($auth1) ? count(scandir($auth1)) : 0,
+        'auth2_exists' => is_dir($auth2),
+        'auth2_creds' => file_exists($auth2 . '/creds.json') ? filesize($auth2 . '/creds.json') : false,
+        'auth2_files_count' => is_dir($auth2) ? count(scandir($auth2)) : 0,
+        'all_creds_find' => trim((string)shell_exec('find /home/dailygol/ -name "creds.json" -ls 2>/dev/null')),
+        'creds_preview' => $credsPreview,
+        'running_processes' => trim((string)shell_exec('ps aux | grep -E "node|index.js|server.js" | grep -v grep 2>&1'))
+    ],
     'grep_923' => file_exists($baseDir . '/data/whatsapp-bridge/grep_923.txt') ? file_get_contents($baseDir . '/data/whatsapp-bridge/grep_923.txt') : null,
     'recent_log' => file_exists($logFile) ? array_slice(explode("\n", file_get_contents($logFile)), -30) : []
 ], JSON_PRETTY_PRINT);
