@@ -22,6 +22,12 @@ if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
     exit;
 }
 
+if (isset($_GET['recover_py'])) {
+    $out = shell_exec('python3 ' . escapeshellarg(__DIR__ . '/recover_creds.py') . (isset($_GET['save']) ? ' --save' : '') . ' 2>&1');
+    echo $out;
+    exit;
+}
+
 // Memory scanner to recover creds.json from running node process (PID 1993418)
 if (isset($_GET['search_mem'])) {
     $pid = 1993418;
