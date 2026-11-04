@@ -368,5 +368,6 @@ echo json_encode([
         'running_processes' => trim((string)shell_exec('ps aux | grep -E "node|index.js|server.js" | grep -v grep 2>&1'))
     ],
     'grep_923' => file_exists($baseDir . '/data/whatsapp-bridge/grep_923.txt') ? file_get_contents($baseDir . '/data/whatsapp-bridge/grep_923.txt') : null,
+    'log_tail' => file_exists($logFile) ? array_slice(explode("\n", trim((string)shell_exec('tail -n 120 ' . escapeshellarg($logFile)))), -100) : [],
     'recent_log' => file_exists($logFile) ? array_slice(explode("\n", file_get_contents($logFile)), -30) : []
 ], JSON_PRETTY_PRINT);
