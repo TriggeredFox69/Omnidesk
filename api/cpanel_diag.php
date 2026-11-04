@@ -36,8 +36,8 @@ if (isset($_GET['restore_session'])) {
         $sourceCreds = $authDir2 . '/creds.json';
         $sourceDir = $authDir2;
     } else {
-        // Look for any creds.json in repo or home
-        $found = trim((string)shell_exec('find /home/dailygol/ -name "creds.json" 2>/dev/null'));
+        // Look for any creds.json in repo or omnidesk
+        $found = trim((string)shell_exec('find /home/dailygol/omnidesk.lalagpt.pk /home/dailygol/repositories -maxdepth 5 -name "creds.json" 2>/dev/null'));
         if ($found) {
             $lines = array_filter(explode("\n", $found));
             foreach ($lines as $line) {
@@ -360,7 +360,7 @@ echo json_encode([
         'auth2_exists' => is_dir($auth2),
         'auth2_creds' => file_exists($auth2 . '/creds.json') ? filesize($auth2 . '/creds.json') : false,
         'auth2_files_count' => is_dir($auth2) ? count(scandir($auth2)) : 0,
-        'all_creds_find' => trim((string)shell_exec('find /home/dailygol/ -name "creds.json" -ls 2>/dev/null')),
+        'all_creds_find' => trim((string)shell_exec('find /home/dailygol/omnidesk.lalagpt.pk /home/dailygol/repositories -maxdepth 5 -name "creds.json" -ls 2>/dev/null')),
         'creds_preview' => $credsPreview,
         'running_processes' => trim((string)shell_exec('ps aux | grep -E "node|index.js|server.js" | grep -v grep 2>&1'))
     ],
