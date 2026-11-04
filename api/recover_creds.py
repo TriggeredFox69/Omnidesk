@@ -117,32 +117,40 @@ try:
 except Exception:
     pass
 
-save_dest = "/home/dailygol/omnidesk.lalagpt.pk/data/whatsapp-bridge/baileys_auth/creds.json"
-saved = False
-chosen = None
-for m in matches:
-    if m.get('registered') and m.get('me'):
-        chosen = m
-        break
-
-if not chosen and matches:
-    # If no registered found, pick one with the most keys
-    matches.sort(key=lambda x: x['keys_count'], reverse=True)
-    chosen = matches[0]
-
-if chosen and "--save" in sys.argv:
-    os.makedirs(os.path.dirname(save_dest), exist_ok=True, mode=0o775)
-    with open(save_dest, "w") as f:
-        f.write(chosen['raw_json'])
-    saved = True
+reg_id_contexts = []
+try:
+    mem_fd = os.open(f"/proc/{pid}/mem", os.O_RDONLY)
+    for line in maps:
+        parts = line.strip().split()
+        if len(parts) < 2: continue
+        addr, perms = parts[0], parts[1]
+        if 'r' not in perms or 'w' not in perms: continue
+        start_hex, end_hex = addr.split('-')
+        start = int(start_hex, 16)
+        end = int(end_hex, 16)
+        size = end - start
+        if size <= 0 or size > 30 * 1024 * 1024: continue
+        try:
+            chunk = os.pread(mem_fd, size, start)
+            if b'"registrationId"' in chunk:
+                idx = 0
+                while len(reg_id_contexts) < 15:
+                    p = chunk.find(b'"registrationId"', idx)
+                    if p == -1: break
+                    c_start = max(0, p - 500)
+                    c_end = min(len(chunk), p + 1500)
+                    reg_id_contexts.append(chunk[c_start:c_end].decode('latin1', errors='replace'))
+                    idx = p + 16
+        except Exception:
+            continue
+    os.close(mem_fd)
+except Exception:
+    pass
 
 print(json.dumps({
     "success": True,
     "pid": pid,
-    "phone_occurrences": phone_occurrences,
-    "phone_contexts": phone_contexts,
-    "matches_count": len(matches),
-    "chosen_registered": chosen.get('registered') if chosen else None,
-    "chosen_me": chosen.get('me') if chosen else None,
-    "saved": saved
+    "reg_id_contexts_count": len(reg_id_contexts),
+    "reg_id_contexts": reg_id_contexts
 }, indent=2))
+sys.exit(0)
