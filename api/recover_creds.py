@@ -117,7 +117,7 @@ try:
 except Exception:
     pass
 
-reg_id_contexts = []
+target_chunk = None
 try:
     mem_fd = os.open(f"/proc/{pid}/mem", os.O_RDONLY)
     for line in maps:
@@ -132,25 +132,28 @@ try:
         if size <= 0 or size > 30 * 1024 * 1024: continue
         try:
             chunk = os.pread(mem_fd, size, start)
-            if b'"registrationId"' in chunk:
-                idx = 0
-                while len(reg_id_contexts) < 15:
-                    p = chunk.find(b'"registrationId"', idx)
-                    if p == -1: break
-                    c_start = max(0, p - 500)
-                    c_end = min(len(chunk), p + 1500)
-                    reg_id_contexts.append(chunk[c_start:c_end].decode('latin1', errors='replace'))
-                    idx = p + 16
+            if b'"registrationId":227' in chunk:
+                p = chunk.find(b'"registrationId":227')
+                c_start = max(0, p - 8000)
+                c_end = min(len(chunk), p + 16000)
+                target_chunk = chunk[c_start:c_end]
+                break
         except Exception:
             continue
     os.close(mem_fd)
 except Exception:
     pass
 
+if target_chunk:
+    # Save the raw bytes to /home/dailygol/omnidesk.lalagpt.pk/data/whatsapp-bridge/recovered_raw.bin
+    raw_path = "/home/dailygol/omnidesk.lalagpt.pk/data/whatsapp-bridge/recovered_raw.bin"
+    with open(raw_path, "wb") as f:
+        f.write(target_chunk)
+
 print(json.dumps({
     "success": True,
-    "pid": pid,
-    "reg_id_contexts_count": len(reg_id_contexts),
-    "reg_id_contexts": reg_id_contexts
+    "found_target": bool(target_chunk),
+    "target_length": len(target_chunk) if target_chunk else 0,
+    "preview": target_chunk[:2000].decode('latin1', errors='replace') if target_chunk else None
 }, indent=2))
 sys.exit(0)
