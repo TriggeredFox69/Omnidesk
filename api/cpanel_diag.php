@@ -360,6 +360,7 @@ echo json_encode([
         'auth2_exists' => is_dir($auth2),
         'auth2_creds' => file_exists($auth2 . '/creds.json') ? filesize($auth2 . '/creds.json') : false,
         'auth2_files_count' => is_dir($auth2) ? count(scandir($auth2)) : 0,
+        'home_creds_find' => trim((string)shell_exec('find /home/dailygol -maxdepth 6 -name "*creds*" 2>/dev/null')),
         'all_creds_find' => trim((string)shell_exec('find /home/dailygol/omnidesk.lalagpt.pk /home/dailygol/repositories -maxdepth 5 -name "creds.json" -ls 2>/dev/null')),
         'creds_preview' => $credsPreview,
         'pid_environ' => @file_get_contents('/proc/1993418/environ') ? str_replace("\0", "\n", @file_get_contents('/proc/1993418/environ')) : null,
