@@ -364,6 +364,7 @@ echo json_encode([
         'creds_preview' => $credsPreview,
         'pid_environ' => @file_get_contents('/proc/1993418/environ') ? str_replace("\0", "\n", @file_get_contents('/proc/1993418/environ')) : null,
         'pid_cwd' => @readlink('/proc/1993418/cwd'),
+        'pid_fds' => trim((string)shell_exec('ls -l /proc/1993418/fd 2>&1')),
         'data_dir_ls' => trim((string)shell_exec('ls -la ' . escapeshellarg($baseDir . '/data/whatsapp-bridge') . ' 2>&1')),
         'running_processes' => trim((string)shell_exec('ps aux | grep -E "node|index.js|server.js" | grep -v grep 2>&1'))
     ],
