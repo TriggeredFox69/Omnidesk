@@ -281,7 +281,10 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
     log(`🚀 Campaign "${state.name}" launched with ${state.audience.length} contacts. Cadence: ${state.minDelay}s - ${state.maxDelay}s. Running headless 24/7 on server.`, 'info');
     saveState();
 
-    step();
+    setTimeout(() => {
+      step().catch(err => log('Step error: ' + err.message, 'error'));
+    }, 50);
+
     return getStatus();
   }
 
@@ -300,7 +303,9 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
     state.status = 'running';
     log(`▶️ Campaign resumed. Dispatching next recipient...`, 'info');
     saveState();
-    step();
+    setTimeout(() => {
+      step().catch(err => log('Step error: ' + err.message, 'error'));
+    }, 50);
     return getStatus();
   }
 

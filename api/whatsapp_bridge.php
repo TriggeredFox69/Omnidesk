@@ -23,7 +23,8 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
     $timeout = match(true) {
         $path === '/send' => 60,
         str_starts_with($path, '/media') => 20,
-        default => 3
+        str_starts_with($path, '/campaign') => 15,
+        default => 4
     };
     curl_setopt_array($curl, [
         CURLOPT_RETURNTRANSFER => true,
