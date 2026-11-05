@@ -5,6 +5,7 @@ const { submitOnce } = require('./submit');
 const { installMessageIdCompatibility } = require('./compatibility');
 const { createInbox } = require('./inbox');
 const { readPresence } = require('./presence');
+const { createCampaignManager } = require('./campaign');
 
 // Dependency injection keeps tests independent of a real WhatsApp account.
 function createService({ createClient, qrImage, token, storageFile, makeMedia }) {
@@ -14,6 +15,23 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
   const receipts = new Map();
   const requests = new Map();
   const inbox = createInbox({ getClient: () => client, storageFile });
+
+  const campaignManager = createCampaignManager({
+    send,
+    dataDir: storageFile ? require('node:path').dirname(storageFile) : process.cwd(),
+    getLeadsPath: () => {
+      const dir = storageFile ? require('node:path').dirname(storageFile) : process.cwd();
+      const candidates = [
+        require('node:path').resolve(dir, '../leads.json'),
+        require('node:path').resolve(__dirname, '../data/leads.json'),
+        require('node:path').resolve(__dirname, '../../data/leads.json')
+      ];
+      for (const c of candidates) {
+        if (require('node:fs').existsSync(c)) return c;
+      }
+      return candidates[0];
+    }
+  });
   const ackStatus = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';
   const remember = (map, key, value) => {
     map.set(key, value);
@@ -188,6 +206,10 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         }
         reply(200, { success: true, ...(receipt || { status: 'accepted' }) }); return;
       }
+      if (req.method === 'GET' && url.pathname === '/campaign/status') {
+        reply(200, campaignManager.getStatus());
+        return;
+      }
       if (req.method !== 'POST') { reply(404, { success: false, message: 'Unknown route.' }); return; }
       let raw = '';
       for await (const chunk of req) {
@@ -219,11 +241,27 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         reply(200, { success: true });
         return;
       }
+      if (url.pathname === '/campaign/start') {
+        reply(200, campaignManager.start(body));
+        return;
+      }
+      if (url.pathname === '/campaign/pause') {
+        reply(200, campaignManager.pause());
+        return;
+      }
+      if (url.pathname === '/campaign/resume') {
+        reply(200, campaignManager.resume());
+        return;
+      }
+      if (url.pathname === '/campaign/stop') {
+        reply(200, campaignManager.stop());
+        return;
+      }
       if (url.pathname === '/send') { reply(200, await send(body)); return; }
       reply(404, { success: false, message: 'Unknown route.' });
     } catch (err) { reply(err.status || 502, { success: false, message: err.message }); }
   });
-  return { server, connect, snapshot, close: async () => {
+  return { server, connect, snapshot, campaignManager, close: async () => {
     if (client) { client.removeAllListeners(); await client.destroy().catch(() => {}); }
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));

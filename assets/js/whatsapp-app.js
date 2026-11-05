@@ -2201,6 +2201,144 @@ document.addEventListener('DOMContentLoaded', () => {
     campaignState.maxDelay = parseInt(els.campaignDelayMax.value, 10) || 12;
   }
 
+  let campaignPollTimer = null;
+
+  async function syncServerCampaignStatus() {
+    if (window.NUNNO_OFFLINE_PREVIEW) return;
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_campaign_status' })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) return;
+      applyServerCampaignState(data);
+    } catch (_) {}
+  }
+
+  function startCampaignStatusPolling() {
+    if (campaignPollTimer) clearInterval(campaignPollTimer);
+    campaignPollTimer = setInterval(() => {
+      syncServerCampaignStatus();
+    }, 3500);
+  }
+
+  function applyServerCampaignState(data) {
+    if (!data || !data.status) return;
+    const isRunning = data.status === 'running';
+    const isPaused = data.status === 'paused';
+    const isCompleted = data.status === 'completed';
+    const isStopped = data.status === 'stopped';
+
+    campaignState.isRunning = isRunning;
+    campaignState.isPaused = isPaused;
+    campaignState.totalSent = data.totalSent || 0;
+    campaignState.totalFailed = data.totalFailed || 0;
+    campaignState.currentIndex = data.currentIndex || 0;
+    campaignState.remainingSeconds = data.remainingSeconds || 0;
+
+    if (data.name && els.campaignNameInput && !els.campaignNameInput.value) {
+      els.campaignNameInput.value = data.name;
+    }
+
+    if (data.audience && data.audience.length > 0 && campaignState.audience.length === 0) {
+      campaignState.audience = data.audience;
+      renderCampaignAudienceUI();
+    } else if (data.audience && data.audience.length > 0) {
+      for (const sa of data.audience) {
+        const local = campaignState.audience.find(c => c.phone === sa.phone);
+        if (local) {
+          local.status = sa.status;
+          local.sentAt = sa.sentAt;
+          local.error = sa.error;
+          const statusEl = document.getElementById(`c_status_${local.id}`);
+          if (statusEl) {
+            if (sa.status === 'accepted' || sa.status === 'sent') {
+              statusEl.innerHTML = '<span style="color:#00a884;font-weight:700;">✓ Accepted</span>';
+            } else if (sa.status === 'sending') {
+              statusEl.innerHTML = '<span style="color:#eab308;">⏳ Sending...</span>';
+            } else if (sa.status === 'failed') {
+              statusEl.innerHTML = '<span style="color:#ef4444;font-weight:700;">✕ Failed</span>';
+            }
+          }
+        }
+      }
+    }
+
+    const total = data.totalContacts || campaignState.audience.length;
+    const currentNum = Math.min(campaignState.currentIndex + 1, total);
+
+    if (isRunning || isPaused) {
+      if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'none';
+      if (els.pauseCampaignBtn) {
+        els.pauseCampaignBtn.style.display = 'inline-flex';
+        els.pauseCampaignBtn.innerHTML = isPaused ? '<span>▶️ Resume</span>' : '<span>⏸️ Pause</span>';
+      }
+      if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'inline-flex';
+      if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'block';
+
+      if (els.campaignProgressCount) els.campaignProgressCount.textContent = `${campaignState.totalSent} / ${total}`;
+      const pct = total > 0 ? Math.round((campaignState.totalSent / total) * 100) : 0;
+      if (els.campaignProgressPct) els.campaignProgressPct.textContent = `${pct}%`;
+      if (els.campaignProgressFill) els.campaignProgressFill.style.width = `${pct}%`;
+
+      if (els.campaignCountdown) {
+        els.campaignCountdown.textContent = isPaused ? 'Paused' : (campaignState.remainingSeconds > 0 ? `${campaignState.remainingSeconds}s` : 'Sending...');
+      }
+
+      if (els.campaignStatusBadge) {
+        if (isPaused) {
+          els.campaignStatusBadge.style.color = '#eab308';
+          els.campaignStatusBadge.style.background = '#3b2f0a';
+          els.campaignStatusBadge.style.borderColor = '#eab308';
+          els.campaignStatusBadge.innerHTML = `🟡 Paused at Lead ${currentNum} of ${total}`;
+        } else {
+          els.campaignStatusBadge.style.color = '#00a884';
+          els.campaignStatusBadge.style.background = '#0a332c';
+          els.campaignStatusBadge.style.borderColor = '#00a884';
+          els.campaignStatusBadge.innerHTML = `🟢 Server Sending (${campaignState.totalSent}/${total})`;
+        }
+      }
+    } else if (isCompleted) {
+      if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
+      if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
+      if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
+      if (els.campaignCountdown) els.campaignCountdown.textContent = 'Complete';
+      if (els.campaignProgressPct) els.campaignProgressPct.textContent = '100%';
+      if (els.campaignProgressFill) els.campaignProgressFill.style.width = '100%';
+      if (els.campaignStatusBadge) {
+        els.campaignStatusBadge.style.color = '#00a884';
+        els.campaignStatusBadge.style.background = '#0a332c';
+        els.campaignStatusBadge.style.borderColor = '#00a884';
+        els.campaignStatusBadge.innerHTML = `✅ Server Completed (${campaignState.totalSent} Sent)`;
+      }
+    } else if (isStopped) {
+      if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
+      if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
+      if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
+      if (els.campaignCountdown) els.campaignCountdown.textContent = 'Stopped';
+      if (els.campaignStatusBadge) {
+        els.campaignStatusBadge.style.color = '#ef4444';
+        els.campaignStatusBadge.style.background = '#311417';
+        els.campaignStatusBadge.style.borderColor = '#ef4444';
+        els.campaignStatusBadge.innerHTML = `⏹️ Stopped (${campaignState.totalSent} Sent)`;
+      }
+    }
+
+    if (data.logs && data.logs.length > 0 && els.campaignTerminalLog) {
+      const logsCount = data.logs.length;
+      if (logsCount !== campaignState.lastLogsCount) {
+        campaignState.lastLogsCount = logsCount;
+        els.campaignTerminalLog.innerHTML = data.logs.map(l =>
+          `<div class="log-line log-${escapeHtml(l.type)}"><span style="color:#8696a0;font-size:10.5px;margin-right:4px;">[${escapeHtml(l.time)}]</span> ${escapeHtml(l.message)}</div>`
+        ).join('');
+        els.campaignTerminalLog.scrollTop = els.campaignTerminalLog.scrollHeight;
+        if (els.campaignLogCount) els.campaignLogCount.textContent = `${logsCount} events`;
+      }
+    }
+  }
+
   async function startCampaign() {
     if (campaignState.isStarting || campaignState.inFlight) return;
     if (campaignState.isRunning && !campaignState.isPaused) return;
@@ -2246,79 +2384,98 @@ document.addEventListener('DOMContentLoaded', () => {
     campaignState.minDelay = minD;
     campaignState.maxDelay = maxD;
 
-    campaignState.isRunning = true;
-    campaignState.isPaused = false;
+    const assignMode = els.campaignAssignSelect ? els.campaignAssignSelect.value : 'pool';
 
-    if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'none';
-    if (els.pauseCampaignBtn) {
-      els.pauseCampaignBtn.style.display = 'inline-flex';
-      els.pauseCampaignBtn.innerHTML = '<span>⏸️ Pause</span>';
-    }
-    if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'inline-flex';
-    if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'block';
-
-    if (els.campaignStatusBadge) {
-      els.campaignStatusBadge.style.color = '#00a884';
-      els.campaignStatusBadge.style.background = '#0a332c';
-      els.campaignStatusBadge.style.borderColor = '#00a884';
-      els.campaignStatusBadge.innerHTML = `🟢 Sending "${escapeHtml(campaignName)}"`;
-    }
-
-    logCampaignTerminal(`🚀 Launching campaign <strong>"${escapeHtml(campaignName)}"</strong> with ${campaignState.audience.length} target contacts. Cadence: ${campaignState.minDelay}s - ${campaignState.maxDelay}s.`, 'info');
-
-    dispatchNextCampaignMessage();
-  }
-
-  function pauseCampaign() {
-    if (!campaignState.isRunning) return;
-
-    if (campaignState.isPaused) {
+    if (window.NUNNO_OFFLINE_PREVIEW) {
+      campaignState.isRunning = true;
       campaignState.isPaused = false;
-      if (els.pauseCampaignBtn) els.pauseCampaignBtn.innerHTML = '<span>⏸️ Pause</span>';
-      if (els.campaignStatusBadge) {
-        els.campaignStatusBadge.style.color = '#00a884';
-        els.campaignStatusBadge.style.background = '#0a332c';
-        els.campaignStatusBadge.style.borderColor = '#00a884';
-        els.campaignStatusBadge.innerHTML = `🟢 Running (${campaignState.currentIndex + 1}/${campaignState.audience.length})`;
-      }
-      logCampaignTerminal(`▶️ Campaign resumed. Dispatching next recipient...`, 'info');
+      if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'none';
+      if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'inline-flex';
+      if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'inline-flex';
+      if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'block';
       dispatchNextCampaignMessage();
-    } else {
-      campaignState.isPaused = true;
-      if (campaignState.timeoutId) clearTimeout(campaignState.timeoutId);
-      if (campaignState.countdownInterval) clearInterval(campaignState.countdownInterval);
-      if (els.pauseCampaignBtn) els.pauseCampaignBtn.innerHTML = '<span>▶️ Resume</span>';
-      if (els.campaignCountdown) els.campaignCountdown.textContent = 'Paused';
-      if (els.campaignStatusBadge) {
-        els.campaignStatusBadge.style.color = '#eab308';
-        els.campaignStatusBadge.style.background = '#3b2f0a';
-        els.campaignStatusBadge.style.borderColor = '#eab308';
-        els.campaignStatusBadge.innerHTML = `🟡 Paused at Lead ${campaignState.currentIndex + 1} of ${campaignState.audience.length}`;
+      return;
+    }
+
+    logCampaignTerminal(`🚀 Launching server-side campaign <strong>"${escapeHtml(campaignName)}"</strong> with ${campaignState.audience.length} target contacts. Running 24/7 on server. You can safely close your browser!`, 'info');
+    showToast('🚀 Campaign running 24/7 on server! You can safely close your browser.');
+
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start_campaign',
+          name: campaignName,
+          message: msg,
+          audience: campaignState.audience,
+          minDelay: minD,
+          maxDelay: maxD,
+          assignMode,
+          closer: state.currentUser
+        })
+      });
+      const data = await response.json();
+      if (data && data.success) {
+        applyServerCampaignState(data);
+        startCampaignStatusPolling();
+      } else {
+        showToast('⚠️ Could not start campaign: ' + (data?.message || 'Server error'));
       }
-      logCampaignTerminal(`⏸️ Campaign paused by operator. Standing by.`, 'warn');
+    } catch (err) {
+      showToast('⚠️ Could not start campaign: ' + err.message);
     }
   }
 
-  function stopCampaign() {
-    if (campaignState.timeoutId) clearTimeout(campaignState.timeoutId);
-    if (campaignState.countdownInterval) clearInterval(campaignState.countdownInterval);
-
-    campaignState.isRunning = false;
-    campaignState.isPaused = false;
-
-    if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
-    if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
-    if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
-
-    if (els.campaignStatusBadge) {
-      els.campaignStatusBadge.style.color = '#ef4444';
-      els.campaignStatusBadge.style.background = '#311417';
-      els.campaignStatusBadge.style.borderColor = '#ef4444';
-      els.campaignStatusBadge.innerHTML = `⏹️ Stopped (${campaignState.totalSent} Sent)`;
+  async function pauseCampaign() {
+    if (window.NUNNO_OFFLINE_PREVIEW) {
+      if (!campaignState.isRunning) return;
+      if (campaignState.isPaused) {
+        campaignState.isPaused = false;
+        dispatchNextCampaignMessage();
+      } else {
+        campaignState.isPaused = true;
+      }
+      return;
     }
 
-    logCampaignTerminal(`⏹️ Campaign halted by operator. WhatsApp accepted ${campaignState.totalSent} of ${campaignState.audience.length} messages.`, 'warn');
-    showToast(`⏹️ Campaign stopped. WhatsApp accepted ${campaignState.totalSent} messages.`);
+    try {
+      const action = campaignState.isPaused ? 'resume_campaign' : 'pause_campaign';
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      const data = await response.json();
+      if (data && data.success) {
+        applyServerCampaignState(data);
+      }
+    } catch (err) {
+      showToast('Action failed: ' + err.message);
+    }
+  }
+
+  async function stopCampaign() {
+    if (window.NUNNO_OFFLINE_PREVIEW) {
+      campaignState.isRunning = false;
+      campaignState.isPaused = false;
+      return;
+    }
+
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop_campaign' })
+      });
+      const data = await response.json();
+      if (data && data.success) {
+        applyServerCampaignState(data);
+      }
+      showToast('⏹️ Campaign stopped on server.');
+    } catch (err) {
+      showToast('Stop failed: ' + err.message);
+    }
   }
 
   function finishCampaign() {
@@ -5075,4 +5232,6 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchServerLeads();
   updateCampaignPreview();
   renderCampaignAudienceUI();
+  syncServerCampaignStatus();
+  startCampaignStatusPolling();
 });

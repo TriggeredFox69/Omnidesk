@@ -5050,7 +5050,7 @@ const nativeError = (native, context) => {
 });
 
 // EXTERNAL MODULE: external "node:module"
-var external_node_module_ = __webpack_require__(8995);
+var external_node_module_ = __webpack_require__(1376);
 // EXTERNAL MODULE: ./bridge/node_modules/detect-libc/lib/detect-libc.js
 var detect_libc = __webpack_require__(183);
 // EXTERNAL MODULE: external "node:child_process"

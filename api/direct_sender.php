@@ -63,7 +63,7 @@ if ($action === 'register_bridge') {
 
 // Regular WhatsApp via a linked device is the default. Cloud API remains opt-in.
 if ((getenv('WHATSAPP_SEND_MODE') ?: 'whatsapp_web') !== 'cloud_api' &&
-    in_array($action, ['get_sender_info', 'connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'get_send_status', 'get_events', 'get_media', 'get_presence', 'send_presence', 'sync_chat'], true)) {
+    in_array($action, ['get_sender_info', 'connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'get_send_status', 'get_events', 'get_media', 'get_presence', 'send_presence', 'sync_chat', 'start_campaign', 'pause_campaign', 'resume_campaign', 'stop_campaign', 'get_campaign_status'], true)) {
     require_once __DIR__ . '/whatsapp_bridge.php';
     handleWhatsAppBridge($action, $input);
 }

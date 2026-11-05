@@ -1,75 +1,70 @@
-const { test } = require('node:test');
+'use strict';
+const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
-const source = fs.readFileSync(path.resolve(__dirname, '../../assets/js/whatsapp-app.js'), 'utf8');
-const connectionCode = source.slice(source.indexOf('  let waPollTimer'), source.indexOf('  // ==========================================', source.indexOf('  let waPollTimer')));
-const startCode = source.slice(source.indexOf('  async function startCampaign()'), source.indexOf('  function pauseCampaign()'));
+const os = require('node:os');
+const { createCampaignManager, resolveSpintax, personalizeMessage } = require('../campaign');
 
-function setup() {
-  let ready = false, dispatches = 0, connects = 0, open = false;
-  const timers = [];
-  const els = {
-    campaignCustomMsg: { value: 'Hello' }, startCampaignBtn: { style: {} },
-    campaignStatusBadge: { style: {} }, waPendingCampaign: {}, waConnectionStatus: {},
-    saveConnectedWaBtn: { style: {} }, waQrImage: { removeAttribute() {} },
-    connectWaModal: { classList: { add() { open = true; }, remove() { open = false; }, contains() { return open; } } }
+test('resolveSpintax picks options and ignores variables', () => {
+  const template = '{Salam|AoA|Hello} {name}!';
+  const resolved = resolveSpintax(template);
+  assert.match(resolved, /^(Salam|AoA|Hello) \{name\}!$/);
+});
+
+test('personalizeMessage injects contact details and fallback', () => {
+  const contact = { name: 'Zeeshan', phone: '923001234567', display: '+92 300 1234567', city: 'Lahore' };
+  const template = 'Hi {name}, in {city}!';
+  const personalized = personalizeMessage(template, contact);
+  assert.equal(personalized, 'Hi Zeeshan, in Lahore!');
+});
+
+test('createCampaignManager starts, executes, pauses, and stops', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
+  const sent = [];
+  const fakeSend = async (payload) => {
+    sent.push(payload);
+    return { success: true, message_id: 'wa_' + sent.length };
   };
-  const campaignState = { audience: [{ phone: '923001234567' }], isRunning: false };
-  const context = vm.createContext({ els, campaignState, state: {}, window: { addEventListener() {} },
-    document: { getElementById() { return null; }, addEventListener() {} },
-    renderConnectedNumber() {}, showToast() {}, logCampaignTerminal() {}, escapeHtml: String,
-    describeSendError: error => error.message,
-    dispatchNextCampaignMessage() { dispatches++; },
-    setTimeout(fn) { timers.push(fn); return fn; }, clearTimeout(fn) { const i = timers.indexOf(fn); if (i >= 0) timers.splice(i, 1); },
-    fetch: async (url, options) => {
-      if (options?.method === 'POST') connects++;
-      return { ok: true, json: async () => ({ success: true, state: ready ? 'ready' : 'qr', is_configured: ready }) };
-    }
+
+  const leadsFile = path.join(tmpDir, 'leads.json');
+  fs.writeFileSync(leadsFile, JSON.stringify([]));
+
+  const mgr = createCampaignManager({
+    send: fakeSend,
+    dataDir: tmpDir,
+    getLeadsPath: () => leadsFile
   });
-  vm.runInContext(connectionCode + startCode, context);
-  return { context, els, campaignState, timers, ready() { ready = true; }, dispatches: () => dispatches, connects: () => connects };
-}
-const flush = () => new Promise(resolve => setImmediate(resolve));
 
-test('Start immediately dispatches when linked and ignores a second Start', async () => {
-  const run = setup(); run.ready();
-  await vm.runInContext('startCampaign()', run.context);
-  await vm.runInContext('startCampaign()', run.context);
-  assert.equal(run.dispatches(), 1);
-  assert.equal(run.campaignState.isRunning, true);
-});
+  const audience = [
+    { phone: '923001111111', name: 'Lead 1', display: '+92 300 1111111' },
+    { phone: '923002222222', name: 'Lead 2', display: '+92 300 2222222' }
+  ];
 
-test('Start opens QR linking and automatically dispatches after scan', async () => {
-  const run = setup();
-  await vm.runInContext('startCampaign()', run.context); await flush();
-  assert.equal(run.dispatches(), 0);
-  assert.equal(run.connects(), 1);
-  assert.equal(run.els.waPendingCampaign.hidden, false);
-  run.ready(); await run.timers.shift()(); await flush();
-  assert.equal(run.dispatches(), 1);
-});
+  const status = mgr.start({
+    name: 'Test Outreach',
+    message: 'Hello {name}',
+    audience,
+    minDelay: 1,
+    maxDelay: 1
+  });
 
-test('Cancel during QR setup prevents automatic campaign launch', async () => {
-  const run = setup();
-  await vm.runInContext('startCampaign()', run.context); await flush();
-  const stalePoll = run.timers[0];
-  vm.runInContext('closeConnectWaModal()', run.context);
-  run.ready(); await stalePoll(); await flush();
-  assert.equal(run.dispatches(), 0);
-});
+  assert.equal(status.status, 'running');
+  assert.equal(status.totalContacts, 2);
 
-test('manual linking closes the QR dialog when ready without starting a campaign', async () => {
-  const run = setup();
-  vm.runInContext('openConnectWaModal()', run.context); await flush();
-  run.ready(); await run.timers.shift()(); await flush();
-  assert.equal(run.els.connectWaModal.classList.contains('open'), false);
-  assert.equal(run.dispatches(), 0);
-});
+  // Wait a moment for first step to fire
+  await new Promise(r => setTimeout(r, 50));
+  assert.equal(sent.length >= 1, true);
 
-test('Start cannot re-enter while a send is already in flight', async () => {
-  const run = setup(); run.ready(); run.campaignState.inFlight = true;
-  await vm.runInContext('startCampaign()', run.context);
-  assert.equal(run.dispatches(), 0);
+  const paused = mgr.pause();
+  assert.equal(paused.status, 'paused');
+
+  const stopped = mgr.stop();
+  assert.equal(stopped.status, 'stopped');
+
+  // Verify leads.json was updated with outbound message
+  const savedLeads = JSON.parse(fs.readFileSync(leadsFile, 'utf8'));
+  assert.equal(savedLeads.length >= 1, true);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 });

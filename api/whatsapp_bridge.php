@@ -123,6 +123,16 @@ function handleWhatsAppBridge(string $action, array $input): void {
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
             $result = ['success' => true];
         }
+    } elseif ($action === 'start_campaign') {
+        $result = whatsappBridgeRequest('/campaign/start', $input);
+    } elseif ($action === 'pause_campaign') {
+        $result = whatsappBridgeRequest('/campaign/pause', $input);
+    } elseif ($action === 'resume_campaign') {
+        $result = whatsappBridgeRequest('/campaign/resume', $input);
+    } elseif ($action === 'stop_campaign') {
+        $result = whatsappBridgeRequest('/campaign/stop', $input);
+    } elseif ($action === 'get_campaign_status') {
+        $result = whatsappBridgeRequest('/campaign/status');
     } else {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
