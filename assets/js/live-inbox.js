@@ -24,12 +24,6 @@
           name: defaultNumber, city: '', network: '', ownerId: null, leadState: 'fresh',
           status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
         state.leads.unshift(lead);
-        // Persist newly discovered WhatsApp conversation to database
-        fetch('api/leads_sync.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'add_lead', id: lead.id, phone: lead.phone, name: lead.name })
-        }).catch(() => {});
       }
       const previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
       // Contact names are user-managed only; do not auto-override with WhatsApp push names
@@ -41,12 +35,6 @@
         if (hydrated && item.sender === 'lead' && (state.activeLeadId !== lead.id || state.currentTab !== 'inbox' || document.hidden)) {
           lead.unreadCount = (lead.unreadCount || 0) + 1; lead.status = 'unread';
         }
-        // Save new message to server database so leads.json stays in full duplex sync
-        fetch('api/leads_sync.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'update_lead', id: lead.id, phone: lead.phone, newMessage: fields, lastActive: 'Just now' })
-        }).catch(() => {});
       }
       lead.messages.sort((a,b) => (a.timestamp || 0)-(b.timestamp || 0));
       lead.lastMessageAt = Math.max(lead.lastMessageAt || 0, item.timestamp);
@@ -100,10 +88,10 @@
             activePhone = lead.phone;
             lastPresenceAt = 0;
             // Request a focused backfill without holding up the live event cursor.
-            api('sync_chat', { phone: lead.phone }).then(() => poll()).catch(() => {});
+            api('sync_chat', { phone: lead.phone }).catch(() => {});
           }
-          // Poll presence for active chat at a responsive cadence (every 3.5s)
-          if (Date.now() - lastPresenceAt > 3500) {
+          // Poll presence for active chat at a responsive cadence (every 5s)
+          if (Date.now() - lastPresenceAt > 5000) {
             lastPresenceAt = Date.now();
             api('get_presence', { phone: lead.phone }).then(presence => {
               if (typeof window.onContactPresenceUpdate === 'function') {
@@ -153,9 +141,8 @@
         message.deliveryError = error.message; toast(error.message);
       } finally { sendingMedia = false; renderList(); if (state.activeLeadId === lead.id) renderChat(); }
     }
-    // The lightweight cursor endpoint is polled frequently for near-live two-way
-    // updates. Media, chat backfills and presence stay off the hot path.
-    setInterval(poll, 800);
+    // Poll every 4.5 seconds for snappy updates without exhausting server workers
+    setInterval(poll, 4500);
     return { poll, loadMedia, sendMedia };
   };
 })();

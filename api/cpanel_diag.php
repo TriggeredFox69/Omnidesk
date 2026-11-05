@@ -84,6 +84,238 @@ if (isset($_GET['restore_session'])) {
     exit;
 }
 
+// Full pristine CRM restore: resets leads to 8 core leads, wipes all mixed history and Bad MAC auth, starts fresh
+if (isset($_GET['restore_pristine']) || isset($_GET['restore_clean_crm'])) {
+    $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+    if ($output) {
+        $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
+        foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
+    }
+    sleep(1);
+
+    $auth1 = $baseDir . '/data/whatsapp-bridge/baileys_auth';
+    $auth2 = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
+    @shell_exec('rm -rf ' . escapeshellarg($auth1) . ' ' . escapeshellarg($auth2));
+    @unlink($baseDir . '/data/whatsapp-bridge/creds.json.bak');
+    @unlink($baseDir . '/data/whatsapp-bridge/creds.json.bak2');
+    @unlink($baseDir . '/data/whatsapp-bridge/raw_messages.json');
+    @unlink($baseDir . '/data/whatsapp-bridge/whatsapp-bridge/raw_messages.json');
+    @unlink($baseDir . '/data/whatsapp-bridge/grep_923.txt');
+    @unlink($baseDir . '/data/whatsapp-bridge/lid_map.json');
+    @file_put_contents($baseDir . '/data/whatsapp-bridge/inbox.json', '[]');
+    @file_put_contents($logFile, '');
+    @file_put_contents($baseDir . '/data/campaign_logs.json', '[]');
+
+    $pristineLeads = [
+        [
+            'id' => 'lead_self',
+            'name' => 'My WhatsApp (Self Test)',
+            'phone' => '923318036576',
+            'display' => '+92 331 8036576',
+            'city' => 'Connected Number',
+            'network' => 'Ufone',
+            'ownerId' => 'USR-ADMIN-01',
+            'ownerName' => 'System Administrator',
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Live Delivery Verification',
+            'lastActive' => 'Just now',
+            'notes' => 'Personal test chat. Any message, voice memo, or document sent here arrives instantly on your linked phone.',
+            'messages' => [
+                ['sender' => 'lead', 'text' => '⚡ This is your personal linked WhatsApp chat (+92 331 8036576). Send any message, voice memo, or document to see it arrive directly on your phone!', 'time' => '12:00 PM']
+            ]
+        ],
+        [
+            'id' => 'lead_1',
+            'name' => 'Zeeshan Tariq',
+            'phone' => '923008472910',
+            'display' => '+92 300 8472910',
+            'city' => 'Lahore',
+            'network' => 'Jazz',
+            'ownerId' => 'EMP-101',
+            'ownerName' => 'Hamza Khan',
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Nunno Pro',
+            'lastActive' => '2 mins ago',
+            'notes' => 'Interested in Pro plan. Asked for EasyPaisa account details. Follow up today.',
+            'messages' => [
+                ['sender' => 'agent', 'agentName' => 'Hamza Khan', 'text' => 'Salam Zeeshan Bhai! Nunno AI Cloud ne Pakistan ke crypto traders ke liye Liquidation Magnet System launch kiya hai jo exact level pehle dikhata hai jahan whales target kar rahi hain. 30% OFF offer available hai!', 'time' => '10:15 AM'],
+                ['sender' => 'lead', 'text' => 'Assalam o alaikum bhai, EasyPaisa se payment ho sakti hai? Aur breakout alert kitne symbols pe aata hai?', 'time' => '10:32 AM'],
+                ['sender' => 'agent', 'agentName' => 'Hamza Khan', 'text' => 'Ji bilkul Zeeshan Bhai! EasyPaisa, JazzCash aur USDT teenon supported hain. Pro plan mein 12-layer multi-symbol alerts live aate hain.', 'time' => '10:35 AM'],
+                ['sender' => 'lead', 'text' => 'Theek hai, mujhe EasyPaisa account number share kar dein, main abhi activate karwana chahta hoon.', 'time' => '10:40 AM']
+            ]
+        ],
+        [
+            'id' => 'lead_2',
+            'name' => 'Bilal Ahmed',
+            'phone' => '923214567890',
+            'display' => '+92 321 4567890',
+            'city' => 'Karachi',
+            'network' => 'Jazz',
+            'ownerId' => null,
+            'leadState' => 'fresh',
+            'status' => 'unread',
+            'unreadCount' => 2,
+            'interest' => 'Nunno Pro',
+            'lastActive' => '14 mins ago',
+            'notes' => 'High intent retail trader. Scalping Binance futures.',
+            'messages' => [
+                ['sender' => 'agent', 'agentName' => 'System Outreach', 'text' => '⚡ FLASH 48-HOUR TRADER PASS: Bilal Bhai, Nunno Pro pe flat 40% discount chal raha hai. EasyPaisa / JazzCash instant accepted: nunno.cloud', 'time' => '09:00 AM'],
+                ['sender' => 'lead', 'text' => 'AoA bhai, kya isme Gold ($XAUUSD) ke liquidation wicks bhi detect hote hain?', 'time' => '09:45 AM'],
+                ['sender' => 'lead', 'text' => 'Mujhe demo video ya coupon code send karein.', 'time' => '09:46 AM']
+            ]
+        ],
+        [
+            'id' => 'lead_3',
+            'name' => 'Usman Ali',
+            'phone' => '923335123984',
+            'display' => '+92 333 5123984',
+            'city' => 'Islamabad',
+            'network' => 'Ufone',
+            'ownerId' => 'EMP-102',
+            'ownerName' => 'Bilal Tariq',
+            'leadState' => 'ongoing',
+            'status' => 'sent',
+            'unreadCount' => 0,
+            'interest' => 'Nunno Starter',
+            'lastActive' => '1 hour ago',
+            'notes' => 'Outreach sent. Awaiting response.',
+            'messages' => [
+                ['sender' => 'agent', 'agentName' => 'Bilal Tariq', 'text' => 'Hello Usman! Are sudden market manipulation wicks hurting your positions? Check Nunno Cloud AI indicator: nunno.cloud', 'time' => '08:30 AM']
+            ]
+        ],
+        [
+            'id' => 'lead_4',
+            'name' => 'Kashif Mehmood',
+            'phone' => '923129876543',
+            'display' => '+92 312 9876543',
+            'city' => 'Rawalpindi',
+            'network' => 'Zong',
+            'ownerId' => 'EMP-101',
+            'ownerName' => 'Hamza Khan',
+            'leadState' => 'paid',
+            'status' => 'paid',
+            'verificationStatus' => 'verified',
+            'verifiedBy' => 'System Administrator',
+            'paidDetails' => [
+                'plan' => 'Nunno Starter',
+                'amount' => 1700,
+                'method' => 'JazzCash',
+                'trxId' => 'JC-88391024',
+                'email' => 'kashif.m@gmail.com',
+                'closedBy' => 'Hamza Khan',
+                'closedById' => 'EMP-101',
+                'closedAt' => '2026-10-23T14:30:00Z'
+            ],
+            'unreadCount' => 0,
+            'interest' => 'Nunno Starter (Paid)',
+            'lastActive' => 'Yesterday',
+            'notes' => 'Verified client. Enjoys the liquidation magnet alerts.',
+            'messages' => [
+                ['sender' => 'lead', 'text' => 'Sent Rs. 1,700 via JazzCash. Trx ID: JC-88391024.', 'time' => 'Yesterday'],
+                ['sender' => 'agent', 'agentName' => 'Hamza Khan', 'text' => 'Payment received and verified, Kashif Bhai! Your Nunno Starter access is active.', 'time' => 'Yesterday']
+            ]
+        ],
+        [
+            'id' => 'lead_5',
+            'name' => 'Hamza Sheikh',
+            'phone' => '923451234567',
+            'display' => '+92 345 1234567',
+            'city' => 'Peshawar',
+            'network' => 'Telenor',
+            'ownerId' => null,
+            'leadState' => 'fresh',
+            'status' => 'unread',
+            'unreadCount' => 1,
+            'interest' => 'Nunno Elite',
+            'lastActive' => '3 hours ago',
+            'notes' => 'Prop firm challenge trader.',
+            'messages' => [
+                ['sender' => 'lead', 'text' => 'Does this work on Forex prop firms like FTMO?', 'time' => '07:15 AM']
+            ]
+        ],
+        [
+            'id' => 'lead_6',
+            'name' => 'Waqas Rasheed',
+            'phone' => '923027891234',
+            'display' => '+92 302 7891234',
+            'city' => 'Faisalabad',
+            'network' => 'Jazz',
+            'ownerId' => 'EMP-103',
+            'ownerName' => 'Ayesha Noor',
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Nunno Pro',
+            'lastActive' => '5 hours ago',
+            'notes' => 'Asked for demo access.',
+            'messages' => [
+                ['sender' => 'agent', 'agentName' => 'Ayesha Noor', 'text' => 'Salam Waqas! Sent you the demo breakdown.', 'time' => '05:00 AM']
+            ]
+        ],
+        [
+            'id' => 'lead_7',
+            'name' => 'Omer Farooq',
+            'phone' => '923226789012',
+            'display' => '+92 322 6789012',
+            'city' => 'Multan',
+            'network' => 'Warid',
+            'ownerId' => 'EMP-104',
+            'ownerName' => 'Zain Ahmed',
+            'leadState' => 'useless',
+            'status' => 'useless',
+            'unreadCount' => 0,
+            'interest' => 'Free Tier',
+            'lastActive' => '2 days ago',
+            'notes' => 'Refused to pay, looking for free pirated indicators.',
+            'messages' => [
+                ['sender' => 'lead', 'text' => 'Free mein kuch nahi dete aap log?', 'time' => '2 days ago']
+            ]
+        ],
+        [
+            'id' => 'lead_8',
+            'name' => 'Rizwan Qureshi',
+            'phone' => '923348901234',
+            'display' => '+92 334 8901234',
+            'city' => 'Sialkot',
+            'network' => 'Ufone',
+            'ownerId' => null,
+            'leadState' => 'fresh',
+            'status' => 'unread',
+            'unreadCount' => 1,
+            'interest' => 'Nunno Pro',
+            'lastActive' => '6 hours ago',
+            'notes' => 'Crypto spot holder.',
+            'messages' => [
+                ['sender' => 'lead', 'text' => 'Aslam o alikum, discount code chal raha koi?', 'time' => '04:10 AM']
+            ]
+        ]
+    ];
+    $leadsFile = $baseDir . '/data/leads.json';
+    file_put_contents($leadsFile, json_encode($pristineLeads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+    $bridgeDir = $baseDir . '/bridge';
+    $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    shell_exec($startCmd);
+    sleep(2);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'CRM restored cleanly to pristine state. Mixed chats wiped. Bridge restarted for clean QR pairing.',
+        'leads_count' => count($pristineLeads)
+    ], JSON_PRETTY_PRINT);
+    exit;
+}
+
 // Allow executing clean pairing action directly through diag to eliminate stale prekeys
 if (isset($_GET['clean_pair'])) {
     $authDir = $baseDir . '/data/whatsapp-bridge/whatsapp-bridge/baileys_auth';
@@ -420,6 +652,6 @@ echo json_encode([
         'running_processes' => trim((string)shell_exec('ps aux | grep -E "node|index.js|server.js" | grep -v grep 2>&1'))
     ],
     'grep_923' => file_exists($baseDir . '/data/whatsapp-bridge/grep_923.txt') ? file_get_contents($baseDir . '/data/whatsapp-bridge/grep_923.txt') : null,
-    'log_tail' => file_exists($logFile) ? array_slice(explode("\n", trim((string)shell_exec('tail -n 120 ' . escapeshellarg($logFile)))), -100) : [],
-    'recent_log' => file_exists($logFile) ? array_slice(explode("\n", file_get_contents($logFile)), -30) : []
+    'log_tail' => file_exists($logFile) ? array_slice(explode("\n", trim((string)shell_exec('tail -n 60 ' . escapeshellarg($logFile)))), -50) : [],
+    'recent_log' => []
 ], JSON_PRETTY_PRINT);

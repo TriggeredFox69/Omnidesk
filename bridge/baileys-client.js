@@ -228,7 +228,12 @@ class BaileysClient extends EventEmitter {
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
       browser: Browsers.ubuntu('Chrome'),
-      syncFullHistory: true,
+      syncFullHistory: false,
+      keepAliveIntervalMs: 25000,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      retryRequestDelayMs: 250,
+      markOnlineOnConnect: true,
       msgRetryCounterCache: this._msgRetryCache,
       getMessage: async (key) => {
         const id = key?.id;
@@ -511,10 +516,7 @@ class BaileysClient extends EventEmitter {
         }
       }
       this._saveRawStore();
-      emitMessages((messages || []).filter(msg => {
-        const jid = msg.key?.remoteJid || '';
-        return !jid.endsWith('@g.us') && !jid.endsWith('@broadcast') && !jid.endsWith('@newsletter');
-      }));
+      // Do not emit historical messages into live event inbox to avoid polluting the CRM with personal phone history
     });
 
     // Handle delivery / read receipts

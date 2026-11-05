@@ -20,10 +20,15 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
         return ['success' => false, 'state' => 'offline', 'message' => 'The remote WhatsApp bridge requires a valid HTTPS address.'];
     }
     $curl = curl_init($base . $path);
+    $timeout = match(true) {
+        $path === '/send' => 60,
+        str_starts_with($path, '/media') => 20,
+        default => 3
+    };
     curl_setopt_array($curl, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 15,
-        CURLOPT_TIMEOUT        => $path === '/send' ? 90 : (str_starts_with($path, '/media') ? 35 : 20),
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_TIMEOUT        => $timeout,
         CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_SSL_VERIFYHOST => 0,
         CURLOPT_FOLLOWLOCATION => true,
