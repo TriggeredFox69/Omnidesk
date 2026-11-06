@@ -37,7 +37,11 @@ function personalizeMessage(template, contact) {
   msg = msg
     .replace(/\{name\}/gi, cName)
     .replace(/\{phone\}/gi, cPhone)
-    .replace(/\{city\}/gi, cCity);
+    .replace(/\{city\}/gi, cCity)
+    .replace(/\{plan\}/gi, 'Nunno Pro')
+    .replace(/\{price\}/gi, 'Rs. 5,000')
+    .replace(/\{coupon\}/gi, 'NUNNO30')
+    .replace(/\{link\}/gi, 'https://nunno.cloud');
 
   return msg;
 }
