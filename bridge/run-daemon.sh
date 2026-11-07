@@ -34,3 +34,4 @@ while true; do
     echo "[$(date -u)] Bridge process exited with code $EXIT_CODE. Auto-restarting in 2s..." >> "$LOGFILE"
     sleep 2
 done
+

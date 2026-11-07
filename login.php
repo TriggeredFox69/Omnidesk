@@ -21,6 +21,15 @@ if (!empty($_SESSION['user'])) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    (function(){
+      try {
+        if (localStorage.getItem('nunno_theme') === 'light' || (!localStorage.getItem('nunno_theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+          document.documentElement.classList.add('theme-light');
+        }
+      } catch(_) {}
+    })();
+  </script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -331,10 +340,46 @@ if (!empty($_SESSION['user'])) {
     }
 
     /* ===== NUNNO 360 ROTATE & ZOOM-OUT LOGIN ANIMATION ===== */
+    :root {
+      --anim-overlay-bg: #06050a;
+      --anim-aura-bg: radial-gradient(circle, rgba(139, 92, 246, 0.45) 0%, rgba(139, 92, 246, 0) 70%);
+      --anim-logo-bg: #0d0c18;
+      --anim-logo-border: 2px solid rgba(168, 85, 247, 0.8);
+      --anim-text-color: #ffffff;
+      --anim-subtext-color: #94a3b8;
+      --anim-tag-bg: rgba(139, 92, 246, 0.2);
+      --anim-tag-border: 1px solid rgba(168, 85, 247, 0.45);
+      --anim-tag-color: #c4b5fd;
+      --anim-tag-shadow: none;
+      --anim-glow-0: 0 0 20px rgba(139, 92, 246, 0.5);
+      --anim-glow-22: 0 0 45px rgba(168, 85, 247, 0.9), 0 0 85px rgba(139, 92, 246, 0.5);
+      --anim-glow-50: 0 0 55px rgba(168, 85, 247, 1), 0 0 95px rgba(139, 92, 246, 0.6);
+      --anim-glow-75: 0 0 45px rgba(168, 85, 247, 0.9), 0 0 80px rgba(139, 92, 246, 0.5);
+      --anim-glow-88: 0 0 35px rgba(168, 85, 247, 0.8);
+    }
+
+    html.theme-light {
+      --anim-overlay-bg: radial-gradient(circle at 50% 40%, #ffffff 0%, #f6f7fb 100%);
+      --anim-aura-bg: radial-gradient(circle, rgba(168, 85, 247, 0.12) 0%, rgba(139, 92, 246, 0.04) 50%, rgba(255, 255, 255, 0) 70%);
+      --anim-logo-bg: #ffffff;
+      --anim-logo-border: 1px solid rgba(139, 92, 246, 0.22);
+      --anim-text-color: #0f172a;
+      --anim-subtext-color: #475569;
+      --anim-tag-bg: #ede9fe;
+      --anim-tag-border: 1px solid #ddd6fe;
+      --anim-tag-color: #6d28d9;
+      --anim-tag-shadow: 0 1px 2px rgba(109, 40, 217, 0.08);
+      --anim-glow-0: 0 4px 12px rgba(139, 92, 246, 0.1);
+      --anim-glow-22: 0 16px 36px rgba(139, 92, 246, 0.18), 0 0 25px rgba(168, 85, 247, 0.14);
+      --anim-glow-50: 0 22px 48px rgba(139, 92, 246, 0.22), 0 0 35px rgba(168, 85, 247, 0.18);
+      --anim-glow-75: 0 16px 36px rgba(139, 92, 246, 0.18), 0 0 25px rgba(168, 85, 247, 0.14);
+      --anim-glow-88: 0 12px 28px rgba(139, 92, 246, 0.14);
+    }
+
     .login-anim-overlay {
       position: fixed;
       inset: 0;
-      background: #06050a;
+      background: var(--anim-overlay-bg);
       z-index: 9999999;
       display: flex;
       align-items: center;
@@ -353,11 +398,11 @@ if (!empty($_SESSION['user'])) {
 
     .anim-aura {
       position: absolute;
-      width: 280px;
-      height: 280px;
+      width: 320px;
+      height: 320px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(139, 92, 246, 0.45) 0%, rgba(139, 92, 246, 0) 70%);
-      filter: blur(35px);
+      background: var(--anim-aura-bg);
+      filter: blur(40px);
       pointer-events: none;
       opacity: 0;
       transform: scale(0.8);
@@ -379,20 +424,17 @@ if (!empty($_SESSION['user'])) {
       z-index: 2;
     }
 
-    /* Logo Box with Signature Purple Edge Glow */
+    /* Logo Box with Adaptive Signature Edge Glow */
     .anim-logo-box {
       width: 96px;
       height: 96px;
       border-radius: 24px;
-      background: #0d0c18;
-      border: 2px solid rgba(168, 85, 247, 0.8);
+      background: var(--anim-logo-bg);
+      border: var(--anim-logo-border);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 
-        0 0 35px rgba(139, 92, 246, 0.75),
-        0 0 70px rgba(139, 92, 246, 0.4),
-        0 14px 40px rgba(0, 0, 0, 0.9);
+      box-shadow: var(--anim-glow-0);
       will-change: transform, opacity, box-shadow;
     }
 
@@ -413,32 +455,32 @@ if (!empty($_SESSION['user'])) {
       0% {
         opacity: 0;
         transform: scale(0.5) rotate(0deg);
-        box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+        box-shadow: var(--anim-glow-0);
       }
       22% {
         opacity: 1;
         transform: scale(1.08) rotate(90deg);
-        box-shadow: 0 0 45px rgba(168, 85, 247, 0.9), 0 0 85px rgba(139, 92, 246, 0.5);
+        box-shadow: var(--anim-glow-22);
       }
       50% {
         opacity: 1;
         transform: scale(1) rotate(180deg);
-        box-shadow: 0 0 55px rgba(168, 85, 247, 1), 0 0 95px rgba(139, 92, 246, 0.6);
+        box-shadow: var(--anim-glow-50);
       }
       75% {
         opacity: 1;
         transform: scale(1.05) rotate(270deg);
-        box-shadow: 0 0 45px rgba(168, 85, 247, 0.9), 0 0 80px rgba(139, 92, 246, 0.5);
+        box-shadow: var(--anim-glow-75);
       }
       88% {
         opacity: 1;
         transform: scale(1) rotate(360deg);
-        box-shadow: 0 0 35px rgba(168, 85, 247, 0.8);
+        box-shadow: var(--anim-glow-88);
       }
       100% {
         opacity: 0;
         transform: scale(0) rotate(360deg);
-        box-shadow: 0 0 0px rgba(139, 92, 246, 0);
+        box-shadow: 0 0 0px transparent;
       }
     }
 
@@ -476,32 +518,33 @@ if (!empty($_SESSION['user'])) {
     }
 
     .anim-brand-text {
-      font-size: 20px;
+      font-size: 21px;
       font-weight: 800;
-      color: #ffffff;
-      letter-spacing: -0.02em;
+      color: var(--anim-text-color);
+      letter-spacing: -0.03em;
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
     .anim-role-tag {
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      padding: 3px 8px;
+      letter-spacing: 0.07em;
+      padding: 3px 9px;
       border-radius: 999px;
-      background: rgba(139, 92, 246, 0.2);
-      border: 1px solid rgba(168, 85, 247, 0.45);
-      color: #c4b5fd;
+      background: var(--anim-tag-bg);
+      border: var(--anim-tag-border);
+      color: var(--anim-tag-color);
+      box-shadow: var(--anim-tag-shadow);
     }
 
     .anim-subtext {
-      font-size: 13px;
+      font-size: 13.5px;
       font-weight: 500;
-      color: #94a3b8;
-      letter-spacing: 0.02em;
+      color: var(--anim-subtext-color);
+      letter-spacing: 0.01em;
     }
   </style>
 </head>
