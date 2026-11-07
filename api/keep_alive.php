@@ -29,7 +29,8 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
 
     // If restart requested, kill any running bridge processes first
     if (isset($_GET['restart'])) {
-        $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+        @unlink($dataDir . '/daemon.pid');
+        $output = @shell_exec('pgrep -f "run-daemon.sh|dist/index.js|server.js" 2>&1');
         if ($output) {
             $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
             foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
@@ -49,10 +50,17 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
         @copy($dataDir . '/creds.json.bak', $dataDir . '/baileys_auth/creds.json');
     }
 
-    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
-        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
-        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    $daemonScript = $bridgeDir . '/run-daemon.sh';
+    if (file_exists($daemonScript)) {
+        @chmod($daemonScript, 0755);
+        $startCmd = "WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token) . " /bin/bash " . escapeshellarg($daemonScript)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    } else {
+        $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
+            . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    }
 
     shell_exec($startCmd);
     $started = true;

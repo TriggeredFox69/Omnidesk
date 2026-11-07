@@ -11,7 +11,7 @@ $conn = file_exists($connFile) ? require($connFile) : null;
 // Check and setup cron job to keep bridge alive 24/7
 if (isset($_GET['cron'])) {
     $currentCron = @shell_exec('crontab -l 2>&1');
-    $cronCmd = '*/5 * * * * /usr/bin/curl -s "https://omnidesk.lalagpt.pk/api/keep_alive.php" >/dev/null 2>&1';
+    $cronCmd = '* * * * * /usr/bin/curl -s "https://omnidesk.lalagpt.pk/api/keep_alive.php" >/dev/null 2>&1';
     $installed = false;
     if (isset($_GET['install_cron'])) {
         $lines = array_filter(array_map('trim', explode("\n", (string)$currentCron)));
@@ -38,7 +38,7 @@ if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
     $repoDir = '/home/dailygol/repositories/Omnidesk';
     $targetDir = '/home/dailygol/omnidesk.lalagpt.pk';
     $pullOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && git fetch origin main 2>&1 && git reset --hard origin/main 2>&1");
-    $deployOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && /bin/cp -R api assets index.php index.html login.php open-omnidesk.html " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -R bridge/dist " . escapeshellarg($targetDir) . "/bridge/ 2>/dev/null || true && /bin/cp -f bridge/*.js " . escapeshellarg($targetDir) . "/bridge/ 2>&1");
+    $deployOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && /bin/cp -R api assets index.php index.html login.php open-omnidesk.html " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -R bridge/dist " . escapeshellarg($targetDir) . "/bridge/ 2>/dev/null || true && /bin/cp -f bridge/*.js bridge/*.sh " . escapeshellarg($targetDir) . "/bridge/ 2>&1 && chmod +x " . escapeshellarg($targetDir) . "/bridge/*.sh 2>/dev/null || true");
     echo json_encode([
         'success' => true,
         'git_pull' => trim((string)$pullOut),
@@ -403,7 +403,8 @@ if (isset($_GET['reset_session'])) {
 }
 
 if (isset($_GET['restart'])) {
-    $output = @shell_exec('pgrep -f "dist/index.js|server.js" 2>&1');
+    @unlink($baseDir . '/data/whatsapp-bridge/daemon.pid');
+    $output = @shell_exec('pgrep -f "run-daemon.sh|dist/index.js|server.js" 2>&1');
     if ($output) {
         $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
         foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
@@ -413,10 +414,17 @@ if (isset($_GET['restart'])) {
     $bridgeDir = $baseDir . '/bridge';
     $token = $conn['token'] ?? (file_exists($tokenFile) ? trim(file_get_contents($tokenFile)) : '');
     $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
-    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
-        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
-        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    $daemonScript = $bridgeDir . '/run-daemon.sh';
+    if (file_exists($daemonScript)) {
+        @chmod($daemonScript, 0755);
+        $startCmd = "WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token) . " /bin/bash " . escapeshellarg($daemonScript)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    } else {
+        $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($baseDir . '/data/whatsapp-bridge') . " WHATSAPP_ENGINE=baileys "
+            . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    }
     shell_exec($startCmd);
     sleep(2);
     echo json_encode(['success' => true, 'restarted' => true]);

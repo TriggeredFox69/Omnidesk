@@ -83,7 +83,17 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         }
       });
       client.on('auth_failure', () => { phase = 'error'; qr = null; number = ''; error = 'WhatsApp authentication failed. Link your phone again.'; });
-      client.on('disconnected', () => { phase = 'disconnected'; qr = null; number = ''; error = 'WhatsApp disconnected. Reconnect to continue.'; });
+      client.on('disconnected', () => {
+        if (phase === 'ready' || number) {
+          phase = 'starting';
+          error = 'WhatsApp connection interrupted. Reconnecting automatically...';
+        } else {
+          phase = 'disconnected';
+          qr = null;
+          number = '';
+          error = 'WhatsApp disconnected. Reconnect to continue.';
+        }
+      });
       client.on('message_ack', (message, ack) => {
         if (message.id?.fromMe) remember(receipts, message.id._serialized, { status: ackStatus(ack), error: ack < 0 ? 'WhatsApp reported delivery failure.' : null });
         inbox.ack(message, ack);

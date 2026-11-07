@@ -175,6 +175,28 @@ class BaileysClient extends EventEmitter {
     }, 1000);
   }
 
+  _scheduleReconnect() {
+    if (this._destroyed) return;
+    if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+    const delay = Math.min(25000, Math.max(3000, ((this._reconnectAttempts || 0) + 1) * 3000));
+    this._reconnectAttempts = (this._reconnectAttempts || 0) + 1;
+    console.log(`[Baileys] Socket closed. Auto-reconnecting in ${delay / 1000}s (attempt ${this._reconnectAttempts})...`);
+    this._reconnectTimer = setTimeout(async () => {
+      this._reconnectTimer = null;
+      if (this._destroyed) return;
+      try {
+        if (this.sock) {
+          try { this.sock.ev.removeAllListeners(); } catch (_) {}
+          try { this.sock.end(undefined); } catch (_) {}
+        }
+        await this.initialize();
+      } catch (err) {
+        console.error(`[Baileys] Reconnect failed: ${err.message}. Retrying...`);
+        this._scheduleReconnect();
+      }
+    }, delay);
+  }
+
   async initialize() {
     this._destroyed = false;
     fs.mkdirSync(this.authPath, { recursive: true, mode: 0o700 });
@@ -316,10 +338,15 @@ class BaileysClient extends EventEmitter {
         } else {
           this.emit('disconnected');
           if (!this._destroyed) {
-            setTimeout(() => this.initialize().catch(() => {}), 4000);
+            this._scheduleReconnect();
           }
         }
       } else if (connection === 'open') {
+        this._reconnectAttempts = 0;
+        if (this._reconnectTimer) {
+          clearTimeout(this._reconnectTimer);
+          this._reconnectTimer = null;
+        }
         const rawId = this.sock.user?.id || '';
         const userNum = rawId.split(':')[0] || rawId.split('@')[0];
         this.info.wid.user = userNum;
@@ -1046,7 +1073,12 @@ class BaileysClient extends EventEmitter {
 
   async destroy() {
     this._destroyed = true;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     if (this.sock) {
+      try { this.sock.ev.removeAllListeners(); } catch (_) {}
       try { this.sock.end(undefined); } catch (_) {}
       this.sock = null;
     }

@@ -36,10 +36,17 @@ function ensureBridgeRunning(): bool {
         @copy($dataDir . '/creds.json.bak', $dataDir . '/baileys_auth/creds.json');
     }
 
-    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
-        . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
-        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
-        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    $daemonScript = $bridgeDir . '/run-daemon.sh';
+    if (file_exists($daemonScript)) {
+        @chmod($daemonScript, 0755);
+        $startCmd = "WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token) . " /bin/bash " . escapeshellarg($daemonScript)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    } else {
+        $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+            . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
+            . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+            . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+    }
 
     @shell_exec($startCmd);
 

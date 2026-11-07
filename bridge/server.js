@@ -87,4 +87,13 @@ service.server.listen(port, host, () => {
     fs.existsSync(path.join(dataPath, 'baileys_auth', 'creds.json'));
   if (hasSavedSession) service.connect();
 });
+
+// Crash-prevention: Never let unexpected socket disconnects or rejections kill the bridge process
+process.on('uncaughtException', (err) => {
+  console.error('[Bridge Process] Caught uncaught exception (prevented crash):', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Bridge Process] Caught unhandled rejection (prevented crash):', reason?.message || reason);
+});
+
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => { await service.close(); process.exit(0); });
