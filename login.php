@@ -359,21 +359,21 @@ if (!empty($_SESSION['user'])) {
     }
 
     html.theme-light {
-      --anim-overlay-bg: radial-gradient(circle at 50% 40%, #ffffff 0%, #f6f7fb 100%);
-      --anim-aura-bg: radial-gradient(circle, rgba(168, 85, 247, 0.12) 0%, rgba(139, 92, 246, 0.04) 50%, rgba(255, 255, 255, 0) 70%);
+      --anim-overlay-bg: radial-gradient(circle at 50% 35%, #ffffff 0%, #f8fafc 65%, #f1f5f9 100%);
+      --anim-aura-bg: transparent;
       --anim-logo-bg: #ffffff;
-      --anim-logo-border: 1px solid rgba(139, 92, 246, 0.22);
+      --anim-logo-border: 1px solid rgba(226, 232, 240, 0.9);
       --anim-text-color: #0f172a;
-      --anim-subtext-color: #475569;
+      --anim-subtext-color: #64748b;
       --anim-tag-bg: #ede9fe;
-      --anim-tag-border: 1px solid #ddd6fe;
-      --anim-tag-color: #6d28d9;
-      --anim-tag-shadow: 0 1px 2px rgba(109, 40, 217, 0.08);
-      --anim-glow-0: 0 4px 12px rgba(139, 92, 246, 0.1);
-      --anim-glow-22: 0 16px 36px rgba(139, 92, 246, 0.18), 0 0 25px rgba(168, 85, 247, 0.14);
-      --anim-glow-50: 0 22px 48px rgba(139, 92, 246, 0.22), 0 0 35px rgba(168, 85, 247, 0.18);
-      --anim-glow-75: 0 16px 36px rgba(139, 92, 246, 0.18), 0 0 25px rgba(168, 85, 247, 0.14);
-      --anim-glow-88: 0 12px 28px rgba(139, 92, 246, 0.14);
+      --anim-tag-border: 1px solid #c4b5fd;
+      --anim-tag-color: #5b21b6;
+      --anim-tag-shadow: 0 1px 2px rgba(91, 33, 182, 0.06);
+      --anim-glow-0: 0 4px 14px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+      --anim-glow-22: 0 16px 36px -6px rgba(109, 40, 217, 0.14), 0 6px 16px -4px rgba(15, 23, 42, 0.06);
+      --anim-glow-50: 0 24px 48px -8px rgba(109, 40, 217, 0.18), 0 10px 22px -5px rgba(15, 23, 42, 0.07);
+      --anim-glow-75: 0 16px 36px -6px rgba(109, 40, 217, 0.14), 0 6px 16px -4px rgba(15, 23, 42, 0.06);
+      --anim-glow-88: 0 8px 20px -4px rgba(109, 40, 217, 0.10), 0 2px 6px rgba(15, 23, 42, 0.04);
     }
 
     .login-anim-overlay {
