@@ -532,8 +532,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function refreshSenderConnection() {
-    const response = await fetch('api/direct_sender.php?action=get_sender_info', { cache: 'no-store' });
-    const result = await response.json();
+    let response = await fetch('api/direct_sender.php?action=get_sender_info', { cache: 'no-store' });
+    let result = await response.json();
+    if (!result.is_connected || result.state === 'offline') {
+      try {
+        await fetch('api/keep_alive.php', { cache: 'no-store' });
+        response = await fetch('api/direct_sender.php?action=get_sender_info', { cache: 'no-store' });
+        result = await response.json();
+      } catch (_) {}
+    }
     renderSenderConnection(result);
     if (!response.ok || !result.success) throw new Error(result.message || 'Could not check WhatsApp connection.');
     return state.senderConfigured;

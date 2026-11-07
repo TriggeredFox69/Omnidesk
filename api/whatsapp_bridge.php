@@ -1,4 +1,59 @@
 <?php
+function ensureBridgeRunning(): bool {
+    static $attempted = false;
+    if ($attempted) return false;
+    $attempted = true;
+
+    $lockFile = sys_get_temp_dir() . '/omnidesk_bridge_spawn.lock';
+    if (file_exists($lockFile) && (time() - filemtime($lockFile) < 4)) {
+        return false;
+    }
+    @touch($lockFile);
+
+    $baseDir = realpath(__DIR__ . '/..');
+    $dataDir = $baseDir . '/data/whatsapp-bridge';
+    $logFile = $dataDir . '/bridge.log';
+    $connFile = $dataDir . '/connection.php';
+    $masterToken = 'c8e4acd8219dafce2a74e37954fa4a12c3fd1256bff8fcb518b7f137b4f9af20';
+    $token = $masterToken;
+    if (file_exists($dataDir . '/token')) {
+        $token = trim((string) @file_get_contents($dataDir . '/token')) ?: $masterToken;
+    }
+    if (!file_exists($connFile)) {
+        @file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
+    }
+
+    $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
+    if (!file_exists($nodePath)) {
+        $nodePath = trim((string) @shell_exec('which node 2>/dev/null')) ?: 'node';
+    }
+    $bridgeDir = $baseDir . '/bridge';
+    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    if (!is_dir($dataDir)) @mkdir($dataDir, 0775, true);
+
+    if (!file_exists($dataDir . '/baileys_auth/creds.json') && file_exists($dataDir . '/creds.json.bak')) {
+        @mkdir($dataDir . '/baileys_auth', 0775, true);
+        @copy($dataDir . '/creds.json.bak', $dataDir . '/baileys_auth/creds.json');
+    }
+
+    $startCmd = "PORT=3210 WHATSAPP_BRIDGE_HOST=127.0.0.1 WHATSAPP_BRIDGE_TOKEN=" . escapeshellarg($token)
+        . " WHATSAPP_DATA_DIR=" . escapeshellarg($dataDir) . " WHATSAPP_ENGINE=baileys "
+        . escapeshellarg($nodePath) . " " . escapeshellarg($scriptPath)
+        . " </dev/null >> " . escapeshellarg($logFile) . " 2>&1 &";
+
+    @shell_exec($startCmd);
+
+    for ($i = 0; $i < 6; $i++) {
+        usleep(500000);
+        $fp = @fsockopen('127.0.0.1', 3210, $errno, $errstr, 0.4);
+        if ($fp) {
+            fclose($fp);
+            return true;
+        }
+    }
+    return false;
+}
+
 /** Private PHP-to-Node adapter. Never expose the bridge token to the browser. */
 function whatsappBridgeRequest(string $path, ?array $body = null): array {
     // Private per-server configuration, uploaded separately from Git.
@@ -41,6 +96,30 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
     $curlErr = curl_error($curl);
     curl_close($curl);
     $result = json_decode((string) $raw, true);
+    if (($raw === false || !is_array($result)) && $local) {
+        if (ensureBridgeRunning()) {
+            $curl2 = curl_init($base . $path);
+            curl_setopt_array($curl2, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_TIMEOUT        => $timeout,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $token, 'Content-Type: application/json']
+            ]);
+            if ($body !== null) curl_setopt_array($curl2, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($body)]);
+            $raw2 = curl_exec($curl2);
+            $code = (int) curl_getinfo($curl2, CURLINFO_HTTP_CODE);
+            $curlErr = curl_error($curl2);
+            curl_close($curl2);
+            $result = json_decode((string) $raw2, true);
+            if ($raw2 !== false && is_array($result)) {
+                if ($code >= 400) $result['success'] = false;
+                return $result;
+            }
+        }
+    }
     if ($raw === false || !is_array($result)) {
         return ['success' => false, 'state' => 'offline', 'message' => $path === '/send'
             ? 'The WhatsApp service did not respond (' . ($curlErr ?: 'timeout') . '). Delivery is unknown; check the chat before retrying.'
