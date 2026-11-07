@@ -8,31 +8,6 @@ $logFile = $baseDir . '/data/whatsapp-bridge/bridge.log';
 
 $conn = file_exists($connFile) ? require($connFile) : null;
 
-// Check and setup cron job to keep bridge alive 24/7
-if (isset($_GET['cron'])) {
-    $currentCron = @shell_exec('crontab -l 2>&1');
-    $cronCmd = '* * * * * /usr/bin/curl -s "https://omnidesk.lalagpt.pk/api/keep_alive.php" >/dev/null 2>&1';
-    $installed = false;
-    if (isset($_GET['install_cron'])) {
-        $lines = array_filter(array_map('trim', explode("\n", (string)$currentCron)));
-        $filtered = array_filter($lines, fn($l) => !str_contains($l, 'keep_alive.php'));
-        $filtered[] = $cronCmd;
-        $newCrontab = implode("\n", $filtered) . "\n";
-        $tmp = tempnam(sys_get_temp_dir(), 'cron');
-        file_put_contents($tmp, $newCrontab);
-        $res = @shell_exec("crontab " . escapeshellarg($tmp) . " 2>&1");
-        @unlink($tmp);
-        $currentCron = @shell_exec('crontab -l 2>&1');
-        $installed = true;
-    }
-    echo json_encode([
-        'success' => true,
-        'installed' => $installed,
-        'crontab' => $currentCron
-    ], JSON_PRETTY_PRINT);
-    exit;
-}
-
 // Allow 1-click git pull and cPanel deployment
 if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
     $repoDir = '/home/dailygol/repositories/Omnidesk';
