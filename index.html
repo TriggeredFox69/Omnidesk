@@ -11,8 +11,8 @@
   <title>OmniDesk — WhatsApp inbox & campaigns</title>
   <meta name="description" content="OmniDesk brings your WhatsApp conversations and campaigns into one focused workspace.">
   <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=6.1">
-  <link rel="stylesheet" href="assets/css/omnidesk.css?v=3.1">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=14.0">
+  <link rel="stylesheet" href="assets/css/omnidesk.css?v=14.0">
   <script>
     window.NUNNO_TEMPLATES = {
       pro_liquidation_urdu: {
@@ -34,6 +34,23 @@
   </script>
 </head>
 <body>
+
+  <!-- FULLSCREEN NUNNO 360 ROTATE & ZOOM-OUT OVERLAY -->
+  <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true" role="status" aria-live="polite">
+    <div class="anim-aura"></div>
+    <div class="anim-scene">
+      <div class="anim-logo-box">
+        <img src="assets/images/nunno-logo.png" alt="Nunno" class="anim-logo-img">
+      </div>
+      <div class="anim-label">
+        <div class="anim-brand-text">
+          <span>Nunno</span>
+          <span class="anim-role-tag" id="animRoleTag">Omni-Desk</span>
+        </div>
+        <div class="anim-subtext" id="animSubtext">Opening workspace…</div>
+      </div>
+    </div>
+  </div>
 
   <!-- ════════════════════════════════════════════════════════
        TOP NAVIGATION BAR
@@ -63,17 +80,17 @@
         <span>Campaigns</span>
       </button>
 
-      <button class="nav-tab-btn employee-home-tab" id="tabEmployee" style="display:none;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>
-        <span>My workspace</span>
+      <button class="nav-tab-btn employee-home-tab" id="tabEmployee">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+        <span id="tabEmployeeLabel">📊 My Stats</span>
       </button>
     </nav>
 
     <!-- Top Right Actions -->
-    <div style="display:flex;align-items:center;gap:6px;">
-      <button class="btn-header-perf" id="openScoreBtn" title="View My Performance Score & Closed Deals">
+    <div class="topbar-actions" style="display:flex;align-items:center;gap:6px;">
+      <button class="btn-header-perf" id="openScoreBtn" style="display:none;" title="View Performance Stats">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
-        <span>My Score</span>
+        <span>Stats</span>
       </button>
 
       <button class="btn-header-admin" id="openTeamModalBtn" style="display:none;" title="Admin Portal: Manage Employees">
@@ -149,25 +166,328 @@
   </div>
 
   <main class="employee-workspace" id="viewEmployee" style="display:none;">
-    <section class="employee-welcome">
-      <div>
-        <span class="workspace-eyebrow">YOUR SALES DESK</span>
-        <h1>Good to see you, <span id="employeeWelcomeName">there</span></h1>
-        <p>Your leads, follow-ups and progress, all in one place.</p>
+    <!-- 1. Executive Bento Hero Profile Card -->
+    <section class="profile-hero-card">
+      <div class="profile-hero-ambient"></div>
+      <div class="profile-hero-main">
+        <div class="profile-avatar-box" id="profileAvatarBox">
+          <span class="profile-avatar-text" id="profileAvatarText">AR</span>
+          <div class="profile-online-ring"></div>
+        </div>
+        <div class="profile-hero-details">
+          <div class="profile-hero-name-row">
+            <h1 id="profileCloserName">Ali Raza</h1>
+            <span class="profile-pill-role" id="profileCloserRole">✦ Sales Team Lead</span>
+          </div>
+          <div class="profile-hero-meta-row">
+            <span class="profile-badge id-badge" id="profileCloserId">EMP-TL-01</span>
+            <span class="profile-badge status-pulse-badge" id="profileGenderBadge">
+              <span class="pulse-spark"></span>
+              <span id="profileStatusTag">Active Now</span>
+            </span>
+          </div>
+        </div>
       </div>
-      <button type="button" class="btn btn-wa" id="employeeOpenInboxBtn">Open team inbox <span aria-hidden="true">↗</span></button>
+      <div class="profile-hero-actions">
+        <button type="button" class="btn btn-hero-inbox" id="employeeOpenInboxBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          <span>Open Team Inbox</span>
+          <span class="hero-arrow">→</span>
+        </button>
+      </div>
     </section>
-    <section class="employee-metrics" aria-label="Your performance">
-      <article class="employee-metric"><span>My leads</span><strong id="employeeMetricLeads">0</strong><small>Assigned to you</small></article>
-      <article class="employee-metric"><span>Needs follow-up</span><strong id="employeeMetricFollowups">0</strong><small>Open conversations</small></article>
-      <article class="employee-metric"><span>Awaiting review</span><strong id="employeeMetricReview">0</strong><small>Payments submitted</small></article>
-      <article class="employee-metric"><span>Verified sales</span><strong id="employeeMetricRevenue">PKR 0</strong><small id="employeeMetricDeals">0 closed deals</small></article>
+
+    <!-- 2. High-End Bento Performance Grid with Micro-Widgets & Animations -->
+    <section class="profile-bento-grid" aria-label="Performance Bento Grid">
+      
+      <!-- HERO BENTO CARD: Total Paid Revenue (Full Width) -->
+      <article class="bento-card bento-card-revenue" id="kpiCardPaid">
+        <div class="bento-ambient-glow"></div>
+        <div class="bento-revenue-left">
+          <div class="bento-badge-row">
+            <span class="bento-tag tag-verified">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>VERIFIED REVENUE</span>
+            </span>
+            <span class="bento-target-pill">Target: PKR 25,000</span>
+          </div>
+          <div class="bento-revenue-amount-wrap">
+            <span class="currency-symbol">PKR</span>
+            <strong class="bento-revenue-value" id="employeeMetricPaidRevenueVal">0</strong>
+            <span id="employeeMetricPaidRevenue" style="display:none;">PKR 0</span>
+          </div>
+          <span class="bento-caption" id="employeeMetricDeals">0 verified client transactions</span>
+        </div>
+        
+        <div class="bento-revenue-right">
+          <div class="bento-track-header">
+            <span>Monthly Target Pace</span>
+            <strong id="revenueQuotaPercent">0%</strong>
+          </div>
+          <div class="bento-track-bar">
+            <div class="bento-track-fill" id="revenueQuotaFill" style="width: 0%;"></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;">
+            <span class="bento-track-sub">Real-time sync from verified payments</span>
+            <button type="button" class="btn btn-hero-withdraw" id="heroQuickWithdrawBtn">
+              <span>⚡ Request Payout</span>
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <!-- 2. Ongoing Leads Widget -->
+      <article class="bento-card bento-card-ongoing" id="kpiCardOngoing">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-ongoing">
+              <div class="radar-pulse"></div>
+              <span>💬</span>
+            </div>
+            <div>
+              <span class="bento-card-title">Ongoing Leads</span>
+              <span class="bento-card-desc">Active in pipeline</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-amber">Live</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="employeeMetricOngoing">0</strong>
+          <div class="bento-wave-sparkline">
+            <span class="spark-bar bar-1"></span>
+            <span class="spark-bar bar-2"></span>
+            <span class="spark-bar bar-3"></span>
+            <span class="spark-bar bar-4"></span>
+            <span class="spark-bar bar-5"></span>
+          </div>
+        </div>
+        <span class="bento-footer-note">Client discussions in progress</span>
+      </article>
+
+      <!-- 3. Total Closed Deals Widget -->
+      <article class="bento-card bento-card-closed" id="kpiCardClosed">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-closed">
+              <span>🎯</span>
+            </div>
+            <div>
+              <span class="bento-card-title">Total Closed</span>
+              <span class="bento-card-desc">Won + Settled</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-emerald">Closed</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="employeeMetricClosed">0</strong>
+          <div class="bento-mini-ring-wrap" title="Win Rate">
+            <svg class="bento-mini-ring" width="36" height="36" viewBox="0 0 36 36">
+              <circle class="ring-bg" cx="18" cy="18" r="14" fill="none" stroke-width="3.5"/>
+              <circle class="ring-fg" id="bentoWinRateRing" cx="18" cy="18" r="14" fill="none" stroke-width="3.5" stroke-dasharray="88" stroke-dashoffset="88"/>
+            </svg>
+            <span class="ring-center-icon">🏆</span>
+          </div>
+        </div>
+        <span class="bento-footer-note" id="employeeMetricClosedSub">0 won • 0 lost</span>
+      </article>
+
+      <!-- 4. Total In Review Widget -->
+      <article class="bento-card bento-card-review" id="kpiCardReview">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-review">
+              <div class="hourglass-pulse"></div>
+              <span>⏳</span>
+            </div>
+            <div>
+              <span class="bento-card-title">In Review</span>
+              <span class="bento-card-desc">Pending approval</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-purple">Audit</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="employeeMetricReview">0</strong>
+          <span class="bento-micro-badge">Escrow / Slip</span>
+        </div>
+        <span class="bento-footer-note">Awaiting payment verification</span>
+      </article>
+
+      <!-- 5. Won't Pay / Unresponsive Widget -->
+      <article class="bento-card bento-card-wontpay" id="kpiCardWontPay">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-wontpay">
+              <span>🚫</span>
+            </div>
+            <div>
+              <span class="bento-card-title">Won't Pay</span>
+              <span class="bento-card-desc">Cold or dropped</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-rose">Dropped</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="employeeMetricWontPay">0</strong>
+          <span class="bento-micro-badge muted">Archived</span>
+        </div>
+        <span class="bento-footer-note">Refused or invalid contacts</span>
+      </article>
+
     </section>
+
+    <!-- 3. Pipeline Health & Segmented Visual Gauge -->
+    <section class="profile-pipeline-progress">
+      <div class="pipeline-progress-header">
+        <div>
+          <span class="workspace-eyebrow">PIPELINE HEALTH &amp; FLOW</span>
+          <h2 style="font-size:15px;font-weight:750;margin:2px 0;">Deal Distribution &amp; Conversion</h2>
+        </div>
+        <div class="pipeline-win-rate-pill" id="profileWinRateBadge">Win Rate: 0%</div>
+      </div>
+
+      <div class="pipeline-segmented-track">
+        <div class="seg-block seg-ongoing" id="progSegOngoing" style="width:0%;" title="Ongoing"></div>
+        <div class="seg-block seg-review" id="progSegReview" style="width:0%;" title="In Review"></div>
+        <div class="seg-block seg-paid" id="progSegPaid" style="width:0%;" title="Paid"></div>
+        <div class="seg-block seg-wontpay" id="progSegWontPay" style="width:0%;" title="Won't Pay"></div>
+      </div>
+
+      <div class="pipeline-chips-grid">
+        <div class="pipeline-chip chip-ongoing">
+          <span class="chip-dot"></span>
+          <span class="chip-name">Ongoing</span>
+          <strong class="chip-val" id="chipOngoingVal">0%</strong>
+        </div>
+        <div class="pipeline-chip chip-review">
+          <span class="chip-dot"></span>
+          <span class="chip-name">In Review</span>
+          <strong class="chip-val" id="chipReviewVal">0%</strong>
+        </div>
+        <div class="pipeline-chip chip-paid">
+          <span class="chip-dot"></span>
+          <span class="chip-name">Paid</span>
+          <strong class="chip-val" id="chipPaidVal">0%</strong>
+        </div>
+        <div class="pipeline-chip chip-wontpay">
+          <span class="chip-dot"></span>
+          <span class="chip-name">Won't Pay</span>
+          <strong class="chip-val" id="chipWontPayVal">0%</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Earnings & Withdrawal Requests Portal -->
+    <section class="employee-withdrawal-section" id="employeeWithdrawalSection">
+      <div class="withdrawal-header-row">
+        <div>
+          <span class="workspace-eyebrow">COMMISSION &amp; SETTLEMENTS</span>
+          <h2 class="withdrawal-section-title">Earnings &amp; Payout Portal</h2>
+          <p class="withdrawal-section-sub">Request withdrawals directly to EasyPaisa, JazzCash, or Bank Account.</p>
+        </div>
+        <button type="button" class="btn btn-request-payout" id="openWithdrawModalBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Request Payout</span>
+        </button>
+      </div>
+
+      <!-- Financial Balance Strip -->
+      <div class="withdrawal-balance-strip">
+        <div class="wd-balance-card card-available">
+          <div class="wd-card-top">
+            <span class="wd-card-label">Available for Payout</span>
+            <span class="wd-card-badge badge-green">Ready</span>
+          </div>
+          <div class="wd-card-amount">
+            <span class="wd-currency">PKR</span>
+            <strong class="wd-value" id="wdAvailableAmount">0</strong>
+          </div>
+          <div class="wd-card-action-row">
+            <span class="wd-card-footer">Earned from verified closed deals</span>
+            <button type="button" class="btn btn-card-withdraw" id="cardQuickWithdrawBtn">
+              <span>Withdraw →</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="wd-balance-card card-pending">
+          <div class="wd-card-top">
+            <span class="wd-card-label">Pending Clearance</span>
+            <span class="wd-card-badge badge-amber">Processing</span>
+          </div>
+          <div class="wd-card-amount">
+            <span class="wd-currency">PKR</span>
+            <strong class="wd-value" id="wdPendingAmount">0</strong>
+          </div>
+          <span class="wd-card-footer" id="wdPendingCount">0 requests under admin review</span>
+        </div>
+
+        <div class="wd-balance-card card-settled">
+          <div class="wd-card-top">
+            <span class="wd-card-label">Total Withdrawn</span>
+            <span class="wd-card-badge badge-blue">Settled</span>
+          </div>
+          <div class="wd-card-amount">
+            <span class="wd-currency">PKR</span>
+            <strong class="wd-value" id="wdSettledAmount">0</strong>
+          </div>
+          <span class="wd-card-footer" id="wdSettledCount">Transferred to your accounts</span>
+        </div>
+      </div>
+
+      <!-- Withdrawal History Table / Ledger -->
+      <div class="withdrawal-history-box">
+        <div class="withdrawal-history-header">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <strong>Recent Withdrawal Requests</strong>
+          </div>
+          <span class="text-xs text-muted" id="withdrawalHistoryCount">0 Requests</span>
+        </div>
+        <div class="withdrawal-history-list" id="withdrawalHistoryList">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Assigned Pipeline Lead Directory -->
     <section class="employee-board">
-      <div class="employee-board-heading"><div><span class="workspace-eyebrow">PIPELINE</span><h2>Your leads</h2></div><button class="employee-text-link" type="button" id="employeeViewScoreBtn">View my score ↗</button></div>
+      <div class="employee-board-heading">
+        <div>
+          <span class="workspace-eyebrow">MY PIPELINE</span>
+          <h2>Assigned Customer Conversations (<span id="profileAssignedCount">0</span>)</h2>
+        </div>
+        <div class="board-filters">
+          <button type="button" class="profile-filter-btn active" data-pipeline-filter="all">All</button>
+          <button type="button" class="profile-filter-btn" data-pipeline-filter="ongoing">Ongoing</button>
+          <button type="button" class="profile-filter-btn" data-pipeline-filter="pending_verification">In Review</button>
+          <button type="button" class="profile-filter-btn" data-pipeline-filter="paid">Paid</button>
+          <button type="button" class="profile-filter-btn" data-pipeline-filter="useless">Won't Pay</button>
+          <button type="button" class="btn btn-xs btn-trash-toggle" id="pipelineDeleteToggleBtn" style="margin-left:6px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);border-radius:14px;padding:4px 10px;font-size:11.5px;font-weight:700;cursor:pointer;">
+            🗑️ Delete Chats
+          </button>
+        </div>
+      </div>
+
+      <!-- Pipeline Batch Delete Toolbar -->
+      <div id="pipelineBatchBar" class="admin-batch-bar" style="display:none;margin:10px 0 14px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:12px;padding:10px 16px;align-items:center;justify-content:space-between;">
+        <label class="batch-select-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;">
+          <input type="checkbox" id="pipelineSelectAllCheckbox" style="width:18px;height:18px;accent-color:#ef4444;cursor:pointer;">
+          <span>Select All Pipeline Chats</span>
+        </label>
+        <div class="batch-actions" style="display:flex;align-items:center;gap:10px;">
+          <span id="pipelineSelectedCount" style="color:var(--text-muted);font-weight:700;">0 selected</span>
+          <button type="button" id="pipelineDeleteBtn" class="btn btn-rose btn-sm" style="background:#ef4444;color:#fff;font-weight:750;padding:6px 14px;border-radius:8px;border:none;cursor:pointer;">
+            🗑️ Permanently Delete Selected
+          </button>
+          <button type="button" id="pipelineCancelDeleteBtn" class="btn btn-ghost btn-sm" style="padding:6px 10px;border-radius:8px;">
+            Done
+          </button>
+        </div>
+      </div>
+
       <div class="employee-lead-list" id="employeeLeadList"></div>
     </section>
-    <aside class="employee-portal-note"><span class="employee-note-mark">✳</span><p><strong>A good conversation starts with listening.</strong><br>Reply in the team inbox, save a private note, and update a lead’s status as it progresses.</p></aside>
   </main>
 
   <!-- ════════════════════════════════════════════════════════
@@ -204,7 +524,13 @@
 
     <!-- Pane 2: Active Chat Thread -->
     <section class="chat-thread-col" id="chatThreadCol" style="position:relative;">
-      <div class="chat-transition-overlay" id="chatTransitionOverlay" aria-hidden="true"><span class="chat-transition-mark">N</span><span class="chat-transition-spinner"></span><span>Opening conversation</span></div>
+      <div class="chat-transition-overlay" id="chatTransitionOverlay" aria-hidden="true">
+        <div class="chat-transition-logo-box">
+          <img src="assets/images/nunno-logo.png" alt="Nunno" class="chat-transition-logo">
+        </div>
+        <div class="chat-transition-spinner"></div>
+        <span class="chat-transition-text">Opening conversation…</span>
+      </div>
       <div class="chat-header">
         <div class="chat-lead-info">
           <button type="button" class="chat-back-btn" id="chatBackBtn" title="Back to conversations">
@@ -221,10 +547,9 @@
               <span id="chatLeadStatusBadge" class="status-pill-clean ongoing">🟡 Ongoing</span>
             </div>
             <div class="chat-lead-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-              <span class="mono text-xs" id="chatLeadPhone">+92 300 8472910</span>
-              <button type="button" id="editLeadPhoneBtn" title="Edit phone number for this lead" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--cyan);cursor:pointer;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;">Edit Number</button>
-              <span id="chatPresence" class="chat-presence" aria-live="polite">Online / last seen unavailable</span>
-              <span class="lead-closer-text" id="chatLeadCloser">🔒 Hamza Khan</span>
+              <span class="mono text-xs" id="chatLeadPhone" style="display:none;"></span>
+              <span id="chatPresence" class="chat-presence" aria-live="polite" style="display:none;"></span>
+              <span class="lead-closer-text" id="chatLeadCloser" style="display:none;"></span>
             </div>
           </div>
         </div>
@@ -282,11 +607,45 @@
       <!-- Anti-Theft Shield -->
       <div id="leadLockedShield" class="lead-locked-shield" style="display:none;">
         <div class="lock-shield-card">
-          <div class="lock-shield-icon">🔒</div>
-          <h3 class="lock-shield-title">Lead In Progress & Protected</h3>
-          <p class="lock-shield-desc">This client is currently being handled by <strong id="lockedCloserName">Hamza Khan</strong>.</p>
-          <div class="lock-shield-badge">🛡️ Anti-Theft Lead Protection Active</div>
-          <p class="lock-shield-sub">Only the assigned closer or the Administrator can view or reply.</p>
+          <div class="lock-shield-icon">
+            <div class="lock-icon-glow"></div>
+            <div class="lock-icon-circle">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="3" ry="3"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="lock-shield-badge">
+            <span class="lock-pulse-dot"></span>
+            <span>Anti-Theft Lead Protection</span>
+          </div>
+
+          <h3 class="lock-shield-title">Lead In Progress &amp; Protected</h3>
+
+          <div class="lock-shield-handler-box">
+            <div class="lock-handler-avatar" id="lockedCloserAvatar">AR</div>
+            <div class="lock-handler-info">
+              <span class="lock-handler-label">Exclusively Claimed By</span>
+              <strong class="lock-handler-name" id="lockedCloserName">Ali Raza (Team Lead)</strong>
+            </div>
+            <span class="lock-handler-status">Ongoing</span>
+          </div>
+
+          <p class="lock-shield-desc">
+            To prevent customer conflict and double-messaging, only the assigned closer or the Administrator can view message history or reply.
+          </p>
+
+          <div class="lock-shield-actions">
+            <button type="button" class="btn btn-wa btn-sm" id="lockedBackToMineBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              <span>View My Leads</span>
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" id="lockedBrowsePoolBtn" style="border:1px solid var(--glass-border);border-radius:10px;">
+              <span>Browse Fresh Leads</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -301,15 +660,14 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
 
-          <textarea id="chatInput" class="chat-input" rows="2" placeholder="Write a message…"></textarea>
+          <textarea id="chatInput" class="chat-input" rows="1" placeholder="Write a message…"></textarea>
 
           <button type="button" class="btn-composer-mic" id="voiceRecordBtn" title="Record voice note">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
           </button>
 
-          <button class="btn btn-wa" id="sendMsgBtn" title="Send Message">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            <span>Send</span>
+          <button class="btn btn-wa btn-send-circle" id="sendMsgBtn" title="Send Message" aria-label="Send Message">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
 
@@ -733,23 +1091,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
   <div class="auth-overlay hidden" id="authOverlay" style="display:none;">
     <div class="bg-grid"></div>
 
-    <!-- FULLSCREEN NUNNO 360 ROTATE & ZOOM-OUT OVERLAY -->
-    <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true" role="status" aria-live="polite">
-      <div class="anim-aura"></div>
-      <div class="anim-scene">
-        <div class="anim-logo-box">
-          <img src="assets/images/nunno-logo.png" alt="Nunno" class="anim-logo-img">
-        </div>
-        <div class="anim-label">
-          <div class="anim-brand-text">
-            <span>Nunno</span>
-            <span class="anim-role-tag" id="animRoleTag">Omni-Desk</span>
-          </div>
-          <div class="anim-subtext" id="animSubtext">Opening workspace…</div>
-        </div>
-      </div>
-    </div>
-
     <main class="login-container" id="loginMainContainer">
       <!-- HERO NUNNO LOGO WITH PURPLE EDGE GLOW -->
       <header class="brand-hero">
@@ -809,9 +1150,14 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
             Sign In to Omni-Desk
           </button>
 
-          <div class="quick-fill-bar">
-            <button type="button" class="quick-fill-btn" id="quickFillAdminBtn">👑 Admin</button>
-            <button type="button" class="quick-fill-btn" id="quickFillEmpBtn">👨‍💼 Closer (Hamza)</button>
+          <div class="quick-fill-bar" style="display:flex;flex-direction:column;gap:6px;margin-top:14px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">1-Click Test Credentials:</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <button type="button" class="quick-fill-btn" id="quickFillAdminBtn">👑 Admin</button>
+              <button type="button" class="quick-fill-btn" id="quickFillMaleLeadBtn">👨 Ali (Male Team Lead)</button>
+              <button type="button" class="quick-fill-btn" id="quickFillFemaleLeadBtn">👩 Asima (Female Team Lead)</button>
+              <button type="button" class="quick-fill-btn" id="quickFillEmpBtn">💼 Hamza</button>
+            </div>
           </div>
         </form>
 
@@ -879,6 +1225,14 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
                 <option value="Team Lead">⚡ Team Lead</option>
                 <option value="Admin">👑 Admin</option>
               </select>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Gender (Closer Voice Permissions)</label>
+              <select id="newEmpGender" class="form-select">
+                <option value="male">👨 Male (Voice recording restricted)</option>
+                <option value="female" selected>👩 Female (Voice recording enabled)</option>
+              </select>
+              <small style="font-size:10.5px;color:var(--text-muted);display:block;margin-top:2px;">Male employees cannot record voice notes (VM button disabled).</small>
             </div>
             <div class="form-group" style="margin:0;">
               <label class="form-label">Employee WhatsApp (Optional)</label>
@@ -1029,6 +1383,119 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
   </div>
 
   <!-- ════════════════════════════════════════════════════════
+       MODAL: WITHDRAWAL REQUEST PORTAL
+  ════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="withdrawModal" style="display:none;">
+    <div class="modal-box withdraw-modal-box">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="modal-icon-badge" style="background:rgba(16,185,129,0.15);color:#10b981;">💳</div>
+          <div>
+            <h3 style="margin:0;font-size:16px;font-weight:800;">Request Payout</h3>
+            <span class="text-xs text-muted">Withdraw commission earnings directly to your account</span>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-xs" id="closeWithdrawModalBtn">✕</button>
+      </div>
+
+      <form id="withdrawRequestForm" class="withdraw-form" novalidate>
+        <!-- Balance Alert -->
+        <div class="withdraw-available-strip">
+          <span class="text-xs text-muted">Available to Withdraw:</span>
+          <strong class="withdraw-max-text">PKR <span id="modalWdAvailableBalance">0</span></strong>
+        </div>
+
+        <!-- 1. Amount -->
+        <div class="form-group" style="margin-top:12px;">
+          <label class="form-label">Withdrawal Amount (PKR)</label>
+          <div class="input-with-prefix">
+            <span class="input-prefix">Rs.</span>
+            <input type="number" id="wdAmountInput" class="form-input mono" placeholder="Enter amount (e.g. 2,000)" step="100">
+          </div>
+          <!-- Quick Amount Chips -->
+          <div class="quick-amount-chips">
+            <button type="button" class="btn-amt-chip" data-amt="2000">Rs. 2,000</button>
+            <button type="button" class="btn-amt-chip" data-amt="5000">Rs. 5,000</button>
+            <button type="button" class="btn-amt-chip" data-amt="10000">Rs. 10,000</button>
+            <button type="button" class="btn-amt-chip" data-amt="all">Max Balance</button>
+          </div>
+        </div>
+
+        <!-- 2. Payout Method -->
+        <div class="form-group">
+          <label class="form-label">Select Payment Method</label>
+          <div class="payout-method-grid">
+            <label class="method-option active">
+              <input type="radio" name="payoutMethod" value="EasyPaisa" checked>
+              <span class="method-card">
+                <span class="method-icon">📱</span>
+                <span class="method-name">EasyPaisa</span>
+              </span>
+            </label>
+            <label class="method-option">
+              <input type="radio" name="payoutMethod" value="JazzCash">
+              <span class="method-card">
+                <span class="method-icon">📱</span>
+                <span class="method-name">JazzCash</span>
+              </span>
+            </label>
+            <label class="method-option">
+              <input type="radio" name="payoutMethod" value="Bank Transfer">
+              <span class="method-card">
+                <span class="method-icon">🏦</span>
+                <span class="method-name">Bank / Raast</span>
+              </span>
+            </label>
+            <label class="method-option">
+              <input type="radio" name="payoutMethod" value="USDT (TRC20)">
+              <span class="method-card">
+                <span class="method-icon">💎</span>
+                <span class="method-name">USDT</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. Account Details -->
+        <div class="form-group">
+          <label class="form-label" id="wdTitleLabel">Account Title / Beneficiary Name</label>
+          <input type="text" id="wdAccountTitleInput" class="form-input" placeholder="e.g. Ali Raza" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" id="wdNumberLabel">Mobile Number / Account / IBAN</label>
+          <input type="text" id="wdAccountNumberInput" class="form-input mono" placeholder="e.g. 0308-9774571" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Remarks / Note (Optional)</label>
+          <input type="text" id="wdNoteInput" class="form-input" placeholder="e.g. Bi-weekly settlement">
+        </div>
+
+        <!-- Payout Info Summary -->
+        <div class="payout-summary-box">
+          <div class="summary-line">
+            <span>Processing Fee:</span>
+            <strong style="color:#10b981;">Rs. 0 (Free)</strong>
+          </div>
+          <div class="summary-line">
+            <span>Estimated Transfer:</span>
+            <span>2 to 6 hours</span>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding-top:12px;">
+          <button type="button" class="btn btn-ghost" id="cancelWithdrawBtn">Cancel</button>
+          <button type="submit" class="btn btn-wa" id="submitWithdrawBtn" style="padding:10px 22px;">
+            <span>Submit Withdrawal Request</span>
+            <span>→</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
        MODAL: PERFORMANCE PORTAL & LEADERBOARD
   ════════════════════════════════════════════════════════ -->
   <div class="modal-overlay" id="scoreModal">
@@ -1070,6 +1537,30 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
               </div>
             </div>
             <div class="perf-tier-badge" id="perfTierBadge">👤 Team Member</div>
+          </div>
+
+          <!-- Quick Pipeline Overview Strip -->
+          <div class="score-pipeline-strip">
+            <div class="score-pipe-item pipe-ongoing">
+              <span class="score-pipe-label">🟡 Ongoing Leads</span>
+              <strong class="score-pipe-val" id="scoreOngoingCount">0</strong>
+            </div>
+            <div class="score-pipe-item pipe-closed">
+              <span class="score-pipe-label">🟢 Total Closed</span>
+              <strong class="score-pipe-val" id="scoreClosedCount">0</strong>
+            </div>
+            <div class="score-pipe-item pipe-wontpay">
+              <span class="score-pipe-label">🔴 Won't Pay</span>
+              <strong class="score-pipe-val" id="scoreWontPayCount">0</strong>
+            </div>
+            <div class="score-pipe-item pipe-review">
+              <span class="score-pipe-label">🟣 In Review</span>
+              <strong class="score-pipe-val" id="scoreInReviewCount">0</strong>
+            </div>
+            <div class="score-pipe-item pipe-paid">
+              <span class="score-pipe-label">💎 Total Paid</span>
+              <strong class="score-pipe-val" id="scorePaidCount">0</strong>
+            </div>
           </div>
 
           <div class="salary-milestone-card">
@@ -1174,8 +1665,8 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/offline-preview.js?v=1"></script>
-  <script src="assets/js/live-inbox.js?v=4"></script>
-  <script src="assets/js/whatsapp-app.js?v=7.5"></script>
+  <script src="assets/js/offline-preview.js?v=14.0"></script>
+  <script src="assets/js/live-inbox.js?v=14.0"></script>
+  <script src="assets/js/whatsapp-app.js?v=14.0"></script>
 </body>
 </html>

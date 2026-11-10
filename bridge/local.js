@@ -30,7 +30,22 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
   });
   if (restoreSession) bridge.connect();
   const bridgeUrl = `http://127.0.0.1:${bridge.server.address().port}`;
-  const user = { id: 'local-admin', name: 'Local Tester', username: 'local', role: 'admin' };
+  const usersPath = path.join(root, 'data/users.json');
+  function loadLocalUsers() {
+    try {
+      if (fs.existsSync(usersPath)) {
+        const parsed = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    } catch (_) {}
+    return [
+      { id: 'USR-ADMIN-01', name: 'System Administrator', username: 'admin', role: 'admin', designation: 'Admin', gender: 'male', status: 'active' },
+      { id: 'EMP-TL-01', name: 'Ali Raza (Team Lead)', username: 'ali', role: 'lead', designation: 'Male Team Lead', gender: 'male', status: 'active' },
+      { id: 'EMP-TL-02', name: 'Asima Noor (Team Lead)', username: 'asima', role: 'lead', designation: 'Female Team Lead', gender: 'female', status: 'active' },
+      { id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', gender: 'male', status: 'active' }
+    ];
+  }
+  let currentLocalUser = null;
   const leads = new Map();
   let origin;
   const server = http.createServer(async (req, res) => {
@@ -54,17 +69,157 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         }
         const action = body.action || url.searchParams.get('action');
         if (url.pathname === '/api/auth.php') {
-          if (['check', 'login'].includes(action)) { json(200, { success: true, authenticated: true, user }); return; }
-          if (action === 'list_employees') { json(200, { success: true, employees: [] }); return; }
-          if (action === 'logout') { json(200, { success: true }); return; }
+          const allUsers = loadLocalUsers();
+          if (action === 'check') {
+            const userToReturn = currentLocalUser || allUsers[0];
+            json(200, { success: true, authenticated: true, user: userToReturn });
+            return;
+          }
+          if (action === 'login') {
+            const username = String(body.username || '').trim().toLowerCase();
+            const password = String(body.password || '').trim();
+            const matched = allUsers.find(u => u.username.toLowerCase() === username || (u.email && u.email.toLowerCase() === username));
+            let isValid = false;
+            if (matched) {
+              if (matched.username === 'admin' && (password === 'admin123' || password === 'Admin@Omnidesk2026!')) isValid = true;
+              else if (matched.username === 'ali' && (password === 'ali123' || password === 'Lead@123')) isValid = true;
+              else if (matched.username === 'asima' && (password === 'asima123' || password === 'Lead@123')) isValid = true;
+              else if (matched.username === 'hamza' && (password === 'closer123' || password === 'Agent@123')) isValid = true;
+              else if (matched.password && matched.password === password) isValid = true;
+            }
+            if (matched && isValid) {
+              currentLocalUser = matched;
+              json(200, { success: true, authenticated: true, user: matched });
+            } else {
+              json(401, { success: false, error: 'Invalid username or password.' });
+            }
+            return;
+          }
+          if (action === 'logout') {
+            currentLocalUser = null;
+            json(200, { success: true });
+            return;
+          }
+          if (action === 'list_employees') {
+            json(200, { success: true, employees: allUsers });
+            return;
+          }
+          if (action === 'create_employee') {
+            const newEmp = {
+              id: 'EMP-' + Date.now().toString(36).toUpperCase(),
+              name: body.name || 'New Employee',
+              username: body.username || 'emp_' + Date.now().toString(36),
+              role: body.role || 'member',
+              designation: body.designation || 'Closer Specialist',
+              gender: body.gender || 'male',
+              phone: body.phone || '',
+              status: 'active'
+            };
+            allUsers.push(newEmp);
+            try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+            json(200, { success: true, employee: newEmp });
+            return;
+          }
+          if (action === 'toggle_status') {
+            const target = allUsers.find(u => u.id === body.id);
+            if (target) {
+              target.status = target.status === 'active' ? 'suspended' : 'active';
+              try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+              json(200, { success: true, message: `Status updated to ${target.status}` });
+            } else {
+              json(404, { success: false, error: 'Employee not found' });
+            }
+            return;
+          }
+          if (action === 'delete_employee') {
+            const filtered = allUsers.filter(u => u.id !== body.id);
+            try { fs.writeFileSync(usersPath, JSON.stringify(filtered, null, 2), 'utf8'); } catch (_) {}
+            json(200, { success: true, message: 'Employee removed' });
+            return;
+          }
         }
         if (url.pathname === '/api/leads_sync.php') {
           if (action === 'get_leads') { json(200, { success: true, leads: [...leads.values()] }); return; }
+          if (action === 'delete_leads' || action === 'delete_lead') {
+            const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
+            ids.forEach(id => leads.delete(id));
+            const inboxFile = path.join(root, 'data/whatsapp-bridge/local/inbox.json');
+            try {
+              if (fs.existsSync(inboxFile)) {
+                const inbox = JSON.parse(fs.readFileSync(inboxFile, 'utf8') || '[]');
+                const phonesToDelete = ids.map(id => String(id).replace(/\D/g, ''));
+                const newInbox = inbox.filter(m => {
+                  const s = String(m.from || m.sender || '').replace(/\D/g, '');
+                  return !phonesToDelete.includes(s);
+                });
+                fs.writeFileSync(inboxFile, JSON.stringify(newInbox, null, 2), 'utf8');
+              }
+            } catch (_) {}
+            json(200, { success: true, deleted_count: ids.length, remaining_count: leads.size });
+            return;
+          }
           if (action === 'update_lead' && req.method === 'POST') {
             const lead = { ...(leads.get(body.id) || { messages: [] }), ...body };
             if (body.newMessage && !lead.messages.some(m => m.id === body.newMessage.id)) lead.messages.push(body.newMessage);
             if (body.updateMessage) lead.messages = lead.messages.map(m => m.waMessageId === body.updateMessage.waMessageId ? { ...m, ...body.updateMessage } : m);
             leads.set(body.id, lead); json(200, { success: true }); return;
+          }
+        }
+        if (url.pathname === '/api/withdrawals.php') {
+          const wdFile = path.join(root, 'data/withdrawals.json');
+          const loadWds = () => {
+            try {
+              if (fs.existsSync(wdFile)) return JSON.parse(fs.readFileSync(wdFile, 'utf8') || '[]');
+            } catch (_) {}
+            return [];
+          };
+          const saveWds = (arr) => {
+            try {
+              fs.writeFileSync(wdFile, JSON.stringify(arr, null, 2), 'utf8');
+            } catch (_) {}
+          };
+
+          if (action === 'get_withdrawals') {
+            const list = loadWds();
+            const targetUser = url.searchParams.get('user_id') || body.user_id;
+            const isAdmin = currentLocalUser && currentLocalUser.role === 'admin';
+            const resList = (!isAdmin && targetUser) ? list.filter(w => w.userId === targetUser) : list;
+            json(200, { success: true, withdrawals: resList });
+            return;
+          }
+          if (action === 'request_withdrawal' && req.method === 'POST') {
+            const list = loadWds();
+            const newWd = {
+              id: 'WD-' + Date.now().toString().slice(-5) + Math.floor(Math.random() * 90 + 10),
+              userId: body.userId || (currentLocalUser ? currentLocalUser.id : 'EMP-TL-01'),
+              userName: body.userName || (currentLocalUser ? currentLocalUser.name : 'Team Lead'),
+              userRole: body.userRole || (currentLocalUser ? currentLocalUser.role : 'lead'),
+              amount: Number(body.amount) || 0,
+              method: body.method || 'EasyPaisa',
+              accountTitle: body.accountTitle || '',
+              accountNumber: body.accountNumber || '',
+              note: body.note || '',
+              status: 'pending',
+              created_at: new Date().toISOString()
+            };
+            list.unshift(newWd);
+            saveWds(list);
+            json(200, { success: true, withdrawal: newWd, withdrawals: list });
+            return;
+          }
+          if (action === 'update_status' && req.method === 'POST') {
+            const list = loadWds();
+            const item = list.find(w => w.id === body.id);
+            if (item) {
+              item.status = body.status;
+              if (body.txRef) item.txRef = body.txRef;
+              item.updated_at = new Date().toISOString();
+              saveWds(list);
+              json(200, { success: true, withdrawal: item, withdrawals: list });
+            } else {
+              json(404, { success: false, error: 'Withdrawal not found' });
+            }
+            return;
           }
         }
         if (url.pathname === '/api/direct_sender.php') {

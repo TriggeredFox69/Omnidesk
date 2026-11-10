@@ -1,0 +1,11 @@
+# ====================================================
+# Nunno WhatsApp — Private Data Directory Security
+# Strictly forbids all public HTTP/HTTPS access to live data files
+# ====================================================
+Order allow,deny
+Deny from all
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+

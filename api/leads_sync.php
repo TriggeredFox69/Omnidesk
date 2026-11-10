@@ -21,11 +21,23 @@ function getStoredLeads($dataFile) {
     return null;
 }
 
-// Helper: Save centralized leads safely with atomic write
+// Helper: Save centralized leads safely with atomic write and automatic rolling backups
 function saveStoredLeads($dataFile, $leads) {
     $tempFile = $dataFile . '.tmp.' . uniqid();
     file_put_contents($tempFile, json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     rename($tempFile, $dataFile);
+
+    // Automated rolling snapshot backup (keeps hourly / daily fallback)
+    try {
+        $backupDir = dirname($dataFile) . '/backups';
+        if (!is_dir($backupDir)) {
+            @mkdir($backupDir, 0755, true);
+        }
+        $todayBackup = $backupDir . '/leads_' . date('Y-m-d') . '.json';
+        if (!file_exists($todayBackup) || (time() - filemtime($todayBackup) > 3600)) {
+            @copy($dataFile, $todayBackup);
+        }
+    } catch (Exception $e) {}
 }
 
 // Default initial leads if data/leads.json doesn't exist yet
@@ -133,6 +145,49 @@ if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
         'leads' => $selfOnly,
         'count' => 1
     ], JSON_PRETTY_PRINT);
+    exit;
+}
+
+// Permanently delete single or multiple conversations (Admin Only)
+if ($action === 'delete_leads' || $action === 'delete_lead') {
+    $leadIds = $input['ids'] ?? [];
+    if (empty($leadIds) && !empty($input['id'])) {
+        $leadIds = [$input['id']];
+    }
+    if (empty($leadIds)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'No lead IDs provided for deletion']);
+        exit;
+    }
+
+    $initialCount = count($currentLeads);
+    $currentLeads = array_values(array_filter($currentLeads, function($l) use ($leadIds) {
+        return !in_array($l['id'], $leadIds);
+    }));
+    $deletedCount = $initialCount - count($currentLeads);
+    saveStoredLeads($dataFile, $currentLeads);
+
+    // Also purge deleted numbers from bridge inbox.json so they don't resurrect
+    $dataDir = dirname(__DIR__) . '/data/whatsapp-bridge';
+    $inboxFiles = [$dataDir . '/inbox.json', $dataDir . '/whatsapp-bridge/inbox.json'];
+    foreach ($inboxFiles as $inboxFile) {
+        if (file_exists($inboxFile)) {
+            $inbox = json_decode(@file_get_contents($inboxFile), true) ?: [];
+            $phonesToDelete = array_map(function($id) { return preg_replace('/\D/', '', $id); }, $leadIds);
+            $newInbox = array_values(array_filter($inbox, function($m) use ($phonesToDelete) {
+                $sender = preg_replace('/\D/', '', $m['from'] ?? $m['sender'] ?? '');
+                return !in_array($sender, $phonesToDelete);
+            }));
+            @file_put_contents($inboxFile, json_encode($newInbox, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'deleted_count' => $deletedCount,
+        'remaining_count' => count($currentLeads),
+        'message' => "Successfully deleted {$deletedCount} conversation(s) permanently."
+    ]);
     exit;
 }
 

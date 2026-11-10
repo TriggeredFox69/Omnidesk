@@ -74,12 +74,10 @@
           window.onWhatsAppPresencesUpdate(result.presences);
         }
         if (result.messages?.length) { renderList(); if (activeChanged) renderChat(); }
-        // Saved history is available while WhatsApp reconnects. Only live operations
-        // need a linked sender; hiding the history made a restart look like data loss.
         if (!state.senderConfigured) {
           activePhone = '';
           const el = document.getElementById('chatPresence');
-          if (el) { el.textContent = 'Saved history · reconnect WhatsApp for live updates'; el.className = 'chat-presence'; }
+          if (el) { el.textContent = ''; el.style.display = 'none'; }
           return;
         }
         const lead = getLead(state.activeLeadId);
