@@ -2854,6 +2854,59 @@ body:not(.theme-dark) .emp-roster-card {
   background: rgba(239, 68, 68, 0.12);
   color: #dc2626;
 }
+.btn-emp-action.suspend {
+  color: #dc2626 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+.btn-emp-action.suspend:hover {
+  background: rgba(239, 68, 68, 0.18) !important;
+}
+.btn-emp-action.reactivate {
+  color: #059669 !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+  background: rgba(16, 185, 129, 0.1) !important;
+}
+.btn-emp-action.reactivate:hover {
+  background: rgba(16, 185, 129, 0.2) !important;
+}
+.btn-emp-action.mail {
+  color: #6366f1 !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+.btn-emp-action.mail:hover {
+  background: rgba(99, 102, 241, 0.18) !important;
+}
+.emp-roster-card.suspended {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+}
+
+/* Suspended Account Lockout Overlay */
+.account-suspended-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background: rgba(15, 23, 42, 0.92);
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+.suspended-lockout-box {
+  animation: suspendedPulse 2.5s infinite ease-in-out;
+}
+@keyframes suspendedPulse {
+  0%, 100% {
+    box-shadow: 0 25px 60px -15px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 30px 75px -10px rgba(239, 68, 68, 0.5);
+  }
+}
 
 /* 24-Hour Settlement Countdown Pill & Card */
 .wd-timer-pill {

@@ -99,6 +99,11 @@
         <span class="badge-role-admin" id="headerEmpCount">2</span>
       </button>
 
+      <button class="btn-header-admin" id="openEmailModalBtn" style="display:none;" title="Admin Portal: Email Communications Hub">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>Email Hub</span>
+      </button>
+
       <button type="button" class="btn-header-theme" id="themeToggleBtn" title="Switch to dark theme" aria-label="Switch to dark theme" aria-pressed="false">
         <svg class="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"/></svg>
         <span>Dark theme</span>
@@ -1235,8 +1240,18 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
               <small style="font-size:10.5px;color:var(--text-muted);display:block;margin-top:2px;">Male employees cannot record voice notes (VM button disabled).</small>
             </div>
             <div class="form-group" style="margin:0;">
+              <label class="form-label">Employee Email Address</label>
+              <input type="email" id="newEmpEmail" class="form-input" placeholder="e.g. usman@gmail.com" required autocomplete="off">
+            </div>
+            <div class="form-group" style="margin:0;">
               <label class="form-label">Employee WhatsApp (Optional)</label>
               <input type="text" id="newEmpPhone" class="form-input mono" placeholder="e.g. +923001234567">
+            </div>
+            <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 12px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;cursor:pointer;user-select:none;margin:0;">
+                <input type="checkbox" id="sendWelcomeEmailOnCreate" checked style="accent-color:var(--emerald);width:16px;height:16px;">
+                <span style="font-weight:700;color:var(--text-primary);">✉️ Dispatch welcome email with login credentials</span>
+              </label>
             </div>
             <button type="submit" class="btn btn-wa btn-sm" id="submitNewEmpBtn" style="width:100%;justify-content:center;padding:10px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
@@ -1690,6 +1705,228 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           <div id="verifySalesList" style="display:flex;flex-direction:column;gap:12px;"></div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       MODAL: ADMIN EMAIL COMMUNICATIONS STUDIO
+  ════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="adminEmailModal">
+    <div class="emp-modal-box" style="max-width:1040px;">
+      <div class="emp-modal-header">
+        <div class="emp-modal-title-group">
+          <div class="emp-modal-icon" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#6366f1;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <div>
+            <div class="emp-modal-title">
+              <span>Admin Email &amp; Communications Studio</span>
+              <span class="badge-role-admin" style="background:rgba(99,102,241,0.15);color:#6366f1;border-color:rgba(99,102,241,0.3);">Dispatch Hub</span>
+            </div>
+            <div class="text-xs text-muted">Dispatch targeted credentials, 24-hour payout confirmations, status alerts &amp; team directives.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <a href="email_hub.php" target="_blank" class="btn btn-ghost btn-xs" style="color:var(--accent-brand);font-weight:700;text-decoration:none;" title="Open in new standalone tab">
+            ↗ Standalone Page
+          </a>
+          <button class="btn btn-ghost btn-xs" id="closeEmailModalBtn">✕</button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div style="display:flex;gap:6px;padding:10px 24px;border-bottom:1px solid var(--border-subtle);background:rgba(0,0,0,0.12);overflow-x:auto;">
+        <button type="button" class="nav-tab-btn active" id="tabEmailComposeBtn" style="padding:6px 14px;font-size:12px;">✍️ Compose &amp; Send</button>
+        <button type="button" class="nav-tab-btn" id="tabEmailLogsBtn" style="padding:6px 14px;font-size:12px;">📜 Sent History &amp; Logs</button>
+        <button type="button" class="nav-tab-btn" id="tabEmailSettingsBtn" style="padding:6px 14px;font-size:12px;">⚙️ Mailer Settings</button>
+      </div>
+
+      <!-- TAB 1: COMPOSE & SEND -->
+      <div id="viewEmailCompose" class="emp-modal-body" style="grid-template-columns:1.1fr 1fr;gap:20px;padding:20px 24px;">
+        <!-- Left: Form -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="auth-alert" id="modalEmailAlert" style="display:none;margin:0;"></div>
+
+          <form id="modalEmailForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:11px;">
+            <!-- 1. Target Audience -->
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-weight:700;">1. Target Audience</label>
+              <select id="modalEmailTargetType" class="form-select">
+                <option value="user" selected>🎯 Target Single Employee</option>
+                <option value="all">📢 All Active Employees &amp; Closers (Broadcast)</option>
+                <option value="role_lead">⚡ All Team Leads Only</option>
+                <option value="role_member">👤 All Closers / Members Only</option>
+                <option value="custom">✉️ Custom External Email Address</option>
+              </select>
+            </div>
+
+            <!-- Single User Select -->
+            <div class="form-group" id="modalEmailUserGroup" style="margin:0;">
+              <label class="form-label">Select Target Closer</label>
+              <select id="modalEmailUserSelect" class="form-select"></select>
+            </div>
+
+            <!-- Custom Email Group -->
+            <div id="modalEmailCustomGroup" style="display:none;flex-direction:column;gap:8px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Target Email Address</label>
+                <input type="email" id="modalEmailCustomAddress" class="form-input" placeholder="e.g. employee@gmail.com">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Recipient Name</label>
+                <input type="text" id="modalEmailCustomName" class="form-input" placeholder="e.g. Usman Ali">
+              </div>
+            </div>
+
+            <!-- 2. Template Preset -->
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-weight:700;">2. Email Template Preset</label>
+              <select id="modalEmailTemplateSelect" class="form-select"></select>
+            </div>
+
+            <!-- Placeholders -->
+            <div>
+              <label class="form-label" style="font-size:10.5px;color:var(--text-muted);margin-bottom:4px;">Dynamic Placeholders (Click to insert):</label>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;" id="modalEmailChips">
+                <span class="btn-amt-chip" data-var="{name}" style="padding:2px 7px;font-size:10.5px;">{name}</span>
+                <span class="btn-amt-chip" data-var="{username}" style="padding:2px 7px;font-size:10.5px;">{username}</span>
+                <span class="btn-amt-chip" data-var="{email}" style="padding:2px 7px;font-size:10.5px;">{email}</span>
+                <span class="btn-amt-chip" data-var="{role}" style="padding:2px 7px;font-size:10.5px;">{role}</span>
+                <span class="btn-amt-chip" data-var="{amount}" style="padding:2px 7px;font-size:10.5px;">{amount}</span>
+                <span class="btn-amt-chip" data-var="{method}" style="padding:2px 7px;font-size:10.5px;">{method}</span>
+                <span class="btn-amt-chip" data-var="{date}" style="padding:2px 7px;font-size:10.5px;">{date}</span>
+                <span class="btn-amt-chip" data-var="{portal_url}" style="padding:2px 7px;font-size:10.5px;">{portal_url}</span>
+              </div>
+            </div>
+
+            <!-- Subject -->
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-weight:700;">3. Subject Line</label>
+              <input type="text" id="modalEmailSubject" class="form-input" placeholder="Enter email subject" required>
+            </div>
+
+            <!-- Tag / Badge -->
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-weight:700;">4. Header Tag Badge</label>
+              <input type="text" id="modalEmailBadge" class="form-input" value="Notice">
+            </div>
+
+            <!-- Body HTML -->
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" style="font-weight:700;">5. Message HTML Content</label>
+              <textarea id="modalEmailBody" class="form-input mono" rows="6" style="font-size:11.5px;resize:vertical;"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-wa" id="modalEmailSendBtn" style="padding:11px;font-weight:800;justify-content:center;margin-top:4px;">
+              <span>✉️ Dispatch Email Now</span>
+              <span>&rarr;</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Right: Live Preview -->
+        <div style="display:flex;flex-direction:column;min-height:480px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:13px;color:var(--text-primary);">Live Responsive Email Preview</strong>
+            <span style="font-size:10.5px;color:var(--text-muted);">Real-time HTML</span>
+          </div>
+          <div style="flex:1;background:#fff;border:1px solid var(--border-subtle);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-card);">
+            <iframe id="modalEmailPreviewIframe" style="width:100%;height:100%;min-height:460px;border:none;"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: SENT HISTORY & LOGS -->
+      <div id="viewEmailLogs" style="display:none;padding:20px 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="font-size:13px;font-weight:700;color:var(--text-primary);">Dispatched Email Audit Trail</span>
+          <button type="button" class="btn btn-ghost btn-xs" id="modalRefreshEmailLogsBtn">🔄 Refresh Logs</button>
+        </div>
+        <div style="max-height:440px;overflow-y:auto;border:1px solid var(--border-subtle);border-radius:10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:var(--glass-surface-subtle);border-bottom:1px solid var(--border-subtle);text-align:left;">
+                <th style="padding:8px 12px;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;">ID</th>
+                <th style="padding:8px 12px;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;">Recipient</th>
+                <th style="padding:8px 12px;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;">Subject</th>
+                <th style="padding:8px 12px;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;">Template</th>
+                <th style="padding:8px 12px;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;">Timestamp</th>
+                <th style="padding:8px 12px;font-size:10.5px;color:var(--text-muted);text-transform:uppercase;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="modalEmailLogsTbody">
+              <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">Loading logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 3: MAILER SETTINGS -->
+      <div id="viewEmailSettings" style="display:none;padding:20px 24px;max-width:600px;margin:0 auto;">
+        <div class="auth-alert" id="modalEmailSettingsAlert" style="display:none;margin-bottom:12px;"></div>
+        <form id="modalEmailSettingsForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Transport</label>
+            <select id="modalEmailTransport" class="form-select">
+              <option value="mail" selected>PHP Native Mailer (cPanel Recommended)</option>
+              <option value="smtp">Custom SMTP Server</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Sender Display Name</label>
+            <input type="text" id="modalEmailSenderName" class="form-input" value="OmniDesk Administration">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Sender Email Address</label>
+            <input type="email" id="modalEmailSenderAddress" class="form-input" value="admin@nunno.cloud">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Reply-To Address</label>
+            <input type="email" id="modalEmailReplyTo" class="form-input" value="numeniousnexus@gmail.com">
+          </div>
+          <button type="submit" class="btn btn-wa" id="modalEmailSaveSettingsBtn" style="padding:10px;font-weight:700;margin-top:6px;">
+            Save Mailer Settings
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       LOCKOUT OVERLAY: ACCOUNT SUSPENDED
+  ════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay account-suspended-overlay" id="accountSuspendedOverlay" style="display:none;z-index:999999;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(15,23,42,0.92);align-items:center;justify-content:center;">
+    <div class="emp-modal-box suspended-lockout-box" style="max-width:480px;text-align:center;padding:36px 28px;border:1px solid rgba(239,68,68,0.4);box-shadow:0 25px 60px -15px rgba(239,68,68,0.35);background:var(--glass-surface);">
+      <div class="suspended-shield-icon" style="width:72px;height:72px;margin:0 auto 18px;border-radius:24px;background:rgba(239,68,68,0.12);border:2px solid rgba(239,68,68,0.35);display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 0 30px rgba(239,68,68,0.3);">
+        🚫
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);padding:4px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:12px;">
+        Account Suspended
+      </div>
+      <h2 style="font-size:22px;font-weight:900;color:var(--text-primary);margin:0 0 8px;">Access Suspended</h2>
+      <p style="font-size:13px;color:var(--text-secondary);line-height:1.55;margin:0 0 20px;">
+        Your OmniDesk closer workspace has been suspended by the System Administrator. All messaging capabilities, lead actions, and withdrawals are locked.
+      </p>
+      <div style="background:var(--glass-surface-subtle);border:1px solid var(--glass-border-subtle);border-radius:12px;padding:14px 16px;text-align:left;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:11px;color:var(--text-muted);font-weight:600;">Account Name:</span>
+          <strong style="font-size:12px;color:var(--text-primary);" id="suspendedEmpName">--</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:11px;color:var(--text-muted);font-weight:600;">Username:</span>
+          <span style="font-size:11.5px;font-family:var(--font-mono);color:var(--accent-brand);" id="suspendedEmpUsername">--</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:var(--text-muted);font-weight:600;">Status:</span>
+          <span class="emp-status-badge suspended">🔴 Suspended by Admin</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button type="button" class="btn btn-ghost" id="suspendedLogoutBtn" style="width:100%;padding:11px;font-weight:700;border-radius:10px;border:1px solid var(--border-subtle);">
+          Sign Out / Switch Account
+        </button>
       </div>
     </div>
   </div>

@@ -124,8 +124,10 @@ function getCurrentUser($usersFile) {
     if (isset($_SESSION['omnidesk_user']) && is_array($_SESSION['omnidesk_user'])) {
         $userId = $_SESSION['omnidesk_user']['id'] ?? '';
         foreach ($users as $u) {
-            if ($u['id'] === $userId && $u['status'] === 'active') {
-                return sanitizeUser($u);
+            if ($u['id'] === $userId) {
+                $sanitized = sanitizeUser($u);
+                $_SESSION['omnidesk_user'] = $sanitized;
+                return $sanitized;
             }
         }
     }
@@ -230,7 +232,7 @@ switch ($action) {
             exit;
         }
 
-        if ($matchedUser['status'] !== 'active') {
+        if ($matchedUser['status'] !== 'active' && $matchedUser['status'] !== 'suspended') {
             http_response_code(403);
             echo json_encode([
                 'success' => false,

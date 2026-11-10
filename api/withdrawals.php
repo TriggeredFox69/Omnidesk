@@ -41,8 +41,15 @@ $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true) ?: [];
 $action = isset($_GET['action']) ? $_GET['action'] : (isset($data['action']) ? $data['action'] : 'get_withdrawals');
 
-$currentUser = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+$currentUser = $_SESSION['omnidesk_user'] ?? $_SESSION['user'] ?? null;
 $isAdmin = $currentUser && isset($currentUser['role']) && $currentUser['role'] === 'admin';
+
+// Guard: Suspended closer cannot perform withdrawal transactions
+if ($currentUser && isset($currentUser['status']) && $currentUser['status'] === 'suspended') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Account access suspended. Payout transactions are locked.']);
+    exit;
+}
 
 if ($action === 'get_withdrawals') {
     $withdrawals = getStoredWithdrawals($wdFile);

@@ -51,7 +51,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
   const server = http.createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
     if (req.headers.host !== new URL(origin).host) { json(403, { success: false }); return; }
     try {
@@ -109,6 +109,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               id: 'EMP-' + Date.now().toString(36).toUpperCase(),
               name: body.name || 'New Employee',
               username: body.username || 'emp_' + Date.now().toString(36),
+              email: body.email || (body.username ? body.username + '@nunno.cloud' : ''),
               role: body.role || 'member',
               designation: body.designation || 'Closer Specialist',
               gender: body.gender || 'male',
@@ -241,6 +242,101 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
         }
+        if (url.pathname === '/api/email_service.php') {
+          const emailLogsFile = path.join(root, 'data/email_logs.json');
+          const emailConfigFile = path.join(root, 'data/email_config.json');
+          const loadLogs = () => {
+            try { if (fs.existsSync(emailLogsFile)) return JSON.parse(fs.readFileSync(emailLogsFile, 'utf8') || '[]'); } catch (_) {}
+            return [];
+          };
+          const saveLogs = (arr) => {
+            try { fs.writeFileSync(emailLogsFile, JSON.stringify(arr.slice(0, 500), null, 2), 'utf8'); } catch (_) {}
+          };
+          const loadEmailConfig = () => {
+            const def = { transport: 'mail', sender_name: 'OmniDesk Administration', sender_email: 'admin@nunno.cloud', reply_to: 'numeniousnexus@gmail.com', portal_url: origin || 'http://127.0.0.1:8080' };
+            try { if (fs.existsSync(emailConfigFile)) return { ...def, ...JSON.parse(fs.readFileSync(emailConfigFile, 'utf8') || '{}') }; } catch (_) {}
+            return def;
+          };
+
+          if (action === 'get_templates') {
+            const templates = [
+              { id: 'welcome', name: '🌟 New Employee Welcome & Login Credentials', badge: 'Account Ready', subject: 'Welcome to OmniDesk — Your Closer Account is Ready [{username}]', default_body: '<h3>Welcome to the Team, {name}! 👋</h3><p>Your authorized OmniDesk sales closer workspace has been provisioned. Below are your initial credentials:</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Username:</strong> {username}<br><strong>Initial Password:</strong> {password}<br><strong>Role:</strong> {role}<br><strong>Portal URL:</strong> <a href="{portal_url}">{portal_url}</a></div><p>Please change your password upon your first sign in.</p>' },
+              { id: 'withdrawal_lodged', name: '⏳ Withdrawal Lodged (24-Hour Settlement Guarantee)', badge: 'Audit Active', subject: 'Withdrawal Request Confirmed — PKR {amount} [24-Hour Audit Active]', default_body: '<h3>Withdrawal Request Confirmed ⏳</h3><p>Hello {name}, your withdrawal request of <strong>PKR {amount}</strong> via <strong>{method}</strong> has been logged under our 24-Hour Settlement Guarantee.</p><div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px;margin:16px 0;"><strong>Account:</strong> {account_title} ({account_number})<br><strong>Status:</strong> Under Final Compliance Audit</div>' },
+              { id: 'withdrawal_approved', name: '💰 Withdrawal Approved & Payout Disbursed', badge: 'Funds Sent', subject: 'Funds Disbursed: Your PKR {amount} Payout is Complete [{method}]', default_body: '<h3>Payout Disbursed Successfully! 🟢</h3><p>Dear {name}, we are pleased to confirm that your payout of <strong>PKR {amount}</strong> has been disbursed to your {method} account ({account_number}).</p><div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;margin:16px 0;"><strong>Transaction Ref:</strong> {tx_ref}<br><strong>Disbursed At:</strong> {date}</div>' },
+              { id: 'withdrawal_rejected', name: '⚠️ Withdrawal Notice: Action Required', badge: 'Needs Attention', subject: 'Notice: Withdrawal Request Requires Resubmission [PKR {amount}]', default_body: '<h3>Withdrawal Request Update ⚠️</h3><p>Hello {name}, your payout request of <strong>PKR {amount}</strong> could not be completed during audit. Reason: {reject_reason}. Your funds have been refunded to your available balance.</p>' },
+              { id: 'account_suspended', name: '🚫 Account Suspension Formal Notice', badge: 'Suspended', subject: 'Urgent: Your OmniDesk Closer Account has been Suspended', default_body: '<h3>Account Access Suspended 🚫</h3><p>Dear {name}, your OmniDesk closer account (<code>{username}</code>) has been suspended by Administration effective immediately. All outbound sending, inbound responses, and withdrawals are locked.</p>' },
+              { id: 'account_reactivated', name: '🟢 Account Reactivated — Workspace Restored', badge: 'Access Restored', subject: 'Welcome Back: Your OmniDesk Access is Restored [{username}]', default_body: '<h3>Welcome Back! Your Access is Restored 🟢</h3><p>Dear {name}, your OmniDesk workspace (<code>{username}</code>) has been reactivated with full closing and payout privileges.</p>' },
+              { id: 'sales_milestone', name: '🎯 Monthly Sales Milestone & Leaderboard Honor', badge: 'Top Closer', subject: 'Congratulations on Crushing Your Target, {name}! 🎯', default_body: '<h3>Outstanding Closing Performance! 🏆</h3><p>Congratulations {name}! You have achieved your sales volume target this cycle on OmniDesk. Your performance bonus qualification is active.</p>' },
+              { id: 'system_notice', name: '📢 System Maintenance & Bridge Advisory', badge: 'System Advisory', subject: 'Advisory: Scheduled OmniDesk Optimization & Bridge Health Check', default_body: '<h3>System Maintenance Notice 🛠️</h3><p>Dear OmniDesk Team, scheduled maintenance will be conducted on the WhatsApp bridge socket. Chat data and pending payouts remain fully preserved.</p>' },
+              { id: 'lead_alert', name: '⚡ Unaddressed Lead Reassignment Warning', badge: 'Urgent Response', subject: 'Pipeline Alert: Lead Awaiting Follow-up [Reassignment Warning]', default_body: '<h3>Urgent: Lead Awaiting Follow-up ⚡</h3><p>Hello {name}, customer {lead_name} is waiting for your response. Unanswered leads are recycled back to the pool after 24 hours.</p>' },
+              { id: 'custom', name: '📝 Custom Team Announcement / Directive', badge: 'Announcement', subject: 'Announcement from OmniDesk Administration', default_body: '<h3>Team Update 📢</h3><p>Hello Team,</p><p>Please review the following directive from OmniDesk Administration:</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">{message}</div>' }
+            ];
+            json(200, { success: true, templates });
+            return;
+          }
+          if (action === 'get_logs') {
+            json(200, { success: true, logs: loadLogs() });
+            return;
+          }
+          if (action === 'get_settings') {
+            json(200, { success: true, settings: loadEmailConfig() });
+            return;
+          }
+          if (action === 'save_settings' && req.method === 'POST') {
+            const conf = { ...loadEmailConfig(), ...body };
+            fs.writeFileSync(emailConfigFile, JSON.stringify(conf, null, 2), 'utf8');
+            json(200, { success: true, message: 'Settings saved' });
+            return;
+          }
+          if (action === 'send_email' && req.method === 'POST') {
+            const allUsers = loadLocalUsers();
+            let recipients = [];
+            const tType = body.target_type || 'user';
+            if (tType === 'all') recipients = allUsers.filter(u => u.email);
+            else if (tType === 'role_lead') recipients = allUsers.filter(u => u.role === 'lead' && u.email);
+            else if (tType === 'role_member') recipients = allUsers.filter(u => u.role === 'member' && u.email);
+            else if (tType === 'custom' && body.target_custom_email) {
+              recipients = [{ id: 'CUSTOM-1', name: body.target_custom_name || 'Recipient', username: 'client', email: body.target_custom_email, designation: 'Recipient' }];
+            } else {
+              const matched = allUsers.find(u => u.id === body.target_user_id || u.username === body.target_user_id);
+              if (matched) recipients = [matched];
+            }
+
+            if (!recipients.length) {
+              json(400, { success: false, error: 'No recipients found for selected target audience.' });
+              return;
+            }
+
+            const currentLogs = loadLogs();
+            const dispatched = [];
+            for (const r of recipients) {
+              let subj = body.subject || 'OmniDesk Notification';
+              subj = subj.replace('{name}', r.name).replace('{username}', r.username).replace('{email}', r.email);
+              const logItem = {
+                id: 'ML-' + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 90 + 10),
+                timestamp: new Date().toISOString(),
+                recipient_email: r.email,
+                recipient_name: r.name,
+                subject: subj,
+                template_id: body.template_id || 'custom',
+                status: 'delivered',
+                sent_by: (currentLocalUser ? currentLocalUser.name : 'System Administrator'),
+                sender_email: 'admin@nunno.cloud'
+              };
+              currentLogs.unshift(logItem);
+              dispatched.push(logItem);
+            }
+            saveLogs(currentLogs);
+            json(200, {
+              success: true,
+              sent_count: dispatched.length,
+              total: recipients.length,
+              dispatched,
+              message: `Successfully dispatched email to ${dispatched.length} recipient(s).`
+            });
+            return;
+          }
+        }
         if (url.pathname === '/api/direct_sender.php') {
           const routes = { get_sender_info: '/status', connect_whatsapp: '/connect', send_direct: '/send',
             get_events: '/events?after=' + encodeURIComponent(body.after || 0),
@@ -267,14 +363,20 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       const pathname = decodeURIComponent(url.pathname);
       const relative = pathname === '/' || pathname === '/index.html' ? 'index.html' : pathname.slice(1);
       const file = path.resolve(root, relative);
-      if ((relative !== 'index.html' && !file.startsWith(path.join(root, 'assets') + path.sep)) || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+      if ((relative !== 'index.html' && relative !== 'email_hub.php' && !file.startsWith(path.join(root, 'assets') + path.sep)) || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
         res.writeHead(404); res.end(); return;
       }
-      const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
+      const types = { '.html': 'text/html', '.php': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
       res.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
-      if (relative === 'index.html') {
+      if (relative === 'index.html' || relative === 'email_hub.php') {
         res.setHeader('Set-Cookie', `nunno_local=${session}; HttpOnly; SameSite=Strict; Path=/`);
-        res.end(fs.readFileSync(file, 'utf8').replace('</head>', '<script>window.NUNNO_LOCAL_LIVE=true;</script></head>'));
+        let content = fs.readFileSync(file, 'utf8');
+        if (relative === 'email_hub.php') {
+          content = content.replace(/<\?php[\s\S]*?\?>/i, '');
+        } else {
+          content = content.replace('</head>', '<script>window.NUNNO_LOCAL_LIVE=true;</script></head>');
+        }
+        res.end(content);
       } else res.end(fs.readFileSync(file));
     } catch (_) { if (!res.headersSent) json(500, { success: false, message: 'Local request failed. Check the terminal and reconnect.' }); }
   });

@@ -7,6 +7,27 @@
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'lifetime' => 60 * 60 * 24 * 7,
+        'path'     => '/',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
+
+$sessionUser = $_SESSION['omnidesk_user'] ?? null;
+if ($sessionUser && isset($sessionUser['status']) && $sessionUser['status'] === 'suspended') {
+    $blockedActions = ['save_lead', 'claim_lead', 'update_lead_state', 'mark_paid', 'delete_leads', 'delete_lead', 'clear_demo_data'];
+    $reqAction = $_GET['action'] ?? (json_decode(file_get_contents('php://input'), true)['action'] ?? '');
+    if (in_array($reqAction, $blockedActions)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Account access suspended. All workspace operations are locked.']);
+        exit;
+    }
+}
+
 $dataFile = __DIR__ . '/../data/leads.json';
 
 // Helper: Read current centralized leads

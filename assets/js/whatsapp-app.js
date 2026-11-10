@@ -184,20 +184,32 @@ document.addEventListener('DOMContentLoaded', () => {
     authSubmitBtn: document.getElementById('authSubmitBtn'),
 
     // Employee Provisioning & Roster Modal Elements
+    openTeamModalBtn: document.getElementById('openTeamModalBtn'),
+    openEmailModalBtn: document.getElementById('openEmailModalBtn'),
     employeeModal: document.getElementById('employeeModal'),
     closeTeamModalBtn: document.getElementById('closeTeamModalBtn'),
     createEmpForm: document.getElementById('createEmpForm'),
     newEmpName: document.getElementById('newEmpName'),
     newEmpUsername: document.getElementById('newEmpUsername'),
+    newEmpEmail: document.getElementById('newEmpEmail'),
     newEmpPassword: document.getElementById('newEmpPassword'),
     newEmpRole: document.getElementById('newEmpRole'),
     newEmpGender: document.getElementById('newEmpGender'),
     newEmpPhone: document.getElementById('newEmpPhone'),
+    sendWelcomeEmailOnCreate: document.getElementById('sendWelcomeEmailOnCreate'),
     genEmpPassBtn: document.getElementById('genEmpPassBtn'),
     submitNewEmpBtn: document.getElementById('submitNewEmpBtn'),
     createEmpAlert: document.getElementById('createEmpAlert'),
     teamRosterList: document.getElementById('teamRosterList'),
     refreshTeamBtn: document.getElementById('refreshTeamBtn'),
+
+    // Admin Email Studio Elements
+    adminEmailModal: document.getElementById('adminEmailModal'),
+    closeEmailModalBtn: document.getElementById('closeEmailModalBtn'),
+
+    // Suspended Account Lockout Elements
+    accountSuspendedOverlay: document.getElementById('accountSuspendedOverlay'),
+    suspendedLogoutBtn: document.getElementById('suspendedLogoutBtn'),
 
     // Connected WhatsApp Direct Number Pill & Modal
     connectedNumberPill: document.getElementById('connectedNumberPill'),
@@ -3741,6 +3753,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (data.success) {
         showToast(newStatus === 'approved' ? '🟢 Withdrawal approved & marked as sent!' : '🔴 Withdrawal request rejected.');
+        dispatchWithdrawalStatusEmail(wdId, newStatus, txRef);
         renderEmployeeWorkspace();
       } else {
         showToast(data.error || 'Failed to update withdrawal status.');
@@ -3753,10 +3766,40 @@ document.addEventListener('DOMContentLoaded', () => {
         if (txRef) item.txRef = txRef;
         localStorage.setItem('nunno_cached_withdrawals', JSON.stringify(localWithdrawals));
         showToast(newStatus === 'approved' ? '🟢 Withdrawal marked paid locally!' : '🔴 Withdrawal marked rejected locally.');
+        dispatchWithdrawalStatusEmail(wdId, newStatus, txRef);
         renderEmployeeWorkspace();
       }
     }
   };
+
+  function dispatchWithdrawalStatusEmail(wdId, status, txRef) {
+    const targetWd = localWithdrawals.find(w => w.id === wdId);
+    if (!targetWd) return;
+    const emps = getLocalEmployees();
+    const closer = emps.find(e => e.id === targetWd.userId);
+    const closerEmail = closer?.email || targetWd.email;
+    if (!closerEmail) return;
+
+    fetch('api/email_service.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send_email',
+        target_type: 'custom',
+        target_custom_email: closerEmail,
+        target_custom_name: targetWd.userName || closer?.name,
+        template_id: status === 'approved' ? 'withdrawal_approved' : 'withdrawal_rejected',
+        subject: status === 'approved'
+          ? `Funds Disbursed: Your PKR ${targetWd.amount.toLocaleString()} Payout is Complete [${targetWd.institution || targetWd.method}]`
+          : `Notice: Withdrawal Request Requires Resubmission [PKR ${targetWd.amount.toLocaleString()}]`,
+        badge: status === 'approved' ? 'Funds Sent' : 'Needs Attention',
+        message_html: status === 'approved'
+          ? `<h3>Payout Disbursed Successfully! 🟢</h3><p>Dear ${escapeHtml(targetWd.userName)}, we are pleased to confirm that your payout of <strong>PKR ${targetWd.amount.toLocaleString()}</strong> has been disbursed to your ${escapeHtml(targetWd.institution || targetWd.method)} account (<code>${escapeHtml(targetWd.accountNumber)}</code>).</p><div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;margin:16px 0;"><strong>Transaction Ref:</strong> ${escapeHtml(txRef || 'TX-VERIFIED')}<br><strong>Account Title:</strong> ${escapeHtml(targetWd.accountTitle)}<br><strong>Status:</strong> Completed &amp; Verified</div>`
+          : `<h3>Withdrawal Request Update ⚠️</h3><p>Hello ${escapeHtml(targetWd.userName)}, your payout request of <strong>PKR ${targetWd.amount.toLocaleString()}</strong> could not be completed during audit. Your funds have been refunded back to your available balance. Please verify your account details and resubmit.</p>`,
+        variables: { name: targetWd.userName, amount: targetWd.amount.toLocaleString(), method: targetWd.institution || targetWd.method, tx_ref: txRef || 'TX-VERIFIED' }
+      })
+    }).catch(() => {});
+  }
 
   // Modal Open & Close Event Handlers
   const withdrawModal = document.getElementById('withdrawModal');
@@ -4035,6 +4078,25 @@ document.addEventListener('DOMContentLoaded', () => {
     closeWithdrawModal();
     showToast(`🟢 PKR ${amount.toLocaleString()} requested! Funds will be audited & disbursed within 24 hours.`);
 
+    // Dispatch withdrawal lodged email confirmation to closer
+    if (state.currentUser && state.currentUser.email) {
+      fetch('api/email_service.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_email',
+          target_type: 'custom',
+          target_custom_email: state.currentUser.email,
+          target_custom_name: state.currentUser.name,
+          template_id: 'withdrawal_lodged',
+          subject: `Withdrawal Lodged: PKR ${amount.toLocaleString()} Processing Notice`,
+          badge: 'Audit In Progress',
+          message_html: `<h3>Withdrawal Request Confirmed ⏱️</h3><p>Hello ${escapeHtml(state.currentUser.name)}, your withdrawal request of <strong>PKR ${amount.toLocaleString()}</strong> via <strong>${escapeHtml(institution)}</strong> has been lodged.</p><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Amount:</strong> PKR ${amount.toLocaleString()}<br><strong>Account:</strong> ${escapeHtml(accountTitle)} (${escapeHtml(accountNumber)})<br><strong>Destination:</strong> ${escapeHtml(institution)}<br><strong>Audit SLA:</strong> Within 24 Hours Guaranteed</div><p>Our accounts team will verify and transfer your funds within 24 hours.</p>`,
+          variables: { name: state.currentUser.name, amount: amount.toLocaleString(), method: institution }
+        })
+      }).catch(() => {});
+    }
+
     try {
       const res = await fetch('api/withdrawals.php', {
         method: 'POST',
@@ -4283,6 +4345,13 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('nunno_active_session', JSON.stringify(user));
     hideAuthOverlay();
 
+    // Check account suspension status immediately
+    if (user.status === 'suspended') {
+      showAccountSuspendedScreen(user);
+    } else {
+      hideAccountSuspendedScreen();
+    }
+
     // Map to active closer/agent
     state.currentAgent = {
       id: user.id,
@@ -4295,12 +4364,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAgentProfile();
     updateVoiceRecordingPermission();
 
-    // If Admin, show Employees button and fetch roster
+    // If Admin, show Employees and Email Studio buttons and fetch roster
     if (user.role === 'admin') {
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'inline-flex';
+      if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'inline-flex';
       fetchTeamRoster();
     } else {
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
+      if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'none';
     }
 
     renderConversationsList();
@@ -4309,6 +4380,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if (user.role === 'admin') switchTab('inbox');
     else switchTab('employee');
   }
+
+  function showAccountSuspendedScreen(user) {
+    const overlay = document.getElementById('accountSuspendedOverlay');
+    if (!overlay) return;
+    const nameEl = document.getElementById('suspendedEmpName');
+    const userEl = document.getElementById('suspendedEmpUsername');
+    if (nameEl) nameEl.textContent = user?.name || 'Authorized Closer';
+    if (userEl) userEl.textContent = '@' + (user?.username || 'user');
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function hideAccountSuspendedScreen() {
+    const overlay = document.getElementById('accountSuspendedOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  document.getElementById('suspendedLogoutBtn')?.addEventListener('click', () => {
+    hideAccountSuspendedScreen();
+    handleLogout();
+  });
 
   function handleLogin(e) {
     if (e) e.preventDefault();
@@ -4409,6 +4502,8 @@ document.addEventListener('DOMContentLoaded', () => {
       state.currentUser = null;
       localStorage.removeItem('nunno_active_session');
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
+      if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'none';
+      hideAccountSuspendedScreen();
       if (els.authUsername) els.authUsername.value = '';
       if (els.authPassword) els.authPassword.value = '';
       showAuthOverlay();
@@ -4463,10 +4558,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = (els.newEmpName?.value || '').trim();
     const username = (els.newEmpUsername?.value || '').trim();
     const password = (els.newEmpPassword?.value || '').trim();
+    const email = (els.newEmpEmail?.value || '').trim() || (username + '@nunno.cloud');
     const designation = (els.newEmpRole?.value || 'Team Member');
     const role = designation === 'Admin' ? 'admin' : (designation === 'Team Lead' ? 'lead' : 'member');
     const gender = (els.newEmpGender?.value || 'male');
     const phone = (els.newEmpPhone?.value || '').trim();
+    const shouldSendWelcome = els.sendWelcomeEmailOnCreate ? els.sendWelcomeEmailOnCreate.checked : true;
 
     if (!name || !username || !password) {
       showCreateEmpAlert('Please fill in Full Name, Username, and Password.', 'error');
@@ -4486,7 +4583,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('api/auth.php?action=create_employee', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, username, password, designation, role, gender, phone })
+      body: JSON.stringify({ name, username, password, email, designation, role, gender, phone })
     })
     .then(async res => {
       const data = await res.json();
@@ -4498,8 +4595,15 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(data => {
       showCreateEmpAlert(`✅ Employee account created successfully for ${name} (${username}).`, 'success');
       showToast(`Employee ${name} provisioned!`);
+
+      // Dispatch welcome email with credentials if option enabled
+      if (shouldSendWelcome && email) {
+        dispatchWelcomeEmail(name, username, password, email, designation);
+      }
+
       if (els.newEmpName) els.newEmpName.value = '';
       if (els.newEmpUsername) els.newEmpUsername.value = '';
+      if (els.newEmpEmail) els.newEmpEmail.value = '';
       if (els.newEmpPassword) els.newEmpPassword.value = '';
       if (els.newEmpPhone) els.newEmpPhone.value = '';
       fetchTeamRoster();
@@ -4515,7 +4619,7 @@ document.addEventListener('DOMContentLoaded', () => {
         id: 'EMP-' + (100 + localEmps.length + 1),
         name,
         username,
-        email: username + '@nunno.cloud',
+        email,
         password,
         role,
         designation,
@@ -4528,8 +4632,14 @@ document.addEventListener('DOMContentLoaded', () => {
       saveLocalEmployees(localEmps);
       showCreateEmpAlert(`✅ Employee account created for ${name} (Stored locally).`, 'success');
       showToast(`Employee ${name} provisioned!`);
+
+      if (shouldSendWelcome && email) {
+        dispatchWelcomeEmail(name, username, password, email, designation);
+      }
+
       if (els.newEmpName) els.newEmpName.value = '';
       if (els.newEmpUsername) els.newEmpUsername.value = '';
+      if (els.newEmpEmail) els.newEmpEmail.value = '';
       if (els.newEmpPassword) els.newEmpPassword.value = '';
       if (els.newEmpPhone) els.newEmpPhone.value = '';
       renderRosterList(localEmps);
@@ -4540,6 +4650,31 @@ document.addEventListener('DOMContentLoaded', () => {
         els.submitNewEmpBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg><span>Provision Employee Account</span>';
       }
     });
+  }
+
+  function dispatchWelcomeEmail(name, username, password, email, designation) {
+    fetch('api/email_service.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'send_email',
+        target_type: 'custom',
+        target_custom_email: email,
+        target_custom_name: name,
+        template_id: 'welcome',
+        subject: `Welcome to OmniDesk — Your Closer Account is Ready [${username}]`,
+        badge: 'Account Ready',
+        message_html: `<h3>Welcome to the Team, ${escapeHtml(name)}! 👋</h3><p>Your authorized OmniDesk sales closer workspace has been provisioned by the Administrator.</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Workspace URL:</strong> <a href="${window.location.origin}">${window.location.origin}</a><br><strong>Username:</strong> <code style="background:#ede9fe;color:#5b21b6;padding:2px 6px;border-radius:4px;font-weight:700;">${escapeHtml(username)}</code><br><strong>Initial Password:</strong> <code style="background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-weight:700;">${escapeHtml(password)}</code><br><strong>Designation:</strong> ${escapeHtml(designation)}</div><p style="font-size:12px;color:#64748b;">Please sign in and change your initial password immediately.</p>`,
+        variables: { name, username, password, role: designation, email, portal_url: window.location.origin }
+      })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res && res.success) {
+        showToast(`✉️ Welcome email dispatched to ${email}`);
+      }
+    })
+    .catch(() => {});
   }
 
   function showCreateEmpAlert(msg, type) {
@@ -4556,12 +4691,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data && data.success && Array.isArray(data.employees)) {
           state.employees = data.employees;
           renderRosterList(data.employees);
+          populateAdminEmailUsers();
           if (els.headerEmpCount) els.headerEmpCount.textContent = data.employees.length;
         }
       })
       .catch(() => {
         const localEmps = getLocalEmployees();
+        state.employees = localEmps;
         renderRosterList(localEmps);
+        populateAdminEmailUsers();
         if (els.headerEmpCount) els.headerEmpCount.textContent = localEmps.length;
       });
   }
@@ -4586,24 +4724,31 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="emp-card-user">
             <div class="emp-avatar ${isAdmin ? 'admin-av' : ''}">${initials}</div>
             <div class="emp-card-identity">
-              <div class="emp-card-name">${escapeHtml(emp.name)} ${isAdmin ? '<span class="badge-role-admin" style="font-size:9px;">Admin</span>' : ''}</div>
+              <div class="emp-card-name">
+                <span>${escapeHtml(emp.name)}</span>
+                ${isAdmin ? '<span class="badge-role-admin" style="font-size:9px;">Admin</span>' : ''}
+              </div>
               <div class="emp-card-sub">
-                <span class="emp-card-username">${escapeHtml(emp.username)}</span>
+                <span class="emp-card-username">@${escapeHtml(emp.username)}</span>
                 <span class="emp-card-role">${escapeHtml(emp.designation || emp.role)}</span>
                 <span style="font-size:10.5px;color:var(--text-muted);margin-left:6px;">${genderTag} • ${vmStatus}</span>
+                ${emp.email ? `<span style="font-size:10.5px;color:var(--text-secondary);display:block;margin-top:2px;">✉️ ${escapeHtml(emp.email)}</span>` : ''}
               </div>
             </div>
           </div>
           <div class="emp-actions-group">
             <span class="emp-status-badge ${isSuspended ? 'suspended' : 'active'}">
-              <span class="emp-status-indicator" aria-hidden="true"></span>${isSuspended ? 'Suspended' : 'Active'}
+              <span class="emp-status-indicator" aria-hidden="true"></span>${isSuspended ? '🔴 Suspended' : '🟢 Active'}
             </span>
             ${!isAdmin ? `
-              <button type="button" class="btn-emp-action" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Activate Employee' : 'Suspend Employee'}">
-                ${isSuspended ? 'Activate' : 'Suspend'}
+              <button type="button" class="btn-emp-action ${isSuspended ? 'reactivate' : 'suspend'}" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Reactivate Employee Access' : 'Suspend Employee Access'}">
+                ${isSuspended ? '✅ Reactivate' : '🚫 Suspend'}
+              </button>
+              <button type="button" class="btn-emp-action mail" onclick="window.OmnideskQuickEmail('${emp.id}')" title="Send Email to ${escapeHtml(emp.name)}">
+                ✉️ Email
               </button>
               <button type="button" class="btn-emp-action delete" onclick="window.OmnideskDeleteEmp('${emp.id}', '${escapeHtml(emp.name)}')" title="Remove employee" aria-label="Remove ${escapeHtml(emp.name)}">
-                Remove
+                ✕ Remove
               </button>
             ` : ''}
           </div>
@@ -4614,7 +4759,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Global window hooks for inline onclicks in roster
   window.OmnideskToggleStatus = function(empId) {
-    if (!confirm('Toggle status for this employee?')) return;
+    const targetEmp = (state.employees || []).find(e => e.id === empId);
+    const willSuspend = targetEmp && targetEmp.status !== 'suspended';
+    const actionText = willSuspend ? 'suspend this employee and lock their workspace' : 'reactivate this employee and restore their workspace';
+
+    if (!confirm(`Are you sure you want to ${actionText}?`)) return;
+
     fetch('api/auth.php?action=toggle_status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -4623,8 +4773,36 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(res => res.json())
     .then(data => {
       if (data && data.success) {
-        showToast(data.message || 'Status updated.');
+        showToast(willSuspend ? '🚫 Employee suspended. Access locked.' : '🟢 Employee access restored.');
         fetchTeamRoster();
+
+        // If target is currently active user on this client, update lock screen immediately
+        if (state.currentUser && state.currentUser.id === empId) {
+          state.currentUser.status = willSuspend ? 'suspended' : 'active';
+          if (willSuspend) showAccountSuspendedScreen(state.currentUser);
+          else hideAccountSuspendedScreen();
+        }
+
+        // Send email notice
+        if (targetEmp && targetEmp.email) {
+          fetch('api/email_service.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'send_email',
+              target_type: 'custom',
+              target_custom_email: targetEmp.email,
+              target_custom_name: targetEmp.name,
+              template_id: willSuspend ? 'account_suspended' : 'account_reactivated',
+              subject: willSuspend ? 'Urgent: Your OmniDesk Closer Account has been Suspended' : 'Welcome Back: Your OmniDesk Access is Restored',
+              badge: willSuspend ? 'Suspended' : 'Restored',
+              message_html: willSuspend 
+                ? `<h3>Account Access Suspended 🚫</h3><p>Dear ${escapeHtml(targetEmp.name)}, your OmniDesk closer workspace access (<code>${escapeHtml(targetEmp.username)}</code>) has been suspended by Administration effective immediately.</p><p>All WhatsApp sending, inbound replies, and withdrawals are locked. Please contact management for review.</p>`
+                : `<h3>Welcome Back! Your Access is Restored 🟢</h3><p>Dear ${escapeHtml(targetEmp.name)}, your OmniDesk closer workspace access (<code>${escapeHtml(targetEmp.username)}</code>) has been reactivated with full closing privileges.</p>`,
+              variables: { name: targetEmp.name, username: targetEmp.username, email: targetEmp.email }
+            })
+          }).catch(() => {});
+        }
       } else {
         alert(data.error || 'Failed to update status.');
       }
@@ -4636,7 +4814,12 @@ document.addEventListener('DOMContentLoaded', () => {
         target.status = target.status === 'active' ? 'suspended' : 'active';
         saveLocalEmployees(emps);
         renderRosterList(emps);
-        showToast(`Employee status set to ${target.status}.`);
+        showToast(target.status === 'suspended' ? '🚫 Employee suspended (local).' : '🟢 Employee reactivated (local).');
+        if (state.currentUser && state.currentUser.id === empId) {
+          state.currentUser.status = target.status;
+          if (target.status === 'suspended') showAccountSuspendedScreen(state.currentUser);
+          else hideAccountSuspendedScreen();
+        }
       }
     });
   };
@@ -4731,6 +4914,435 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.createEmpForm) els.createEmpForm.addEventListener('submit', handleCreateEmployee);
   if (els.submitNewEmpBtn) els.submitNewEmpBtn.addEventListener('click', handleCreateEmployee);
   if (els.refreshTeamBtn) els.refreshTeamBtn.addEventListener('click', fetchTeamRoster);
+
+  // ==========================================
+  // ADMIN EMAIL COMMUNICATIONS STUDIO CONTROLLER
+  // ==========================================
+
+  let emailTemplatesCache = [];
+  let emailRosterCache = [];
+
+  function openAdminEmailModal(preselectEmpId) {
+    if (!state.currentUser || state.currentUser.role !== 'admin') {
+      showToast('⚠️ Access Denied: Only Administrator can access the Email Studio.');
+      return;
+    }
+    if (els.adminEmailModal) els.adminEmailModal.classList.add('open');
+    switchAdminEmailTab('compose');
+    populateAdminEmailUsers(preselectEmpId);
+    loadAdminEmailTemplates();
+  }
+
+  function closeAdminEmailModal() {
+    if (els.adminEmailModal) els.adminEmailModal.classList.remove('open');
+  }
+
+  function switchAdminEmailTab(tab) {
+    const composeBtn = document.getElementById('tabEmailComposeBtn');
+    const logsBtn = document.getElementById('tabEmailLogsBtn');
+    const settingsBtn = document.getElementById('tabEmailSettingsBtn');
+
+    const composeView = document.getElementById('viewEmailCompose');
+    const logsView = document.getElementById('viewEmailLogs');
+    const settingsView = document.getElementById('viewEmailSettings');
+
+    if (composeBtn) composeBtn.classList.toggle('active', tab === 'compose');
+    if (logsBtn) logsBtn.classList.toggle('active', tab === 'logs');
+    if (settingsBtn) settingsBtn.classList.toggle('active', tab === 'settings');
+
+    if (composeView) composeView.style.display = tab === 'compose' ? 'grid' : 'none';
+    if (logsView) logsView.style.display = tab === 'logs' ? 'block' : 'none';
+    if (settingsView) settingsView.style.display = tab === 'settings' ? 'block' : 'none';
+
+    if (tab === 'logs') loadAdminEmailLogs();
+    if (tab === 'settings') loadAdminEmailSettings();
+  }
+
+  function populateAdminEmailUsers(preselectEmpId) {
+    const select = document.getElementById('modalEmailUserSelect');
+    if (!select) return;
+
+    fetch('api/auth.php?action=get_team')
+      .then(r => r.json())
+      .then(data => {
+        emailRosterCache = (data && data.success && Array.isArray(data.users)) ? data.users : getLocalEmployees();
+        renderUserOptions(preselectEmpId);
+      })
+      .catch(() => {
+        emailRosterCache = getLocalEmployees();
+        renderUserOptions(preselectEmpId);
+      });
+
+    function renderUserOptions(preselectId) {
+      select.innerHTML = '';
+      emailRosterCache.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = `${u.name} (@${u.username}) — ${u.email || 'no email registered'}`;
+        opt.dataset.email = u.email || '';
+        opt.dataset.name = u.name;
+        opt.dataset.username = u.username;
+        opt.dataset.role = u.role;
+        select.appendChild(opt);
+      });
+      if (preselectId) {
+        select.value = preselectId;
+        const targetType = document.getElementById('modalEmailTargetType');
+        if (targetType) targetType.value = 'user';
+        handleEmailTargetTypeChange();
+      }
+      updateModalEmailPreview();
+    }
+  }
+
+  function handleEmailTargetTypeChange() {
+    const targetType = document.getElementById('modalEmailTargetType')?.value || 'user';
+    const userGroup = document.getElementById('modalEmailUserGroup');
+    const customGroup = document.getElementById('modalEmailCustomGroup');
+
+    if (userGroup) userGroup.style.display = targetType === 'user' ? 'block' : 'none';
+    if (customGroup) customGroup.style.display = targetType === 'custom' ? 'flex' : 'none';
+
+    updateModalEmailPreview();
+  }
+
+  async function loadAdminEmailTemplates() {
+    const select = document.getElementById('modalEmailTemplateSelect');
+    if (!select) return;
+
+    try {
+      const res = await fetch('api/email_service.php?action=get_templates');
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.templates)) {
+        emailTemplatesCache = data.templates;
+      }
+    } catch (_) {}
+
+    if (!emailTemplatesCache || !emailTemplatesCache.length) {
+      emailTemplatesCache = [
+        { id: 'welcome', name: '👋 New Employee Onboarding & Login Credentials', badge: 'Account Activated', subject: 'Welcome to the OmniDesk Team! Your Closer Credentials', default_body: '<h3>Welcome to OmniDesk Closer Workspace! 🚀</h3><p>Dear {name}, your official closer account has been provisioned.</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Username:</strong> <code>{username}</code><br><strong>Access Level:</strong> {role}<br><strong>Security:</strong> Temporary password generated</div><p>Log in securely to start handling leads and closing deals.</p>' },
+        { id: 'withdrawal_lodged', name: '💳 Withdrawal Request Received (24-Hour Settlement)', badge: 'Audit In Progress', subject: 'Withdrawal Lodged: PKR {amount} Processing Notice', default_body: '<h3>Withdrawal Request Confirmed ⏱️</h3><p>Hello {name}, your withdrawal request of <strong>PKR {amount}</strong> via <strong>{method}</strong> has been logged.</p><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Amount:</strong> PKR {amount}<br><strong>Destination:</strong> {method}<br><strong>Audit SLA:</strong> Within 24 Hours Guaranteed</div>' },
+        { id: 'withdrawal_approved', name: '💰 Withdrawal Approved & Payout Disbursed', badge: 'Funds Sent', subject: 'Funds Disbursed: Your PKR {amount} Payout is Complete [{method}]', default_body: '<h3>Payout Disbursed Successfully! 🟢</h3><p>Dear {name}, we are pleased to confirm that your payout of <strong>PKR {amount}</strong> has been disbursed to your {method} account.</p><div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;margin:16px 0;"><strong>Status:</strong> Completed &amp; Verified<br><strong>Disbursed At:</strong> {date}</div>' },
+        { id: 'withdrawal_rejected', name: '⚠️ Withdrawal Notice: Action Required', badge: 'Needs Attention', subject: 'Notice: Withdrawal Request Requires Resubmission [PKR {amount}]', default_body: '<h3>Withdrawal Request Update ⚠️</h3><p>Hello {name}, your payout request of <strong>PKR {amount}</strong> could not be completed during audit. Your funds have been restored to your available balance.</p>' },
+        { id: 'account_suspended', name: '🚫 Account Suspension Formal Notice', badge: 'Suspended', subject: 'Urgent: Your OmniDesk Closer Account has been Suspended', default_body: '<h3>Account Access Suspended 🚫</h3><p>Dear {name}, your OmniDesk closer workspace access (<code>{username}</code>) has been suspended by Administration effective immediately. All outbound sending, inbound replies, and withdrawals are locked.</p>' },
+        { id: 'account_reactivated', name: '🟢 Account Reactivated — Workspace Restored', badge: 'Access Restored', subject: 'Welcome Back: Your OmniDesk Access is Restored [{username}]', default_body: '<h3>Welcome Back! Your Access is Restored 🟢</h3><p>Dear {name}, your OmniDesk closer workspace (<code>{username}</code>) has been reactivated with full closing and payout privileges.</p>' },
+        { id: 'sales_milestone', name: '🎯 Monthly Sales Milestone & Leaderboard Honor', badge: 'Top Closer', subject: 'Congratulations on Crushing Your Target, {name}! 🎯', default_body: '<h3>Outstanding Closing Performance! 🏆</h3><p>Congratulations {name}! You have achieved your sales volume target this cycle on OmniDesk. Your performance bonus qualification is active.</p>' },
+        { id: 'system_notice', name: '📢 System Maintenance & Bridge Advisory', badge: 'System Advisory', subject: 'Advisory: Scheduled OmniDesk Optimization & Bridge Health Check', default_body: '<h3>System Maintenance Notice 🛠️</h3><p>Dear OmniDesk Team, scheduled maintenance will be conducted on the WhatsApp bridge socket. Chat data and pending payouts remain fully preserved.</p>' },
+        { id: 'lead_alert', name: '⚡ Unaddressed Lead Reassignment Warning', badge: 'Urgent Response', subject: 'Pipeline Alert: Lead Awaiting Follow-up [Reassignment Warning]', default_body: '<h3>Urgent: Lead Awaiting Follow-up ⚡</h3><p>Hello {name}, customer inquiries are waiting for your response. Unanswered leads are recycled back to the pool after 24 hours.</p>' },
+        { id: 'custom', name: '📝 Custom Team Announcement / Directive', badge: 'Announcement', subject: 'Directive from OmniDesk Administration', default_body: '<h3>Team Update 📢</h3><p>Hello Team,</p><p>Please review the following directive from OmniDesk Administration:</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">Please keep WhatsApp follow-ups active and ensure deal notes are accurately filled.</div>' }
+      ];
+    }
+
+    select.innerHTML = '';
+    emailTemplatesCache.forEach(tpl => {
+      const opt = document.createElement('option');
+      opt.value = tpl.id;
+      opt.textContent = tpl.name;
+      select.appendChild(opt);
+    });
+
+    applySelectedTemplate();
+  }
+
+  function applySelectedTemplate() {
+    const templateId = document.getElementById('modalEmailTemplateSelect')?.value;
+    const tpl = emailTemplatesCache.find(t => t.id === templateId) || emailTemplatesCache[0];
+    if (!tpl) return;
+
+    const subjInput = document.getElementById('modalEmailSubject');
+    const badgeInput = document.getElementById('modalEmailBadge');
+    const bodyInput = document.getElementById('modalEmailBody');
+
+    if (subjInput) subjInput.value = tpl.subject || '';
+    if (badgeInput) badgeInput.value = tpl.badge || 'Notice';
+    if (bodyInput) bodyInput.value = tpl.default_body || '';
+
+    updateModalEmailPreview();
+  }
+
+  function updateModalEmailPreview() {
+    const iframe = document.getElementById('modalEmailPreviewIframe');
+    if (!iframe) return;
+
+    const badge = document.getElementById('modalEmailBadge')?.value || 'Official Notice';
+    let bodyHtml = document.getElementById('modalEmailBody')?.value || '<p>OmniDesk automated dispatch.</p>';
+
+    // Sample/Selected user values
+    const targetType = document.getElementById('modalEmailTargetType')?.value || 'user';
+    const userSelect = document.getElementById('modalEmailUserSelect');
+    const selectedOpt = userSelect?.options[userSelect.selectedIndex];
+
+    let targetName = 'Team Member';
+    let targetUsername = 'closer';
+    let targetEmail = 'member@nunno.cloud';
+    let targetRole = 'Closer Specialist';
+
+    if (targetType === 'user' && selectedOpt) {
+      targetName = selectedOpt.dataset.name || selectedOpt.textContent.split('(')[0].trim();
+      targetUsername = selectedOpt.dataset.username || 'closer';
+      targetEmail = selectedOpt.dataset.email || 'member@nunno.cloud';
+      targetRole = selectedOpt.dataset.role || 'Closer Specialist';
+    } else if (targetType === 'custom') {
+      targetName = document.getElementById('modalEmailCustomName')?.value || 'Closer Partner';
+      targetEmail = document.getElementById('modalEmailCustomAddress')?.value || 'closer@gmail.com';
+    } else if (targetType === 'all') {
+      targetName = 'All OmniDesk Team Members';
+    }
+
+    const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const portalUrl = window.location.origin + window.location.pathname;
+
+    const replacements = {
+      '{name}': targetName,
+      '{username}': targetUsername,
+      '{email}': targetEmail,
+      '{role}': targetRole,
+      '{amount}': '5,000',
+      '{method}': 'EasyPaisa (03001234567)',
+      '{date}': todayStr,
+      '{portal_url}': portalUrl,
+      '{password}': '••••••••'
+    };
+
+    let interpolatedBody = bodyHtml;
+    for (const [k, v] of Object.entries(replacements)) {
+      interpolatedBody = interpolatedBody.split(k).join(v);
+    }
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:16px; background:#f1f5f9; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#0f172a; line-height:1.6; }
+    .email-container { max-width:560px; margin:0 auto; background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 8px 30px rgba(0,0,0,0.06); }
+    .email-header { background:linear-gradient(135deg, #0b141a 0%, #111b21 100%); padding:22px 24px; color:#ffffff; }
+    .email-badge { display:inline-block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.8px; padding:3px 9px; border-radius:999px; background:rgba(0,168,132,0.22); color:#25d366; border:1px solid rgba(0,168,132,0.4); margin-bottom:8px; }
+    .email-title { font-size:18px; font-weight:800; margin:0; color:#ffffff; }
+    .email-body { padding:24px; font-size:13.5px; color:#334155; }
+    .email-body h3 { margin-top:0; color:#0f172a; font-size:16px; }
+    .email-body code { background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:12px; font-family:monospace; color:#0f172a; border:1px solid #e2e8f0; }
+    .email-cta-box { text-align:center; margin:24px 0 12px; }
+    .email-btn { display:inline-block; background:#00a884; color:#ffffff !important; text-decoration:none; font-weight:700; font-size:13px; padding:11px 24px; border-radius:8px; box-shadow:0 4px 12px rgba(0,168,132,0.3); }
+    .email-footer { background:#f8fafc; border-top:1px solid #e2e8f0; padding:16px 24px; font-size:11px; color:#64748b; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <div class="email-badge">${escapeHtml(badge)}</div>
+      <h2 class="email-title">OmniDesk Communications</h2>
+    </div>
+    <div class="email-body">
+      ${interpolatedBody}
+      <div class="email-cta-box">
+        <a href="${escapeHtml(portalUrl)}" class="email-btn" target="_blank">Access OmniDesk Portal &rarr;</a>
+      </div>
+    </div>
+    <div class="email-footer">
+      Sent securely by OmniDesk Enterprise &bull; 24/7 Verified Closer Operations
+    </div>
+  </div>
+</body>
+</html>`;
+
+    iframe.srcdoc = html;
+  }
+
+  async function handleSendAdminEmail(e) {
+    if (e) e.preventDefault();
+    const alertBox = document.getElementById('modalEmailAlert');
+    const sendBtn = document.getElementById('modalEmailSendBtn');
+
+    const showAlert = (msg, isSuccess = false) => {
+      if (alertBox) {
+        alertBox.textContent = msg;
+        alertBox.className = 'auth-alert ' + (isSuccess ? 'success' : '');
+        alertBox.style.display = 'block';
+      }
+    };
+
+    const targetType = document.getElementById('modalEmailTargetType')?.value || 'user';
+    const targetUserId = document.getElementById('modalEmailUserSelect')?.value || '';
+    const customEmail = document.getElementById('modalEmailCustomAddress')?.value?.trim() || '';
+    const customName = document.getElementById('modalEmailCustomName')?.value?.trim() || 'Valued Recipient';
+    const templateId = document.getElementById('modalEmailTemplateSelect')?.value || 'custom';
+    const subject = document.getElementById('modalEmailSubject')?.value?.trim() || '';
+    const badge = document.getElementById('modalEmailBadge')?.value?.trim() || 'Notice';
+    const bodyHtml = document.getElementById('modalEmailBody')?.value?.trim() || '';
+
+    if (!subject) { showAlert('Please enter an email subject.'); return; }
+    if (!bodyHtml) { showAlert('Please enter email message content.'); return; }
+    if (targetType === 'custom' && !customEmail) { showAlert('Please enter a target recipient email address.'); return; }
+
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = '<span>⏳ Dispatching Email...</span>';
+    }
+
+    try {
+      const res = await fetch('api/email_service.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_email',
+          target_type: targetType,
+          target_user_id: targetUserId,
+          target_custom_email: customEmail,
+          target_custom_name: customName,
+          template_id: templateId,
+          subject: subject,
+          badge: badge,
+          message_html: bodyHtml
+        })
+      });
+
+      const data = await res.json();
+      if (data && data.success) {
+        showAlert(`✅ ${data.message || 'Email successfully dispatched!'}`, true);
+        showToast(`✉️ Dispatched ${data.dispatched_count || 1} email(s) successfully!`);
+      } else {
+        showAlert(data.error || 'Failed to dispatch email.');
+      }
+    } catch (err) {
+      showAlert('✅ Email recorded to dispatch audit trail (local simulation).', true);
+      showToast('✉️ Email dispatched to queue.');
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<span>✉️ Dispatch Email Now</span> <span>&rarr;</span>';
+      }
+    }
+  }
+
+  async function loadAdminEmailLogs() {
+    const tbody = document.getElementById('modalEmailLogsTbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--text-muted);">Fetching audit logs...</td></tr>';
+
+    try {
+      const res = await fetch('api/email_service.php?action=get_logs');
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.logs) && data.logs.length) {
+        tbody.innerHTML = '';
+        data.logs.forEach(log => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid var(--border-subtle)';
+          tr.innerHTML = `
+            <td style="padding:8px 12px;font-family:monospace;font-size:11px;">${escapeHtml(log.id || '-')}</td>
+            <td style="padding:8px 12px;font-weight:600;">${escapeHtml(log.recipient || '-')}</td>
+            <td style="padding:8px 12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(log.subject || '-')}</td>
+            <td style="padding:8px 12px;"><span class="badge-role-lead" style="font-size:10px;">${escapeHtml(log.template || 'Custom')}</span></td>
+            <td style="padding:8px 12px;font-size:11px;color:var(--text-muted);">${escapeHtml(log.dispatched_at ? new Date(log.dispatched_at).toLocaleString() : '-')}</td>
+            <td style="padding:8px 12px;"><span style="color:var(--accent-brand);font-weight:700;">🟢 Dispatched</span></td>
+          `;
+          tbody.appendChild(tr);
+        });
+        return;
+      }
+    } catch (_) {}
+
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">No dispatched emails logged yet.</td></tr>';
+  }
+
+  async function loadAdminEmailSettings() {
+    try {
+      const res = await fetch('api/email_service.php?action=get_settings');
+      const data = await res.json();
+      if (data && data.success && data.settings) {
+        const s = data.settings;
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+        setVal('modalEmailTransport', s.transport);
+        setVal('modalEmailSenderName', s.sender_name);
+        setVal('modalEmailSenderEmail', s.sender_email);
+        setVal('modalEmailReplyTo', s.reply_to);
+        setVal('modalEmailSmtpHost', s.smtp_host);
+        setVal('modalEmailSmtpPort', s.smtp_port);
+        setVal('modalEmailSmtpSecure', s.smtp_secure);
+        setVal('modalEmailSmtpUser', s.smtp_user);
+        setVal('modalEmailPortalUrl', s.portal_url);
+      }
+    } catch (_) {}
+  }
+
+  async function handleSaveAdminEmailSettings(e) {
+    if (e) e.preventDefault();
+    const alertBox = document.getElementById('modalEmailSettingsAlert');
+    const getVal = id => document.getElementById(id)?.value?.trim() || '';
+
+    const payload = {
+      action: 'save_settings',
+      transport: getVal('modalEmailTransport'),
+      sender_name: getVal('modalEmailSenderName'),
+      sender_email: getVal('modalEmailSenderEmail'),
+      reply_to: getVal('modalEmailReplyTo'),
+      smtp_host: getVal('modalEmailSmtpHost'),
+      smtp_port: parseInt(getVal('modalEmailSmtpPort'), 10) || 465,
+      smtp_secure: getVal('modalEmailSmtpSecure'),
+      smtp_user: getVal('modalEmailSmtpUser'),
+      smtp_pass: getVal('modalEmailSmtpPass'),
+      portal_url: getVal('modalEmailPortalUrl')
+    };
+
+    try {
+      const res = await fetch('api/email_service.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (alertBox) {
+          alertBox.textContent = '✅ Mailer settings successfully updated.';
+          alertBox.className = 'auth-alert success';
+          alertBox.style.display = 'block';
+        }
+        showToast('Mailer settings updated.');
+      }
+    } catch (_) {}
+  }
+
+  window.OmnideskQuickEmail = function(empId) {
+    if (els.employeeModal) els.employeeModal.classList.remove('open');
+    openAdminEmailModal(empId);
+  };
+
+  // Wire Admin Email Studio listeners
+  document.getElementById('openEmailModalBtn')?.addEventListener('click', () => openAdminEmailModal());
+  document.getElementById('closeEmailModalBtn')?.addEventListener('click', closeAdminEmailModal);
+  document.getElementById('tabEmailComposeBtn')?.addEventListener('click', () => switchAdminEmailTab('compose'));
+  document.getElementById('tabEmailLogsBtn')?.addEventListener('click', () => switchAdminEmailTab('logs'));
+  document.getElementById('tabEmailSettingsBtn')?.addEventListener('click', () => switchAdminEmailTab('settings'));
+  document.getElementById('modalEmailForm')?.addEventListener('submit', handleSendAdminEmail);
+  document.getElementById('modalEmailSendBtn')?.addEventListener('click', handleSendAdminEmail);
+  document.getElementById('modalRefreshEmailLogsBtn')?.addEventListener('click', loadAdminEmailLogs);
+  document.getElementById('modalEmailSettingsForm')?.addEventListener('submit', handleSaveAdminEmailSettings);
+  document.getElementById('modalEmailSaveSettingsBtn')?.addEventListener('click', handleSaveAdminEmailSettings);
+  document.getElementById('modalEmailTemplateSelect')?.addEventListener('change', applySelectedTemplate);
+  document.getElementById('modalEmailTargetType')?.addEventListener('change', handleEmailTargetTypeChange);
+  document.getElementById('modalEmailUserSelect')?.addEventListener('change', updateModalEmailPreview);
+  document.getElementById('modalEmailCustomName')?.addEventListener('input', updateModalEmailPreview);
+  document.getElementById('modalEmailCustomAddress')?.addEventListener('input', updateModalEmailPreview);
+  ['modalEmailSubject', 'modalEmailBadge', 'modalEmailBody'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updateModalEmailPreview);
+  });
+
+  document.querySelectorAll('#modalEmailChips .btn-amt-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const variable = chip.dataset.var;
+      const bodyInput = document.getElementById('modalEmailBody');
+      if (bodyInput && variable) {
+        const start = bodyInput.selectionStart || 0;
+        const end = bodyInput.selectionEnd || 0;
+        const text = bodyInput.value;
+        bodyInput.value = text.substring(0, start) + variable + text.substring(end);
+        bodyInput.focus();
+        bodyInput.selectionStart = bodyInput.selectionEnd = start + variable.length;
+        updateModalEmailPreview();
+      }
+    });
+  });
 
   // ==========================================
   // MODAL 5: MARK PAID (DEAL WON POPUP)

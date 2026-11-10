@@ -173,6 +173,12 @@ if ($action === 'send_direct') {
     }
     $user = $_SESSION['omnidesk_user'];
 
+    if (isset($user['status']) && $user['status'] === 'suspended') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Account access suspended. Outbound WhatsApp sending is locked.']);
+        exit;
+    }
+
     $phone = trim($input['phone'] ?? '');
     $message = trim($input['message'] ?? '');
 
