@@ -70,6 +70,7 @@ if ($action === 'request_withdrawal') {
     }
     
     $method = isset($data['method']) ? trim($data['method']) : 'EasyPaisa';
+    $institution = isset($data['institution']) ? trim($data['institution']) : $method;
     $accountTitle = isset($data['accountTitle']) ? trim($data['accountTitle']) : '';
     $accountNumber = isset($data['accountNumber']) ? trim($data['accountNumber']) : '';
     $note = isset($data['note']) ? trim($data['note']) : '';
@@ -77,6 +78,27 @@ if ($action === 'request_withdrawal') {
     if (empty($accountTitle) || empty($accountNumber)) {
         echo json_encode(['success' => false, 'error' => 'Account title and account number are required.']);
         exit;
+    }
+
+    // Pakistani Digital Wallet validation (11 digits starting with 0, or 12 digits with +92)
+    $walletKeys = ['easypaisa', 'jazzcash', 'sadapay', 'nayapay', 'upaisa', 'zindigi', 'digital wallet'];
+    $isWallet = in_array(strtolower($method), $walletKeys) || in_array(strtolower($institution), $walletKeys);
+    if ($isWallet) {
+        $cleanPhone = preg_replace('/[^\d\+]/', '', $accountNumber);
+        $isValidWallet = false;
+        if (preg_match('/^0[0-9]{10}$/', $cleanPhone)) {
+            $isValidWallet = true;
+        } elseif (preg_match('/^\+?92[0-9]{10}$/', $cleanPhone)) {
+            $isValidWallet = true;
+        }
+        if (!$isValidWallet) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Technical Validation Error: For digital wallets (' . htmlspecialchars($institution) . '), enter 11 digits starting with 0 (e.g. 03001234567) or 12 digits with country code (+923001234567).'
+            ]);
+            exit;
+        }
+        $accountNumber = $cleanPhone;
     }
     
     $userId = isset($data['userId']) ? $data['userId'] : ($currentUser ? $currentUser['id'] : 'EMP-TL-01');
@@ -92,6 +114,7 @@ if ($action === 'request_withdrawal') {
         'userRole' => $userRole,
         'amount' => $amount,
         'method' => $method,
+        'institution' => $institution,
         'accountTitle' => $accountTitle,
         'accountNumber' => $accountNumber,
         'note' => $note,

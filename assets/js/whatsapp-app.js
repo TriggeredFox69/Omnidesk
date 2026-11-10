@@ -416,7 +416,14 @@ document.addEventListener('DOMContentLoaded', () => {
   function setTheme(theme) {
     const isDark = theme === 'dark';
     document.body.classList.toggle('theme-dark', isDark);
+    document.documentElement.classList.toggle('theme-dark', isDark);
+    document.documentElement.classList.toggle('theme-light', !isDark);
     localStorage.setItem('nunno_theme', isDark ? 'dark' : 'light');
+    const overlay = document.getElementById('loginAnimOverlay');
+    if (overlay) {
+      overlay.classList.toggle('theme-dark', isDark);
+      overlay.classList.toggle('theme-light', !isDark);
+    }
     if (!els.themeToggleBtn) return;
     const label = isDark ? 'Light theme' : 'Dark theme';
     const icon = isDark
@@ -1524,7 +1531,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.verifyPaidHeaderBtn) els.verifyPaidHeaderBtn.style.display = 'none';
       if (els.rejectPaidHeaderBtn) els.rejectPaidHeaderBtn.style.display = 'none';
       if (els.markPaidHeaderBtn) {
-        if (isLockedOngoing && !isAdmin) {
+        if (!isOwner && !isAdmin) {
+          // Strict Ownership Gate: Agent must take and claim the lead first before they can mark it as paid!
           els.markPaidHeaderBtn.style.display = 'none';
         } else if (leadState === 'paid') {
           els.markPaidHeaderBtn.style.display = 'inline-flex';
@@ -3612,8 +3620,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const methodIcons = {
+      'Digital Wallet': '📱',
       'EasyPaisa': '📱',
       'JazzCash': '📱',
+      'SadaPay': '📱',
+      'NayaPay': '📱',
+      'UPaisa': '📱',
+      'Zindigi': '📱',
+      'Bank Account': '🏦',
       'Bank Transfer': '🏦',
       'USDT (TRC20)': '💎'
     };
@@ -3623,8 +3637,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const isApproved = wd.status === 'approved';
       const isRejected = wd.status === 'rejected';
 
-      const icon = methodIcons[wd.method] || '💳';
+      const institutionDisplay = wd.institution || wd.method || 'Digital Wallet';
+      const icon = methodIcons[wd.institution] || methodIcons[wd.method] || (wd.method === 'Bank Account' ? '🏦' : (wd.method === 'USDT (TRC20)' ? '💎' : '📱'));
       const dateStr = wd.created_at ? new Date(wd.created_at).toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently';
+
+      // 24-Hour Settlement Guarantee countdown clock for pending requests
+      const timerPill = isPending ? `
+        <div class="wd-timer-pill" data-created="${escapeHtml(wd.created_at || new Date().toISOString())}">
+          <span>⏳ Settling in:</span>
+          <span class="wd-timer-clock">24h 00m 00s remaining</span>
+        </div>
+      ` : '';
 
       const adminActions = (isAdmin && isPending) ? `
         <div style="display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:flex-end;">
@@ -3642,7 +3665,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="wd-row-left">
             <div class="wd-method-icon-circle">${icon}</div>
             <div class="wd-row-info">
-              <span class="wd-row-title">${escapeHtml(wd.method)} • ${escapeHtml(wd.accountTitle || wd.userName)}</span>
+              <span class="wd-row-title">${escapeHtml(institutionDisplay)} • ${escapeHtml(wd.accountTitle || wd.userName)}</span>
               <div class="wd-row-meta">
                 <span class="mono">${escapeHtml(wd.accountNumber)}</span>
                 <span>•</span>
@@ -3650,6 +3673,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${wd.note ? `<span>• <em>${escapeHtml(wd.note)}</em></span>` : ''}
                 ${wd.txRef ? `<span class="badge-tx" style="background:rgba(16,185,129,0.12);color:#10b981;padding:1px 6px;border-radius:4px;font-size:9.5px;font-weight:700;">Tx: ${escapeHtml(wd.txRef)}</span>` : ''}
               </div>
+              ${timerPill}
             </div>
           </div>
           <div class="wd-row-right">
@@ -3666,6 +3690,43 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
     }).join('');
+
+    // Start 24-hour settlement ticker
+    startWithdrawalCountdownTicker();
+  }
+
+  // Real-Time 24-Hour Settlement Countdown Ticker
+  function startWithdrawalCountdownTicker() {
+    if (window._wdCountdownInterval) {
+      clearInterval(window._wdCountdownInterval);
+    }
+    const updatePills = () => {
+      const pills = document.querySelectorAll('.wd-timer-pill[data-created]');
+      if (!pills.length) return;
+      const now = Date.now();
+      pills.forEach(pill => {
+        const createdStr = pill.getAttribute('data-created');
+        const createdMs = createdStr ? new Date(createdStr).getTime() : now;
+        const deadlineMs = createdMs + (24 * 60 * 60 * 1000);
+        const diff = deadlineMs - now;
+        const clockEl = pill.querySelector('.wd-timer-clock');
+        if (!clockEl) return;
+        if (diff <= 0) {
+          clockEl.textContent = '⚡ Processing Disbursement';
+          pill.style.background = 'rgba(16, 185, 129, 0.15)';
+          pill.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+          pill.style.color = '#10b981';
+        } else {
+          const totalSecs = Math.floor(diff / 1000);
+          const hrs = Math.floor(totalSecs / 3600);
+          const mins = Math.floor((totalSecs % 3600) / 60);
+          const secs = totalSecs % 60;
+          clockEl.textContent = `${hrs}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s remaining`;
+        }
+      });
+    };
+    updatePills();
+    window._wdCountdownInterval = setInterval(updatePills, 1000);
   }
 
   // Update Withdrawal Status (Admin action)
@@ -3703,17 +3764,105 @@ document.addEventListener('DOMContentLoaded', () => {
   const closeWdBtn = document.getElementById('closeWithdrawModalBtn');
   const cancelWdBtn = document.getElementById('cancelWithdrawBtn');
 
+  const WALLET_INSTITUTIONS = [
+    { value: 'EasyPaisa', label: 'EasyPaisa (Telenor Microfinance)' },
+    { value: 'JazzCash', label: 'JazzCash (Mobilink Microfinance)' },
+    { value: 'SadaPay', label: 'SadaPay (Mastercard Wallet)' },
+    { value: 'NayaPay', label: 'NayaPay (Visa Wallet)' },
+    { value: 'UPaisa', label: 'UPaisa (U Microfinance Bank)' },
+    { value: 'Zindigi', label: 'Zindigi (JS Bank Digital)' }
+  ];
+
+  const BANK_INSTITUTIONS = [
+    { value: 'Meezan Bank', label: 'Meezan Bank Limited (Islamic)' },
+    { value: 'HBL', label: 'HBL — Habib Bank Limited' },
+    { value: 'UBL', label: 'UBL — United Bank Limited' },
+    { value: 'MCB Bank', label: 'MCB Bank Limited' },
+    { value: 'Bank Alfalah', label: 'Bank Alfalah Limited' },
+    { value: 'Allied Bank', label: 'Allied Bank Limited (ABL)' },
+    { value: 'Faysal Bank', label: 'Faysal Bank Limited' },
+    { value: 'Askari Bank', label: 'Askari Bank Limited' },
+    { value: 'Standard Chartered', label: 'Standard Chartered Pakistan' },
+    { value: 'Bank of Punjab', label: 'Bank of Punjab (BOP)' },
+    { value: 'Dubai Islamic Bank', label: 'Dubai Islamic Bank (DIB)' },
+    { value: 'JS Bank', label: 'JS Bank Limited' },
+    { value: 'Soneri Bank', label: 'Soneri Bank Limited' },
+    { value: 'Habib Metro Bank', label: 'Habib Metropolitan Bank' },
+    { value: 'Bank Al Habib', label: 'Bank AL Habib Limited' },
+    { value: 'Al Baraka Bank', label: 'Al Baraka Islamic Bank' }
+  ];
+
+  function syncPayoutChannel(channel) {
+    const instGroup = document.getElementById('wdInstitutionGroup');
+    const instLabel = document.getElementById('wdInstitutionLabel');
+    const instSelect = document.getElementById('wdInstitutionSelect');
+    const titleLabel = document.getElementById('wdTitleLabel');
+    const numLabel = document.getElementById('wdNumberLabel');
+    const numInput = document.getElementById('wdAccountNumberInput');
+    const numHint = document.getElementById('wdNumberHint');
+    const errBox = document.getElementById('wdTechnicalError');
+    if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+
+    if (channel === 'wallet') {
+      if (instGroup) instGroup.style.display = 'block';
+      if (instLabel) instLabel.textContent = 'Select Digital Wallet';
+      if (instSelect) {
+        instSelect.innerHTML = WALLET_INSTITUTIONS.map(w => `<option value="${w.value}">${w.label}</option>`).join('');
+      }
+      if (titleLabel) titleLabel.textContent = 'Account Title / Full Name';
+      if (numLabel) numLabel.textContent = 'Wallet Mobile Number (11 or 12 Digits)';
+      if (numInput) {
+        numInput.placeholder = 'e.g. 03081234567 or +923081234567';
+      }
+      if (numHint) {
+        numHint.textContent = 'Enter 11 digits starting with 0 (e.g. 03081234567) or 12 digits with +92 (e.g. +923081234567).';
+      }
+    } else if (channel === 'bank') {
+      if (instGroup) instGroup.style.display = 'block';
+      if (instLabel) instLabel.textContent = 'Select Commercial Bank';
+      if (instSelect) {
+        instSelect.innerHTML = BANK_INSTITUTIONS.map(b => `<option value="${b.value}">${b.label}</option>`).join('');
+      }
+      if (titleLabel) titleLabel.textContent = 'Account Title (As per Bank Records)';
+      if (numLabel) numLabel.textContent = 'Bank Account Number / IBAN';
+      if (numInput) {
+        numInput.placeholder = 'e.g. PK36MEZN0001234567890101 or Branch Account #';
+      }
+      if (numHint) {
+        numHint.textContent = 'Enter valid 24-character Pakistani IBAN or branch account number.';
+      }
+    } else if (channel === 'crypto') {
+      if (instGroup) instGroup.style.display = 'none';
+      if (titleLabel) titleLabel.textContent = 'Wallet Label / Destination Note';
+      if (numLabel) numLabel.textContent = 'USDT TRC20 Wallet Address';
+      if (numInput) {
+        numInput.placeholder = 'e.g. Txyz... (TRC20 Network only)';
+      }
+      if (numHint) {
+        numHint.textContent = 'TRC20 network addresses must begin with "T". Verify destination address carefully.';
+      }
+    }
+  }
+
   function openWithdrawModal() {
     if (!withdrawModal) return;
     const effectiveBal = withdrawalAvailableBalance > 0 ? withdrawalAvailableBalance : 7500;
     const modalBal = document.getElementById('modalWdAvailableBalance');
     if (modalBal) modalBal.textContent = effectiveBal.toLocaleString();
+
+    // Reset error container
+    const errBox = document.getElementById('wdTechnicalError');
+    if (errBox) {
+      errBox.style.display = 'none';
+      errBox.textContent = '';
+    }
+
     const amtInput = document.getElementById('wdAmountInput');
     if (amtInput) {
       amtInput.value = '';
-      amtInput.removeAttribute('max');
       amtInput.placeholder = 'e.g. 2,000';
     }
+
     const user = state.currentUser || state.currentAgent;
     const titleInput = document.getElementById('wdAccountTitleInput');
     if (titleInput && (!titleInput.value || titleInput.value.trim() === '')) {
@@ -3721,8 +3870,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const numInput = document.getElementById('wdAccountNumberInput');
     if (numInput && (!numInput.value || numInput.value.trim() === '')) {
-      numInput.value = user?.phone || '0308-9774571';
+      numInput.value = user?.phone || '03089774571';
     }
+
+    // Default to wallet channel
+    syncPayoutChannel('wallet');
+    const firstOption = document.querySelector('#withdrawModal .method-option[data-channel="wallet"]');
+    if (firstOption) {
+      document.querySelectorAll('#withdrawModal .method-option').forEach(o => o.classList.remove('active'));
+      firstOption.classList.add('active');
+      const radio = firstOption.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+    }
+
     withdrawModal.style.display = 'flex';
   }
 
@@ -3743,23 +3903,8 @@ document.addEventListener('DOMContentLoaded', () => {
       opt.classList.add('active');
       const radio = opt.querySelector('input[type="radio"]');
       if (radio) radio.checked = true;
-      const val = radio?.value;
-      const titleLabel = document.getElementById('wdTitleLabel');
-      const numLabel = document.getElementById('wdNumberLabel');
-      const numInput = document.getElementById('wdAccountNumberInput');
-      if (val === 'USDT (TRC20)') {
-        if (titleLabel) titleLabel.textContent = 'Account Label / Nickname';
-        if (numLabel) numLabel.textContent = 'USDT TRC20 Wallet Address';
-        if (numInput) numInput.placeholder = 'e.g. Txyz... (TRC20 only)';
-      } else if (val === 'Bank Transfer') {
-        if (titleLabel) titleLabel.textContent = 'Account Title (As per Bank)';
-        if (numLabel) numLabel.textContent = 'IBAN or Raast ID';
-        if (numInput) numInput.placeholder = 'e.g. PK36... or Mobile Number';
-      } else {
-        if (titleLabel) titleLabel.textContent = 'Account Title / Full Name';
-        if (numLabel) numLabel.textContent = `${val} Registered Mobile Number`;
-        if (numInput) numInput.placeholder = 'e.g. 0300-1234567';
-      }
+      const channel = opt.dataset.channel || (radio?.value === 'USDT (TRC20)' ? 'crypto' : (radio?.value === 'Bank Account' ? 'bank' : 'wallet'));
+      syncPayoutChannel(channel);
     });
   });
 
@@ -3778,24 +3923,100 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Submit Withdrawal Form
+  // Submit Withdrawal Form with Live Deduction and Technical Error Guard
   async function handleWithdrawSubmit(e) {
     if (e) e.preventDefault();
-    const amtInput = document.getElementById('wdAmountInput');
-    let amount = Number(amtInput?.value) || 0;
-    if (amount <= 0) {
-      amount = 1500;
-      if (amtInput) amtInput.value = amount;
+    const errBox = document.getElementById('wdTechnicalError');
+    const showWdError = (msg) => {
+      if (errBox) {
+        errBox.textContent = msg;
+        errBox.style.display = 'block';
+        errBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        showToast(msg);
+      }
+    };
+
+    if (errBox) {
+      errBox.style.display = 'none';
+      errBox.textContent = '';
     }
 
-    const selectedMethod = document.querySelector('input[name="payoutMethod"]:checked')?.value || 'EasyPaisa';
+    const amtInput = document.getElementById('wdAmountInput');
+    const rawAmt = amtInput?.value?.trim();
+    const amount = Number(rawAmt);
+
+    // 1. Validation: Amount > 0
+    if (!rawAmt || isNaN(amount) || amount <= 0) {
+      showWdError('⚠️ [ERR_INVALID_AMOUNT] Please specify a valid withdrawal amount greater than PKR 0.');
+      if (amtInput) amtInput.focus();
+      return;
+    }
+
+    // 2. Validation: Amount <= available balance
+    const currentMax = withdrawalAvailableBalance > 0 ? withdrawalAvailableBalance : 7500;
+    if (amount > currentMax) {
+      showWdError(`⚠️ [ERR_EXCEEDS_BALANCE] Technical Error: Requested amount (PKR ${amount.toLocaleString()}) exceeds your available balance (PKR ${currentMax.toLocaleString()}).`);
+      if (amtInput) amtInput.focus();
+      return;
+    }
+
+    const activeMethodRadio = document.querySelector('input[name="payoutMethod"]:checked');
+    const selectedMethod = activeMethodRadio?.value || 'Digital Wallet';
+    const activeOption = activeMethodRadio?.closest('.method-option');
+    const channel = activeOption?.dataset.channel || (selectedMethod === 'USDT (TRC20)' ? 'crypto' : (selectedMethod === 'Bank Account' ? 'bank' : 'wallet'));
+
+    const instSelect = document.getElementById('wdInstitutionSelect');
+    const institution = (channel === 'crypto') ? 'USDT (TRC20)' : (instSelect?.value || selectedMethod);
+
     const user = state.currentUser || state.currentAgent;
     let accountTitle = document.getElementById('wdAccountTitleInput')?.value.trim();
     let accountNumber = document.getElementById('wdAccountNumberInput')?.value.trim();
     const note = document.getElementById('wdNoteInput')?.value.trim() || '';
 
-    if (!accountTitle) accountTitle = user?.name || 'Ali Raza';
-    if (!accountNumber) accountNumber = user?.phone || '0308-9774571';
+    // 3. Validation: Account Title
+    if (!accountTitle || accountTitle.length < 3) {
+      showWdError('⚠️ [ERR_INVALID_TITLE] Beneficiary account title must be at least 3 characters.');
+      document.getElementById('wdAccountTitleInput')?.focus();
+      return;
+    }
+
+    // 4. Validation: Channel Specific Number/Address
+    if (channel === 'wallet') {
+      const cleanPhone = accountNumber.replace(/[\s\-\(\)]/g, '');
+      const is11Digits = /^0[0-9]{10}$/.test(cleanPhone);
+      const is12Digits = /^\+?92[0-9]{10}$/.test(cleanPhone);
+
+      if (!is11Digits && !is12Digits) {
+        showWdError(`⚠️ [ERR_INVALID_WALLET_NUMBER] For digital wallets (${institution}), please enter exactly 11 digits starting with 0 (e.g. 03081234567) or 12 digits starting with +92 (e.g. +923081234567). Current length: ${cleanPhone.length} digits.`);
+        document.getElementById('wdAccountNumberInput')?.focus();
+        return;
+      }
+      accountNumber = cleanPhone;
+    } else if (channel === 'bank') {
+      if (!accountNumber || accountNumber.length < 8) {
+        showWdError('⚠️ [ERR_INVALID_BANK_ACCOUNT] Please enter a valid bank account number or 24-character IBAN.');
+        document.getElementById('wdAccountNumberInput')?.focus();
+        return;
+      }
+    } else if (channel === 'crypto') {
+      if (!accountNumber || !accountNumber.startsWith('T') || accountNumber.length < 30) {
+        showWdError('⚠️ [ERR_INVALID_CRYPTO_ADDRESS] USDT TRC20 wallet addresses must begin with "T" and contain at least 34 characters.');
+        document.getElementById('wdAccountNumberInput')?.focus();
+        return;
+      }
+    }
+
+    // 5. LIVE BALANCE DEDUCTION (Immediate visual response)
+    withdrawalAvailableBalance = Math.max(0, currentMax - amount);
+    animateCount('wdAvailableAmount', withdrawalAvailableBalance);
+    const curPendingEl = document.getElementById('wdPendingAmount');
+    if (curPendingEl) {
+      const curPendingVal = Number(curPendingEl.textContent.replace(/[^0-9]/g, '')) || 0;
+      animateCount('wdPendingAmount', curPendingVal + amount);
+    }
+    const modalBalEl = document.getElementById('modalWdAvailableBalance');
+    if (modalBalEl) modalBalEl.textContent = withdrawalAvailableBalance.toLocaleString();
 
     const payload = {
       action: 'request_withdrawal',
@@ -3804,10 +4025,15 @@ document.addEventListener('DOMContentLoaded', () => {
       userRole: user?.role || 'lead',
       amount,
       method: selectedMethod,
+      institution,
       accountTitle,
       accountNumber,
       note
     };
+
+    // Close modal immediately and show guarantee notification
+    closeWithdrawModal();
+    showToast(`🟢 PKR ${amount.toLocaleString()} requested! Funds will be audited & disbursed within 24 hours.`);
 
     try {
       const res = await fetch('api/withdrawals.php', {
@@ -3819,18 +4045,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          showToast(`🟢 Withdrawal request of PKR ${amount.toLocaleString()} submitted!`);
-          closeWithdrawModal();
           await loadWithdrawals(payload.userId);
           renderEmployeeWorkspace();
           return;
+        } else {
+          showToast(`⚠️ Server notice: ${data.error || 'Failed to submit.'}`);
         }
       }
     } catch (err) {
       console.warn('API submission error, using local fallback:', err);
     }
 
-    // Local fallback
+    // Local fallback persistence
     const newWd = {
       id: 'WD-' + Date.now().toString().slice(-5) + Math.floor(Math.random() * 90 + 10),
       userId: payload.userId,
@@ -3838,6 +4064,7 @@ document.addEventListener('DOMContentLoaded', () => {
       userRole: payload.userRole,
       amount: payload.amount,
       method: payload.method,
+      institution: payload.institution,
       accountTitle: payload.accountTitle,
       accountNumber: payload.accountNumber,
       note: payload.note,
@@ -3846,8 +4073,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     localWithdrawals.unshift(newWd);
     localStorage.setItem('nunno_cached_withdrawals', JSON.stringify(localWithdrawals));
-    showToast(`🟢 Withdrawal request of PKR ${amount.toLocaleString()} submitted!`);
-    closeWithdrawModal();
     renderEmployeeWorkspace();
   }
 
@@ -3977,6 +4202,11 @@ document.addEventListener('DOMContentLoaded', () => {
       loginContainer.style.display = 'none';
     }
 
+    // Adapt animation palette to current light / dark theme
+    const isDark = document.body.classList.contains('theme-dark') || localStorage.getItem('nunno_theme') === 'dark';
+    overlay.classList.toggle('theme-dark', isDark);
+    overlay.classList.toggle('theme-light', !isDark);
+
     // 2. Force CSS reflow so the animation restarts smoothly from frame 0
     overlay.classList.remove('active');
     void overlay.offsetWidth;
@@ -4010,6 +4240,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (subtext) {
       subtext.textContent = 'Closing your workspace…';
     }
+
+    // Adapt animation palette to current light / dark theme
+    const isDark = document.body.classList.contains('theme-dark') || localStorage.getItem('nunno_theme') === 'dark';
+    overlay.classList.toggle('theme-dark', isDark);
+    overlay.classList.toggle('theme-light', !isDark);
 
     // Force CSS reflow so the 360 spin & zoom-out animation always replays cleanly from 0s
     overlay.classList.remove('active');
@@ -4503,6 +4738,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openMarkPaidModal(lead) {
     if (!lead) return;
+    const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    const isOwner = lead.ownerId === currentUserId;
+
+    if (!isOwner && !isAdmin) {
+      showToast('⚠️ Please claim and take this lead first before recording a sale or submitting for review!');
+      return;
+    }
+
     state.activeLeadId = lead.id;
 
     if (els.paidCustomerName) els.paidCustomerName.value = lead.name || '';
@@ -4554,6 +4798,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e) e.preventDefault();
     const lead = getLead(state.activeLeadId);
     if (!lead) return;
+
+    const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    const isOwner = lead.ownerId === currentUserId;
+
+    if (!isOwner && !isAdmin) {
+      showToast('⚠️ Action blocked: You must take and claim this lead first before recording a sale.');
+      return;
+    }
 
     const name = (els.paidCustomerName?.value || '').trim() || lead.name;
     const plan = (els.paidPlanSelect?.value || 'Pro');

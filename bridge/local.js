@@ -189,15 +189,34 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
           if (action === 'request_withdrawal' && req.method === 'POST') {
             const list = loadWds();
+            const method = body.method || 'Digital Wallet';
+            const institution = body.institution || method;
+            let accountNumber = String(body.accountNumber || '').trim();
+            const walletKeys = ['easypaisa', 'jazzcash', 'sadapay', 'nayapay', 'upaisa', 'zindigi', 'digital wallet'];
+            const isWallet = walletKeys.includes(method.toLowerCase()) || walletKeys.includes(institution.toLowerCase());
+            if (isWallet) {
+              const cleanPhone = accountNumber.replace(/[^\d\+]/g, '');
+              const isValidWallet = /^0[0-9]{10}$/.test(cleanPhone) || /^\+?92[0-9]{10}$/.test(cleanPhone);
+              if (!isValidWallet) {
+                json(400, {
+                  success: false,
+                  error: `Technical Validation Error: For digital wallets (${institution}), enter 11 digits starting with 0 (e.g. 03001234567) or 12 digits with country code (+923001234567).`
+                });
+                return;
+              }
+              accountNumber = cleanPhone;
+            }
+
             const newWd = {
               id: 'WD-' + Date.now().toString().slice(-5) + Math.floor(Math.random() * 90 + 10),
               userId: body.userId || (currentLocalUser ? currentLocalUser.id : 'EMP-TL-01'),
               userName: body.userName || (currentLocalUser ? currentLocalUser.name : 'Team Lead'),
               userRole: body.userRole || (currentLocalUser ? currentLocalUser.role : 'lead'),
               amount: Number(body.amount) || 0,
-              method: body.method || 'EasyPaisa',
+              method: method,
+              institution: institution,
               accountTitle: body.accountTitle || '',
-              accountNumber: body.accountNumber || '',
+              accountNumber: accountNumber,
               note: body.note || '',
               status: 'pending',
               created_at: new Date().toISOString()
