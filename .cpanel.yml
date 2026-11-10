@@ -7,7 +7,7 @@ deployment:
     - export DEPLOYPATH=/home/dailygol/omnidesk.lalagpt.pk/
     - /bin/mkdir -p $DEPLOYPATH
     - /bin/cp -R api assets $DEPLOYPATH
-    - /bin/cp -f index.php index.html login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH
+    - /bin/cp -f index.php index.html email_hub.php login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/bridge
     - /bin/cp -R bridge/dist $DEPLOYPATH/bridge/ 2>/dev/null || true
     - /bin/cp -f bridge/*.js bridge/package.json $DEPLOYPATH/bridge/
@@ -20,7 +20,7 @@ deployment:
     - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
     - /bin/mkdir -p $DEPLOYPATH2
     - /bin/cp -R api assets $DEPLOYPATH2
-    - /bin/cp -f index.php index.html login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH2
+    - /bin/cp -f index.php index.html email_hub.php login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH2
     - /bin/mkdir -p $DEPLOYPATH2/bridge
     - /bin/cp -R bridge/dist $DEPLOYPATH2/bridge/ 2>/dev/null || true
     - /bin/cp -f bridge/*.js bridge/package.json $DEPLOYPATH2/bridge/

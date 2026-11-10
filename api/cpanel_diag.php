@@ -13,7 +13,7 @@ if (isset($_GET['deploy']) || isset($_GET['git_pull'])) {
     $repoDir = '/home/dailygol/repositories/Omnidesk';
     $targetDir = '/home/dailygol/omnidesk.lalagpt.pk';
     $pullOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && git fetch origin main 2>&1 && git reset --hard origin/main 2>&1");
-    $deployOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && /bin/cp -R api assets index.php index.html login.php open-omnidesk.html " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -R bridge/dist " . escapeshellarg($targetDir) . "/bridge/ 2>/dev/null || true && /bin/cp -f bridge/*.js bridge/*.sh " . escapeshellarg($targetDir) . "/bridge/ 2>&1 && chmod +x " . escapeshellarg($targetDir) . "/bridge/*.sh 2>/dev/null || true");
+    $deployOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && /bin/cp -R api assets index.php index.html email_hub.php login.php open-omnidesk.html " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -R bridge/dist " . escapeshellarg($targetDir) . "/bridge/ 2>/dev/null || true && /bin/cp -f bridge/*.js bridge/*.sh " . escapeshellarg($targetDir) . "/bridge/ 2>&1 && chmod +x " . escapeshellarg($targetDir) . "/bridge/*.sh 2>/dev/null || true");
     echo json_encode([
         'success' => true,
         'git_pull' => trim((string)$pullOut),
