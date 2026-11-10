@@ -46,12 +46,12 @@ function getEmailConfig($file) {
     $default = [
         'transport'    => 'mail', // 'mail' | 'smtp'
         'sender_name'  => 'OmniDesk Administration',
-        'sender_email' => 'admin@nunno.cloud',
+        'sender_email' => 'numeniousnexus@gmail.com',
         'reply_to'     => 'numeniousnexus@gmail.com',
-        'smtp_host'    => 'mail.lalagpt.pk',
+        'smtp_host'    => 'smtp.gmail.com',
         'smtp_port'    => 465,
         'smtp_secure'  => 'ssl', // 'ssl' | 'tls' | 'none'
-        'smtp_user'    => '',
+        'smtp_user'    => 'numeniousnexus@gmail.com',
         'smtp_pass'    => '',
         'portal_url'   => 'https://omnidesk.lalagpt.pk'
     ];
@@ -96,9 +96,78 @@ if (!$isAuthorized && in_array($action, ['send_email', 'save_settings', 'test_em
     exit;
 }
 
+// Convert Human-Readable Normal Text into High-Converting Branded Email HTML
+function formatNormalTextToEmailHtml($text) {
+    if (empty($text)) return '';
+    // If it already contains structured HTML tags like <p>, <h3>, <div>, return as-is
+    if (preg_match('/<[a-z][\s\S]*>/i', $text)) {
+        return $text;
+    }
+
+    $lines = preg_split('/\r\n|\r|\n/', trim($text));
+    $html = '';
+    $inList = false;
+    $isFirst = true;
+
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '') {
+            if ($inList) {
+                $html .= "</table></div>\n";
+                $inList = false;
+            }
+            continue;
+        }
+
+        // Bullet point or key-value row (• or - or *)
+        if (preg_match('/^[•\-\*]\s*(.+)$/u', $trimmed, $m)) {
+            $itemContent = $m[1];
+            if (!$inList) {
+                $html .= "<div style=\"background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin:16px 0;\"><table style=\"width:100%;font-size:13px;line-height:1.8;border-collapse:collapse;\">\n";
+                $inList = true;
+            }
+            if (strpos($itemContent, ':') !== false) {
+                list($key, $val) = explode(':', $itemContent, 2);
+                $html .= "<tr><td style=\"color:#64748b;font-weight:600;width:140px;vertical-align:top;padding:4px 10px 4px 0;\">" . htmlspecialchars(trim($key)) . ":</td><td style=\"color:#0f172a;font-weight:700;padding:4px 0;\">" . htmlspecialchars(trim($val)) . "</td></tr>\n";
+            } else {
+                $html .= "<tr><td style=\"color:#6366f1;width:20px;vertical-align:top;padding:4px 0;\">&bull;</td><td style=\"color:#334155;font-weight:600;padding:4px 0;\">" . htmlspecialchars($itemContent) . "</td></tr>\n";
+            }
+            $isFirst = false;
+            continue;
+        } elseif ($inList) {
+            $html .= "</table></div>\n";
+            $inList = false;
+        }
+
+        // First line heading
+        if ($isFirst && mb_strlen($trimmed) < 75) {
+            $html .= "<h3 style=\"margin-top:0;margin-bottom:12px;color:#0f172a;font-size:18px;font-weight:800;letter-spacing:-0.02em;\">" . htmlspecialchars($trimmed) . "</h3>\n";
+            $isFirst = false;
+            continue;
+        }
+
+        // Sub-heading with colon (e.g. "Your OmniDesk Login Credentials:")
+        if (preg_match('/^[A-Za-z0-9\s—]+:\s*$/u', $trimmed)) {
+            $html .= "<div style=\"font-size:11.5px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.04em;margin-top:16px;margin-bottom:6px;\">" . htmlspecialchars($trimmed) . "</div>\n";
+            $isFirst = false;
+            continue;
+        }
+
+        $html .= "<p style=\"margin:0 0 14px;line-height:1.65;font-size:13.5px;color:#334155;\">" . htmlspecialchars($trimmed) . "</p>\n";
+        $isFirst = false;
+    }
+
+    if ($inList) {
+        $html .= "</table></div>\n";
+    }
+
+    return $html;
+}
+
 // Default High-Converting Brand HTML Template Generator
 function wrapEmailInBrandedTemplate($title, $badge, $contentHtml, $portalUrl, $footerNote = '') {
     $year = date('Y');
+    $formattedBody = formatNormalTextToEmailHtml($contentHtml);
     return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
@@ -143,7 +212,7 @@ function wrapEmailInBrandedTemplate($title, $badge, $contentHtml, $portalUrl, $f
           <!-- Content Body -->
           <tr>
             <td style="padding:28px 32px 32px;">
-              {$contentHtml}
+              {$formattedBody}
             </td>
           </tr>
 
@@ -169,6 +238,7 @@ function wrapEmailInBrandedTemplate($title, $badge, $contentHtml, $portalUrl, $f
                 <tr>
                   <td>
                     <strong>OmniDesk Automated Notification System</strong><br>
+                    Dispatched securely from: <strong style="color:#0f172a;">numeniousnexus@gmail.com</strong>
                     {$footerNote}
                     <div style="margin-top:6px;font-size:10.5px;color:#94a3b8;">
                       &copy; {$year} Nunno Technologies Inc. All rights reserved. Confidential transmission for authorized closer personnel only.
@@ -188,7 +258,7 @@ function wrapEmailInBrandedTemplate($title, $badge, $contentHtml, $portalUrl, $f
 HTML;
 }
 
-// 1. Action: Get Templates List & Definitions
+// 1. Action: Get Templates List & Definitions (Normal Human-Editable Text)
 if ($action === 'get_templates') {
     $templates = [
         [
@@ -197,21 +267,8 @@ if ($action === 'get_templates') {
             'category'    => 'Onboarding',
             'subject'     => 'Welcome to OmniDesk — Your Closer Account is Ready [{username}]',
             'badge'       => 'Account Ready',
-            'description' => 'Dispatches initial login username, generated password, and voice note permissions guide to newly provisioned sales closers.',
-            'default_body' => "<h3>Welcome to the Team, {name}! 👋</h3>
-<p>Your authorized OmniDesk sales closer workspace has been provisioned by the Administrator. You now have full access to our high-converting WhatsApp lead pipeline.</p>
-
-<div style=\"background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;margin-bottom:8px;\">Your OmniDesk Login Credentials:</div>
-  <table style=\"font-size:12.5px;line-height:1.8;\">
-    <tr><td style=\"color:#64748b;width:120px;\"><strong>Workspace URL:</strong></td><td><a href=\"{portal_url}\" style=\"color:#2563eb;font-weight:600;\">{portal_url}</a></td></tr>
-    <tr><td style=\"color:#64748b;\"><strong>Username:</strong></td><td><code style=\"background:#ede9fe;color:#5b21b6;padding:2px 6px;border-radius:4px;font-weight:700;\">{username}</code></td></tr>
-    <tr><td style=\"color:#64748b;\"><strong>Initial Password:</strong></td><td><code style=\"background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-weight:700;\">{password}</code></td></tr>
-    <tr><td style=\"color:#64748b;\"><strong>Assigned Role:</strong></td><td><span style=\"font-weight:700;\">{role}</span></td></tr>
-  </table>
-</div>
-
-<p style=\"font-size:12px;color:#64748b;\"><strong>Security Note:</strong> Please change your password upon your first login. Do not share your login credentials with anyone outside the authorized closing team.</p>"
+            'description' => 'Dispatches initial login username, generated password, and portal link to newly provisioned sales closers.',
+            'default_body' => "Welcome to the Team, {name}! 👋\n\nYour authorized OmniDesk sales closer workspace has been provisioned by the Administrator. You now have full access to our high-converting WhatsApp lead pipeline.\n\nYour OmniDesk Login Credentials:\n• Workspace URL: {portal_url}\n• Username: {username}\n• Initial Password: {password}\n• Assigned Role: {role}\n\nSecurity Note: Please change your password upon your first login. Do not share your login credentials with anyone outside the authorized closing team."
         ],
         [
             'id'          => 'withdrawal_lodged',
@@ -220,21 +277,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Withdrawal Request Confirmed — PKR {amount} [24-Hour Audit Active]',
             'badge'       => 'Audit Active',
             'description' => 'Informs the closer that their payout request has entered the escrow queue with a guaranteed 24-hour settlement window.',
-            'default_body' => "<h3>Withdrawal Request Confirmed ⏳</h3>
-<p>Hello {name}, your withdrawal request has been received and logged under our <strong>Guaranteed 24-Hour Settlement SLA</strong>.</p>
-
-<div style=\"background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#b45309;text-transform:uppercase;margin-bottom:8px;\">Payout Transaction Summary:</div>
-  <table style=\"font-size:12.5px;line-height:1.8;\">
-    <tr><td style=\"color:#78350f;width:130px;\"><strong>Requested Amount:</strong></td><td><strong style=\"color:#047857;font-size:14px;\">PKR {amount}</strong></td></tr>
-    <tr><td style=\"color:#78350f;\"><strong>Payout Channel:</strong></td><td><strong>{method}</strong></td></tr>
-    <tr><td style=\"color:#78350f;\"><strong>Beneficiary Title:</strong></td><td>{account_title}</td></tr>
-    <tr><td style=\"color:#78350f;\"><strong>Account Number:</strong></td><td><code>{account_number}</code></td></tr>
-    <tr><td style=\"color:#78350f;\"><strong>SLA Deadline:</strong></td><td>Within 24 Hours of Submission</td></tr>
-  </table>
-</div>
-
-<p style=\"font-size:12px;color:#64748b;\">Your available balance has been deducted live. Funds are automatically disbursed once payment receipts and deal closing notes are audited.</p>"
+            'default_body' => "Withdrawal Request Confirmed ⏳\n\nHello {name}, your withdrawal request has been received and logged under our Guaranteed 24-Hour Settlement SLA.\n\nPayout Transaction Summary:\n• Requested Amount: PKR {amount}\n• Payout Channel: {method}\n• Beneficiary Title: {account_title}\n• Account Number: {account_number}\n• SLA Deadline: Within 24 Hours of Submission\n\nYour available balance has been deducted live. Funds are automatically disbursed once payment receipts and deal closing notes are audited."
         ],
         [
             'id'          => 'withdrawal_approved',
@@ -243,21 +286,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Funds Disbursed: Your PKR {amount} Payout is Complete [{method}]',
             'badge'       => 'Funds Sent',
             'description' => 'Official payment receipt confirming funds transfer to the closer\'s EasyPaisa, JazzCash, or bank account.',
-            'default_body' => "<h3>Payout Disbursed Successfully! 🟢</h3>
-<p>Dear {name}, we are pleased to confirm that your payout has been approved and successfully transferred to your destination account.</p>
-
-<div style=\"background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#065f46;text-transform:uppercase;margin-bottom:8px;\">Transfer Confirmation Receipt:</div>
-  <table style=\"font-size:12.5px;line-height:1.8;\">
-    <tr><td style=\"color:#065f46;width:130px;\"><strong>Amount Sent:</strong></td><td><strong style=\"color:#059669;font-size:15px;\">PKR {amount}</strong></td></tr>
-    <tr><td style=\"color:#065f46;\"><strong>Destination:</strong></td><td>{method} ({account_number})</td></tr>
-    <tr><td style=\"color:#065f46;\"><strong>Account Title:</strong></td><td>{account_title}</td></tr>
-    <tr><td style=\"color:#065f46;\"><strong>Transaction Ref:</strong></td><td><code style=\"background:#d1fae5;color:#065f46;font-weight:800;padding:2px 6px;border-radius:4px;\">{tx_ref}</code></td></tr>
-    <tr><td style=\"color:#065f46;\"><strong>Disbursed At:</strong></td><td>{date}</td></tr>
-  </table>
-</div>
-
-<p>Thank you for your dedicated closing efforts! Keep scaling your conversions on OmniDesk.</p>"
+            'default_body' => "Payout Disbursed Successfully! 🟢\n\nDear {name}, we are pleased to confirm that your payout has been approved and successfully transferred to your destination account.\n\nTransfer Confirmation Receipt:\n• Amount Sent: PKR {amount}\n• Destination: {method} ({account_number})\n• Account Title: {account_title}\n• Transaction Ref: {tx_ref}\n• Disbursed At: {date}\n\nThank you for your dedicated closing efforts! Keep scaling your conversions on OmniDesk."
         ],
         [
             'id'          => 'withdrawal_rejected',
@@ -266,14 +295,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Notice: Withdrawal Request Requires Resubmission [PKR {amount}]',
             'badge'       => 'Needs Attention',
             'description' => 'Informs closer if destination account details were incorrect, allowing them to correct and resubmit.',
-            'default_body' => "<h3>Withdrawal Request Update ⚠️</h3>
-<p>Hello {name}, your recent payout request of <strong>PKR {amount}</strong> could not be completed during audit.</p>
-
-<div style=\"background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#991b1b;text-transform:uppercase;margin-bottom:6px;\">Reason for Resubmission:</div>
-  <p style=\"font-size:13px;color:#7f1d1d;margin:0 0 10px;\"><strong>{reject_reason}</strong></p>
-  <div style=\"font-size:11.5px;color:#991b1b;\">Your balance has been restored to your available funds. Please open the Withdrawal portal and resubmit with verified account information.</div>
-</div>"
+            'default_body' => "Withdrawal Request Update ⚠️\n\nHello {name}, your recent payout request of PKR {amount} could not be completed during audit.\n\nReason for Resubmission:\n• {reject_reason}\n\nYour balance has been restored to your available funds. Please open the Withdrawal portal and resubmit with verified account information."
         ],
         [
             'id'          => 'account_suspended',
@@ -282,20 +304,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Urgent: Your OmniDesk Closer Account has been Suspended',
             'badge'       => 'Suspended',
             'description' => 'Formal notice delivered to an employee whose account has been suspended by administration.',
-            'default_body' => "<h3>Account Access Suspended 🚫</h3>
-<p>Dear {name},</p>
-<p>This is a formal notice that your OmniDesk closer account (<code>{username}</code>) has been <strong>suspended</strong> by the System Administrator effective immediately.</p>
-
-<div style=\"background:#fef2f2;border:1px solid #f87171;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#b91c1c;text-transform:uppercase;margin-bottom:6px;\">Access Restrictions Enacted:</div>
-  <ul style=\"font-size:12.5px;color:#7f1d1d;margin:0;padding-left:18px;line-height:1.7;\">
-    <li>WhatsApp sending and inbound response privileges locked.</li>
-    <li>Lead pipeline claims and active discussions frozen.</li>
-    <li>Commission withdrawal requests temporarily restricted.</li>
-  </ul>
-</div>
-
-<p style=\"font-size:12.5px;\">If you believe this action was taken in error or wish to request a compliance review, please contact administrative management directly.</p>"
+            'default_body' => "Account Access Suspended 🚫\n\nDear {name},\n\nThis is a formal notice that your OmniDesk closer account ({username}) has been suspended by the System Administrator effective immediately.\n\nAccess Restrictions Enacted:\n• WhatsApp sending and inbound response privileges locked.\n• Lead pipeline claims and active discussions frozen.\n• Commission withdrawal requests temporarily restricted.\n\nIf you believe this action was taken in error or wish to request a compliance review, please contact administrative management directly."
         ],
         [
             'id'          => 'account_reactivated',
@@ -304,14 +313,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Welcome Back: Your OmniDesk Access is Restored [{username}]',
             'badge'       => 'Access Restored',
             'description' => 'Notifies closer when their account has been unsuspended and restored by administration.',
-            'default_body' => "<h3>Welcome Back! Your Access is Restored 🟢</h3>
-<p>Dear {name},</p>
-<p>We are pleased to inform you that your OmniDesk closer workspace (<code>{username}</code>) has been <strong>reactivated</strong> by the System Administrator.</p>
-
-<div style=\"background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#166534;text-transform:uppercase;margin-bottom:6px;\">Status: Full Privileges Restored</div>
-  <p style=\"font-size:12.5px;color:#14532d;margin:0;\">You may now log in to continue managing client discussions, taking incoming leads, and processing sales deals.</p>
-</div>"
+            'default_body' => "Welcome Back! Your Access is Restored 🟢\n\nDear {name},\n\nWe are pleased to inform you that your OmniDesk closer workspace ({username}) has been reactivated by the System Administrator.\n\nStatus: Full Privileges Restored\nYou may now log in to continue managing client discussions, taking incoming leads, and processing sales deals."
         ],
         [
             'id'          => 'sales_milestone',
@@ -320,19 +322,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Congratulations on Crushing Your Target, {name}! 🎯',
             'badge'       => 'Top Closer',
             'description' => 'Congratulates closer for hitting sales target quota and unlocking milestone commissions.',
-            'default_body' => "<h3>Outstanding Performance! 🏆</h3>
-<p>Congratulations {name}! You have achieved a remarkable milestone this sales cycle by hitting your target deal volume on OmniDesk.</p>
-
-<div style=\"background:#faf5ff;border:1px solid #d8b4fe;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#7e22ce;text-transform:uppercase;margin-bottom:8px;\">Cycle Achievements:</div>
-  <table style=\"font-size:12.5px;line-height:1.8;\">
-    <tr><td style=\"color:#6b21a8;width:140px;\"><strong>Verified Closures:</strong></td><td><strong style=\"color:#15803d;\">{deals_count} Won Deals</strong></td></tr>
-    <tr><td style=\"color:#6b21a8;\"><strong>Total Volume:</strong></td><td><strong style=\"color:#0f172a;\">PKR {amount}</strong></td></tr>
-    <tr><td style=\"color:#6b21a8;\"><strong>Leaderboard Rank:</strong></td><td><span style=\"background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:4px;font-weight:800;\">⭐ Top Tier Closer</span></td></tr>
-  </table>
-</div>
-
-<p>Your performance bonus qualification is active. Keep leading the charge!</p>"
+            'default_body' => "Outstanding Performance! 🏆\n\nCongratulations {name}! You have achieved a remarkable milestone this sales cycle by hitting your target deal volume on OmniDesk.\n\nCycle Achievements:\n• Verified Closures: {deals_count} Won Deals\n• Total Volume: PKR {amount}\n• Leaderboard Rank: Top Tier Closer ⭐\n\nYour performance bonus qualification is active. Keep leading the charge!"
         ],
         [
             'id'          => 'system_notice',
@@ -341,15 +331,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Advisory: Scheduled OmniDesk Optimization & Bridge Health Check',
             'badge'       => 'System Advisory',
             'description' => 'Informs closers of scheduled maintenance, system optimizations, or bridge sync routines.',
-            'default_body' => "<h3>System Maintenance & Optimization Notice 🛠️</h3>
-<p>Dear OmniDesk Team,</p>
-<p>Please be advised that scheduled maintenance and socket health optimizations will be conducted on the WhatsApp bridge infrastructure.</p>
-
-<div style=\"background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#334155;text-transform:uppercase;margin-bottom:6px;\">Maintenance Window:</div>
-  <p style=\"font-size:12.5px;color:#1e293b;margin:0 0 6px;\"><strong>Schedule:</strong> {maintenance_window}</p>
-  <p style=\"font-size:12px;color:#64748b;margin:0;\">Lead data, chat history, and pending balances are fully preserved. Outbound sending may pause briefly during the 5-minute health check.</p>
-</div>"
+            'default_body' => "System Maintenance & Optimization Notice 🛠️\n\nDear OmniDesk Team,\n\nPlease be advised that scheduled maintenance and socket health optimizations will be conducted on the WhatsApp bridge infrastructure.\n\nMaintenance Window:\n• Schedule: {maintenance_window}\n• Status: Lead data, chat history, and pending balances are fully preserved. Outbound sending may pause briefly during the 5-minute health check."
         ],
         [
             'id'          => 'lead_alert',
@@ -358,13 +340,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Pipeline Alert: {lead_name} Awaiting Response [Reassignment Warning]',
             'badge'       => 'Urgent Response',
             'description' => 'Alerts closer when a claimed high-intent lead hasn\'t received a follow-up in over 12 hours.',
-            'default_body' => "<h3>Urgent: Lead Awaiting Follow-up ⚡</h3>
-<p>Hello {name}, our pipeline monitor indicates that customer <strong>{lead_name}</strong> has been waiting for your response.</p>
-
-<div style=\"background:#fff7ed;border:1px solid #ffedd5;border-radius:12px;padding:16px;margin:20px 0;\">
-  <div style=\"font-size:11px;font-weight:800;color:#c2410c;text-transform:uppercase;margin-bottom:6px;\">Lead Follow-up Policy:</div>
-  <p style=\"font-size:12.5px;color:#9a3412;margin:0;\">Unanswered leads are automatically recycled back to the public pool after 24 hours to preserve customer engagement. Please check your active inbox immediately.</p>
-</div>"
+            'default_body' => "Urgent: Lead Awaiting Follow-up ⚡\n\nHello {name}, our pipeline monitor indicates that customer {lead_name} has been waiting for your response.\n\nLead Follow-up Policy:\n• High-intent inquiries left unaddressed for over 24 hours are automatically recycled to the next available closer.\n• Please open the active conversation and reply to the prospect immediately."
         ],
         [
             'id'          => 'custom',
@@ -373,15 +349,7 @@ if ($action === 'get_templates') {
             'subject'     => 'Announcement from OmniDesk Administration',
             'badge'       => 'Announcement',
             'description' => 'Free-form editor allowing administration to draft tailored updates, incentives, or policies.',
-            'default_body' => "<h3>Team Update 📢</h3>
-<p>Hello Team,</p>
-<p>Please review the following directive from OmniDesk Administration:</p>
-
-<div style=\"background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:20px 0;\">
-  <p style=\"font-size:13px;line-height:1.6;color:#1e293b;margin:0;\">Enter your custom announcement text here...</p>
-</div>
-
-<p style=\"font-size:12px;color:#64748b;\">If you have any questions regarding this update, please reply directly or consult your Team Lead.</p>"
+            'default_body' => "Team Directive from OmniDesk Administration 📢\n\nHello Team,\n\nPlease review the following directive from OmniDesk Administration:\n\nKey Action Items:\n• Keep WhatsApp follow-ups active and ensure deal notes are accurately filled.\n• Log verified transaction IDs immediately upon deal completion.\n\nIf you have any questions regarding this update, please reply directly or consult your Team Lead."
         ]
     ];
 
@@ -546,20 +514,28 @@ if ($action === 'send_email') {
         $headers[] = 'Content-Type: text/html; charset=UTF-8';
         $headers[] = 'From: ' . $senderName . ' <' . $senderEmail . '>';
         $headers[] = 'Reply-To: ' . ($config['reply_to'] ?: $senderEmail);
+        $headers[] = 'Return-Path: <' . $senderEmail . '>';
         $headers[] = 'X-Mailer: OmniDesk Enterprise Dispatcher 2.0';
 
         $isSent = false;
+        $extraParams = '-f ' . escapeshellarg($senderEmail);
 
         // Transport: Native PHP Mail
         if ($config['transport'] === 'mail' || empty($config['smtp_host'])) {
-            $isSent = @mail($email, $interpolatedSubject, $fullHtml, implode("\r\n", $headers));
+            $isSent = @mail($email, $interpolatedSubject, $fullHtml, implode("\r\n", $headers), $extraParams);
+            if (!$isSent) {
+                $isSent = @mail($email, $interpolatedSubject, $fullHtml, implode("\r\n", $headers));
+            }
             // In local/test environments where local sendmail is unconfigured, mark as logged
             if (!$isSent && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1']) || !isset($_SERVER['SERVER_NAME']))) {
                 $isSent = true;
             }
         } else {
             // SMTP Dispatcher Socket Fallback
-            $isSent = @mail($email, $interpolatedSubject, $fullHtml, implode("\r\n", $headers));
+            $isSent = @mail($email, $interpolatedSubject, $fullHtml, implode("\r\n", $headers), $extraParams);
+            if (!$isSent) {
+                $isSent = @mail($email, $interpolatedSubject, $fullHtml, implode("\r\n", $headers));
+            }
             if (!$isSent) $isSent = true; // Log record
         }
 
@@ -607,3 +583,4 @@ if ($action === 'delete_log') {
 
 // Default fallback
 echo json_encode(['success' => true, 'service' => 'OmniDesk Email Dispatch Hub 2.0']);
+

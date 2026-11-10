@@ -274,10 +274,19 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
               <input type="text" id="hubBadge" class="form-input" placeholder="e.g. Account Ready, Funds Sent" value="Notice">
             </div>
 
-            <!-- Content HTML -->
+            <!-- Content (Normal Editable Text) -->
             <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-weight:700;">5. Email Body (HTML &amp; Text)</label>
-              <textarea id="hubBodyHtml" class="form-input" rows="8" style="font-family:var(--font-mono, monospace);font-size:12px;resize:vertical;"></textarea>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label class="form-label" style="font-weight:700;margin:0;">5. Email Message (Normal Editable Text)</label>
+                <span style="font-size:10.5px;color:var(--accent-brand);font-weight:700;">✨ Auto-styled to Brand Email</span>
+              </div>
+              <div style="display:flex;gap:4px;margin-bottom:6px;">
+                <button type="button" class="btn btn-ghost btn-xs" id="hubInsertBulletBtn" style="padding:2px 8px;font-size:11px;font-weight:600;" title="Insert bullet detail">• Bullet Detail</button>
+                <button type="button" class="btn btn-ghost btn-xs" id="hubInsertDetailRowBtn" style="padding:2px 8px;font-size:11px;font-weight:600;" title="Insert key-value row">🔑 Label: Value</button>
+                <button type="button" class="btn btn-ghost btn-xs" id="hubClearBodyBtn" style="padding:2px 8px;font-size:11px;color:#ef4444;" title="Clear text box">🧹 Clear</button>
+              </div>
+              <textarea id="hubBodyHtml" class="form-input" rows="8" style="font-size:13px;line-height:1.6;font-family:inherit;resize:vertical;padding:10px 12px;" placeholder="Type your email message here in normal text... No HTML tags needed."></textarea>
+              <div style="font-size:10px;color:var(--hub-muted);margin-top:3px;">💡 Type normal text and use <code>•</code> for bullet details. Everything formats automatically into the email preview!</div>
             </div>
 
             <button type="submit" class="btn btn-wa" id="hubSendBtn" style="padding:12px;font-size:13.5px;font-weight:800;justify-content:center;">
@@ -347,16 +356,18 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
           </div>
           <div class="form-group" style="margin:0;">
             <label class="form-label">Default Sender Email</label>
-            <input type="email" id="hubSenderEmail" class="form-input" value="admin@nunno.cloud">
+            <input type="email" id="hubSenderEmail" class="form-input" value="numeniousnexus@gmail.com">
+            <span style="font-size:10.5px;color:var(--hub-muted);margin-top:2px;">Emails will be dispatched with From: <strong>numeniousnexus@gmail.com</strong></span>
           </div>
           <div class="form-group" style="margin:0;">
             <label class="form-label">Reply-To Address</label>
             <input type="email" id="hubReplyTo" class="form-input" value="numeniousnexus@gmail.com">
           </div>
           <div id="hubSmtpFields" style="display:none;flex-direction:column;gap:12px;background:rgba(99,102,241,0.04);padding:14px;border-radius:10px;border:1px solid var(--hub-border);">
+            <div style="font-size:11.5px;font-weight:700;color:var(--accent-brand);">Google / Gmail SMTP Configuration</div>
             <div class="form-group" style="margin:0;">
               <label class="form-label">SMTP Host</label>
-              <input type="text" id="hubSmtpHost" class="form-input" placeholder="mail.lalagpt.pk">
+              <input type="text" id="hubSmtpHost" class="form-input" value="smtp.gmail.com" placeholder="smtp.gmail.com">
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
               <div class="form-group" style="margin:0;">
@@ -373,12 +384,12 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
               </div>
             </div>
             <div class="form-group" style="margin:0;">
-              <label class="form-label">SMTP Username / Email</label>
-              <input type="text" id="hubSmtpUser" class="form-input">
+              <label class="form-label">Gmail Address / Username</label>
+              <input type="text" id="hubSmtpUser" class="form-input" value="numeniousnexus@gmail.com">
             </div>
             <div class="form-group" style="margin:0;">
-              <label class="form-label">SMTP Password</label>
-              <input type="password" id="hubSmtpPass" class="form-input" placeholder="••••••••">
+              <label class="form-label">Google App Password (16-characters)</label>
+              <input type="password" id="hubSmtpPass" class="form-input" placeholder="Google Account > Security > App Passwords">
             </div>
           </div>
           <button type="submit" class="btn btn-wa" id="hubSaveSettingsBtn" style="padding:10px;font-weight:700;">
@@ -507,6 +518,88 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
       });
     });
 
+    // Formatting shortcut buttons
+    document.getElementById('hubInsertBulletBtn')?.addEventListener('click', () => {
+      const ta = document.getElementById('hubBodyHtml');
+      if (!ta) return;
+      const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value;
+      const bullet = (start > 0 && val[start - 1] !== '\n' ? '\n' : '') + '• ';
+      ta.value = val.substring(0, start) + bullet + val.substring(end);
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = start + bullet.length;
+      updatePreview();
+    });
+
+    document.getElementById('hubInsertDetailRowBtn')?.addEventListener('click', () => {
+      const ta = document.getElementById('hubBodyHtml');
+      if (!ta) return;
+      const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value;
+      const row = (start > 0 && val[start - 1] !== '\n' ? '\n' : '') + '• Key: Value\n';
+      ta.value = val.substring(0, start) + row + val.substring(end);
+      ta.focus();
+      ta.selectionStart = start + 3;
+      ta.selectionEnd = start + 6;
+      updatePreview();
+    });
+
+    document.getElementById('hubClearBodyBtn')?.addEventListener('click', () => {
+      const ta = document.getElementById('hubBodyHtml');
+      if (ta && confirm('Clear message text?')) {
+        ta.value = '';
+        ta.focus();
+        updatePreview();
+      }
+    });
+
+    function formatNormalTextToEmailHtml(text) {
+      if (!text) return '';
+      if (/<[a-z][\s\S]*>/i.test(text)) return text;
+      const lines = text.split(/\r?\n/);
+      let html = '', inList = false, isFirst = true;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          if (inList) { html += '</table></div>\n'; inList = false; }
+          continue;
+        }
+        const bulletMatch = trimmed.match(/^[•\-\*]\s*(.+)$/);
+        if (bulletMatch) {
+          const item = bulletMatch[1];
+          if (!inList) {
+            html += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin:16px 0;"><table style="width:100%;font-size:13px;line-height:1.8;border-collapse:collapse;">\n';
+            inList = true;
+          }
+          if (item.includes(':')) {
+            const idx = item.indexOf(':');
+            const k = item.substring(0, idx).trim();
+            const v = item.substring(idx + 1).trim();
+            html += '<tr><td style="color:#64748b;font-weight:600;width:140px;vertical-align:top;padding:4px 10px 4px 0;">' + escapeHtml(k) + ':</td><td style="color:#0f172a;font-weight:700;padding:4px 0;">' + escapeHtml(v) + '</td></tr>\n';
+          } else {
+            html += '<tr><td style="color:#6366f1;width:20px;vertical-align:top;padding:4px 0;">&bull;</td><td style="color:#334155;font-weight:600;padding:4px 0;">' + escapeHtml(item) + '</td></tr>\n';
+          }
+          isFirst = false;
+          continue;
+        } else if (inList) {
+          html += '</table></div>\n';
+          inList = false;
+        }
+        if (isFirst && trimmed.length < 75) {
+          html += '<h3 style="margin-top:0;margin-bottom:12px;color:#0f172a;font-size:18px;font-weight:800;letter-spacing:-0.02em;">' + escapeHtml(trimmed) + '</h3>\n';
+          isFirst = false;
+          continue;
+        }
+        if (/^[A-Za-z0-9\s—]+:\s*$/.test(trimmed)) {
+          html += '<div style="font-size:11.5px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.04em;margin-top:16px;margin-bottom:6px;">' + escapeHtml(trimmed) + '</div>\n';
+          isFirst = false;
+          continue;
+        }
+        html += '<p style="margin:0 0 14px;line-height:1.65;font-size:13.5px;color:#334155;">' + escapeHtml(trimmed) + '</p>\n';
+        isFirst = false;
+      }
+      if (inList) html += '</table></div>\n';
+      return html;
+    }
+
     function updatePreview() {
       const targetType = document.getElementById('hubTargetType').value;
       let targetUser = employees[0] || { name: 'Ali Raza', username: 'ali', email: 'ali@nunno.cloud', designation: 'Closer' };
@@ -525,7 +618,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
 
       let subject = document.getElementById('hubSubject').value || 'Preview Subject';
       let badge = document.getElementById('hubBadge').value || 'Notice';
-      let body = document.getElementById('hubBodyHtml').value || '<p>No content</p>';
+      let body = document.getElementById('hubBodyHtml').value || 'No content';
 
       const vars = {
         name: targetUser.name || 'Team Member',
@@ -546,6 +639,8 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
         subject = subject.replaceAll('{' + k + '}', v);
         body = body.replaceAll('{' + k + '}', v);
       }
+
+      const formattedContent = formatNormalTextToEmailHtml(body);
 
       const previewHtml = `
         <!DOCTYPE html>
@@ -573,13 +668,13 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
               <div class="badge">${badge}</div>
             </div>
             <div class="body">
-              ${body}
+              ${formattedContent}
               <div style="text-align:center;margin-top:24px;">
                 <a href="${vars.portal_url}" class="btn" target="_blank">Open OmniDesk Workspace &rarr;</a>
               </div>
             </div>
             <div class="foot">
-              &copy; 2026 Nunno Technologies Inc. Confidential transmission for authorized closer personnel only.
+              Sent securely by OmniDesk Enterprise &bull; <strong>numeniousnexus@gmail.com</strong>
             </div>
           </div>
         </body>
@@ -687,3 +782,4 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
   </script>
 </body>
 </html>
+

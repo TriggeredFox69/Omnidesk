@@ -1812,10 +1812,19 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
               <input type="text" id="modalEmailBadge" class="form-input" value="Notice">
             </div>
 
-            <!-- Body HTML -->
+            <!-- Body Content (Normal Editable Text) -->
             <div class="form-group" style="margin:0;">
-              <label class="form-label" style="font-weight:700;">5. Message HTML Content</label>
-              <textarea id="modalEmailBody" class="form-input mono" rows="6" style="font-size:11.5px;resize:vertical;"></textarea>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label class="form-label" style="font-weight:700;margin:0;">5. Email Message (Normal Editable Text)</label>
+                <span style="font-size:10.5px;color:var(--accent-brand);font-weight:700;">✨ Auto-styled into branded card</span>
+              </div>
+              <div style="display:flex;gap:4px;margin-bottom:6px;">
+                <button type="button" class="btn btn-ghost btn-xs" id="insertBulletBtn" style="padding:2px 8px;font-size:11px;font-weight:600;" title="Insert bullet row">• Bullet Detail</button>
+                <button type="button" class="btn btn-ghost btn-xs" id="insertDetailRowBtn" style="padding:2px 8px;font-size:11px;font-weight:600;" title="Insert key-value row">🔑 Label: Value</button>
+                <button type="button" class="btn btn-ghost btn-xs" id="clearEmailBodyBtn" style="padding:2px 8px;font-size:11px;color:#ef4444;" title="Clear text box">🧹 Clear</button>
+              </div>
+              <textarea id="modalEmailBody" class="form-input" rows="7" style="font-size:13px;line-height:1.6;font-family:inherit;resize:vertical;padding:10px 12px;" placeholder="Type your email message here in normal text... No HTML tags needed."></textarea>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">💡 Type normal text and use <code>•</code> for bullet details. Everything formats automatically into the email preview!</div>
             </div>
 
             <button type="submit" class="btn btn-wa" id="modalEmailSendBtn" style="padding:11px;font-weight:800;justify-content:center;margin-top:4px;">
@@ -1879,11 +1888,40 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           </div>
           <div class="form-group" style="margin:0;">
             <label class="form-label">Sender Email Address</label>
-            <input type="email" id="modalEmailSenderAddress" class="form-input" value="admin@nunno.cloud">
+            <input type="email" id="modalEmailSenderAddress" class="form-input" value="numeniousnexus@gmail.com">
+            <span style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">Emails will be dispatched with From: <strong>numeniousnexus@gmail.com</strong></span>
           </div>
           <div class="form-group" style="margin:0;">
             <label class="form-label">Reply-To Address</label>
             <input type="email" id="modalEmailReplyTo" class="form-input" value="numeniousnexus@gmail.com">
+          </div>
+          <div id="modalEmailSmtpFields" style="display:none;flex-direction:column;gap:10px;padding:12px;background:var(--glass-surface-subtle);border-radius:10px;border:1px solid var(--border-subtle);">
+            <div style="font-size:11px;font-weight:700;color:var(--accent-brand);">Google / Gmail SMTP Configuration</div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">SMTP Host</label>
+              <input type="text" id="modalEmailSmtpHost" class="form-input" value="smtp.gmail.com">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Port</label>
+                <input type="number" id="modalEmailSmtpPort" class="form-input" value="465">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">Security</label>
+                <select id="modalEmailSmtpSecure" class="form-select">
+                  <option value="ssl" selected>SSL (Port 465)</option>
+                  <option value="tls">TLS (Port 587)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Gmail Address / Username</label>
+              <input type="text" id="modalEmailSmtpUser" class="form-input" value="numeniousnexus@gmail.com">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">Google App Password (16-characters)</label>
+              <input type="password" id="modalEmailSmtpPass" class="form-input" placeholder="Google Account > Security > App Passwords">
+            </div>
           </div>
           <button type="submit" class="btn btn-wa" id="modalEmailSaveSettingsBtn" style="padding:10px;font-weight:700;margin-top:6px;">
             Save Mailer Settings

@@ -5020,16 +5020,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!emailTemplatesCache || !emailTemplatesCache.length) {
       emailTemplatesCache = [
-        { id: 'welcome', name: '👋 New Employee Onboarding & Login Credentials', badge: 'Account Activated', subject: 'Welcome to the OmniDesk Team! Your Closer Credentials', default_body: '<h3>Welcome to OmniDesk Closer Workspace! 🚀</h3><p>Dear {name}, your official closer account has been provisioned.</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Username:</strong> <code>{username}</code><br><strong>Access Level:</strong> {role}<br><strong>Security:</strong> Temporary password generated</div><p>Log in securely to start handling leads and closing deals.</p>' },
-        { id: 'withdrawal_lodged', name: '💳 Withdrawal Request Received (24-Hour Settlement)', badge: 'Audit In Progress', subject: 'Withdrawal Lodged: PKR {amount} Processing Notice', default_body: '<h3>Withdrawal Request Confirmed ⏱️</h3><p>Hello {name}, your withdrawal request of <strong>PKR {amount}</strong> via <strong>{method}</strong> has been logged.</p><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Amount:</strong> PKR {amount}<br><strong>Destination:</strong> {method}<br><strong>Audit SLA:</strong> Within 24 Hours Guaranteed</div>' },
-        { id: 'withdrawal_approved', name: '💰 Withdrawal Approved & Payout Disbursed', badge: 'Funds Sent', subject: 'Funds Disbursed: Your PKR {amount} Payout is Complete [{method}]', default_body: '<h3>Payout Disbursed Successfully! 🟢</h3><p>Dear {name}, we are pleased to confirm that your payout of <strong>PKR {amount}</strong> has been disbursed to your {method} account.</p><div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:14px;margin:16px 0;"><strong>Status:</strong> Completed &amp; Verified<br><strong>Disbursed At:</strong> {date}</div>' },
-        { id: 'withdrawal_rejected', name: '⚠️ Withdrawal Notice: Action Required', badge: 'Needs Attention', subject: 'Notice: Withdrawal Request Requires Resubmission [PKR {amount}]', default_body: '<h3>Withdrawal Request Update ⚠️</h3><p>Hello {name}, your payout request of <strong>PKR {amount}</strong> could not be completed during audit. Your funds have been restored to your available balance.</p>' },
-        { id: 'account_suspended', name: '🚫 Account Suspension Formal Notice', badge: 'Suspended', subject: 'Urgent: Your OmniDesk Closer Account has been Suspended', default_body: '<h3>Account Access Suspended 🚫</h3><p>Dear {name}, your OmniDesk closer workspace access (<code>{username}</code>) has been suspended by Administration effective immediately. All outbound sending, inbound replies, and withdrawals are locked.</p>' },
-        { id: 'account_reactivated', name: '🟢 Account Reactivated — Workspace Restored', badge: 'Access Restored', subject: 'Welcome Back: Your OmniDesk Access is Restored [{username}]', default_body: '<h3>Welcome Back! Your Access is Restored 🟢</h3><p>Dear {name}, your OmniDesk closer workspace (<code>{username}</code>) has been reactivated with full closing and payout privileges.</p>' },
-        { id: 'sales_milestone', name: '🎯 Monthly Sales Milestone & Leaderboard Honor', badge: 'Top Closer', subject: 'Congratulations on Crushing Your Target, {name}! 🎯', default_body: '<h3>Outstanding Closing Performance! 🏆</h3><p>Congratulations {name}! You have achieved your sales volume target this cycle on OmniDesk. Your performance bonus qualification is active.</p>' },
-        { id: 'system_notice', name: '📢 System Maintenance & Bridge Advisory', badge: 'System Advisory', subject: 'Advisory: Scheduled OmniDesk Optimization & Bridge Health Check', default_body: '<h3>System Maintenance Notice 🛠️</h3><p>Dear OmniDesk Team, scheduled maintenance will be conducted on the WhatsApp bridge socket. Chat data and pending payouts remain fully preserved.</p>' },
-        { id: 'lead_alert', name: '⚡ Unaddressed Lead Reassignment Warning', badge: 'Urgent Response', subject: 'Pipeline Alert: Lead Awaiting Follow-up [Reassignment Warning]', default_body: '<h3>Urgent: Lead Awaiting Follow-up ⚡</h3><p>Hello {name}, customer inquiries are waiting for your response. Unanswered leads are recycled back to the pool after 24 hours.</p>' },
-        { id: 'custom', name: '📝 Custom Team Announcement / Directive', badge: 'Announcement', subject: 'Directive from OmniDesk Administration', default_body: '<h3>Team Update 📢</h3><p>Hello Team,</p><p>Please review the following directive from OmniDesk Administration:</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;">Please keep WhatsApp follow-ups active and ensure deal notes are accurately filled.</div>' }
+        { id: 'welcome', name: '👋 New Employee Onboarding & Login Credentials', badge: 'Account Activated', subject: 'Welcome to the OmniDesk Team! Your Closer Credentials', default_body: 'Welcome to the Team, {name}! 👋\n\nYour authorized OmniDesk sales closer workspace has been provisioned by the Administrator. You now have full access to our high-converting WhatsApp lead pipeline.\n\nYour OmniDesk Login Credentials:\n• Workspace URL: {portal_url}\n• Username: {username}\n• Initial Password: {password}\n• Assigned Role: {role}\n\nSecurity Note: Please change your password upon your first login. Do not share your login credentials with anyone outside the authorized closing team.' },
+        { id: 'withdrawal_lodged', name: '💳 Withdrawal Request Received (24-Hour Settlement)', badge: 'Audit In Progress', subject: 'Withdrawal Lodged: PKR {amount} Processing Notice', default_body: 'Withdrawal Request Confirmed ⏳\n\nHello {name}, your withdrawal request has been received and logged under our Guaranteed 24-Hour Settlement SLA.\n\nPayout Transaction Summary:\n• Requested Amount: PKR {amount}\n• Payout Channel: {method}\n• Beneficiary Title: {account_title}\n• Account Number: {account_number}\n• SLA Deadline: Within 24 Hours of Submission\n\nYour available balance has been deducted live. Funds are automatically disbursed once payment receipts and deal closing notes are audited.' },
+        { id: 'withdrawal_approved', name: '💰 Withdrawal Approved & Payout Disbursed', badge: 'Funds Sent', subject: 'Funds Disbursed: Your PKR {amount} Payout is Complete [{method}]', default_body: 'Payout Disbursed Successfully! 🟢\n\nDear {name}, we are pleased to confirm that your payout has been approved and successfully transferred to your destination account.\n\nTransfer Confirmation Receipt:\n• Amount Sent: PKR {amount}\n• Destination: {method} ({account_number})\n• Account Title: {account_title}\n• Transaction Ref: {tx_ref}\n• Disbursed At: {date}\n\nThank you for your dedicated closing efforts! Keep scaling your conversions on OmniDesk.' },
+        { id: 'withdrawal_rejected', name: '⚠️ Withdrawal Notice: Action Required', badge: 'Needs Attention', subject: 'Notice: Withdrawal Request Requires Resubmission [PKR {amount}]', default_body: 'Withdrawal Request Update ⚠️\n\nHello {name}, your recent payout request of PKR {amount} could not be completed during audit.\n\nReason for Resubmission:\n• {reject_reason}\n\nYour balance has been restored to your available funds. Please open the Withdrawal portal and resubmit with verified account information.' },
+        { id: 'account_suspended', name: '🚫 Account Suspension Formal Notice', badge: 'Suspended', subject: 'Urgent: Your OmniDesk Closer Account has been Suspended', default_body: 'Account Access Suspended 🚫\n\nDear {name},\n\nThis is a formal notice that your OmniDesk closer account ({username}) has been suspended by the System Administrator effective immediately.\n\nAccess Restrictions Enacted:\n• WhatsApp sending and inbound response privileges locked.\n• Lead pipeline claims and active discussions frozen.\n• Commission withdrawal requests temporarily restricted.\n\nIf you believe this action was taken in error or wish to request a compliance review, please contact administrative management directly.' },
+        { id: 'account_reactivated', name: '🟢 Account Reactivated — Workspace Restored', badge: 'Access Restored', subject: 'Welcome Back: Your OmniDesk Access is Restored [{username}]', default_body: 'Welcome Back! Your Access is Restored 🟢\n\nDear {name},\n\nWe are pleased to inform you that your OmniDesk closer workspace ({username}) has been reactivated by the System Administrator.\n\nStatus: Full Privileges Restored\nYou may now log in to continue managing client discussions, taking incoming leads, and processing sales deals.' },
+        { id: 'sales_milestone', name: '🎯 Monthly Sales Milestone & Leaderboard Honor', badge: 'Top Closer', subject: 'Congratulations on Crushing Your Target, {name}! 🎯', default_body: 'Outstanding Performance! 🏆\n\nCongratulations {name}! You have achieved a remarkable milestone this sales cycle by hitting your target deal volume on OmniDesk.\n\nCycle Achievements:\n• Verified Closures: {deals_count} Won Deals\n• Total Volume: PKR {amount}\n• Leaderboard Rank: Top Tier Closer ⭐\n\nYour performance bonus qualification is active. Keep leading the charge!' },
+        { id: 'system_notice', name: '📢 System Maintenance & Bridge Advisory', badge: 'System Advisory', subject: 'Advisory: Scheduled OmniDesk Optimization & Bridge Health Check', default_body: 'System Maintenance & Optimization Notice 🛠️\n\nDear OmniDesk Team,\n\nPlease be advised that scheduled maintenance and socket health optimizations will be conducted on the WhatsApp bridge infrastructure.\n\nMaintenance Window:\n• Schedule: {maintenance_window}\n• Status: Lead data, chat history, and pending balances are fully preserved. Outbound sending may pause briefly during the 5-minute health check.' },
+        { id: 'lead_alert', name: '⚡ Unaddressed Lead Reassignment Warning', badge: 'Urgent Response', subject: 'Pipeline Alert: Lead Awaiting Follow-up [Reassignment Warning]', default_body: 'Urgent: Lead Awaiting Follow-up ⚡\n\nHello {name}, our pipeline monitor indicates that customer {lead_name} has been waiting for your response.\n\nLead Follow-up Policy:\n• High-intent inquiries left unaddressed for over 24 hours are automatically recycled to the next available closer.\n• Please open the active conversation and reply to the prospect immediately.' },
+        { id: 'custom', name: '📝 Custom Team Announcement / Directive', badge: 'Announcement', subject: 'Directive from OmniDesk Administration', default_body: 'Team Directive from OmniDesk Administration 📢\n\nHello Team,\n\nPlease review the following directive from OmniDesk Administration:\n\nKey Action Items:\n• Keep WhatsApp follow-ups active and ensure deal notes are accurately filled.\n• Log verified transaction IDs immediately upon deal completion.\n\nIf you have any questions regarding this update, please reply directly or consult your Team Lead.' }
       ];
     }
 
@@ -5060,12 +5060,61 @@ document.addEventListener('DOMContentLoaded', () => {
     updateModalEmailPreview();
   }
 
+  function formatNormalTextToEmailHtml(text) {
+    if (!text) return '';
+    if (/<[a-z][\s\S]*>/i.test(text)) return text;
+    const lines = text.split(/\r?\n/);
+    let html = '', inList = false, isFirst = true;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        if (inList) { html += '</table></div>\n'; inList = false; }
+        continue;
+      }
+      const bulletMatch = trimmed.match(/^[•\-\*]\s*(.+)$/);
+      if (bulletMatch) {
+        const item = bulletMatch[1];
+        if (!inList) {
+          html += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin:16px 0;"><table style="width:100%;font-size:13px;line-height:1.8;border-collapse:collapse;">\n';
+          inList = true;
+        }
+        if (item.includes(':')) {
+          const idx = item.indexOf(':');
+          const k = item.substring(0, idx).trim();
+          const v = item.substring(idx + 1).trim();
+          html += '<tr><td style="color:#64748b;font-weight:600;width:140px;vertical-align:top;padding:4px 10px 4px 0;">' + escapeHtml(k) + ':</td><td style="color:#0f172a;font-weight:700;padding:4px 0;">' + escapeHtml(v) + '</td></tr>\n';
+        } else {
+          html += '<tr><td style="color:#6366f1;width:20px;vertical-align:top;padding:4px 0;">&bull;</td><td style="color:#334155;font-weight:600;padding:4px 0;">' + escapeHtml(item) + '</td></tr>\n';
+        }
+        isFirst = false;
+        continue;
+      } else if (inList) {
+        html += '</table></div>\n';
+        inList = false;
+      }
+      if (isFirst && trimmed.length < 75) {
+        html += '<h3 style="margin-top:0;margin-bottom:12px;color:#0f172a;font-size:18px;font-weight:800;letter-spacing:-0.02em;">' + escapeHtml(trimmed) + '</h3>\n';
+        isFirst = false;
+        continue;
+      }
+      if (/^[A-Za-z0-9\s—]+:\s*$/.test(trimmed)) {
+        html += '<div style="font-size:11.5px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.04em;margin-top:16px;margin-bottom:6px;">' + escapeHtml(trimmed) + '</div>\n';
+        isFirst = false;
+        continue;
+      }
+      html += '<p style="margin:0 0 14px;line-height:1.65;font-size:13.5px;color:#334155;">' + escapeHtml(trimmed) + '</p>\n';
+      isFirst = false;
+    }
+    if (inList) html += '</table></div>\n';
+    return html;
+  }
+
   function updateModalEmailPreview() {
     const iframe = document.getElementById('modalEmailPreviewIframe');
     if (!iframe) return;
 
     const badge = document.getElementById('modalEmailBadge')?.value || 'Official Notice';
-    let bodyHtml = document.getElementById('modalEmailBody')?.value || '<p>OmniDesk automated dispatch.</p>';
+    let rawText = document.getElementById('modalEmailBody')?.value || 'Type your message...';
 
     // Sample/Selected user values
     const targetType = document.getElementById('modalEmailTargetType')?.value || 'user';
@@ -5099,15 +5148,21 @@ document.addEventListener('DOMContentLoaded', () => {
       '{role}': targetRole,
       '{amount}': '5,000',
       '{method}': 'EasyPaisa (03001234567)',
+      '{account_title}': targetName,
+      '{account_number}': '03001234567',
       '{date}': todayStr,
       '{portal_url}': portalUrl,
-      '{password}': '••••••••'
+      '{password}': '••••••••',
+      '{tx_ref}': 'TX-891042',
+      '{reject_reason}': 'Account details requires review'
     };
 
-    let interpolatedBody = bodyHtml;
+    let interpolatedText = rawText;
     for (const [k, v] of Object.entries(replacements)) {
-      interpolatedBody = interpolatedBody.split(k).join(v);
+      interpolatedText = interpolatedText.split(k).join(v);
     }
+
+    const formattedContent = formatNormalTextToEmailHtml(interpolatedText);
 
     const html = `<!DOCTYPE html>
 <html>
@@ -5135,13 +5190,13 @@ document.addEventListener('DOMContentLoaded', () => {
       <h2 class="email-title">OmniDesk Communications</h2>
     </div>
     <div class="email-body">
-      ${interpolatedBody}
+      ${formattedContent}
       <div class="email-cta-box">
         <a href="${escapeHtml(portalUrl)}" class="email-btn" target="_blank">Access OmniDesk Portal &rarr;</a>
       </div>
     </div>
     <div class="email-footer">
-      Sent securely by OmniDesk Enterprise &bull; 24/7 Verified Closer Operations
+      Dispatched securely from: <strong style="color:#0f172a;">numeniousnexus@gmail.com</strong> &bull; OmniDesk Enterprise
     </div>
   </div>
 </body>
@@ -5255,13 +5310,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
         setVal('modalEmailTransport', s.transport);
         setVal('modalEmailSenderName', s.sender_name);
-        setVal('modalEmailSenderEmail', s.sender_email);
-        setVal('modalEmailReplyTo', s.reply_to);
-        setVal('modalEmailSmtpHost', s.smtp_host);
-        setVal('modalEmailSmtpPort', s.smtp_port);
-        setVal('modalEmailSmtpSecure', s.smtp_secure);
-        setVal('modalEmailSmtpUser', s.smtp_user);
+        setVal('modalEmailSenderEmail', s.sender_email || 'numeniousnexus@gmail.com');
+        setVal('modalEmailSenderAddress', s.sender_email || 'numeniousnexus@gmail.com');
+        setVal('modalEmailReplyTo', s.reply_to || 'numeniousnexus@gmail.com');
+        setVal('modalEmailSmtpHost', s.smtp_host || 'smtp.gmail.com');
+        setVal('modalEmailSmtpPort', s.smtp_port || 465);
+        setVal('modalEmailSmtpSecure', s.smtp_secure || 'ssl');
+        setVal('modalEmailSmtpUser', s.smtp_user || 'numeniousnexus@gmail.com');
         setVal('modalEmailPortalUrl', s.portal_url);
+
+        const smtpFields = document.getElementById('modalEmailSmtpFields');
+        if (smtpFields) smtpFields.style.display = s.transport === 'smtp' ? 'flex' : 'none';
       }
     } catch (_) {}
   }
@@ -5273,14 +5332,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const payload = {
       action: 'save_settings',
-      transport: getVal('modalEmailTransport'),
-      sender_name: getVal('modalEmailSenderName'),
-      sender_email: getVal('modalEmailSenderEmail'),
-      reply_to: getVal('modalEmailReplyTo'),
-      smtp_host: getVal('modalEmailSmtpHost'),
+      transport: getVal('modalEmailTransport') || 'mail',
+      sender_name: getVal('modalEmailSenderName') || 'OmniDesk Administration',
+      sender_email: getVal('modalEmailSenderAddress') || getVal('modalEmailSenderEmail') || 'numeniousnexus@gmail.com',
+      reply_to: getVal('modalEmailReplyTo') || 'numeniousnexus@gmail.com',
+      smtp_host: getVal('modalEmailSmtpHost') || 'smtp.gmail.com',
       smtp_port: parseInt(getVal('modalEmailSmtpPort'), 10) || 465,
-      smtp_secure: getVal('modalEmailSmtpSecure'),
-      smtp_user: getVal('modalEmailSmtpUser'),
+      smtp_secure: getVal('modalEmailSmtpSecure') || 'ssl',
+      smtp_user: getVal('modalEmailSmtpUser') || 'numeniousnexus@gmail.com',
       smtp_pass: getVal('modalEmailSmtpPass'),
       portal_url: getVal('modalEmailPortalUrl')
     };
@@ -5294,11 +5353,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (data && data.success) {
         if (alertBox) {
-          alertBox.textContent = '✅ Mailer settings successfully updated.';
+          alertBox.textContent = '✅ Mailer settings successfully updated with sender numeniousnexus@gmail.com.';
           alertBox.className = 'auth-alert success';
           alertBox.style.display = 'block';
         }
-        showToast('Mailer settings updated.');
+        showToast('Mailer settings updated (numeniousnexus@gmail.com).');
       }
     } catch (_) {}
   }
@@ -5324,6 +5383,44 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modalEmailUserSelect')?.addEventListener('change', updateModalEmailPreview);
   document.getElementById('modalEmailCustomName')?.addEventListener('input', updateModalEmailPreview);
   document.getElementById('modalEmailCustomAddress')?.addEventListener('input', updateModalEmailPreview);
+  document.getElementById('modalEmailTransport')?.addEventListener('change', e => {
+    const smtpFields = document.getElementById('modalEmailSmtpFields');
+    if (smtpFields) smtpFields.style.display = e.target.value === 'smtp' ? 'flex' : 'none';
+  });
+
+  // Quick formatting buttons for normal text
+  document.getElementById('insertBulletBtn')?.addEventListener('click', () => {
+    const ta = document.getElementById('modalEmailBody');
+    if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value;
+    const bullet = (start > 0 && val[start - 1] !== '\n' ? '\n' : '') + '• ';
+    ta.value = val.substring(0, start) + bullet + val.substring(end);
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = start + bullet.length;
+    updateModalEmailPreview();
+  });
+
+  document.getElementById('insertDetailRowBtn')?.addEventListener('click', () => {
+    const ta = document.getElementById('modalEmailBody');
+    if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value;
+    const row = (start > 0 && val[start - 1] !== '\n' ? '\n' : '') + '• Key: Value\n';
+    ta.value = val.substring(0, start) + row + val.substring(end);
+    ta.focus();
+    ta.selectionStart = start + 3;
+    ta.selectionEnd = start + 6;
+    updateModalEmailPreview();
+  });
+
+  document.getElementById('clearEmailBodyBtn')?.addEventListener('click', () => {
+    const ta = document.getElementById('modalEmailBody');
+    if (ta && confirm('Clear message text?')) {
+      ta.value = '';
+      ta.focus();
+      updateModalEmailPreview();
+    }
+  });
+
   ['modalEmailSubject', 'modalEmailBadge', 'modalEmailBody'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', updateModalEmailPreview);
   });
