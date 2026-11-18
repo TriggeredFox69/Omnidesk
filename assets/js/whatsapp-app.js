@@ -561,14 +561,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update Connected Direct WhatsApp Number in Subbar
   function renderConnectedNumber() {
     if (!els.connectedNumberText) return;
+    const userPhoneRaw = state.connectedWaNumber || state.currentUser?.phone || '';
+    const cleanDigits = String(userPhoneRaw).replace(/\D/g, '');
+    const userPhone = cleanDigits ? ('+' + cleanDigits) : '';
+
+    const pillCircle = document.querySelector('#connectedNumberPill .pulse-circle');
     if (state.senderConfigured) {
-      els.connectedNumberText.textContent = state.connectedWaNumber ? ('+' + state.connectedWaNumber) : 'Connected (+92 331 8036576)';
+      els.connectedNumberText.textContent = userPhone ? `Connected (${userPhone})` : 'Connected';
       els.connectedNumberText.style.color = 'var(--c-wa)';
-      if (els.quickReconnectWaBtn) els.quickReconnectWaBtn.style.display = 'none';
+      if (pillCircle) {
+        pillCircle.classList.remove('offline');
+        pillCircle.classList.add('online');
+      }
     } else {
-      els.connectedNumberText.textContent = 'Disconnected (+92 331 8036576) · Click to Link';
+      els.connectedNumberText.textContent = userPhone ? `Disconnected (${userPhone}) · Click to Link` : 'Disconnected · Click to Link';
       els.connectedNumberText.style.color = '#f59e0b';
-      if (els.quickReconnectWaBtn) els.quickReconnectWaBtn.style.display = 'inline-flex';
+      if (pillCircle) {
+        pillCircle.classList.remove('online');
+        pillCircle.classList.add('offline');
+      }
+    }
+    if (els.quickReconnectWaBtn) {
+      els.quickReconnectWaBtn.style.display = 'none';
+      try { els.quickReconnectWaBtn.remove(); } catch (_) {}
     }
   }
 
@@ -3478,22 +3493,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (els.quickAddMyNumberBtn) {
     els.quickAddMyNumberBtn.addEventListener('click', () => {
-      const userPhone = '923318036576';
+      const userPhone = (state.currentUser?.phone || state.connectedWaNumber || '923001234567').replace(/\D/g, '');
+      const userDisplay = '+' + userPhone;
+      const userName = state.currentUser?.name || 'My Linked Number';
       const exists = campaignState.audience.some(c => c.phone === userPhone);
       if (!exists) {
         campaignState.audience.unshift({
           id: `c_lead_my_test_${Date.now()}`,
-          name: 'Askar (My Number)',
+          name: `${userName} (My Number)`,
           phone: userPhone,
-          display: '+92 331 8036576',
+          display: userDisplay,
           city: 'Pakistan',
-          network: 'Ufone',
+          network: 'WhatsApp',
           status: 'pending',
           sentAt: null
         });
         renderCampaignAudienceUI();
-        showToast('⚡ Loaded your WhatsApp number (+92 304 6588806) into campaign queue!');
-        logCampaignTerminal('⚡ User test number +92 304 6588806 added to target queue.', 'info');
+        showToast(`⚡ Loaded your linked WhatsApp number (${userDisplay}) into campaign queue!`);
+        logCampaignTerminal(`⚡ User test number ${userDisplay} added to target queue.`, 'info');
       } else {
         showToast('ℹ️ Your number is already in the campaign queue.');
       }
@@ -4770,6 +4787,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyUserSession(user) {
     state.currentUser = user;
+    renderConnectedNumber();
+    const selfLead = (state.leads || []).find(l => l.id === 'lead_self');
+    if (selfLead && user.phone) {
+      const cleanUPhone = String(user.phone).replace(/\D/g, '');
+      if (cleanUPhone) {
+        selfLead.phone = cleanUPhone;
+        selfLead.display = '+' + cleanUPhone;
+        selfLead.name = (user.name || 'My WhatsApp') + ' (Self Test)';
+      }
+    }
     refreshSenderConnection().catch(() => {});
     localStorage.setItem('nunno_active_session', JSON.stringify(user));
     hideAuthOverlay();

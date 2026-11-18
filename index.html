@@ -24,7 +24,7 @@
       }
     };
     window.NUNNO_CONFIG = {
-      connected_whatsapp_number: '+923318036576',
+      connected_whatsapp_number: '',
       sender_engine: {
         mode: 'whatsapp_cloud_api',
         delivery_delay_min: 4,
@@ -158,9 +158,6 @@
         <span class="conn-label">Direct WA:</span>
         <span class="conn-number mono" id="connectedNumberText">Checking connection…</span>
       </div>
-      <button type="button" class="btn btn-warning btn-xs" id="quickReconnectWaBtn" style="display:none;padding:3px 10px;font-size:11px;font-weight:750;border-radius:6px;gap:5px;cursor:pointer;" title="Click to relink +923318036576 or scan QR code">
-        <span>⚡ Relink +923318036576</span>
-      </button>
       <div class="kpi-widget-group">
         <button type="button" class="kpi-stat-pill active" data-filter="all" id="kpiFilterAll">
           <span class="kpi-dot dot-all"></span>
@@ -1175,7 +1172,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <div>
             <div style="font-size:13px;font-weight:700;color:#10b981;">✓ WhatsApp Connected</div>
-            <div style="font-size:12px;color:#cbd5e1;margin-top:2px;">Linked Number: <span id="waModalConnectedNum" class="mono font-bold" style="color:#fff;">+92 331 8036576</span></div>
+            <div style="font-size:12px;color:#cbd5e1;margin-top:2px;">Linked Number: <span id="waModalConnectedNum" class="mono font-bold" style="color:#fff;">Not Linked</span></div>
           </div>
           <button type="button" class="btn btn-warning btn-xs" id="reconnectWaBtn" style="padding:5px 12px;font-size:11px;font-weight:700;border-radius:5px;cursor:pointer;">🔄 Link New Number / Scan QR</button>
         </div>
@@ -1186,7 +1183,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
       </div>
       <p id="waPendingCampaign" class="text-xs text-muted" hidden>Your campaign will start automatically once your phone is linked. Cancel to stop this pending launch.</p>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
-        <button class="btn btn-warning btn-sm" id="forceRelinkWaBtn" style="font-weight:750;">⚡ Relink +923318036576 / Scan QR</button>
+        <button class="btn btn-warning btn-sm" id="forceRelinkWaBtn" style="font-weight:750;">⚡ Scan QR / Pair WhatsApp</button>
         <button class="btn btn-ghost btn-sm" id="cancelConnectWaBtn">Cancel</button>
         <button class="btn btn-wa btn-sm" id="saveConnectedWaBtn">Connect WhatsApp</button>
       </div>
