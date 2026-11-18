@@ -778,11 +778,11 @@ switch ($action) {
 
     // 5. List Employees (ADMIN ONLY)
     case 'list_employees':
-        if (!$currentUser || !in_array($currentUser['role'], ['admin', 'superadmin'], true)) {
-            http_response_code(403);
+        if (!$currentUser) {
+            http_response_code(401);
             echo json_encode([
                 'success' => false,
-                'error'   => 'Access Denied: Only Administrator can view employee roster.'
+                'error'   => 'Authentication required.'
             ]);
             exit;
         }

@@ -939,7 +939,12 @@ document.addEventListener('DOMContentLoaded', () => {
               }
               return l;
             });
-            if (!state.activeLeadId || !state.leads.some(l => l.id === state.activeLeadId)) {
+            const urlChat = urlParams.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
+            if (urlChat) {
+              const cleanTarget = normalizePhone(urlChat);
+              const matched = state.leads.find(l => normalizePhone(l.phone || '') === cleanTarget || l.id === urlChat);
+              if (matched) state.activeLeadId = matched.id;
+            } else if (!state.activeLeadId || !state.leads.some(l => l.id === state.activeLeadId)) {
               state.activeLeadId = state.leads.length ? state.leads[0].id : null;
             }
             renderConversationsList();
@@ -1425,6 +1430,87 @@ document.addEventListener('DOMContentLoaded', () => {
     renderEmployeeWorkspace();
   }
 
+  function getLeadAssignedTm(lead) {
+    if (!lead) return { name: 'Unassigned Pool', username: '', initials: 'UP', isUnassigned: true };
+
+    // 1. Direct ownerUsername on lead
+    if (lead.ownerUsername) {
+      const emp = (state.employees || []).find(e => (e.username || '').toLowerCase() === String(lead.ownerUsername).toLowerCase());
+      if (emp) return { ...emp, isUnassigned: false };
+      return {
+        name: lead.ownerName || lead.ownerUsername,
+        username: lead.ownerUsername,
+        initials: (lead.ownerName || lead.ownerUsername).substring(0, 2).toUpperCase(),
+        isUnassigned: false
+      };
+    }
+    // 2. Direct ownerId
+    if (lead.ownerId) {
+      const emp = (state.employees || []).find(e => e.id === lead.ownerId) || getAgent(lead.ownerId);
+      if (emp) return { ...emp, isUnassigned: false };
+      if (lead.ownerName) {
+        return {
+          name: lead.ownerName,
+          username: '',
+          initials: String(lead.ownerName).substring(0, 2).toUpperCase(),
+          isUnassigned: false
+        };
+      }
+    }
+    // 3. Direct ownerName
+    if (lead.ownerName && lead.ownerName !== 'Unassigned Pool') {
+      const emp = (state.employees || []).find(e => (e.name || '').toLowerCase() === String(lead.ownerName).toLowerCase());
+      if (emp) return { ...emp, isUnassigned: false };
+      return {
+        name: lead.ownerName,
+        username: '',
+        initials: String(lead.ownerName).substring(0, 2).toUpperCase(),
+        isUnassigned: false
+      };
+    }
+    // 4. Match lead phone to employee phone
+    const cleanLeadPhone = normalizePhone(lead.phone || '');
+    if (cleanLeadPhone) {
+      const matchedEmp = (state.employees || []).find(e => {
+        const ep = normalizePhone(e.phone || '');
+        return ep && (ep === cleanLeadPhone || (ep.length >= 9 && cleanLeadPhone.length >= 9 && ep.slice(-9) === cleanLeadPhone.slice(-9)));
+      });
+      if (matchedEmp) return { ...matchedEmp, isUnassigned: false };
+    }
+    return { name: 'Unassigned Pool', username: '', initials: 'UP', isUnassigned: true };
+  }
+
+  window.handleAdminDirectSwitchToTm = async function(lead, tm) {
+    const targetUsername = tm.username;
+    if (!targetUsername) {
+      selectLead(lead.id);
+      return;
+    }
+    showToast(`⚡ Switching session to ${tm.name} (@${targetUsername})...`);
+    try {
+      const res = await fetch('api/auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'direct_login', username: targetUsername })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        localStorage.setItem('omnidesk_impersonated_from_admin', '1');
+        localStorage.setItem('omnidesk_impersonated_user', targetUsername);
+        localStorage.setItem('omnidesk_impersonated_name', tm.name || targetUsername);
+        const cleanPhone = normalizePhone(lead.phone || '');
+        localStorage.setItem('omnidesk_active_chat_phone', cleanPhone);
+        window.location.href = `index.html?chat=${encodeURIComponent(cleanPhone)}&impersonated=1`;
+      } else {
+        showToast('⚠️ Could not switch: ' + (data.error || 'Server error'));
+        selectLead(lead.id);
+      }
+    } catch (err) {
+      showToast('⚠️ Direct login error: ' + err.message);
+      selectLead(lead.id);
+    }
+  };
+
   function renderConversationsList() {
     if (!els.conversationsScroll) return;
 
@@ -1569,10 +1655,21 @@ document.addEventListener('DOMContentLoaded', () => {
         previewHtml = `<span class="conv-preview-text" title="${escapeHtml(cleanPreview)}">${escapeHtml(cleanPreview)}</span>`;
       }
 
+      const assignedTm = getLeadAssignedTm(lead);
+      const isCompanyAdmin = state.currentUser ? ['admin', 'superadmin'].includes(state.currentUser.role) : false;
+      const canImpersonateThisTm = isCompanyAdmin && !assignedTm.isUnassigned && assignedTm.username && assignedTm.username !== state.currentUser?.username;
+
       const item = document.createElement('div');
       item.className = `conv-item state-${leadState} ${isSelected ? 'active' : ''}`;
       item.dataset.leadPhone = normalizePhone(lead.phone);
-      item.onclick = () => selectLead(lead.id);
+      item.onclick = async (e) => {
+        if (canImpersonateThisTm) {
+          e.preventDefault();
+          await handleAdminDirectSwitchToTm(lead, assignedTm);
+          return;
+        }
+        selectLead(lead.id);
+      };
 
       item.innerHTML = `
         <div class="conv-avatar-wrap">
@@ -1584,6 +1681,16 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="conv-top-row">
             <span class="conv-contact-name">${escapeHtml(displayTitle)}</span>
             <span class="conv-timestamp">${lastMsg.time || lead.lastActive}</span>
+          </div>
+          <div class="conv-tm-row">
+            <span class="conv-tm-pill ${assignedTm.isUnassigned ? 'unassigned' : ''}" title="Assigned Closer: ${escapeHtml(assignedTm.name)}">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>${escapeHtml(assignedTm.name)}</span>
+              ${assignedTm.username ? `<span class="tm-handle">@${escapeHtml(assignedTm.username)}</span>` : ''}
+            </span>
+            ${canImpersonateThisTm ? `
+              <span class="admin-takeover-hint" title="Direct Login into ${escapeHtml(assignedTm.name)}'s workspace">⚡ Enter Desk ↗</span>
+            ` : ''}
           </div>
           <div class="conv-preview-row">
             ${previewHtml}
@@ -4931,19 +5038,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (isAdmin) {
-      if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'inline-flex';
-      if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'inline-flex';
-      fetchTeamRoster();
-    } else {
-      if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
-      if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'none';
-    }
+    fetchTeamRoster();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasChatParam = urlParams.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
+    const isImpersonated = urlParams.get('impersonated') === '1' || localStorage.getItem('omnidesk_impersonated_from_admin') === '1' || Boolean(user?._impersonated_by);
 
     renderConversationsList();
     renderActiveChat();
     renderEmployeeWorkspace();
-    if (user.role === 'admin') switchTab('inbox');
+    if (user.role === 'admin' || isImpersonated || hasChatParam) switchTab('inbox');
     else switchTab('employee');
   }
 
@@ -5558,8 +5662,9 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('omnidesk_impersonated_from_admin');
     localStorage.removeItem('omnidesk_impersonated_user');
     localStorage.removeItem('omnidesk_impersonated_name');
+    localStorage.removeItem('omnidesk_active_chat_phone');
     setTimeout(() => {
-      window.location.href = 'admin.php';
+      window.location.href = 'index.html?company_id=' + encodeURIComponent(state.currentCompanyId || 'COMP-001');
     }, 200);
   };
   window.OmnideskToggleStatus = function(empId) {

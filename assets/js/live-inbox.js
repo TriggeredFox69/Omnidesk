@@ -43,9 +43,17 @@
           return null;
         }
 
+        const isTM = isTMUser();
+        const tmOwnerId = isTM ? state.currentUser.id : null;
+        const tmOwnerName = isTM ? state.currentUser.name : null;
+        const tmOwnerUsername = isTM ? state.currentUser.username : null;
+        const tmState = isTM ? 'ongoing' : 'fresh';
+
         const defaultNumber = itemPhone ? ('+' + itemPhone) : (item.phone ? '+' + cleanDigits(item.phone) : '');
         lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: defaultNumber,
-          name: defaultNumber, city: '', network: '', ownerId: null, leadState: 'fresh',
+          name: defaultNumber, city: '', network: '',
+          ownerId: tmOwnerId, ownerName: tmOwnerName, ownerUsername: tmOwnerUsername,
+          leadState: tmState,
           status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
         state.leads.unshift(lead);
       }

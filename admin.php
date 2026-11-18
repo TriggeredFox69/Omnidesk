@@ -474,7 +474,7 @@ if (!$activeCompany) {
           <span class="badge-tier"><?php echo htmlspecialchars($activeCompany['plan'] ?? 'Enterprise Pro'); ?></span>
           <span style="font-size: 11px; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
             <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-            Trunk: <?php echo htmlspecialchars($activeCompany['fallback_phone'] ?? '+923318036576'); ?>
+            Decentralized TM Hub &bull; Active
           </span>
         </div>
         <div class="company-sub">
@@ -560,9 +560,6 @@ if (!$activeCompany) {
     </button>
     <button class="dash-tab-btn" id="tabBtnCampaigns" onclick="switchDashboardTab('campaigns')">
       <span>🚀</span> Campaign Dispatcher (3 Variations)
-    </button>
-    <button class="dash-tab-btn" id="tabBtnTrunk" onclick="switchDashboardTab('trunk')">
-      <span>📞</span> Company Trunk &amp; Fallback Numbers
     </button>
     <button class="dash-tab-btn" id="tabBtnCommissions" onclick="switchDashboardTab('commissions')">
       <span>💰</span> TL Commission &amp; Plan Ledger
@@ -660,7 +657,10 @@ if (!$activeCompany) {
             If an admin identifies a high-potential lead, click <strong>Takeover Lead</strong> to close it personally. The original closer's commission remains 100% protected and delivered.
           </div>
         </div>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a href="index.html?company_id=<?php echo urlencode($activeCompany['id']); ?>" target="_blank" class="btn btn-purple" style="display:inline-flex; align-items:center; gap:6px;">
+            <span>💬</span> Full-Screen Live Chats (All TMs) ↗
+          </a>
           <button class="btn btn-secondary" onclick="loadCompanyLeads()">🔄 Refresh Leads</button>
         </div>
       </div>
@@ -771,58 +771,6 @@ if (!$activeCompany) {
           🚀 Dispatch Campaign Now
         </button>
       </form>
-    </div>
-  </div>
-
-  <!-- TAB 4: COMPANY TRUNK & FALLBACK NUMBERS -->
-  <div class="dash-pane" id="paneTrunk">
-    <div class="content-box">
-      <div class="box-header">
-        <div>
-          <div class="box-title"><span>📞</span> Company Trunk & Number Profiles Pool</div>
-          <div class="box-desc">
-            Official company WhatsApp trunk number. If an employee cannot arrange their own phone, they fall back to using this company profile until their device is ready.
-          </div>
-        </div>
-      </div>
-
-      <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.35); border-radius: 14px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
-        <div>
-          <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #34d399; background: rgba(16, 185, 129, 0.2); padding: 3px 8px; border-radius: 4px;">Primary Company Trunk</span>
-          <div style="font-size: 22px; font-weight: 800; margin-top: 6px; letter-spacing: 0.02em;">
-            <?php echo htmlspecialchars($activeCompany['fallback_phone'] ?? '+923318036576'); ?>
-          </div>
-          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
-            Linked via Pure WebSocket Baileys &bull; 24/7 Persistent Daemon &bull; Auto-healed
-          </div>
-        </div>
-        <div style="display:flex; gap:10px;">
-          <a href="index.html" class="btn btn-emerald" target="_blank">⚡ Reconnect / Scan QR</a>
-        </div>
-      </div>
-
-      <div style="overflow-x: auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>Profile Label</th>
-              <th>Phone Number</th>
-              <th>Daily Capacity</th>
-              <th>Current Assignment</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="trunkProfilesTableBody">
-            <tr>
-              <td><strong>Primary Trunk Line</strong></td>
-              <td><?php echo htmlspecialchars($activeCompany['fallback_phone'] ?? '+923318036576'); ?></td>
-              <td>1,000 msgs/day</td>
-              <td><em>Company Shared Pool</em></td>
-              <td><span class="badge-status status-active">Active Trunk</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
   </div>
 
@@ -984,7 +932,7 @@ let currentCompanyLeads = [];
 let currentPendingTMs = [];
 
 function switchDashboardTab(tabName) {
-  const tabs = ['closers', 'pending', 'leads', 'campaigns', 'trunk', 'commissions', 'products'];
+  const tabs = ['closers', 'pending', 'leads', 'campaigns', 'commissions', 'products'];
   tabs.forEach((t) => {
     const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
     const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1471,17 +1419,45 @@ function renderLeadsTable(leads) {
           ` : '<span style="font-size:11px; color:var(--text-muted);">Standard closer ownership</span>'}
         </td>
         <td>
-          ${isTakeover ? `
-            <span style="font-size:11px; color:#34d399; font-weight:700;">✓ Active Under Admin</span>
-          ` : `
-            <button class="btn-takeover" onclick="handleAdminTakeover('${lead.phone}')">
-              👑 Takeover Lead
+          <div style="display:flex; flex-direction:column; gap:5px;">
+            ${isTakeover ? `
+              <span style="font-size:11px; color:#34d399; font-weight:700;">✓ Active Under Admin</span>
+            ` : `
+              <button class="btn-takeover" onclick="handleAdminTakeover('${lead.phone}')">
+                👑 Takeover Lead
+              </button>
+            `}
+            <button type="button" class="btn btn-secondary" style="font-size:10.5px; padding:3px 8px; border-radius:6px; font-weight:700; background:rgba(99,102,241,0.15); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3); cursor:pointer;" onclick="adminInspectFromAdmin('${lead.ownerUsername || 'hamza'}', '${lead.phone}')">
+              ⚡ Open Chat as TM ↗
             </button>
-          `}
+          </div>
         </td>
       </tr>
     `;
   }).join('');
+}
+
+async function adminInspectFromAdmin(username, phone) {
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'direct_login', username: username })
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      localStorage.setItem('omnidesk_impersonated_from_admin', '1');
+      localStorage.setItem('omnidesk_impersonated_user', username);
+      localStorage.setItem('omnidesk_impersonated_name', data.user?.name || username);
+      const cleanPhone = String(phone).replace(/\D/g, '');
+      localStorage.setItem('omnidesk_active_chat_phone', cleanPhone);
+      window.open(`index.html?chat=${encodeURIComponent(cleanPhone)}&impersonated=1`, '_blank');
+    } else {
+      alert(data.error || 'Failed to switch into TM workspace.');
+    }
+  } catch (err) {
+    alert('Error logging in as TM: ' + err.message);
+  }
 }
 
 async function handleAdminTakeover(phone) {

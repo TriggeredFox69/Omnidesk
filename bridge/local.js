@@ -107,14 +107,26 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
   let currentLocalUser = null;
   const leads = new Map();
 
-  // Load existing leads from data/leads.json if available
+  function saveLeadsDisk() {
+    try {
+      const arr = [...leads.values()];
+      fs.writeFileSync(path.join(root, 'data/leads.json'), JSON.stringify(arr, null, 2), 'utf8');
+      fs.writeFileSync(path.join(root, 'data/tenants/COMP-001/leads.json'), JSON.stringify(arr, null, 2), 'utf8');
+    } catch (_) {}
+  }
+
+  // Load existing leads from data/leads.json or data/tenants/COMP-001/leads.json
   try {
     const leadsFile = path.join(root, 'data/leads.json');
+    const tenantLeadsFile = path.join(root, 'data/tenants/COMP-001/leads.json');
+    let loaded = null;
     if (fs.existsSync(leadsFile)) {
-      const initialLeads = JSON.parse(fs.readFileSync(leadsFile, 'utf8') || '[]');
-      if (Array.isArray(initialLeads)) {
-        initialLeads.forEach(l => { if (l && l.id) leads.set(l.id, l); });
-      }
+      loaded = JSON.parse(fs.readFileSync(leadsFile, 'utf8') || '[]');
+    } else if (fs.existsSync(tenantLeadsFile)) {
+      loaded = JSON.parse(fs.readFileSync(tenantLeadsFile, 'utf8') || '[]');
+    }
+    if (Array.isArray(loaded)) {
+      loaded.forEach(l => { if (l && l.id) leads.set(l.id, l); });
     }
   } catch (_) {}
 
@@ -956,6 +968,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           if (action === 'delete_leads' || action === 'delete_lead') {
             const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
             ids.forEach(id => leads.delete(id));
+            saveLeadsDisk();
             json(200, { success: true, deleted_count: ids.length, remaining_count: leads.size });
             return;
           }
@@ -963,7 +976,9 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             const lead = { ...(leads.get(body.id) || { messages: [] }), ...body };
             if (body.newMessage && !lead.messages.some(m => m.id === body.newMessage.id)) lead.messages.push(body.newMessage);
             if (body.updateMessage) lead.messages = lead.messages.map(m => m.waMessageId === body.updateMessage.waMessageId ? { ...m, ...body.updateMessage } : m);
-            leads.set(body.id, lead); json(200, { success: true }); return;
+            leads.set(body.id, lead);
+            saveLeadsDisk();
+            json(200, { success: true }); return;
           }
         }
 
