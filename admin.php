@@ -255,13 +255,21 @@ if (!$activeCompany) {
     /* Tabs Bar */
     .dashboard-tabs {
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
       background: var(--bg-surface);
       padding: 6px;
       border-radius: 14px;
       border: 1px solid var(--border-subtle);
       margin-bottom: 24px;
-      overflow-x: auto;
+      overflow: hidden;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .dashboard-tabs::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
     }
     .dash-tab-btn {
       padding: 10px 18px;
@@ -459,7 +467,7 @@ if (!$activeCompany) {
         <img src="assets/images/chatly-logo.jpg" alt="Chatly" style="height:34px; width:auto; border-radius:6px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,0.2);">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
-      <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/nunno-logo.svg'); ?>" alt="Company Logo" class="company-logo">
+      <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/nunno-logo.png'); ?>" alt="Company Logo" class="company-logo">
       <div class="company-info">
         <div class="company-name-row">
           <span class="company-name"><?php echo htmlspecialchars($activeCompany['name']); ?></span>

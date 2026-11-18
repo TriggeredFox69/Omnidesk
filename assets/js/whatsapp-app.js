@@ -606,7 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'COMP-001': {
       name: 'Nunno Official',
       short_name: 'Nunno',
-      logo: 'assets/images/nunno-logo.svg',
+      logo: 'assets/images/nunno-logo.png',
       badge: 'Scalper Alpha & SaaS',
       brand_color: '#8b5cf6'
     },
@@ -632,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let brand = COMPANY_BRAND_CATALOG[compId] || {
       name: state.currentUser?.company_name || 'Nunno Official',
       short_name: (state.currentUser?.company_name || 'Nunno').split(' ')[0],
-      logo: 'assets/images/nunno-logo.svg',
+      logo: 'assets/images/nunno-logo.png',
       badge: 'Scalper Alpha & SaaS',
       brand_color: '#00a884'
     };
@@ -3942,7 +3942,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userCompId = user.company_id || state.currentCompanyId || 'COMP-001';
     const compCatalog = (typeof COMPANY_BRAND_CATALOG !== 'undefined' && COMPANY_BRAND_CATALOG[userCompId]) ? COMPANY_BRAND_CATALOG[userCompId] : null;
     const resolvedCompName = user.company_name || compCatalog?.name || 'Company Workspace';
-    const resolvedCompLogo = compCatalog?.logo || 'assets/images/nunno-logo.svg';
+    const resolvedCompLogo = compCatalog?.logo || 'assets/images/nunno-logo.png';
     if (profCompName) profCompName.textContent = resolvedCompName;
     if (profCompLogo) profCompLogo.src = resolvedCompLogo;
 

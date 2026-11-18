@@ -24,7 +24,7 @@ function templateAdminPhp(content, currentUser) {
   }
   let compName = 'Nunno Official';
   let compPlan = 'Enterprise Billion';
-  let compLogo = 'assets/images/nunno-logo.svg';
+  let compLogo = 'assets/images/nunno-logo.png';
   const compId = currentUser?.company_id || 'COMP-001';
   try {
     const comps = JSON.parse(fs.readFileSync(path.join(root, 'data/companies.json'), 'utf8') || '[]');

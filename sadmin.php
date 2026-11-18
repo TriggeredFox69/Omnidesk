@@ -192,9 +192,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
     /* Navigation Tabs */
     .sadmin-tabs {
-      display: flex; gap: 6px; background: var(--bg-surface);
+      display: flex; flex-wrap: wrap; gap: 6px; background: var(--bg-surface);
       padding: 6px; border-radius: 14px; border: 1px solid var(--border-subtle);
-      margin-bottom: 24px; overflow-x: auto;
+      margin-bottom: 24px; overflow: hidden;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .sadmin-tabs::-webkit-scrollbar {
+      display: none; width: 0; height: 0;
     }
     .sadmin-tab-btn {
       padding: 10px 18px; font-size: 13px; font-weight: 700;

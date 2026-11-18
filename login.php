@@ -173,6 +173,13 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       background: rgba(0, 0, 0, 0.15);
       border-bottom: 1px solid var(--wa-card-border);
       overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .role-nav-bar::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
     }
     html.theme-light .role-nav-bar {
       background: #f0f2f5;
@@ -1272,7 +1279,7 @@ async function handleSadminLogin(e) {
 
       <!-- Live Company Brand & Logo Preview Card -->
       <div id="companyBrandPreviewCard" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(0,168,132,0.3); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease;">
-        <img id="previewCompLogo" src="assets/images/nunno-logo.svg" alt="Company Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: contain; background: #0c0a18; border: 1px solid rgba(255,255,255,0.15); padding: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;">
+        <img id="previewCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: contain; background: #0c0a18; border: 1px solid rgba(255,255,255,0.15); padding: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;">
         <div style="flex: 1; min-width: 0;">
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
             <strong id="previewCompName" style="color: var(--wa-text-primary); font-size: 13.5px; font-weight: 800;">Nunno Official</strong>
@@ -1323,7 +1330,7 @@ async function handleSadminLogin(e) {
 <div id="modalTMSuccess" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
   <div style="background:var(--wa-card-bg); border:1px solid rgba(0,168,132,0.4); border-radius:20px; padding:32px; max-width:460px; width:90%; box-shadow:0 25px 60px rgba(0,0,0,0.6); text-align:center;">
     <div style="display:flex; justify-content:center; margin-bottom:12px;">
-      <img id="successCompLogo" src="assets/images/nunno-logo.svg" alt="Company Logo" style="width:64px; height:64px; border-radius:16px; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.18); padding:5px; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+      <img id="successCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:64px; height:64px; border-radius:16px; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.18); padding:5px; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
     </div>
     <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Closer Application Received!</h3>
     <p style="font-size:13px; color:var(--wa-text-secondary); line-height:1.6; margin-bottom:20px;">
@@ -1448,7 +1455,7 @@ function updateSelectedCompanyPreview() {
   const comp = (loadedCompaniesCache && loadedCompaniesCache.find(c => c.id === compId)) || {
     id: compId || 'COMP-001',
     name: 'Nunno Official',
-    logo: 'assets/images/nunno-logo.svg',
+    logo: 'assets/images/nunno-logo.png',
     plan: 'Enterprise Billion',
     badge: 'Scalper Alpha & SaaS'
   };
@@ -1456,7 +1463,7 @@ function updateSelectedCompanyPreview() {
   const nameEl = document.getElementById('previewCompName');
   const badgeEl = document.getElementById('previewCompBadge');
   const taglineEl = document.getElementById('previewCompTagline');
-  if (logoEl) logoEl.src = comp.logo || 'assets/images/nunno-logo.svg';
+  if (logoEl) logoEl.src = comp.logo || 'assets/images/nunno-logo.png';
   if (nameEl) nameEl.textContent = comp.name;
   if (badgeEl) badgeEl.textContent = comp.plan || 'Verified Company';
   if (taglineEl) taglineEl.textContent = comp.badge || (comp.plan + ' • Verified Closing Workspace');
