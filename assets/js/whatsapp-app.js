@@ -4591,6 +4591,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data && data.authenticated && data.user) {
           applyUserSession(data.user);
         } else {
+          // If on web server (local or hosted), redirect to landing page
+          if (location.protocol !== 'file:') {
+            window.location.href = 'login.php';
+            return;
+          }
           // Check local offline fallback
           const localSession = localStorage.getItem('nunno_active_session');
           if (localSession) {
@@ -5038,9 +5043,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.classList.remove('mobile-in-chat');
     if (els.viewInbox) els.viewInbox.classList.remove('mobile-chat-open');
     toggleDossierDrawer(false);
+    localStorage.removeItem('nunno_active_session');
+    if (location.protocol !== 'file:') {
+      window.location.href = 'login.php';
+      return;
+    }
     triggerLogoutAnimation(() => {
       state.currentUser = null;
-      localStorage.removeItem('nunno_active_session');
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
       if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'none';
       hideAccountSuspendedScreen();

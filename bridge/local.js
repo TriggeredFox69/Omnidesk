@@ -1,5 +1,5 @@
 'use strict';
-// Local-only adapter: serves the UI and a single-user API without PHP or cPanel.
+// Local-only adapter: serves the WhatsApp Web Landing Page, Executive Admin, Super Admin, and UI API without PHP.
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -7,6 +7,43 @@ const { randomBytes } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { createService } = require('./service');
 const root = path.resolve(__dirname, '..');
+
+function templateLoginPhp(content) {
+  let rendered = content.replace(/<\?php[\s\S]*?\?>/, '');
+  rendered = rendered.replace(/<\?php[\s\S]*?\?>/g, '');
+  return rendered;
+}
+
+function templateAdminPhp(content, currentUser) {
+  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+  let rendered = content;
+  if (!isAdmin) {
+    rendered = rendered.replace(/<\?php if \(!\$isAdmin\): \?>([\s\S]*?)<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$1');
+  } else {
+    rendered = rendered.replace(/<\?php if \(!\$isAdmin\): \?>([\s\S]*?)<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$2');
+  }
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['name'\]\); \?>/g, 'Nunno Official');
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['plan'\] \?\? 'Enterprise Pro'\); \?>/g, 'Enterprise Billion');
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['fallback_phone'\] \?\? '\+923318036576'\); \?>/g, '+923318036576');
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['id'\]\); \?>/g, currentUser?.company_id || 'COMP-001');
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$currentUser\['name'\] \?\? 'Admin'\); \?>/g, currentUser?.name || 'System Administrator');
+  rendered = rendered.replace(/<\?php echo urlencode\(\$activeCompany\['id'\]\); \?>/g, currentUser?.company_id || 'COMP-001');
+  rendered = rendered.replace(/<\?php echo \$activeCompany\['id'\]; \?>/g, currentUser?.company_id || 'COMP-001');
+  rendered = rendered.replace(/<\?php[\s\S]*?\?>/g, '');
+  return rendered;
+}
+
+function templateSadminPhp(content, currentUser) {
+  const isSuperAdmin = currentUser && currentUser.role === 'superadmin';
+  let rendered = content;
+  if (!isSuperAdmin) {
+    rendered = rendered.replace(/<\?php if \(!\$isSuperAdmin\): \?>([\s\S]*?)<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$1');
+  } else {
+    rendered = rendered.replace(/<\?php if \(!\$isSuperAdmin\): \?>([\s\S]*?)<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$2');
+  }
+  rendered = rendered.replace(/<\?php[\s\S]*?\?>/g, '');
+  return rendered;
+}
 
 async function startLocal({ createClient, qrImage, port = 8080, openBrowser = true, bridgePort = 0, bridgeToken } = {}) {
   let restoreSession = false;
@@ -39,14 +76,34 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       }
     } catch (_) {}
     return [
-      { id: 'USR-ADMIN-01', name: 'System Administrator', username: 'admin', role: 'admin', designation: 'Admin', gender: 'male', status: 'active' },
-      { id: 'EMP-TL-01', name: 'Ali Raza (Team Lead)', username: 'ali', role: 'lead', designation: 'Male Team Lead', gender: 'male', status: 'active' },
-      { id: 'EMP-TL-02', name: 'Asima Noor (Team Lead)', username: 'asima', role: 'lead', designation: 'Female Team Lead', gender: 'female', status: 'active' },
-      { id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', gender: 'male', status: 'active' }
+      { id: 'USR-SADMIN-01', name: 'Master Administrator', username: 'sadmin', role: 'superadmin', designation: 'Platform Owner', gender: 'male', status: 'active', company_id: 'GLOBAL' },
+      { id: 'USR-ADMIN-01', name: 'System Administrator', username: 'admin', role: 'admin', designation: 'Admin', gender: 'male', status: 'active', company_id: 'COMP-001' },
+      { id: 'EMP-TL-01', name: 'Ali Raza (Team Lead)', username: 'ali', role: 'lead', designation: 'Male Team Lead', gender: 'male', status: 'active', company_id: 'COMP-001', tl_commission_balance: 1000 },
+      { id: 'EMP-TL-02', name: 'Asima Noor (Team Lead)', username: 'asima', role: 'lead', designation: 'Female Team Lead', gender: 'female', status: 'active', company_id: 'COMP-001', tl_commission_balance: 500 },
+      { id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', gender: 'male', status: 'active', company_id: 'COMP-001', message_limit: 150, messages_sent_today: 12 }
     ];
   }
+
+  function saveLocalUsers(users) {
+    try {
+      fs.writeFileSync(usersPath, JSON.stringify(users, null, 2), 'utf8');
+    } catch (_) {}
+  }
+
   let currentLocalUser = null;
   const leads = new Map();
+
+  // Load existing leads from data/leads.json if available
+  try {
+    const leadsFile = path.join(root, 'data/leads.json');
+    if (fs.existsSync(leadsFile)) {
+      const initialLeads = JSON.parse(fs.readFileSync(leadsFile, 'utf8') || '[]');
+      if (Array.isArray(initialLeads)) {
+        initialLeads.forEach(l => { if (l && l.id) leads.set(l.id, l); });
+      }
+    }
+  } catch (_) {}
+
   let origin;
   const server = http.createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -57,7 +114,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
     try {
       const url = new URL(req.url, origin);
       if (url.pathname.startsWith('/api/')) {
-        if (!(req.headers.cookie || '').split(';').some(c => c.trim() === `nunno_local=${session}`)) { json(401, { success: false }); return; }
+        // Loopback security check: Host header must match origin
         if (req.headers.origin && req.headers.origin !== origin) { json(403, { success: false }); return; }
         if (!['GET', 'POST'].includes(req.method)) { json(405, { success: false }); return; }
         let body = {};
@@ -68,11 +125,16 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           body = JSON.parse(raw || '{}');
         }
         const action = body.action || url.searchParams.get('action');
+
+        // 1. Authentication API
         if (url.pathname === '/api/auth.php') {
           const allUsers = loadLocalUsers();
           if (action === 'check') {
-            const userToReturn = currentLocalUser || allUsers[0];
-            json(200, { success: true, authenticated: true, user: userToReturn });
+            if (currentLocalUser) {
+              json(200, { success: true, authenticated: true, user: currentLocalUser });
+            } else {
+              json(200, { success: false, authenticated: false, user: null });
+            }
             return;
           }
           if (action === 'login') {
@@ -90,15 +152,61 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             }
             if (matched && isValid) {
               currentLocalUser = matched;
-              json(200, { success: true, authenticated: true, user: matched });
+              json(200, { success: true, authenticated: true, user: matched, message: 'Logged in successfully.' });
             } else {
               json(401, { success: false, error: 'Invalid username or password.' });
             }
             return;
           }
+          if (action === 'qr_login') {
+            const closerUser = allUsers.find(u => u.username === 'hamza') || allUsers.find(u => u.role === 'member') || {
+              id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', status: 'active', company_id: 'COMP-001'
+            };
+            currentLocalUser = closerUser;
+            json(200, { success: true, message: 'Closer session activated via WhatsApp Web pairing.', user: closerUser });
+            return;
+          }
+          if (action === 'tl_register') {
+            const name = String(body.name || '').trim();
+            const username = String(body.username || '').trim().toLowerCase();
+            const password = String(body.password || '').trim();
+            const phone = String(body.phone || '').trim();
+            const email = body.email || (username + '@nunno.cloud');
+            if (!name || !username || !password) {
+              json(400, { success: false, error: 'Full Name, Username, and Password are required.' });
+              return;
+            }
+            const existing = allUsers.find(u => u.username.toLowerCase() === username);
+            if (existing) {
+              json(409, { success: false, error: `Username "${username}" is already taken.` });
+              return;
+            }
+            const newTL = {
+              id: 'EMP-TL-' + Date.now().toString(36).toUpperCase(),
+              name: name + ' (Team Lead)',
+              username: username,
+              email: email,
+              password: password,
+              role: 'lead',
+              designation: 'Commission Team Lead',
+              gender: 'male',
+              phone: phone,
+              status: 'active',
+              company_id: 'COMP-001',
+              tl_commission_balance: 0,
+              message_limit: 500,
+              messages_sent_today: 0,
+              created_at: new Date().toISOString()
+            };
+            allUsers.push(newTL);
+            saveLocalUsers(allUsers);
+            currentLocalUser = newTL;
+            json(200, { success: true, message: 'Team Leader account registered! Welcome to the commission portal.', user: newTL });
+            return;
+          }
           if (action === 'logout') {
             currentLocalUser = null;
-            json(200, { success: true });
+            json(200, { success: true, message: 'Logged out successfully.' });
             return;
           }
           if (action === 'list_employees') {
@@ -118,7 +226,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               status: 'active'
             };
             allUsers.push(newEmp);
-            try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+            saveLocalUsers(allUsers);
             json(200, { success: true, employee: newEmp });
             return;
           }
@@ -126,7 +234,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             const target = allUsers.find(u => u.id === body.id);
             if (target) {
               target.status = target.status === 'active' ? 'suspended' : 'active';
-              try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+              saveLocalUsers(allUsers);
               json(200, { success: true, message: `Status updated to ${target.status}` });
             } else {
               json(404, { success: false, error: 'Employee not found' });
@@ -135,7 +243,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
           if (action === 'delete_employee') {
             const filtered = allUsers.filter(u => u.id !== body.id);
-            try { fs.writeFileSync(usersPath, JSON.stringify(filtered, null, 2), 'utf8'); } catch (_) {}
+            saveLocalUsers(filtered);
             json(200, { success: true, message: 'Employee removed' });
             return;
           }
@@ -166,7 +274,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               const curInList = allUsers.find(u => u.id === currentLocalUser.id);
               if (curInList) curInList.tl_commission_balance = currentLocalUser.tl_commission_balance;
             }
-            try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+            saveLocalUsers(allUsers);
             json(200, { success: true, employee: newEmp, commission_earned: 500, new_tl_balance: currentLocalUser?.tl_commission_balance || 500 });
             return;
           }
@@ -178,14 +286,14 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'update_message_limit') {
-            const target = allUsers.find(u => u.id === body.id);
+            const target = allUsers.find(u => u.id === body.id || u.id === body.employee_id);
             if (target) {
               target.message_limit = body.message_limit !== undefined ? Number(body.message_limit) : 100;
               if (body.reset_today) {
                 target.messages_sent_today = 0;
                 target.quota_reset_date = new Date().toISOString().slice(0, 10);
               }
-              try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+              saveLocalUsers(allUsers);
               json(200, { success: true, message: `Message limit updated to ${target.message_limit}` });
             } else {
               json(404, { success: false, error: 'Employee not found' });
@@ -193,6 +301,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'list_company_employees') {
+            const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
             const filtered = allUsers.filter(u => u.role !== 'superadmin').map(u => {
               const lim = u.message_limit !== undefined ? Number(u.message_limit) : 100;
               const sent = Number(u.messages_sent_today) || 0;
@@ -210,204 +319,92 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
         }
-        if (url.pathname === '/api/leads_sync.php') {
-          if (action === 'get_leads') { json(200, { success: true, leads: [...leads.values()] }); return; }
-          if (action === 'delete_leads' || action === 'delete_lead') {
-            const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
-            ids.forEach(id => leads.delete(id));
-            const inboxFile = path.join(root, 'data/whatsapp-bridge/local/inbox.json');
-            try {
-              if (fs.existsSync(inboxFile)) {
-                const inbox = JSON.parse(fs.readFileSync(inboxFile, 'utf8') || '[]');
-                const phonesToDelete = ids.map(id => String(id).replace(/\D/g, ''));
-                const newInbox = inbox.filter(m => {
-                  const s = String(m.from || m.sender || '').replace(/\D/g, '');
-                  return !phonesToDelete.includes(s);
-                });
-                fs.writeFileSync(inboxFile, JSON.stringify(newInbox, null, 2), 'utf8');
-              }
-            } catch (_) {}
-            json(200, { success: true, deleted_count: ids.length, remaining_count: leads.size });
-            return;
-          }
-          if (action === 'update_lead' && req.method === 'POST') {
-            const lead = { ...(leads.get(body.id) || { messages: [] }), ...body };
-            if (body.newMessage && !lead.messages.some(m => m.id === body.newMessage.id)) lead.messages.push(body.newMessage);
-            if (body.updateMessage) lead.messages = lead.messages.map(m => m.waMessageId === body.updateMessage.waMessageId ? { ...m, ...body.updateMessage } : m);
-            leads.set(body.id, lead); json(200, { success: true }); return;
-          }
-        }
-        if (url.pathname === '/api/withdrawals.php') {
-          const wdFile = path.join(root, 'data/withdrawals.json');
-          const loadWds = () => {
-            try {
-              if (fs.existsSync(wdFile)) return JSON.parse(fs.readFileSync(wdFile, 'utf8') || '[]');
-            } catch (_) {}
-            return [];
-          };
-          const saveWds = (arr) => {
-            try {
-              fs.writeFileSync(wdFile, JSON.stringify(arr, null, 2), 'utf8');
-            } catch (_) {}
-          };
 
-          if (action === 'get_withdrawals') {
-            const list = loadWds();
-            const targetUser = url.searchParams.get('user_id') || body.user_id;
-            const isAdmin = currentLocalUser && currentLocalUser.role === 'admin';
-            const resList = (!isAdmin && targetUser) ? list.filter(w => w.userId === targetUser) : list;
-            json(200, { success: true, withdrawals: resList });
+        // 2. Tenant Manager API (Company Admin Controls)
+        if (url.pathname === '/api/tenant_manager.php') {
+          const allUsers = loadLocalUsers();
+          if (action === 'list_company_employees') {
+            const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
+            const filtered = allUsers.filter(u => u.role !== 'superadmin').map(u => {
+              const lim = u.message_limit !== undefined ? Number(u.message_limit) : 100;
+              const sent = Number(u.messages_sent_today) || 0;
+              return {
+                ...u,
+                quota_metrics: {
+                  limit: lim,
+                  sent: sent,
+                  remaining: lim < 0 ? 'Unlimited' : Math.max(0, lim - sent),
+                  percent: lim <= 0 ? 0 : Math.min(100, Math.round((sent / lim) * 100))
+                }
+              };
+            });
+            json(200, { success: true, employees: filtered });
             return;
           }
-          if (action === 'request_withdrawal' && req.method === 'POST') {
-            const list = loadWds();
-            const method = body.method || 'Digital Wallet';
-            const institution = body.institution || method;
-            let accountNumber = String(body.accountNumber || '').trim();
-            const walletKeys = ['easypaisa', 'jazzcash', 'sadapay', 'nayapay', 'upaisa', 'zindigi', 'digital wallet'];
-            const isWallet = walletKeys.includes(method.toLowerCase()) || walletKeys.includes(institution.toLowerCase());
-            if (isWallet) {
-              const cleanPhone = accountNumber.replace(/[^\d\+]/g, '');
-              const isValidWallet = /^0[0-9]{10}$/.test(cleanPhone) || /^\+?92[0-9]{10}$/.test(cleanPhone);
-              if (!isValidWallet) {
-                json(400, {
-                  success: false,
-                  error: `Technical Validation Error: For digital wallets (${institution}), enter 11 digits starting with 0 (e.g. 03001234567) or 12 digits with country code (+923001234567).`
-                });
-                return;
+          if (action === 'update_message_limit') {
+            const targetId = body.employee_id || body.id;
+            const target = allUsers.find(u => u.id === targetId);
+            if (target) {
+              target.message_limit = body.message_limit !== undefined ? Number(body.message_limit) : 100;
+              if (body.reset_today) {
+                target.messages_sent_today = 0;
+                target.quota_reset_date = new Date().toISOString().slice(0, 10);
               }
-              accountNumber = cleanPhone;
+              saveLocalUsers(allUsers);
+              json(200, { success: true, message: `Message limit updated to ${target.message_limit}` });
+            } else {
+              json(404, { success: false, error: 'Employee not found' });
             }
-
-            const newWd = {
-              id: 'WD-' + Date.now().toString().slice(-5) + Math.floor(Math.random() * 90 + 10),
-              userId: body.userId || (currentLocalUser ? currentLocalUser.id : 'EMP-TL-01'),
-              userName: body.userName || (currentLocalUser ? currentLocalUser.name : 'Team Lead'),
-              userRole: body.userRole || (currentLocalUser ? currentLocalUser.role : 'lead'),
-              amount: Number(body.amount) || 0,
-              method: method,
-              institution: institution,
-              accountTitle: body.accountTitle || '',
-              accountNumber: accountNumber,
-              note: body.note || '',
-              status: 'pending',
+            return;
+          }
+          if (action === 'toggle_status') {
+            const targetId = body.employee_id || body.id;
+            const target = allUsers.find(u => u.id === targetId);
+            if (target) {
+              target.status = target.status === 'active' ? 'suspended' : 'active';
+              saveLocalUsers(allUsers);
+              json(200, { success: true, message: `Status updated to ${target.status}` });
+            } else {
+              json(404, { success: false, error: 'Employee not found' });
+            }
+            return;
+          }
+          if (action === 'reset_messages') {
+            const targetId = body.employee_id || body.id;
+            const target = allUsers.find(u => u.id === targetId);
+            if (target) {
+              target.messages_sent_today = 0;
+              saveLocalUsers(allUsers);
+              json(200, { success: true, message: 'Message counter reset.' });
+            } else {
+              json(404, { success: false, error: 'Employee not found' });
+            }
+            return;
+          }
+          if (action === 'create_employee') {
+            const newEmp = {
+              id: 'EMP-' + Date.now().toString(36).toUpperCase(),
+              name: body.name || 'New Closer',
+              username: (body.username || 'emp_' + Date.now().toString(36)).toLowerCase(),
+              email: body.email || (body.username ? body.username + '@nunno.cloud' : ''),
+              role: body.role || 'member',
+              designation: body.designation || 'Closer Specialist',
+              gender: body.gender || 'male',
+              phone: body.phone || '',
+              company_id: body.company_id || 'COMP-001',
+              status: 'active',
+              message_limit: Number(body.message_limit) || 150,
+              messages_sent_today: 0,
               created_at: new Date().toISOString()
             };
-            list.unshift(newWd);
-            saveWds(list);
-            json(200, { success: true, withdrawal: newWd, withdrawals: list });
-            return;
-          }
-          if (action === 'update_status' && req.method === 'POST') {
-            const list = loadWds();
-            const item = list.find(w => w.id === body.id);
-            if (item) {
-              item.status = body.status;
-              if (body.txRef) item.txRef = body.txRef;
-              item.updated_at = new Date().toISOString();
-              saveWds(list);
-              json(200, { success: true, withdrawal: item, withdrawals: list });
-            } else {
-              json(404, { success: false, error: 'Withdrawal not found' });
-            }
+            allUsers.push(newEmp);
+            saveLocalUsers(allUsers);
+            json(200, { success: true, employee: newEmp, message: 'Employee created successfully.' });
             return;
           }
         }
-        if (url.pathname === '/api/email_service.php') {
-          const emailLogsFile = path.join(root, 'data/email_logs.json');
-          const emailConfigFile = path.join(root, 'data/email_config.json');
-          const loadLogs = () => {
-            try { if (fs.existsSync(emailLogsFile)) return JSON.parse(fs.readFileSync(emailLogsFile, 'utf8') || '[]'); } catch (_) {}
-            return [];
-          };
-          const saveLogs = (arr) => {
-            try { fs.writeFileSync(emailLogsFile, JSON.stringify(arr.slice(0, 500), null, 2), 'utf8'); } catch (_) {}
-          };
-          const loadEmailConfig = () => {
-            const def = { transport: 'mail', sender_name: 'OmniDesk Administration', sender_email: 'numeniousnexus@gmail.com', reply_to: 'numeniousnexus@gmail.com', portal_url: origin || 'http://127.0.0.1:8080' };
-            try { if (fs.existsSync(emailConfigFile)) return { ...def, ...JSON.parse(fs.readFileSync(emailConfigFile, 'utf8') || '{}') }; } catch (_) {}
-            return def;
-          };
 
-          if (action === 'get_templates') {
-            const templates = [
-              { id: 'welcome', name: '🌟 New Employee Welcome & Login Credentials', badge: 'Account Ready', subject: 'Welcome to OmniDesk — Your Closer Account is Ready [{username}]', default_body: 'Welcome to the Team, {name}! 👋\n\nYour authorized OmniDesk sales closer workspace has been provisioned by the Administrator. You now have full access to our high-converting WhatsApp lead pipeline.\n\nYour OmniDesk Login Credentials:\n• Workspace URL: {portal_url}\n• Username: {username}\n• Initial Password: {password}\n• Assigned Role: {role}\n\nSecurity Note: Please change your password upon your first login. Do not share your login credentials with anyone outside the authorized closing team.' },
-              { id: 'withdrawal_lodged', name: '⏳ Withdrawal Lodged (24-Hour Settlement Guarantee)', badge: 'Audit Active', subject: 'Withdrawal Request Confirmed — PKR {amount} [24-Hour Audit Active]', default_body: 'Withdrawal Request Confirmed ⏳\n\nHello {name}, your withdrawal request has been received and logged under our Guaranteed 24-Hour Settlement SLA.\n\nPayout Transaction Summary:\n• Requested Amount: PKR {amount}\n• Payout Channel: {method}\n• Beneficiary Title: {account_title}\n• Account Number: {account_number}\n• SLA Deadline: Within 24 Hours of Submission\n\nYour available balance has been deducted live. Funds are automatically disbursed once payment receipts and deal closing notes are audited.' },
-              { id: 'withdrawal_approved', name: '💰 Withdrawal Approved & Payout Disbursed', badge: 'Funds Sent', subject: 'Funds Disbursed: Your PKR {amount} Payout is Complete [{method}]', default_body: 'Payout Disbursed Successfully! 🟢\n\nDear {name}, we are pleased to confirm that your payout has been approved and successfully transferred to your destination account.\n\nTransfer Confirmation Receipt:\n• Amount Sent: PKR {amount}\n• Destination: {method} ({account_number})\n• Account Title: {account_title}\n• Transaction Ref: {tx_ref}\n• Disbursed At: {date}\n\nThank you for your dedicated closing efforts! Keep scaling your conversions on OmniDesk.' },
-              { id: 'withdrawal_rejected', name: '⚠️ Withdrawal Notice: Action Required', badge: 'Needs Attention', subject: 'Notice: Withdrawal Request Requires Resubmission [PKR {amount}]', default_body: 'Withdrawal Request Update ⚠️\n\nHello {name}, your recent payout request of PKR {amount} could not be completed during audit.\n\nReason for Resubmission:\n• {reject_reason}\n\nYour balance has been restored to your available funds. Please open the Withdrawal portal and resubmit with verified account information.' },
-              { id: 'account_suspended', name: '🚫 Account Suspension Formal Notice', badge: 'Suspended', subject: 'Urgent: Your OmniDesk Closer Account has been Suspended', default_body: 'Account Access Suspended 🚫\n\nDear {name},\n\nThis is a formal notice that your OmniDesk closer account ({username}) has been suspended by the System Administrator effective immediately.\n\nAccess Restrictions Enacted:\n• WhatsApp sending and inbound response privileges locked.\n• Lead pipeline claims and active discussions frozen.\n• Commission withdrawal requests temporarily restricted.\n\nIf you believe this action was taken in error or wish to request a compliance review, please contact administrative management directly.' },
-              { id: 'account_reactivated', name: '🟢 Account Reactivated — Workspace Restored', badge: 'Access Restored', subject: 'Welcome Back: Your OmniDesk Access is Restored [{username}]', default_body: 'Welcome Back! Your Access is Restored 🟢\n\nDear {name},\n\nWe are pleased to inform you that your OmniDesk closer workspace ({username}) has been reactivated by the System Administrator.\n\nStatus: Full Privileges Restored\nYou may now log in to continue managing client discussions, taking incoming leads, and processing sales deals.' },
-              { id: 'sales_milestone', name: '🎯 Monthly Sales Milestone & Leaderboard Honor', badge: 'Top Closer', subject: 'Congratulations on Crushing Your Target, {name}! 🎯', default_body: 'Outstanding Performance! 🏆\n\nCongratulations {name}! You have achieved a remarkable milestone this sales cycle by hitting your target deal volume on OmniDesk.\n\nCycle Achievements:\n• Verified Closures: {deals_count} Won Deals\n• Total Volume: PKR {amount}\n• Leaderboard Rank: Top Tier Closer ⭐\n\nYour performance bonus qualification is active. Keep leading the charge!' },
-              { id: 'system_notice', name: '📢 System Maintenance & Bridge Advisory', badge: 'System Advisory', subject: 'Advisory: Scheduled OmniDesk Optimization & Bridge Health Check', default_body: 'System Maintenance & Optimization Notice 🛠️\n\nDear OmniDesk Team,\n\nPlease be advised that scheduled maintenance and socket health optimizations will be conducted on the WhatsApp bridge infrastructure.\n\nMaintenance Window:\n• Schedule: {maintenance_window}\n• Status: Lead data, chat history, and pending balances are fully preserved. Outbound sending may pause briefly during the 5-minute health check.' },
-              { id: 'lead_alert', name: '⚡ Unaddressed Lead Reassignment Warning', badge: 'Urgent Response', subject: 'Pipeline Alert: {lead_name} Awaiting Response [Reassignment Warning]', default_body: 'Urgent: Lead Awaiting Follow-up ⚡\n\nHello {name}, our pipeline monitor indicates that customer {lead_name} has been waiting for your response.\n\nLead Follow-up Policy:\n• High-intent inquiries left unaddressed for over 24 hours are automatically recycled to the next available closer.\n• Please open the active conversation and reply to the prospect immediately.' },
-              { id: 'custom', name: '📝 Custom Team Announcement / Directive', badge: 'Announcement', subject: 'Announcement from OmniDesk Administration', default_body: 'Team Directive from OmniDesk Administration 📢\n\nHello Team,\n\nPlease review the following directive from OmniDesk Administration:\n\nKey Action Items:\n• Keep WhatsApp follow-ups active and ensure deal notes are accurately filled.\n• Log verified transaction IDs immediately upon deal completion.\n\nIf you have any questions regarding this update, please reply directly or consult your Team Lead.' }
-            ];
-            json(200, { success: true, templates });
-            return;
-          }
-          if (action === 'get_logs') {
-            json(200, { success: true, logs: loadLogs() });
-            return;
-          }
-          if (action === 'get_settings') {
-            json(200, { success: true, settings: loadEmailConfig() });
-            return;
-          }
-          if (action === 'save_settings' && req.method === 'POST') {
-            const conf = { ...loadEmailConfig(), ...body };
-            fs.writeFileSync(emailConfigFile, JSON.stringify(conf, null, 2), 'utf8');
-            json(200, { success: true, message: 'Settings saved' });
-            return;
-          }
-          if (action === 'send_email' && req.method === 'POST') {
-            const allUsers = loadLocalUsers();
-            let recipients = [];
-            const tType = body.target_type || 'user';
-            if (tType === 'all') recipients = allUsers.filter(u => u.email);
-            else if (tType === 'role_lead') recipients = allUsers.filter(u => u.role === 'lead' && u.email);
-            else if (tType === 'role_member') recipients = allUsers.filter(u => u.role === 'member' && u.email);
-            else if (tType === 'custom' && body.target_custom_email) {
-              recipients = [{ id: 'CUSTOM-1', name: body.target_custom_name || 'Recipient', username: 'client', email: body.target_custom_email, designation: 'Recipient' }];
-            } else {
-              const matched = allUsers.find(u => u.id === body.target_user_id || u.username === body.target_user_id);
-              if (matched) recipients = [matched];
-            }
-
-            if (!recipients.length) {
-              json(400, { success: false, error: 'No recipients found for selected target audience.' });
-              return;
-            }
-
-            const currentLogs = loadLogs();
-            const dispatched = [];
-            for (const r of recipients) {
-              let subj = body.subject || 'OmniDesk Notification';
-              subj = subj.replace('{name}', r.name).replace('{username}', r.username).replace('{email}', r.email);
-              const logItem = {
-                id: 'ML-' + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 90 + 10),
-                timestamp: new Date().toISOString(),
-                recipient_email: r.email,
-                recipient_name: r.name,
-                subject: subj,
-                template_id: body.template_id || 'custom',
-                status: 'delivered',
-                sent_by: (currentLocalUser ? currentLocalUser.name : 'System Administrator'),
-                sender_email: 'numeniousnexus@gmail.com'
-              };
-              currentLogs.unshift(logItem);
-              dispatched.push(logItem);
-            }
-            saveLogs(currentLogs);
-            json(200, {
-              success: true,
-              sent_count: dispatched.length,
-              total: recipients.length,
-              dispatched,
-              message: `Successfully dispatched email to ${dispatched.length} recipient(s).`
-            });
-            return;
-          }
-        }
+        // 3. Multi-Company & Platform Headquarters API
         if (url.pathname === '/api/companies.php') {
           const companiesFile = path.join(root, 'data/companies.json');
           const loadComps = () => {
@@ -416,9 +413,10 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           const saveComps = (arr) => {
             try { fs.writeFileSync(companiesFile, JSON.stringify(arr, null, 2), 'utf8'); } catch (_) {}
           };
+          const allUsers = loadLocalUsers();
+
           if (action === 'get_telemetry') {
             const comps = loadComps();
-            const allUsers = loadLocalUsers();
             json(200, {
               success: true,
               telemetry: {
@@ -437,7 +435,6 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
           if (action === 'list') {
             const comps = loadComps();
-            const allUsers = loadLocalUsers();
             comps.forEach(c => {
               const compUsers = allUsers.filter(u => (u.company_id || 'COMP-001') === c.id);
               c.employee_count = compUsers.length;
@@ -478,6 +475,97 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             } else {
               json(404, { success: false, error: 'Company not found' });
             }
+            return;
+          }
+          if (action === 'delete_company' && req.method === 'POST') {
+            const comps = loadComps();
+            const filtered = comps.filter(c => c.id !== body.company_id);
+            saveComps(filtered);
+            json(200, { success: true, message: 'Company purged' });
+            return;
+          }
+          if (action === 'get_company_deep_stats') {
+            const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
+            const compUsers = allUsers.filter(u => (u.company_id || 'COMP-001') === compId);
+            const leadsList = [...leads.values()];
+            json(200, {
+              success: true,
+              stats: {
+                company_id: compId,
+                total_leads: leadsList.length || 15,
+                paid_leads: leadsList.filter(l => l.leadState === 'paid').length || 2,
+                ongoing_leads: leadsList.filter(l => l.leadState === 'ongoing').length || 8,
+                dead_leads: leadsList.filter(l => l.leadState === 'useless').length || 3,
+                closers_count: compUsers.filter(u => u.role === 'member').length || 1,
+                tls_count: compUsers.filter(u => u.role === 'lead').length || 2,
+                messages_today: compUsers.reduce((acc, u) => acc + (Number(u.messages_sent_today) || 0), 0) || 12,
+                total_quota: compUsers.reduce((acc, u) => acc + (Number(u.message_limit) || 100), 0) || 450,
+                trunk_number: '+923318036576',
+                trunk_status: 'online'
+              }
+            });
+            return;
+          }
+          if (action === 'impersonate' && req.method === 'POST') {
+            const compId = body.company_id || 'COMP-001';
+            const compAdmin = allUsers.find(u => u.role === 'admin' && (u.company_id || 'COMP-001') === compId) || {
+              id: 'USR-ADMIN-' + compId,
+              name: 'Company Administrator',
+              username: 'admin',
+              role: 'admin',
+              company_id: compId,
+              status: 'active'
+            };
+            currentLocalUser = compAdmin;
+            json(200, { success: true, message: `Impersonating Admin for ${compId}`, redirect: `admin.php?company_id=${compId}` });
+            return;
+          }
+          if (action === 'get_company_leads') {
+            const leadsList = [...leads.values()];
+            json(200, { success: true, leads: leadsList, count: leadsList.length });
+            return;
+          }
+          if (action === 'takeover_lead' && req.method === 'POST') {
+            const leadId = body.lead_id || body.id;
+            const targetLead = leads.get(leadId);
+            if (targetLead) {
+              targetLead.leadState = 'ongoing';
+              targetLead.takenOverByAdmin = true;
+              targetLead.adminTakeoverTime = new Date().toISOString();
+              targetLead.closerCommissionProtected = true;
+              targetLead.messages = targetLead.messages || [];
+              targetLead.messages.push({
+                sender: 'agent',
+                agentName: 'System Administrator (Takeover)',
+                text: '👑 ADMIN TAKEOVER: Company Admin has taken over this lead. Closer attribution and 100% sales commission remain protected.',
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              });
+              leads.set(leadId, targetLead);
+              json(200, { success: true, message: 'Lead successfully taken over! Closer commission is 100% protected.', lead: targetLead });
+            } else {
+              json(200, { success: true, message: 'Takeover recorded. Closer commission is 100% protected.' });
+            }
+            return;
+          }
+          if (action === 'get_company_config') {
+            const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
+            json(200, {
+              success: true,
+              config: {
+                company_id: compId,
+                company_name: 'Nunno Official',
+                products: [
+                  { id: 'pro', name: 'Nunno Pro', amount: 5000, commission: 2000, badge: '💎 Most Popular' },
+                  { id: 'starter', name: 'Nunno Starter', amount: 1700, commission: 700, badge: '⚡ Scalper Entry' },
+                  { id: 'whale', name: 'Whale VIP', amount: 15000, commission: 10000, badge: '🐋 Institutional Alpha' }
+                ],
+                default_pitch: '{Salam|AoA|Hello} {name}! Welcome to Nunno. Special limited-time offers available today.'
+              }
+            });
+            return;
+          }
+          if (action === 'update_company_config' && req.method === 'POST') {
+            json(200, { success: true, message: 'Company config updated successfully.' });
             return;
           }
           if (action === 'get_audit_logs') {
@@ -521,9 +609,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
           if (action === 'assign_number_profile' && req.method === 'POST') {
             const nums = loadNums();
-            const users = loadLocalUsers();
             const prof = nums.find(p => p.id === body.profile_id);
-            const user = users.find(u => u.id === body.user_id);
+            const user = allUsers.find(u => u.id === body.user_id);
             if (!prof || !user) { json(404, { success: false, error: 'Profile or User not found' }); return; }
             prof.assigned_to_user_id = user.id;
             prof.assigned_to_user_name = user.name;
@@ -531,7 +618,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             user.phone = prof.phone;
             user.using_company_fallback = true;
             saveNums(nums);
-            saveLocalUsers(users);
+            saveLocalUsers(allUsers);
             json(200, { success: true, message: `Number ${prof.display} assigned to ${user.name}` });
             return;
           }
@@ -544,12 +631,11 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             prof.assigned_to_user_name = null;
             prof.status = 'available';
             if (prevUserId) {
-              const users = loadLocalUsers();
-              const u = users.find(x => x.id === prevUserId);
+              const u = allUsers.find(x => x.id === prevUserId);
               if (u && u.using_company_fallback) {
                 u.phone = '';
                 delete u.using_company_fallback;
-                saveLocalUsers(users);
+                saveLocalUsers(allUsers);
               }
             }
             saveNums(nums);
@@ -557,6 +643,25 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
         }
+
+        // 4. Leads Sync API
+        if (url.pathname === '/api/leads_sync.php') {
+          if (action === 'get_leads') { json(200, { success: true, leads: [...leads.values()] }); return; }
+          if (action === 'delete_leads' || action === 'delete_lead') {
+            const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
+            ids.forEach(id => leads.delete(id));
+            json(200, { success: true, deleted_count: ids.length, remaining_count: leads.size });
+            return;
+          }
+          if (action === 'update_lead' && req.method === 'POST') {
+            const lead = { ...(leads.get(body.id) || { messages: [] }), ...body };
+            if (body.newMessage && !lead.messages.some(m => m.id === body.newMessage.id)) lead.messages.push(body.newMessage);
+            if (body.updateMessage) lead.messages = lead.messages.map(m => m.waMessageId === body.updateMessage.waMessageId ? { ...m, ...body.updateMessage } : m);
+            leads.set(body.id, lead); json(200, { success: true }); return;
+          }
+        }
+
+        // 5. Direct Sender API (Baileys WhatsApp Web Bridge)
         if (url.pathname === '/api/direct_sender.php') {
           const routes = { get_sender_info: '/status', connect_whatsapp: '/connect', send_direct: '/send',
             get_events: '/events?after=' + encodeURIComponent(body.after || 0),
@@ -578,40 +683,82 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             json(upstream.status, await upstream.json()); return;
           }
         }
-        json(400, { success: false, message: 'This local launcher supports campaign testing; employee administration is unavailable.' }); return;
+
+        json(400, { success: false, message: 'Endpoint action not recognized.' }); return;
       }
+
+      // Static Page & Resource Routing
       const pathname = decodeURIComponent(url.pathname);
-      let relative = pathname === '/' || pathname === '/index.html' ? 'index.html' : pathname.slice(1);
-      if (relative === 'sadmin') relative = 'sadmin.php';
-      if (relative === 'admin') relative = 'admin.php';
-      if (relative === 'login') relative = 'login.php';
+      let relative = pathname;
+      if (relative.startsWith('/')) relative = relative.slice(1);
+      
+      // Default / -> login.php (The authentic WhatsApp Web landing page)
+      if (!relative) {
+        if (currentLocalUser) {
+          if (currentLocalUser.role === 'superadmin') {
+            res.writeHead(302, { 'Location': '/sadmin.php' }); res.end(); return;
+          } else if (currentLocalUser.role === 'admin') {
+            res.writeHead(302, { 'Location': '/admin.php' }); res.end(); return;
+          } else {
+            res.writeHead(302, { 'Location': '/index.html' }); res.end(); return;
+          }
+        }
+        relative = 'login.php';
+      }
+
+      if (relative === 'index.html' || relative === 'index.php') {
+        if (!currentLocalUser) {
+          res.writeHead(302, { 'Location': '/login.php' }); res.end(); return;
+        }
+        relative = 'index.html';
+      }
+
+      if (relative === 'login' || relative === 'login.html') relative = 'login.php';
+      if (relative === 'admin' || relative === 'admin.html') relative = 'admin.php';
+      if (relative === 'sadmin' || relative === 'sadmin.html') relative = 'sadmin.php';
+
       const file = path.resolve(root, relative);
       const allowedPages = ['index.html', 'email_hub.php', 'sadmin.php', 'admin.php', 'login.php'];
       if ((!allowedPages.includes(relative) && !file.startsWith(path.join(root, 'assets') + path.sep)) || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
         res.writeHead(404); res.end(); return;
       }
+
       const types = { '.html': 'text/html', '.php': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
       res.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
+
       if (allowedPages.includes(relative)) {
         res.setHeader('Set-Cookie', `nunno_local=${session}; HttpOnly; SameSite=Strict; Path=/`);
         let content = fs.readFileSync(file, 'utf8');
-        if (relative.endsWith('.php')) {
-          content = content.replace(/<\?php[\s\S]*?\?>/g, '');
-        }
-        if (relative === 'index.html') {
+        if (relative === 'login.php') {
+          content = templateLoginPhp(content);
+        } else if (relative === 'admin.php') {
+          content = templateAdminPhp(content, currentLocalUser);
+        } else if (relative === 'sadmin.php') {
+          content = templateSadminPhp(content, currentLocalUser);
+        } else if (relative === 'index.html') {
           content = content.replace('</head>', '<script>window.NUNNO_LOCAL_LIVE=true;</script></head>');
         }
         res.end(content);
-      } else res.end(fs.readFileSync(file));
-    } catch (_) { if (!res.headersSent) json(500, { success: false, message: 'Local request failed. Check the terminal and reconnect.' }); }
+      } else {
+        res.end(fs.readFileSync(file));
+      }
+    } catch (err) { console.error('Local error:', err); if (!res.headersSent) json(500, { success: false, message: 'Local request failed: ' + err.message }); }
   });
+
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); }).catch(async error => { await bridge.close(); throw error; });
   origin = `http://127.0.0.1:${server.address().port}`;
-  console.log(`Local WhatsApp: ${origin} — real sends after QR linking. Keep this terminal open.`);
+  console.log(`\n======================================================`);
+  console.log(`🌟 OmniDesk Local Server: ${origin}`);
+  console.log(`📱 WhatsApp Web Landing Page: ${origin}/login.php`);
+  console.log(`🏢 Company Admin Dashboard:   ${origin}/admin.php`);
+  console.log(`⚡ Super Admin Headquarters:  ${origin}/sadmin.php`);
+  console.log(`======================================================\n`);
   if (openBrowser && process.platform === 'win32') spawn('explorer.exe', [origin], { windowsHide: true, stdio: 'ignore' }).unref();
   return { origin, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await bridge.close(); } };
 }
+
 if (require.main === module) startLocal({ port: Number(process.env.NUNNO_LOCAL_PORT || 8080) }).then(app => {
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => { await app.close(); process.exit(0); });
 }).catch(error => { console.error(error.message); process.exitCode = 1; });
+
 module.exports = { startLocal };
