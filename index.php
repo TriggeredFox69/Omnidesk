@@ -15,22 +15,10 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $config = require __DIR__ . '/api/config.php';
 
-// Auto-authenticate default administrator if no session exists (matching the local app)
+// If no authenticated user session exists, route to the Landing Page (WhatsApp Web QR journey)
 if (empty($_SESSION['omnidesk_user'])) {
-    $usersFile = __DIR__ . '/data/users.json';
-    $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
-    $defaultAdmin = (!empty($users) && is_array($users)) ? $users[0] : [
-        'id'          => 'USR-ADMIN-01',
-        'name'        => 'System Administrator',
-        'username'    => 'admin',
-        'email'       => 'admin@nunno.cloud',
-        'role'        => 'admin',
-        'designation' => 'Admin',
-        'phone'       => '',
-        'status'      => 'active'
-    ];
-    unset($defaultAdmin['password_hash']);
-    $_SESSION['omnidesk_user'] = $defaultAdmin;
+    header('Location: login.php');
+    exit;
 }
 $user = $_SESSION['omnidesk_user'];
 

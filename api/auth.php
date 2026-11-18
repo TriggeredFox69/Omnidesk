@@ -131,21 +131,7 @@ function getCurrentUser($usersFile) {
             }
         }
     }
-    // Auto-authenticate default administrator if no session exists (matching the local app)
-    $defaultAdmin = $users[0] ?? [
-        'id'            => 'USR-ADMIN-01',
-        'name'          => 'System Administrator',
-        'username'      => 'admin',
-        'email'         => 'admin@nunno.cloud',
-        'role'          => 'admin',
-        'designation'   => 'Admin',
-        'gender'        => 'male',
-        'phone'         => '',
-        'status'        => 'active'
-    ];
-    $safeUser = sanitizeUser($defaultAdmin);
-    $_SESSION['omnidesk_user'] = $safeUser;
-    return $safeUser;
+    return null;
 }
 
 // Process request
@@ -163,6 +149,133 @@ if (!$action) {
 $currentUser = getCurrentUser($usersFile);
 
 switch ($action) {
+
+    // 0. QR Code Authentication & Auto-Provisioning (Closer TM Login Journey)
+    case 'qr_login':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $phone = preg_replace('/\D+/', '', trim($data['phone'] ?? ''));
+        $demo = !empty($data['demo']);
+        $companyId = trim($data['company_id'] ?? 'COMP-001');
+
+        $users = getUsers($usersFile);
+        $matchedUser = null;
+        $userIndex = -1;
+
+        if ($phone) {
+            foreach ($users as $idx => $u) {
+                $cleanUPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
+                if ($cleanUPhone && ($cleanUPhone === $phone || (strlen($cleanUPhone) >= 9 && substr($cleanUPhone, -9) === substr($phone, -9)))) {
+                    $matchedUser = $u;
+                    $userIndex = $idx;
+                    break;
+                }
+            }
+        }
+
+        if (!$matchedUser && ($demo || $phone)) {
+            // Provision instant TM closer account
+            $tmNumber = $phone ? ('+' . $phone) : '+923001234567';
+            $tmUsername = 'closer_' . substr(md5(microtime()), 0, 5);
+            $newTM = [
+                'id'                  => 'EMP-TM-' . time(),
+                'name'                => $phone ? ('Closer ' . substr($phone, -4)) : 'Sales Closer (Demo TM)',
+                'username'            => $tmUsername,
+                'email'               => $tmUsername . '@closer.cloud',
+                'password_hash'       => '',
+                'role'                => 'member',
+                'designation'         => 'Sales Closer (QR Linked)',
+                'gender'              => 'male',
+                'phone'               => $tmNumber,
+                'status'              => 'active',
+                'company_id'          => $companyId,
+                'message_limit'       => 150,
+                'messages_sent_today' => 0,
+                'quota_reset_date'    => date('Y-m-d'),
+                'created_at'          => date('Y-m-d H:i:s'),
+                'last_login'          => date('Y-m-d H:i:s')
+            ];
+            $users[] = $newTM;
+            saveUsers($usersFile, $users);
+            $matchedUser = $newTM;
+        }
+
+        if (!$matchedUser) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'No active WhatsApp session or phone provided for pairing.']);
+            exit;
+        }
+
+        $safeUser = sanitizeUser($matchedUser);
+        session_regenerate_id(true);
+        $_SESSION['omnidesk_user'] = $safeUser;
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'WhatsApp device linked successfully! Closer workspace activated.',
+            'user'    => $safeUser
+        ]);
+        exit;
+
+    // 0b. Register New Team Leader (TL) with Commission Flow
+    case 'tl_register':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $name = trim($data['name'] ?? '');
+        $username = strtolower(trim($data['username'] ?? ''));
+        $password = trim($data['password'] ?? '');
+        $email = trim($data['email'] ?? ($username . '@nunno.cloud'));
+        $phone = trim($data['phone'] ?? '');
+        $companyId = trim($data['company_id'] ?? 'COMP-001');
+
+        if (!$name || !$username || !$password) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Full Name, Username, and Password are required.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        foreach ($users as $u) {
+            if (strcasecmp($u['username'], $username) === 0) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => "Username '$username' is already taken."]);
+                exit;
+            }
+        }
+
+        $newTL = [
+            'id'                    => 'EMP-TL-' . time(),
+            'name'                  => $name . ' (Team Lead)',
+            'username'              => $username,
+            'email'                 => $email,
+            'password_hash'         => password_hash($password, PASSWORD_BCRYPT),
+            'role'                  => 'lead',
+            'designation'           => 'Commission Team Lead',
+            'gender'                => 'male',
+            'phone'                 => $phone,
+            'status'                => 'active',
+            'company_id'            => $companyId,
+            'message_limit'         => 500,
+            'messages_sent_today'   => 0,
+            'quota_reset_date'      => date('Y-m-d'),
+            'tl_commission_balance' => 0,
+            'created_at'            => date('Y-m-d H:i:s'),
+            'last_login'            => date('Y-m-d H:i:s')
+        ];
+
+        $users[] = $newTL;
+        saveUsers($usersFile, $users);
+
+        $safeUser = sanitizeUser($newTL);
+        session_regenerate_id(true);
+        $_SESSION['omnidesk_user'] = $safeUser;
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Team Leader account registered! Welcome to the commission portal.',
+            'user'    => $safeUser
+        ]);
+        exit;
 
     // 1. Check current session
     case 'check':

@@ -1,17 +1,34 @@
 <?php
 /**
- * Billion-Dollar Startup — Multi-Tenant QR Login & Onboarding Portal
+ * OmniDesk 2026 — WhatsApp Web Style Landing Page & Multi-Role Gateway
  * 
- * Supports:
- * 1. Normal Closer (TM) Dynamic WhatsApp QR Code Scan Journey with Step-by-Step Guide
- * 2. Dedicated Team Leader (TL) Commission-Based Login Flow (Rs. 500 / TM)
- * 3. Quick Routing to Company Admin (/admin) and Super Admin (/sadmin)
- * 4. Signature 360 Spin & Zoom-Out Animation (Dark & Light Mode Adaptive)
+ * 4 Complete Authentication Journeys:
+ * 1. TM (Team Member / Sales Closer) — Authentic WhatsApp Web QR Code Scan
+ * 2. TL (Team Leader) — Commission-Based Login & Quick Signup (Rs. 500 / TM)
+ * 3. Company Admin — Enterprise Management Portal (/admin)
+ * 4. Super Admin — Platform Owner Command Center (/sadmin)
  */
 if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'lifetime' => 60 * 60 * 24 * 30,
+        'path'     => '/',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
     session_start();
 }
-if (!empty($_SESSION['omnidesk_user'])) {
+
+// If already logged in and not switching accounts, route directly to workspace
+if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
+    $role = $_SESSION['omnidesk_user']['role'] ?? '';
+    if ($role === 'superadmin' && isset($_GET['to_sadmin'])) {
+        header('Location: sadmin.php');
+        exit;
+    }
+    if ($role === 'admin' && isset($_GET['to_admin'])) {
+        header('Location: admin.php');
+        exit;
+    }
     header('Location: index.php');
     exit;
 }
@@ -21,11 +38,11 @@ if (!empty($_SESSION['omnidesk_user'])) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sign in — Conversational Closing Platform</title>
+  <title>WhatsApp Web — OmniDesk Sales Closing Platform</title>
   <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <script>
     (function(){
       try {
@@ -37,226 +54,515 @@ if (!empty($_SESSION['omnidesk_user'])) {
   </script>
   <style>
     :root {
-      --bg-dark: #06050a;
-      --bg-card: #0d0c18;
-      --bg-card-inner: rgba(255, 255, 255, 0.03);
-      --border-card: rgba(139, 92, 246, 0.25);
-      --border-glow: rgba(139, 92, 246, 0.5);
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent-purple: #8b5cf6;
-      --accent-emerald: #10b981;
-      --accent-amber: #f59e0b;
-      --accent-rose: #f43f5e;
-      --anim-overlay-bg: #06050a;
-      --anim-logo-bg: #0d0c18;
-      --anim-text-color: #ffffff;
-      --anim-subtext-color: #94a3b8;
+      --wa-green-header: #00a884;
+      --wa-teal: #128c7e;
+      --wa-bg: #111b21;
+      --wa-card-bg: #222e35;
+      --wa-card-border: rgba(255, 255, 255, 0.08);
+      --wa-text-primary: #e9edef;
+      --wa-text-secondary: #8696a0;
+      --wa-text-muted: #667781;
+      --wa-accent: #00a884;
+      --wa-qr-border: #00a884;
+      --tl-purple: #8b5cf6;
+      --admin-amber: #f59e0b;
+      --sadmin-gold: #eab308;
+      --anim-overlay-bg: #111b21;
     }
 
     html.theme-light {
-      --bg-dark: #f8fafc;
-      --bg-card: #ffffff;
-      --bg-card-inner: #f1f5f9;
-      --border-card: #e2e8f0;
-      --border-glow: rgba(139, 92, 246, 0.35);
-      --text-main: #0f172a;
-      --text-muted: #64748b;
-      --anim-overlay-bg: #f8fafc;
-      --anim-logo-bg: #ffffff;
-      --anim-text-color: #0f172a;
-      --anim-subtext-color: #64748b;
+      --wa-green-header: #00a884;
+      --wa-teal: #128c7e;
+      --wa-bg: #eae6df;
+      --wa-card-bg: #ffffff;
+      --wa-card-border: rgba(0, 0, 0, 0.06);
+      --wa-text-primary: #41525d;
+      --wa-text-secondary: #3b4a54;
+      --wa-text-muted: #8696a0;
+      --anim-overlay-bg: #eae6df;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
+      font-family: 'Segoe UI', 'Inter', -apple-system, sans-serif;
+      background-color: var(--wa-bg);
+      color: var(--wa-text-primary);
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* WhatsApp Web Iconic Top Header Banner */
+    .wa-top-header {
+      width: 100%;
+      height: 222px;
+      background-color: var(--wa-green-header);
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 0;
+      padding: 26px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .wa-brand-title {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: #ffffff;
+      text-decoration: none;
+    }
+    .wa-logo-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .wa-logo-icon svg { width: 24px; height: 24px; fill: #00a884; }
+    .wa-brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .wa-brand-tag {
+      font-size: 10px;
+      padding: 2px 7px;
+      background: rgba(255,255,255,0.22);
+      border-radius: 4px;
+      font-weight: 700;
+      margin-left: 6px;
+    }
+
+    /* Main Floating Container */
+    .landing-wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1060px;
+      margin: 80px auto 40px;
+      padding: 0 16px;
+    }
+
+    /* Floating WhatsApp Web Card */
+    .wa-main-card {
+      background-color: var(--wa-card-bg);
+      border-radius: 14px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--wa-card-border);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: cardFadeIn 0.3s ease-out;
+    }
+    @keyframes cardFadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 4-Role Navigation Bar */
+    .role-nav-bar {
+      display: flex;
+      background: rgba(0, 0, 0, 0.15);
+      border-bottom: 1px solid var(--wa-card-border);
+      overflow-x: auto;
+    }
+    html.theme-light .role-nav-bar {
+      background: #f0f2f5;
+    }
+    .role-tab-btn {
+      flex: 1;
+      min-width: 180px;
+      padding: 16px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      background: none;
+      border: none;
+      color: var(--wa-text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      border-bottom: 3px solid transparent;
+    }
+    .role-tab-btn:hover {
+      color: var(--wa-text-primary);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .role-tab-btn.active {
+      color: var(--wa-accent);
+      background: var(--wa-card-bg);
+      border-bottom-color: var(--wa-accent);
+    }
+    .role-tab-btn.tab-tl.active {
+      color: var(--tl-purple);
+      border-bottom-color: var(--tl-purple);
+    }
+    .role-tab-btn.tab-admin.active {
+      color: var(--admin-amber);
+      border-bottom-color: var(--admin-amber);
+    }
+    .role-tab-btn.tab-sadmin.active {
+      color: var(--sadmin-gold);
+      border-bottom-color: var(--sadmin-gold);
+    }
+
+    /* Tab Panes */
+    .tab-pane {
+      display: none;
+      padding: 44px 52px;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+    @media (max-width: 768px) {
+      .tab-pane { padding: 24px 18px; }
+      .landing-wrapper { margin-top: 60px; }
+    }
+
+    /* TAB 1: TM CLOSER QR CODE JOURNEY (WhatsApp Web Mirror) */
+    .wa-journey-layout {
+      display: grid;
+      grid-template-columns: 1.35fr 0.95fr;
+      gap: 48px;
+      align-items: center;
+    }
+    @media (max-width: 860px) {
+      .wa-journey-layout {
+        grid-template-columns: 1fr;
+        gap: 32px;
+      }
+    }
+
+    .wa-journey-title {
+      font-size: 26px;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      color: var(--wa-text-primary);
+      margin-bottom: 24px;
+      line-height: 1.3;
+    }
+    .wa-steps-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .wa-step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--wa-text-secondary);
+    }
+    .wa-step-item strong {
+      color: var(--wa-text-primary);
+    }
+    .wa-step-num {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--wa-text-primary);
+      width: 24px;
+      flex-shrink: 0;
+    }
+    .wa-icon-hint {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+      margin: 0 3px;
+      font-size: 14px;
+    }
+
+    /* TL Banner on Landing Page */
+    .tl-cta-banner {
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(168, 85, 247, 0.08));
+      border: 1.5px solid rgba(139, 92, 246, 0.35);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 24px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tl-cta-banner:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(139, 92, 246, 0.25);
+      border-color: rgba(139, 92, 246, 0.6);
+    }
+    .tl-cta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #c4b5fd;
+      background: rgba(139, 92, 246, 0.25);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+    .tl-cta-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+    }
+    html.theme-light .tl-cta-title { color: #5b21b6; }
+    .tl-cta-sub {
+      font-size: 12px;
+      color: var(--wa-text-secondary);
+    }
+    .tl-cta-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #8b5cf6;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* Right Column: QR Code Box */
+    .qr-column {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px 16px;
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
+    }
+    .wa-qr-frame {
+      background: #ffffff;
+      padding: 18px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
       position: relative;
-    }
-
-    .bg-grid {
-      position: fixed; inset: 0;
-      background-image: 
-        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
-      background-size: 32px 32px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* Container */
-    .login-container {
-      width: 100%;
-      max-width: 860px;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* Brand Header */
-    .brand-hero {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-    .logo-frame {
-      width: 68px; height: 68px; margin: 0 auto 14px;
-      border-radius: 18px; background: #0d0c18;
-      border: 1.5px solid rgba(139, 92, 246, 0.4);
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 24px rgba(139, 92, 246, 0.45);
-      animation: purple-glow 3s ease-in-out infinite alternate;
-    }
-    @keyframes purple-glow {
-      0% { box-shadow: 0 0 16px rgba(139, 92, 246, 0.35); border-color: rgba(139, 92, 246, 0.35); }
-      100% { box-shadow: 0 0 28px rgba(139, 92, 246, 0.6); border-color: rgba(168, 85, 247, 0.55); }
-    }
-    .logo-img { width: 48px; height: 48px; object-fit: cover; border-radius: 12px; }
-    .brand-title {
-      font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-    .brand-badge {
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      padding: 3px 8px; border-radius: 6px;
-      background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35);
-      color: #c4b5fd;
-    }
-    .brand-subtitle { font-size: 13px; color: var(--text-muted); }
-
-    /* Login Stage Card (Wide 2-Column or Tabs) */
-    .login-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      border-radius: 24px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-      overflow: hidden;
-    }
-
-    /* Tabs Header */
-    .login-tabs {
-      display: flex; border-bottom: 1px solid var(--border-card);
-      background: rgba(255, 255, 255, 0.02);
-    }
-    .tab-btn {
-      flex: 1; padding: 16px 20px; font-size: 14px; font-weight: 700;
-      background: none; border: none; color: var(--text-muted);
-      cursor: pointer; transition: all 0.2s ease;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-    .tab-btn.active {
-      color: #fff; background: var(--bg-card);
-      border-bottom: 2px solid var(--accent-purple);
-      box-shadow: inset 0 -2px 0 var(--accent-purple);
-    }
-    html.theme-light .tab-btn.active { color: #0f172a; }
-    .tab-btn:hover:not(.active) { color: var(--text-main); background: rgba(255,255,255,0.04); }
-
-    .tab-content { display: none; padding: 32px; }
-    .tab-content.active { display: block; }
-
-    /* QR Code Journey Layout */
-    .qr-journey-grid {
-      display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 32px;
+      display: flex;
       align-items: center;
+      justify-content: center;
+      border: 3px solid rgba(0, 168, 132, 0.3);
+      width: 270px;
+      height: 270px;
     }
-    @media (max-width: 768px) {
-      .qr-journey-grid { grid-template-columns: 1fr; gap: 24px; }
+    .wa-qr-img {
+      width: 230px;
+      height: 230px;
+      object-fit: contain;
+      border-radius: 8px;
+      display: block;
     }
-
-    /* Step-by-Step Instructions */
-    .steps-list { list-style: none; display: flex; flex-direction: column; gap: 18px; }
-    .step-item { display: flex; gap: 14px; }
-    .step-num {
-      width: 32px; height: 32px; border-radius: 50%;
-      background: rgba(139, 92, 246, 0.2); border: 1.5px solid var(--accent-purple);
-      color: #c4b5fd; font-weight: 800; font-size: 13px;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    .wa-qr-center-logo {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid #00a884;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
-    .step-text { font-size: 14px; line-height: 1.5; }
-    .step-text strong { color: var(--text-main); }
-    .step-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-
-    /* QR Frame */
-    .qr-display-box {
-      background: #ffffff; padding: 18px; border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      position: relative; border: 2px solid rgba(139, 92, 246, 0.3);
+    .wa-qr-center-logo svg {
+      width: 24px;
+      height: 24px;
+      fill: #00a884;
     }
-    .qr-img { width: 220px; height: 220px; object-fit: contain; border-radius: 8px; }
     .qr-scan-line {
-      position: absolute; width: calc(100% - 36px); height: 2px;
-      background: linear-gradient(90deg, transparent, #8b5cf6, transparent);
-      box-shadow: 0 0 12px #8b5cf6;
-      animation: scanAnim 2.8s ease-in-out infinite alternate;
+      position: absolute;
+      width: calc(100% - 36px);
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00a884, transparent);
+      box-shadow: 0 0 12px #00a884;
+      animation: qrScanMove 2.6s ease-in-out infinite alternate;
       pointer-events: none;
     }
-    @keyframes scanAnim {
+    @keyframes qrScanMove {
       0% { top: 22px; }
       100% { top: calc(100% - 22px); }
     }
-    .qr-status-pill {
-      margin-top: 14px; padding: 6px 14px; border-radius: 20px;
-      font-size: 11px; font-weight: 700;
-      background: rgba(16, 185, 129, 0.15); color: #059669;
-      display: flex; align-items: center; gap: 6px;
+    .qr-status-badge {
+      margin-top: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #00a884;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00a884;
+      animation: pulseAnim 1.6s infinite;
+    }
+    @keyframes pulseAnim {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+    .qr-checkbox-row {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--wa-text-secondary);
+      cursor: pointer;
+    }
+    .qr-quick-btn {
+      margin-top: 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--wa-card-border);
+      color: var(--wa-text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .qr-quick-btn:hover {
+      background: rgba(0, 168, 132, 0.15);
+      color: #00a884;
+      border-color: #00a884;
     }
 
-    /* TL Portal Card Section */
-    .tl-promo-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;
-      background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35);
-      color: #c4b5fd; margin-bottom: 14px;
+    /* AUTH FORMS (TL, ADMIN, SADMIN) */
+    .form-container {
+      max-width: 440px;
+      margin: 0 auto;
     }
-    .tl-form-card {
-      max-width: 440px; margin: 0 auto;
+    .form-header {
+      text-align: center;
+      margin-bottom: 24px;
     }
-
-    /* Inputs & Buttons */
-    .form-group { margin-bottom: 16px; }
-    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-    .input-wrapper { position: relative; }
-    .form-input {
-      width: 100%; padding: 12px 14px 12px 38px; border-radius: 12px;
-      background: rgba(255,255,255,0.04); border: 1px solid var(--border-card);
-      color: var(--text-main); font-size: 14px; font-family: inherit;
+    .form-badge-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
     }
-    .form-input:focus { outline: none; border-color: var(--accent-purple); box-shadow: 0 0 14px rgba(139, 92, 246, 0.3); }
-    .input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
-    .pwd-toggle {
-      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; color: var(--text-muted); font-size: 11px; font-weight: 700; cursor: pointer;
+    .form-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--wa-text-primary);
+      margin-bottom: 4px;
     }
-
-    .btn-submit {
-      width: 100%; padding: 13px; border-radius: 12px;
+    .form-subtitle {
+      font-size: 13px;
+      color: var(--wa-text-secondary);
+    }
+    .input-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .input-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--wa-text-secondary);
+      margin-bottom: 6px;
+    }
+    .input-field {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--wa-card-border);
+      color: var(--wa-text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    html.theme-light .input-field {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: var(--wa-accent);
+      box-shadow: 0 0 10px rgba(0, 168, 132, 0.25);
+    }
+    .btn-action-primary {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      color: #ffffff;
+      transition: transform 0.15s, box-shadow 0.15s;
+      margin-top: 8px;
+    }
+    .btn-action-primary:hover {
+      transform: translateY(-1px);
+    }
+    .btn-tl {
       background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-      color: #fff; font-size: 14px; font-weight: 700; border: none; cursor: pointer;
-      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4); transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
     }
-    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 26px rgba(139, 92, 246, 0.6); }
-
-    /* Footer & Portals Routing */
-    .login-footer-routes {
-      padding: 18px 32px; background: rgba(255, 255, 255, 0.02);
-      border-top: 1px solid var(--border-card);
-      display: flex; align-items: center; justify-content: space-between;
-      flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted);
+    .btn-admin {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
     }
-    .route-link { color: var(--accent-purple); text-decoration: none; font-weight: 600; }
-    .route-link:hover { text-decoration: underline; }
+    .btn-sadmin {
+      background: linear-gradient(135deg, #eab308, #ca8a04);
+      color: #000;
+      box-shadow: 0 6px 20px rgba(234, 179, 8, 0.35);
+    }
+    .error-box {
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+      font-size: 12px;
+      margin-bottom: 14px;
+      display: none;
+    }
 
-    /* 360 Spin Animation Overlay */
+    /* Footer Navigation */
+    .wa-card-footer {
+      padding: 18px 40px;
+      background: rgba(0, 0, 0, 0.08);
+      border-top: 1px solid var(--wa-card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--wa-text-muted);
+    }
+    html.theme-light .wa-card-footer { background: #fbfbfa; }
+    .footer-link {
+      color: var(--wa-accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .footer-link:hover { text-decoration: underline; }
+
+    /* 360 Spin & Zoom-Out Animation */
     .login-anim-overlay {
       position: fixed; inset: 0; background: var(--anim-overlay-bg);
       z-index: 9999999; display: flex; align-items: center; justify-content: center;
@@ -264,16 +570,15 @@ if (!empty($_SESSION['omnidesk_user'])) {
       transition: opacity 0.25s ease, visibility 0.25s ease;
     }
     .login-anim-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
-    .anim-scene { display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .anim-logo-box {
       width: 96px; height: 96px; border-radius: 24px;
-      background: var(--anim-logo-bg); border: 1.5px solid rgba(139, 92, 246, 0.45);
+      background: var(--wa-card-bg); border: 1.5px solid var(--wa-accent);
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+      box-shadow: 0 0 35px rgba(0, 168, 132, 0.5);
     }
     .anim-logo-box img { width: 68px; height: 68px; object-fit: cover; border-radius: 17px; }
     .login-anim-overlay.active .anim-logo-box {
-      animation: nunnoSpinZoomOut 1.6s cubic-bezier(0.2, 0.85, 0.25, 1) forwards;
+      animation: nunnoSpinZoomOut 1.5s cubic-bezier(0.2, 0.85, 0.25, 1) forwards;
     }
     @keyframes nunnoSpinZoomOut {
       0% { opacity: 0; transform: scale(0.5) rotate(0deg); }
@@ -283,333 +588,527 @@ if (!empty($_SESSION['omnidesk_user'])) {
       88% { opacity: 1; transform: scale(1) rotate(360deg); }
       100% { opacity: 0; transform: scale(0) rotate(360deg); }
     }
-    .anim-label { margin-top: 20px; text-align: center; }
-    .anim-brand-text { font-size: 20px; font-weight: 800; color: var(--anim-text-color); }
-    .anim-subtext { font-size: 13px; color: var(--anim-subtext-color); margin-top: 4px; }
+    .anim-brand-text { font-size: 20px; font-weight: 800; color: var(--wa-text-primary); margin-top: 20px; text-align: center; }
+    .anim-subtext { font-size: 13px; color: var(--wa-text-secondary); margin-top: 4px; text-align: center; }
   </style>
 </head>
 <body>
 
-<div class="bg-grid"></div>
+<!-- Green Header Banner -->
+<div class="wa-top-header">
+  <a href="login.php" class="wa-brand-title">
+    <div class="wa-logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
+    </div>
+    <span class="wa-brand-name">OmniDesk • WhatsApp Web</span>
+    <span class="wa-brand-tag">SaaS 2026</span>
+  </a>
 
-<!-- 360 Spin Animation Overlay -->
-<div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true">
-  <div class="anim-scene">
-    <div class="anim-logo-box">
-      <img src="assets/images/nunno-logo.png" alt="Platform Logo">
-    </div>
-    <div class="anim-label">
-      <div class="anim-brand-text" id="animBrandText">Nunno Conversational CRM</div>
-      <div class="anim-subtext" id="animSubtext">Initializing isolated closer workspace…</div>
-    </div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <button onclick="toggleTheme()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600;">
+      🌓 Theme
+    </button>
   </div>
 </div>
 
-<main class="login-container">
-  <!-- Brand Hero -->
-  <header class="brand-hero">
-    <div class="logo-frame">
-      <img src="assets/images/nunno-logo.png" alt="Platform Logo" class="logo-img">
+<!-- 360 Spin Animation Overlay -->
+<div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true">
+  <div style="display:flex; flex-direction:column; align-items:center;">
+    <div class="anim-logo-box">
+      <img src="assets/images/nunno-logo.png" alt="Platform Logo">
     </div>
-    <h1 class="brand-title">
-      Conversational Closing Platform
-      <span class="brand-badge">Multi-Tenant 2026</span>
-    </h1>
-    <p class="brand-subtitle">High-Velocity WhatsApp Sales Pipeline & Automated Settlement</p>
-  </header>
+    <div class="anim-brand-text" id="animBrandText">OmniDesk Sales Desk</div>
+    <div class="anim-subtext" id="animSubtext">Initializing isolated workspace…</div>
+  </div>
+</div>
 
-  <!-- Login Card with Tabs -->
-  <div class="login-card">
-    <div class="login-tabs">
-      <button class="tab-btn active" id="tabBtnQR" onclick="switchTab('qr')">
-        <span>📱</span> Scan QR Code (Closer)
+<!-- Main Floating Container -->
+<div class="landing-wrapper">
+  <div class="wa-main-card">
+    
+    <!-- 4-Role Navigation Bar -->
+    <div class="role-nav-bar">
+      <button class="role-tab-btn active" id="tabBtnTM" onclick="switchRole('tm')">
+        <span>📱</span> 1. Closer (TM) QR Login
       </button>
-      <button class="tab-btn" id="tabBtnTL" onclick="switchTab('tl')">
-        <span>👑</span> Continue as Team Leader (TL)
+      <button class="role-tab-btn tab-tl" id="tabBtnTL" onclick="switchRole('tl')">
+        <span>👑</span> 2. Continue as TL (Rs. 500/TM)
       </button>
-      <button class="tab-btn" id="tabBtnDirect" onclick="switchTab('direct')">
-        <span>🔑</span> Staff Sign In
+      <button class="role-tab-btn tab-admin" id="tabBtnAdmin" onclick="switchRole('admin')">
+        <span>🏢</span> 3. Company Admin (/admin)
+      </button>
+      <button class="role-tab-btn tab-sadmin" id="tabBtnSadmin" onclick="switchRole('sadmin')">
+        <span>⚡</span> 4. Super Admin (/sadmin)
       </button>
     </div>
 
-    <!-- TAB 1: CLOSER QR JOURNEY -->
-    <div class="tab-content active" id="tabQR">
-      <div class="qr-journey-grid">
+    <!-- TAB 1: TM CLOSER QR CODE JOURNEY (WhatsApp Web Mirror) -->
+    <div class="tab-pane active" id="paneTM">
+      <div class="wa-journey-layout">
+        
+        <!-- Left: Step-by-Step Instructions -->
         <div>
-          <div style="font-size: 18px; font-weight: 800; margin-bottom: 6px;">
-            Link your Personal WhatsApp Device
-          </div>
-          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 22px;">
-            Every sales closer runs their own dedicated WhatsApp device. One banned number will never impact other closers.
-          </div>
+          <h1 class="wa-journey-title">To use OmniDesk on your computer:</h1>
 
-          <ol class="steps-list">
-            <li class="step-item">
-              <div class="step-num">1</div>
-              <div class="step-text">
-                <strong>Open WhatsApp</strong> on your mobile phone
-                <div class="step-sub">Android or iOS with active internet connection</div>
+          <ol class="wa-steps-list">
+            <li class="wa-step-item">
+              <span class="wa-step-num">1.</span>
+              <div>Open <strong>WhatsApp</strong> on your mobile phone</div>
+            </li>
+            <li class="wa-step-item">
+              <span class="wa-step-num">2.</span>
+              <div>
+                Tap <strong>Menu <span class="wa-icon-hint">⋮</span></strong> on Android, or <strong>Settings <span class="wa-icon-hint">⚙️</span></strong> on iPhone
               </div>
             </li>
-            <li class="step-item">
-              <div class="step-num">2</div>
-              <div class="step-text">
-                Tap <strong>Menu (⋮)</strong> or <strong>Settings (⚙️)</strong>
-                <div class="step-sub">Located at top right (Android) or bottom right (iPhone)</div>
+            <li class="wa-step-item">
+              <span class="wa-step-num">3.</span>
+              <div>
+                Tap <strong>Linked devices</strong> and then <strong>Link a device</strong>
               </div>
             </li>
-            <li class="step-item">
-              <div class="step-num">3</div>
-              <div class="step-text">
-                Select <strong>Linked Devices</strong> and tap <strong>Link a Device</strong>
-                <div class="step-sub">Authorize with your fingerprint or face scan if prompted</div>
-              </div>
-            </li>
-            <li class="step-item">
-              <div class="step-num">4</div>
-              <div class="step-text">
-                <strong>Point your camera</strong> at this screen to capture the QR code
-                <div class="step-sub">Your closer desk will load automatically within seconds</div>
+            <li class="wa-step-item">
+              <span class="wa-step-num">4.</span>
+              <div>
+                Point your phone to this screen to capture the QR code
               </div>
             </li>
           </ol>
 
-          <div style="margin-top: 24px; display: flex; align-items: center; gap: 12px;">
-            <button class="btn-submit" style="width: auto; padding: 10px 18px; font-size: 12px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-card);" onclick="refreshQR()">
-              🔄 Refresh QR Code
-            </button>
-            <span style="font-size: 12px; color: var(--text-muted);">
-              Need account assistance? Contact your Team Lead.
-            </span>
+          <!-- Continue as TL Highlight Banner -->
+          <div class="tl-cta-banner" onclick="switchRole('tl')">
+            <div>
+              <div class="tl-cta-badge">👑 Team Leader Opportunity</div>
+              <div class="tl-cta-title">Or Continue as a Team Leader (TL)</div>
+              <div class="tl-cta-sub">Earn Rs. 500 PKR commission per joined TM closer with an instant recruitment dashboard.</div>
+            </div>
+            <button class="tl-cta-btn">Access TL Portal &rarr;</button>
+          </div>
+
+          <div style="margin-top: 24px; font-size: 13px; color: var(--wa-text-secondary); display: flex; align-items: center; gap: 16px;">
+            <a href="javascript:void(0)" onclick="refreshQRCode()" class="footer-link">🔄 Refresh QR code</a>
+            <span>•</span>
+            <a href="admin.php" class="footer-link">Company Admin Portal</a>
+            <span>•</span>
+            <a href="sadmin.php" class="footer-link">Super Admin</a>
           </div>
         </div>
 
-        <!-- Right QR Box -->
-        <div style="display: flex; flex-direction: column; align-items: center;">
-          <div class="qr-display-box" id="qrContainer">
+        <!-- Right: WhatsApp Web QR Frame -->
+        <div class="qr-column">
+          <div class="wa-qr-frame">
             <div class="qr-scan-line"></div>
-            <img id="qrImageElement" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=OMNIDESK-PAIR-AUTH-DEMO-2026" alt="WhatsApp Pair QR Code" class="qr-img">
-          </div>
-          <div class="qr-status-pill">
-            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; animation:pulse 1.5s infinite;"></span>
-            Auto-refreshing &bull; Ready to Pair
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 2: TEAM LEADER (TL) LOGIN FLOW -->
-    <div class="tab-content" id="tabTL">
-      <div class="tl-form-card">
-        <div style="text-align: center; margin-bottom: 22px;">
-          <div class="tl-promo-badge">
-            💰 Commission Program: Rs. 500 per TM joining
-          </div>
-          <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 6px;">Team Leader Command Portal</h2>
-          <p style="font-size: 13px; color: var(--text-muted);">
-            Provision Team Members under your leadership and track accrued commission balances.
-          </p>
-        </div>
-
-        <form onsubmit="handleAuthSubmit(event, 'tl')">
-          <div class="form-group">
-            <label class="form-label">Team Lead Username or Email</label>
-            <div class="input-wrapper">
-              <input type="text" id="tlUsername" class="form-input" placeholder="e.g. ali or asima" required>
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <img id="landingQrImage" src="https://api.qrserver.com/v1/create-qr-code/?size=230x230&margin=2&data=OMNIDESK-PAIRING-SYNC-2026" alt="WhatsApp QR Code" class="wa-qr-img">
+            <div class="wa-qr-center-logo">
+              <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
             </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Password</label>
-            <div class="input-wrapper">
-              <input type="password" id="tlPassword" class="form-input" placeholder="••••••••" required>
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="3"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
-            </div>
+          <div class="qr-status-badge" id="qrStatusBadge">
+            <span class="pulse-dot"></span>
+            <span id="qrStatusText">Pure WebSocket Bridge • Ready to Pair</span>
           </div>
 
-          <div id="tlErrorBox" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.2); color: #fb7185; font-size: 13px; margin-bottom: 14px;"></div>
+          <label class="qr-checkbox-row">
+            <input type="checkbox" id="keepSignedIn" checked>
+            <span>Keep me signed in</span>
+          </label>
 
-          <button type="submit" id="tlSubmitBtn" class="btn-submit" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);">
-            Sign in as Team Lead 👑
+          <!-- Instant TM Closer Demo (Skip phone scan) -->
+          <button class="qr-quick-btn" onclick="instantTMTestLogin()">
+            ⚡ Instant Closer Demo (Skip phone scan)
           </button>
-
-          <!-- 1-Click Quick Fill for TLs -->
-          <div style="display: flex; gap: 8px; margin-top: 14px; justify-content: center;">
-            <button type="button" style="padding: 5px 10px; font-size: 11px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-card); color: var(--text-muted); cursor: pointer;" onclick="fillCredentials('ali', 'ali123', 'tl')">
-              👑 Ali Raza (TL)
-            </button>
-            <button type="button" style="padding: 5px 10px; font-size: 11px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-card); color: var(--text-muted); cursor: pointer;" onclick="fillCredentials('asima', 'asima123', 'tl')">
-              👑 Asima Noor (TL)
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- TAB 3: DIRECT STAFF SIGN IN -->
-    <div class="tab-content" id="tabDirect">
-      <div class="tl-form-card">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 4px;">Direct Closer / Staff Login</h2>
-          <p style="font-size: 13px; color: var(--text-muted);">Already paired your device? Sign in with your assigned credentials.</p>
         </div>
 
-        <form onsubmit="handleAuthSubmit(event, 'direct')">
-          <div class="form-group">
-            <label class="form-label">Username</label>
-            <div class="input-wrapper">
-              <input type="text" id="dirUsername" class="form-input" placeholder="e.g. hamza" required>
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: TEAM LEADER (TL) COMMISSION PORTAL -->
+    <div class="tab-pane" id="paneTL">
+      <div class="form-container">
+        <div class="form-header">
+          <div class="form-badge-icon" style="background:rgba(139, 92, 246, 0.2); color:#c4b5fd;">👑</div>
+          <h2 class="form-title">Team Leader (TL) Commission Portal</h2>
+          <p class="form-subtitle">Earn <strong>Rs. 500 PKR</strong> per joined TM. Recruit closers & manage quotas.</p>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:18px;">
+          <button type="button" class="role-tab-btn tab-tl active" id="btnTLModeLogin" onclick="toggleTLMode('login')" style="flex:1; border-radius:8px;">TL Sign In</button>
+          <button type="button" class="role-tab-btn tab-tl" id="btnTLModeReg" onclick="toggleTLMode('register')" style="flex:1; border-radius:8px;">Register New TL</button>
+        </div>
+
+        <!-- TL Login Form -->
+        <form id="formTLLogin" onsubmit="handleTLLogin(event)">
+          <div class="input-group">
+            <label class="input-label">TL Username (e.g. ali or asima)</label>
+            <input type="text" id="tlUsername" class="input-field" placeholder="ali" required>
           </div>
-
-          <div class="form-group">
-            <label class="form-label">Password</label>
-            <div class="input-wrapper">
-              <input type="password" id="dirPassword" class="form-input" placeholder="••••••••" required>
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="3"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
-            </div>
+          <div class="input-group">
+            <label class="input-label">Password</label>
+            <input type="password" id="tlPassword" class="input-field" placeholder="ali123 or password" required>
           </div>
-
-          <div id="dirErrorBox" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.2); color: #fb7185; font-size: 13px; margin-bottom: 14px;"></div>
-
-          <button type="submit" id="dirSubmitBtn" class="btn-submit">
-            Enter Workspace 🚀
+          <div class="error-box" id="tlLoginError"></div>
+          <button type="submit" id="tlLoginBtn" class="btn-action-primary btn-tl">
+            Access TL Commission Desk 👑
           </button>
-
-          <!-- Quick Closer Fill -->
-          <div style="display: flex; gap: 8px; margin-top: 14px; justify-content: center;">
-            <button type="button" style="padding: 5px 10px; font-size: 11px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-card); color: var(--text-muted); cursor: pointer;" onclick="fillCredentials('hamza', 'Agent@123', 'direct')">
-              👨‍💼 Hamza Khan (Closer)
-            </button>
-            <button type="button" style="padding: 5px 10px; font-size: 11px; border-radius: 6px; background: rgba(255,255,255,0.06); border: 1px solid var(--border-card); color: var(--text-muted); cursor: pointer;" onclick="fillCredentials('admin', 'Admin@Omnidesk2026!', 'direct')">
-              ⚡ Admin
-            </button>
-          </div>
         </form>
+
+        <!-- TL Register Form -->
+        <form id="formTLRegister" onsubmit="handleTLRegister(event)" style="display:none;">
+          <div class="input-group">
+            <label class="input-label">Full Name *</label>
+            <input type="text" id="regTLName" class="input-field" placeholder="e.g. Bilal Ahmed" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Desired Username *</label>
+            <input type="text" id="regTLUsername" class="input-field" placeholder="e.g. bilal_tl" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">WhatsApp Phone *</label>
+            <input type="text" id="regTLPhone" class="input-field" placeholder="+923001234567" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Password *</label>
+            <input type="password" id="regTLPassword" class="input-field" placeholder="Min 6 characters" required>
+          </div>
+          <div class="error-box" id="tlRegError"></div>
+          <button type="submit" id="tlRegBtn" class="btn-action-primary btn-tl">
+            Register & Activate Commission Desk (Rs. 500/TM) 🚀
+          </button>
+        </form>
+
+        <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
+          Demo accounts: <span style="font-family:monospace; color:#c4b5fd;">ali / ali123</span> &bull; <span style="font-family:monospace; color:#c4b5fd;">asima / asima123</span>
+        </div>
       </div>
     </div>
 
-    <!-- Footer Routes -->
-    <div class="login-footer-routes">
-      <div>
-        🏢 Company Manager? <a href="admin.php" class="route-link">Open Company Portal (/admin) →</a>
-      </div>
-      <div>
-        ⚡ Platform Owner? <a href="sadmin.php" class="route-link">Super Admin Command (/sadmin) →</a>
+    <!-- TAB 3: COMPANY ADMIN PORTAL -->
+    <div class="tab-pane" id="paneAdmin">
+      <div class="form-container">
+        <div class="form-header">
+          <div class="form-badge-icon" style="background:rgba(245, 158, 11, 0.2); color:#fbbf24;">🏢</div>
+          <h2 class="form-title">Company Admin Portal</h2>
+          <p class="form-subtitle">Provision employees, adjust message limits & manage lead takeovers.</p>
+        </div>
+
+        <form id="formAdminLogin" onsubmit="handleAdminLogin(event)">
+          <div class="input-group">
+            <label class="input-label">Admin Username</label>
+            <input type="text" id="adminUsername" class="input-field" placeholder="admin" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Admin Password</label>
+            <input type="password" id="adminPassword" class="input-field" placeholder="admin123" required>
+          </div>
+          <div class="error-box" id="adminLoginError"></div>
+          <button type="submit" id="adminLoginBtn" class="btn-action-primary btn-admin">
+            Sign In to Company Admin (/admin) 🏢
+          </button>
+        </form>
+
+        <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
+          <a href="admin.php" class="footer-link">Go directly to full /admin page &rarr;</a>
+        </div>
       </div>
     </div>
+
+    <!-- TAB 4: SUPER ADMIN MASTER COMMAND -->
+    <div class="tab-pane" id="paneSadmin">
+      <div class="form-container">
+        <div class="form-header">
+          <div class="form-badge-icon" style="background:rgba(234, 179, 8, 0.2); color:#fde047;">⚡</div>
+          <h2 class="form-title">Super Admin Command Center</h2>
+          <p class="form-subtitle">Platform Owner Master Access — Multi-Company Telemetry & Stats.</p>
+        </div>
+
+        <form id="formSadminLogin" onsubmit="handleSadminLogin(event)">
+          <div class="input-group">
+            <label class="input-label">Super Admin Key</label>
+            <input type="text" id="sadminUsername" class="input-field" placeholder="sadmin" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Master Password</label>
+            <input type="password" id="sadminPassword" class="input-field" placeholder="sadmin123" required>
+          </div>
+          <div class="error-box" id="sadminLoginError"></div>
+          <button type="submit" id="sadminLoginBtn" class="btn-action-primary btn-sadmin">
+            Unlock Super Command (/sadmin) ⚡
+          </button>
+        </form>
+
+        <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
+          <a href="sadmin.php" class="footer-link">Go directly to full /sadmin page &rarr;</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- WhatsApp Web Card Bottom Bar -->
+    <div class="wa-card-footer">
+      <div>
+        <span>OmniDesk Multi-Tenant Closing Infrastructure</span>
+        <span style="margin: 0 6px;">&bull;</span>
+        <span style="color:#00a884; font-weight:700;">24/7 Pure WebSocket Engine</span>
+      </div>
+      <div style="display:flex; gap:16px;">
+        <a href="login.php?switch=1" class="footer-link">Switch Account</a>
+        <a href="admin.php" class="footer-link">Company Admin</a>
+        <a href="sadmin.php" class="footer-link">Super Admin</a>
+      </div>
+    </div>
+
   </div>
-</main>
+</div>
 
 <script>
-function switchTab(tabId) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-  if (tabId === 'qr') {
-    document.getElementById('tabBtnQR').classList.add('active');
-    document.getElementById('tabQR').classList.add('active');
-  } else if (tabId === 'tl') {
-    document.getElementById('tabBtnTL').classList.add('active');
-    document.getElementById('tabTL').classList.add('active');
-  } else if (tabId === 'direct') {
-    document.getElementById('tabBtnDirect').classList.add('active');
-    document.getElementById('tabDirect').classList.add('active');
-  }
+// Role switcher
+function switchRole(role) {
+  const tabs = ['tm', 'tl', 'admin', 'sadmin'];
+  tabs.forEach(r => {
+    const btn = document.getElementById('tabBtn' + r.toUpperCase());
+    const pane = document.getElementById('pane' + r.toUpperCase());
+    if (btn) btn.classList.toggle('active', r === role);
+    if (pane) pane.classList.toggle('active', r === role);
+  });
 }
 
-function fillCredentials(user, pass, tab) {
-  if (tab === 'tl') {
-    document.getElementById('tlUsername').value = user;
-    document.getElementById('tlPassword').value = pass;
+// TL Mode Switcher (Login vs Register)
+function toggleTLMode(mode) {
+  const formLogin = document.getElementById('formTLLogin');
+  const formReg = document.getElementById('formTLRegister');
+  const btnLogin = document.getElementById('btnTLModeLogin');
+  const btnReg = document.getElementById('btnTLModeReg');
+  if (mode === 'register') {
+    formLogin.style.display = 'none';
+    formReg.style.display = 'block';
+    btnReg.classList.add('active');
+    btnLogin.classList.remove('active');
   } else {
-    document.getElementById('dirUsername').value = user;
-    document.getElementById('dirPassword').value = pass;
+    formLogin.style.display = 'block';
+    formReg.style.display = 'none';
+    btnLogin.classList.add('active');
+    btnReg.classList.remove('active');
   }
 }
 
-async function refreshQR() {
+// 360 Spin Animation Trigger
+function triggerLoginAnimation(brandName, subtext, redirectUrl) {
+  const overlay = document.getElementById('loginAnimOverlay');
+  const txtBrand = document.getElementById('animBrandText');
+  const txtSub = document.getElementById('animSubtext');
+  if (txtBrand && brandName) txtBrand.textContent = brandName;
+  if (txtSub && subtext) txtSub.textContent = subtext;
+  overlay.classList.add('active');
+  setTimeout(() => {
+    window.location.href = redirectUrl;
+  }, 1450);
+}
+
+// Live QR Code Poller & Auto-Pairing
+let qrPollTimer = null;
+let lastKnownState = '';
+
+async function refreshQRCode() {
+  const qrImg = document.getElementById('landingQrImage');
+  const statusTxt = document.getElementById('qrStatusText');
   try {
     const res = await fetch('api/direct_sender.php?action=get_sender_info');
     const data = await res.json();
-    if (data.qr) {
-      document.getElementById('qrImageElement').src = data.qr;
-    } else {
-      document.getElementById('qrImageElement').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=OMNIDESK-PAIR-' + Date.now();
+    if (data.success) {
+      if (data.qr && data.state === 'qr') {
+        qrImg.src = data.qr;
+        statusTxt.textContent = 'Pure WebSocket Bridge • Scan with WhatsApp';
+      } else if (data.is_connected && data.connected_number) {
+        statusTxt.textContent = `Connected: +${data.connected_number}! Logging in...`;
+        // Auto-authenticate as TM closer
+        if (lastKnownState !== 'connected') {
+          lastKnownState = 'connected';
+          clearInterval(qrPollTimer);
+          instantTMTestLogin(data.connected_number);
+        }
+      } else {
+        statusTxt.textContent = data.message || 'Connecting to WhatsApp bridge…';
+      }
     }
-  } catch (_) {
-    document.getElementById('qrImageElement').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=OMNIDESK-PAIR-' + Date.now();
+  } catch (err) {
+    statusTxt.textContent = 'Bridge reconnecting…';
   }
 }
 
-async function handleAuthSubmit(e, tab) {
-  e.preventDefault();
-  const isTL = (tab === 'tl');
-  const user = isTL ? document.getElementById('tlUsername').value.trim() : document.getElementById('dirUsername').value.trim();
-  const pass = isTL ? document.getElementById('tlPassword').value.trim() : document.getElementById('dirPassword').value.trim();
-  const btn = isTL ? document.getElementById('tlSubmitBtn') : document.getElementById('dirSubmitBtn');
-  const errBox = isTL ? document.getElementById('tlErrorBox') : document.getElementById('dirErrorBox');
+// Polling interval
+qrPollTimer = setInterval(refreshQRCode, 4000);
+refreshQRCode();
 
+// Instant Closer Demo Login
+async function instantTMTestLogin(phone) {
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'qr_login',
+        phone: phone || '',
+        demo: !phone
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      triggerLoginAnimation(data.user.name, 'Sales Closer Desk Activated • Starting Pipeline', 'index.php');
+    } else {
+      alert(data.error || 'Failed to authenticate closer.');
+    }
+  } catch (err) {
+    alert('Network error connecting to closer authentication.');
+  }
+}
+
+// TL Login
+async function handleTLLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('tlLoginBtn');
+  const errBox = document.getElementById('tlLoginError');
   btn.disabled = true;
-  btn.textContent = 'Verifying credentials…';
+  btn.textContent = 'Authenticating TL…';
   errBox.style.display = 'none';
 
   try {
     const res = await fetch('api/auth.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'login', username: user, password: pass })
+      body: JSON.stringify({
+        action: 'login',
+        username: document.getElementById('tlUsername').value.trim(),
+        password: document.getElementById('tlPassword').value.trim()
+      })
     });
     const data = await res.json();
-    if (data.success && data.user) {
-      localStorage.setItem('nunno_active_session', JSON.stringify(data.user));
-      triggerLoginAnimation(data.user);
+    if (data.success) {
+      triggerLoginAnimation(data.user.name, 'Team Leader Commission Portal (Rs. 500/TM)', 'index.php?mode=tl');
     } else {
-      errBox.textContent = data.error || 'Invalid credentials.';
+      errBox.textContent = data.error || 'Invalid TL credentials.';
       errBox.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = isTL ? 'Sign in as Team Lead 👑' : 'Enter Workspace 🚀';
     }
   } catch (err) {
-    errBox.textContent = 'Server communication error.';
+    errBox.textContent = 'Network communication error.';
     errBox.style.display = 'block';
+  } finally {
     btn.disabled = false;
-    btn.textContent = isTL ? 'Sign in as Team Lead 👑' : 'Enter Workspace 🚀';
+    btn.textContent = 'Access TL Commission Desk 👑';
   }
 }
 
-function triggerLoginAnimation(user) {
-  const overlay = document.getElementById('loginAnimOverlay');
-  const mainCard = document.querySelector('.login-container');
-  const brandText = document.getElementById('animBrandText');
-  const subtext = document.getElementById('animSubtext');
+// TL Register
+async function handleTLRegister(e) {
+  e.preventDefault();
+  const btn = document.getElementById('tlRegBtn');
+  const errBox = document.getElementById('tlRegError');
+  btn.disabled = true;
+  btn.textContent = 'Registering…';
+  errBox.style.display = 'none';
 
-  if (user.role === 'lead') {
-    brandText.textContent = 'Team Leader Command';
-    subtext.textContent = `Welcome back, Lead ${user.name} (Rs. 500 / TM Active)`;
-  } else if (user.role === 'admin') {
-    brandText.textContent = 'Company Administration';
-    subtext.textContent = `Welcome back, Administrator ${user.name}`;
-  } else {
-    brandText.textContent = 'Closer Sales Desk';
-    subtext.textContent = `Welcome back, ${user.name}`;
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'tl_register',
+        name: document.getElementById('regTLName').value.trim(),
+        username: document.getElementById('regTLUsername').value.trim(),
+        phone: document.getElementById('regTLPhone').value.trim(),
+        password: document.getElementById('regTLPassword').value.trim()
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      triggerLoginAnimation(data.user.name, 'Team Leader Activated • Rs. 500 / TM Commission Ready', 'index.php?mode=tl');
+    } else {
+      errBox.textContent = data.error || 'Registration failed.';
+      errBox.style.display = 'block';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network communication error.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Register & Activate Commission Desk (Rs. 500/TM) 🚀';
   }
-
-  if (mainCard) mainCard.style.display = 'none';
-  overlay.classList.add('active');
-
-  setTimeout(() => {
-    window.location.replace('index.php');
-  }, 1600);
 }
 
-// Check QR status periodically on page load
-document.addEventListener('DOMContentLoaded', () => {
-  refreshQR();
-  setInterval(refreshQR, 25000);
-});
+// Company Admin Login
+async function handleAdminLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('adminLoginBtn');
+  const errBox = document.getElementById('adminLoginError');
+  btn.disabled = true;
+  btn.textContent = 'Verifying Admin…';
+  errBox.style.display = 'none';
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'login',
+        username: document.getElementById('adminUsername').value.trim(),
+        password: document.getElementById('adminPassword').value.trim()
+      })
+    });
+    const data = await res.json();
+    if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
+      triggerLoginAnimation(data.user.name, 'Company Administrator Control Center', 'admin.php');
+    } else {
+      errBox.textContent = data.error || 'Access Denied: Company Admin privileges required.';
+      errBox.style.display = 'block';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network communication error.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In to Company Admin (/admin) 🏢';
+  }
+}
+
+// Super Admin Login
+async function handleSadminLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('sadminLoginBtn');
+  const errBox = document.getElementById('sadminLoginError');
+  btn.disabled = true;
+  btn.textContent = 'Authenticating Master Access…';
+  errBox.style.display = 'none';
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'login',
+        username: document.getElementById('sadminUsername').value.trim(),
+        password: document.getElementById('sadminPassword').value.trim()
+      })
+    });
+    const data = await res.json();
+    if (data.success && data.user.role === 'superadmin') {
+      triggerLoginAnimation('Platform Super Admin', 'Master Command Center • Multi-Tenant Telemetry', 'sadmin.php');
+    } else {
+      errBox.textContent = data.error || 'Access Denied: Super Administrator privileges required.';
+      errBox.style.display = 'block';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network communication error.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Unlock Super Command (/sadmin) ⚡';
+  }
+}
+
+// Theme Toggle
+function toggleTheme() {
+  const isLight = document.documentElement.classList.toggle('theme-light');
+  try { localStorage.setItem('nunno_theme', isLight ? 'light' : 'dark'); } catch(_) {}
+}
 </script>
 </body>
 </html>

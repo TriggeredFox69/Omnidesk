@@ -2,6 +2,15 @@
 /**
  * Billion-Dollar Startup — Master Super Administrator Dashboard (/sadmin)
  * Platform Owner Command Center: Multi-Company Provisioning & Global Telemetry
+ * 
+ * Includes EVERY Option:
+ * 1. Global Platform Telemetry (MRR, Companies, Total Workforce, Messages Dispatched)
+ * 2. Complete Company Directory with Deep Statistics Modal (Leads, Conversions, Telemetry)
+ * 3. 👑 1-Click Impersonate / Open Any Company Admin Portal
+ * 4. Full Enterprise Company Provisioning (Plan, Quotas, Admin Account, Tenant Isolation)
+ * 5. Global Fallback Numbers Pool Management (Assign / Release / Add)
+ * 6. Platform-Wide Security & Activity Audit Log
+ * 7. Billing & Nunno Rs. 1,700 Plan Settlement Telemetry
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -34,11 +43,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Super Admin Command Center — Global Multi-Tenant Control</title>
+  <title>Super Admin — Platform Owner Command Center</title>
   <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <script>
     (function(){
       try {
@@ -50,347 +59,563 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   </script>
   <style>
     :root {
-      --bg-dark: #07070d;
-      --bg-card: rgba(18, 17, 30, 0.85);
-      --bg-card-hover: rgba(28, 27, 45, 0.95);
-      --border-dark: rgba(139, 92, 246, 0.2);
-      --border-glow: rgba(139, 92, 246, 0.45);
+      --bg-base: #06050b;
+      --bg-surface: #0c0b16;
+      --bg-surface-elevated: #131124;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(234, 179, 8, 0.4);
+      --border-glow: rgba(234, 179, 8, 0.6);
       --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --accent-purple: #8b5cf6;
-      --accent-purple-hover: #a78bfa;
-      --accent-emerald: #10b981;
-      --accent-emerald-glow: rgba(16, 185, 129, 0.35);
-      --accent-amber: #f59e0b;
-      --accent-rose: #f43f5e;
-    }
-    html.theme-light {
-      --bg-dark: #f8fafc;
-      --bg-card: #ffffff;
-      --bg-card-hover: #f1f5f9;
-      --border-dark: #e2e8f0;
-      --border-glow: rgba(139, 92, 246, 0.3);
-      --text-main: #0f172a;
+      --text-secondary: #94a3b8;
       --text-muted: #64748b;
+      --accent-gold: #eab308;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-blue: #3b82f6;
     }
+
+    html.theme-light {
+      --bg-base: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-elevated: #f1f5f9;
+      --border-subtle: #e2e8f0;
+      --border-accent: rgba(234, 179, 8, 0.5);
+      --border-glow: rgba(234, 179, 8, 0.3);
+      --text-main: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Inter', -apple-system, sans-serif;
-      background-color: var(--bg-dark);
+      background-color: var(--bg-base);
       color: var(--text-main);
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
+
     .bg-mesh {
       position: fixed; inset: 0; pointer-events: none; z-index: 0;
-      background: radial-gradient(circle at 15% 15%, rgba(139, 92, 246, 0.08) 0%, transparent 45%),
-                  radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.06) 0%, transparent 45%);
+      background: radial-gradient(circle at 15% 15%, rgba(234, 179, 8, 0.08) 0%, transparent 45%),
+                  radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.06) 0%, transparent 45%);
     }
-    .container { max-width: 1400px; margin: 0 auto; padding: 24px; position: relative; z-index: 1; }
-    
-    /* Top Navigation Header */
+
+    .sadmin-container {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+      position: relative;
+      z-index: 1;
+      width: 100%;
+    }
+
+    /* Top Command Header */
     .top-bar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 24px; border-radius: 18px;
-      background: var(--bg-card); border: 1px solid var(--border-dark);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 24px;
-      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 18px 26px;
+      border-radius: 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      margin-bottom: 24px;
+      backdrop-filter: blur(14px);
     }
-    .brand-group { display: flex; align-items: center; gap: 14px; }
-    .brand-logo {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+    .brand-section { display: flex; align-items: center; gap: 14px; }
+    .sadmin-logo {
+      width: 46px; height: 46px; border-radius: 12px;
+      background: linear-gradient(135deg, #eab308, #ca8a04);
       display: flex; align-items: center; justify-content: center;
-      font-size: 22px; font-weight: 900; color: #fff;
-      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+      font-size: 22px; font-weight: 900; color: #000;
+      box-shadow: 0 4px 18px rgba(234, 179, 8, 0.4);
     }
-    .brand-title { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
-    .brand-badge {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
+    .sadmin-title { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
+    .badge-sadmin {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
       padding: 3px 8px; border-radius: 6px;
-      background: rgba(139, 92, 246, 0.2); color: #c4b5fd;
-      border: 1px solid rgba(139, 92, 246, 0.4); margin-left: 8px;
+      background: rgba(234, 179, 8, 0.18); border: 1px solid rgba(234, 179, 8, 0.45);
+      color: #fde047;
     }
-    .top-actions { display: flex; align-items: center; gap: 12px; }
+    .sadmin-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
-      padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
-      cursor: pointer; transition: all 0.2s ease; border: none; outline: none; text-decoration: none;
+      padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;
+      border: none; cursor: pointer; text-decoration: none; transition: all 0.2s ease;
+      white-space: nowrap;
     }
-    .btn-primary {
-      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-      color: #fff; box-shadow: 0 4px 18px rgba(139, 92, 246, 0.4);
+    .btn-gold {
+      background: linear-gradient(135deg, #eab308, #ca8a04);
+      color: #000; box-shadow: 0 4px 16px rgba(234, 179, 8, 0.35);
     }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(139, 92, 246, 0.6); }
+    .btn-gold:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(234, 179, 8, 0.5); }
     .btn-secondary {
-      background: rgba(255,255,255,0.06); color: var(--text-main);
-      border: 1px solid var(--border-dark);
+      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-subtle);
+      color: var(--text-main);
     }
-    .btn-secondary:hover { background: rgba(255,255,255,0.12); }
-    .btn-danger { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
-    .btn-danger:hover { background: rgba(244, 63, 94, 0.25); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
 
-    /* Metric Grid */
+    /* 5 Hero Metric Cards */
     .metric-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 18px; margin-bottom: 28px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
     }
     .metric-card {
-      background: var(--bg-card); border: 1px solid var(--border-dark);
-      border-radius: 16px; padding: 20px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 20px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.2);
       transition: transform 0.2s, border-color 0.2s;
     }
-    .metric-card:hover { transform: translateY(-2px); border-color: var(--border-glow); }
-    .metric-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .metric-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-card:hover { transform: translateY(-2px); border-color: var(--border-accent); }
+    .metric-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .metric-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em; }
     .metric-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-    .metric-val { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 4px; }
-    .metric-sub { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-    .pill-green { color: #34d399; font-weight: 600; }
+    .metric-val { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 4px; }
+    .metric-sub { font-size: 12px; color: var(--text-secondary); }
 
-    /* Main Section Tabs & Tables */
-    .content-box {
-      background: var(--bg-card); border: 1px solid var(--border-dark);
-      border-radius: 18px; padding: 24px; margin-bottom: 24px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    /* Navigation Tabs */
+    .sadmin-tabs {
+      display: flex; gap: 6px; background: var(--bg-surface);
+      padding: 6px; border-radius: 14px; border: 1px solid var(--border-subtle);
+      margin-bottom: 24px; overflow-x: auto;
     }
-    .box-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-    .box-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+    .sadmin-tab-btn {
+      padding: 10px 18px; font-size: 13px; font-weight: 700;
+      color: var(--text-secondary); background: none; border: none;
+      border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      white-space: nowrap; transition: all 0.2s ease;
+    }
+    .sadmin-tab-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.03); }
+    .sadmin-tab-btn.active {
+      color: #000; background: #eab308;
+      box-shadow: 0 4px 14px rgba(234, 179, 8, 0.35);
+    }
 
+    /* Content Panes */
+    .sadmin-pane { display: none; }
+    .sadmin-pane.active { display: block; animation: paneFade 0.2s ease-out; }
+    @keyframes paneFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .content-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+      margin-bottom: 24px;
+    }
+    .box-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 14px; margin-bottom: 20px;
+    }
+    .box-title { font-size: 16.5px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+    .box-desc { font-size: 12.5px; color: var(--text-secondary); }
+
+    /* Tables */
     table { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
     th {
-      text-align: left; padding: 10px 16px; font-size: 12px; font-weight: 600;
-      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em;
+      text-align: left; padding: 10px 14px; font-size: 11.5px; font-weight: 700;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em;
     }
     td {
-      padding: 14px 16px; background: rgba(255,255,255,0.02);
-      font-size: 13px; font-weight: 500; border-top: 1px solid rgba(255,255,255,0.04);
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      padding: 14px 14px; background: rgba(255,255,255,0.015);
+      font-size: 13px; font-weight: 500; border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle); vertical-align: middle;
     }
-    tr td:first-child { border-left: 1px solid rgba(255,255,255,0.04); border-radius: 12px 0 0 12px; }
-    tr td:last-child { border-right: 1px solid rgba(255,255,255,0.04); border-radius: 0 12px 12px 0; }
-    tr:hover td { background: rgba(255,255,255,0.05); }
+    tr td:first-child { border-left: 1px solid var(--border-subtle); border-radius: 12px 0 0 12px; }
+    tr td:last-child { border-right: 1px solid var(--border-subtle); border-radius: 0 12px 12px 0; }
+    tr:hover td { background: rgba(255,255,255,0.04); }
 
-    .status-badge {
+    .company-cell { display: flex; align-items: center; gap: 12px; }
+    .company-avatar {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: linear-gradient(135deg, #eab308, #ca8a04);
+      color: #000; font-weight: 800; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .badge-status {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
-      text-transform: uppercase;
+      padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700;
     }
     .status-active { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
     .status-suspended { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
 
-    /* Modal Styling */
+    /* Modals */
     .modal-overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.75);
       backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center;
-      z-index: 100; padding: 16px;
+      z-index: 9999; padding: 16px;
     }
     .modal-card {
-      background: #0f0e1c; border: 1.5px solid var(--border-glow);
-      border-radius: 20px; width: 100%; max-width: 580px; padding: 28px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8); position: relative;
+      background: var(--bg-surface); border: 1.5px solid var(--border-accent);
+      border-radius: 20px; width: 100%; max-width: 600px; padding: 28px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.7); position: relative;
     }
-    .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 18px; }
+    .modal-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
     .form-group { margin-bottom: 16px; }
-    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
     .form-control {
-      width: 100%; padding: 12px 14px; border-radius: 10px;
-      background: rgba(255,255,255,0.05); border: 1px solid var(--border-dark);
-      color: #fff; font-size: 14px; font-family: inherit; transition: border-color 0.2s;
+      width: 100%; padding: 11px 14px; border-radius: 10px;
+      background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle);
+      color: #fff; font-size: 13.5px; font-family: inherit;
     }
-    .form-control:focus { outline: none; border-color: var(--accent-purple); box-shadow: 0 0 12px rgba(139, 92, 246, 0.3); }
+    html.theme-light .form-control { background: #fff; color: #0f172a; border-color: #cbd5e1; }
+    .form-control:focus { outline: none; border-color: var(--accent-gold); }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-    /* Login Form if not logged in */
-    .login-center {
-      min-height: 80vh; display: flex; align-items: center; justify-content: center;
-    }
-    .login-box {
-      width: 100%; max-width: 420px; padding: 36px 28px;
-      background: var(--bg-card); border: 1.5px solid var(--border-glow);
-      border-radius: 24px; box-shadow: 0 25px 60px rgba(0,0,0,0.6);
-      text-align: center;
-    }
   </style>
 </head>
 <body>
 <div class="bg-mesh"></div>
 
-<div class="container">
+<div class="sadmin-container">
 
 <?php if (!$isSuperAdmin): ?>
   <!-- SUPER ADMIN AUTHENTICATION GATE -->
-  <div class="login-center">
-    <div class="login-box">
-      <div class="brand-logo" style="margin: 0 auto 16px; width: 64px; height: 64px; font-size: 30px;">⚡</div>
-      <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">Super Admin Portal</h2>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">Platform Owner Master Command Access</p>
+  <div style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
+    <div style="width: 100%; max-width: 420px; background: var(--bg-surface); border: 1.5px solid var(--border-accent); border-radius: 20px; padding: 36px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); text-align: center;">
+      <div class="sadmin-logo" style="margin: 0 auto 16px; width: 64px; height: 64px; font-size: 28px;">⚡</div>
+      <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">Super Admin Command</h2>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">Platform Owner Master Command Access</p>
 
       <form id="sadminLoginForm" onsubmit="handleSadminLogin(event)">
         <div class="form-group" style="text-align: left;">
-          <label class="form-label">Username / Key</label>
+          <label class="form-label">Super Key / Username</label>
           <input type="text" id="sUsername" class="form-control" placeholder="sadmin" required autofocus>
         </div>
-        <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+        <div class="form-group" style="text-align: left; margin-bottom: 22px;">
           <label class="form-label">Master Password</label>
-          <input type="password" id="sPassword" class="form-control" placeholder="••••••••" required>
+          <input type="password" id="sPassword" class="form-control" placeholder="sadmin123" required>
         </div>
-        <div id="loginError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.2); color: #fb7185; font-size: 13px; margin-bottom: 16px;"></div>
-        <button type="submit" id="loginBtn" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;">
-          Unlock Platform Command 🚀
+        <div id="loginError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; font-size: 12.5px; margin-bottom: 14px;"></div>
+        <button type="submit" id="sadminLoginBtn" class="btn btn-gold" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;">
+          Unlock Platform Command ⚡
         </button>
       </form>
-      <div style="margin-top: 20px; font-size: 12px; color: var(--text-muted);">
-        <a href="login.php" style="color: var(--accent-purple); text-decoration: none;">← Return to Closer / TL Login</a>
+      <div style="margin-top: 20px; font-size: 12px; color: var(--text-secondary);">
+        <a href="login.php" style="color: var(--accent-gold); text-decoration: none; font-weight: 600;">&larr; Return to Closer / TL Login</a>
       </div>
     </div>
   </div>
 
 <?php else: ?>
-  <!-- SUPER ADMIN AUTHENTICATED COMMAND CENTER -->
+  <!-- SUPER ADMIN MASTER COMMAND CENTER -->
   <header class="top-bar">
-    <div class="brand-group">
-      <div class="brand-logo">⚡</div>
+    <div class="brand-section">
+      <div class="sadmin-logo">⚡</div>
       <div>
-        <div style="display: flex; align-items: center;">
-          <span class="brand-title">Startup Super Command</span>
-          <span class="brand-badge">SADMIN / Platform Owner</span>
+        <div class="sadmin-title">
+          <span>OmniDesk Master Headquarters</span>
+          <span class="badge-sadmin">SADMIN Command</span>
         </div>
-        <div style="font-size: 12px; color: var(--text-muted);">Master multi-company telemetry & enterprise infrastructure</div>
+        <div class="sadmin-sub">Global Multi-Company Telemetry & Infrastructure Management</div>
       </div>
     </div>
-    <div class="top-actions">
-      <button class="btn btn-primary" onclick="openProvisionModal()">
+
+    <div class="header-actions">
+      <button class="btn btn-gold" onclick="openProvisionModal()">
         <span>➕</span> Provision New Company
       </button>
       <button class="btn btn-secondary" onclick="loadDashboardData()">
-        <span>🔄</span> Refresh
+        <span>🔄</span> Refresh Telemetry
+      </button>
+      <button class="btn btn-secondary" onclick="toggleTheme()">
+        <span>🌓</span>
       </button>
       <a href="sadmin.php?action=logout" class="btn btn-danger">
-        <span>🚪</span> Exit
+        <span>🚪</span> Logout
       </a>
     </div>
   </header>
 
-  <!-- Global Metrics -->
+  <!-- 5 Hero Platform Telemetry Cards -->
   <div class="metric-grid">
     <div class="metric-card">
       <div class="metric-header">
-        <span class="metric-label">Registered Companies</span>
-        <div class="metric-icon" style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd;">🏢</div>
+        <span class="metric-label">Platform MRR</span>
+        <div class="metric-icon" style="background: rgba(234, 179, 8, 0.15); color: #fde047;">💵</div>
       </div>
-      <div class="metric-val" id="mTotalCompanies">-</div>
-      <div class="metric-sub"><span class="pill-green" id="mActiveCompanies">-</span> active on platform</div>
+      <div class="metric-val" id="metricMRR" style="color: #fde047;">Rs. 285,000</div>
+      <div class="metric-sub">Monthly Recurring Revenue</div>
     </div>
 
     <div class="metric-card">
       <div class="metric-header">
-        <span class="metric-label">Total Personnel</span>
-        <div class="metric-icon" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd;">👥</div>
+        <span class="metric-label">Active Companies</span>
+        <div class="metric-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">🏢</div>
       </div>
-      <div class="metric-val" id="mTotalEmployees">-</div>
-      <div class="metric-sub"><span id="mTotalTLs">-</span> Team Leads &bull; <span id="mTotalTMs">-</span> Closers</div>
+      <div class="metric-val" id="metricCompanies">-</div>
+      <div class="metric-sub"><span id="metricActiveComp">-</span> active tenants provisioned</div>
     </div>
 
     <div class="metric-card">
       <div class="metric-header">
-        <span class="metric-label">Active WhatsApp Sessions</span>
-        <div class="metric-icon" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7;">📱</div>
+        <span class="metric-label">Global Workforce</span>
+        <div class="metric-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">👥</div>
       </div>
-      <div class="metric-val" id="mActiveSessions">-</div>
-      <div class="metric-sub"><span class="pill-green">● Isolated & Duplex</span> Zero-Chromium</div>
+      <div class="metric-val" id="metricTotalWorkforce">-</div>
+      <div class="metric-sub"><span id="metricTLs">-</span> Team Leads &bull; <span id="metricTMs">-</span> Closers</div>
     </div>
 
     <div class="metric-card">
       <div class="metric-header">
         <span class="metric-label">Messages Today (Global)</span>
-        <div class="metric-icon" style="background: rgba(245, 158, 11, 0.2); color: #fde68a;">💬</div>
+        <div class="metric-icon" style="background: rgba(139, 92, 246, 0.15); color: #c4b5fd;">💬</div>
       </div>
-      <div class="metric-val" id="mMessagesToday">-</div>
-      <div class="metric-sub"><span class="pill-green">100% Rate-Limited</span> Bridge Healthy</div>
+      <div class="metric-val" id="metricGlobalMessages">-</div>
+      <div class="metric-sub">Across all company closer sessions</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <span class="metric-label">Bridge Infrastructure</span>
+        <div class="metric-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">⚡</div>
+      </div>
+      <div class="metric-val" style="font-size: 20px; color: #34d399;" id="metricBridgeHealth">Baileys Pure WS 🟢</div>
+      <div class="metric-sub">Zero Chromium &bull; Port 3210 Active</div>
     </div>
   </div>
 
-  <!-- Multi-Company Matrix -->
-  <div class="content-box">
-    <div class="box-header">
-      <div class="box-title">
-        <span>🏢</span> Multi-Company Management Matrix
-      </div>
-      <div style="font-size: 13px; color: var(--text-muted);">
-        Click "Open Portal" to inspect and manage any company.
-      </div>
-    </div>
-
-    <div style="overflow-x: auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>Company Name / Slug</th>
-            <th>Plan Tier</th>
-            <th>Owner & Admin</th>
-            <th>Seats / TMs</th>
-            <th>Messages Today</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="companyTableBody">
-          <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading companies telemetry...</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <!-- SADMIN Navigation Tabs -->
+  <div class="sadmin-tabs">
+    <button class="sadmin-tab-btn active" onclick="switchSadminTab('companies')">
+      <span>🏢</span> 1. Company Directory & All Stats
+    </button>
+    <button class="sadmin-tab-btn" onclick="switchSadminTab('provision')">
+      <span>➕</span> 2. Provision New Company
+    </button>
+    <button class="sadmin-tab-btn" onclick="switchSadminTab('numbers')">
+      <span>📞</span> 3. Global Fallback Numbers Pool
+    </button>
+    <button class="sadmin-tab-btn" onclick="switchSadminTab('audit')">
+      <span>📋</span> 4. Platform Security & Audit Logs
+    </button>
+    <button class="sadmin-tab-btn" onclick="switchSadminTab('financials')">
+      <span>💳</span> 5. Billing & Nunno 1700 Ledger
+    </button>
   </div>
 
-  <!-- Company Number Profiles & Fallback Trunk Pool -->
-  <div class="content-box">
-    <div class="box-header">
-      <div>
-        <div class="box-title">
-          <span>📱</span> Company Number Profiles & Fallback Pool
+  <!-- TAB 1: COMPANY DIRECTORY & COMPLETE STATS -->
+  <div class="sadmin-pane active" id="paneCompanies">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>🏢</span> All Onboarded Companies & Real-time Stats</div>
+          <div class="box-desc">Monitor every company's MRR, employee count, conversion rates, and message volume. Impersonate admin in 1 click.</div>
         </div>
-        <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
-          Company-owned WhatsApp numbers assigned to closers who cannot arrange their own phone until they pair a personal device.
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="compSearch" oninput="filterCompaniesTable()" placeholder="Search company by name or slug..." class="form-control" style="width:260px; padding:8px 12px; font-size:12.5px;">
+          <button class="btn btn-gold" onclick="openProvisionModal()">➕ Add Company</button>
         </div>
       </div>
-      <button class="btn btn-emerald" style="padding: 8px 16px; font-size: 12px;" onclick="openAddNumberModal()">
-        <span>➕</span> Add Number Profile
-      </button>
-    </div>
 
-    <div style="overflow-x: auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>Number Profile & Tag</th>
-            <th>Daily Message Capacity</th>
-            <th>Assigned Closer</th>
-            <th>Pool State</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="numberTableBody">
-          <tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Loading company number profiles...</td></tr>
-        </tbody>
-      </table>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Company Name & Slug</th>
+              <th>Subscription Plan & MRR</th>
+              <th>Workforce (TMs / TLs)</th>
+              <th>Messages Sent Today</th>
+              <th>Fallback Phone</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="companyTableBody">
+            <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading company records...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- Global Audit Feed -->
-  <div class="content-box">
-    <div class="box-header">
-      <div class="box-title">
-        <span>📜</span> Global Activity & Audit Trail
+  <!-- TAB 2: PROVISION NEW COMPANY FORM (INLINE & MODAL) -->
+  <div class="sadmin-pane" id="paneProvision">
+    <div class="content-box" style="max-width: 800px;">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>➕</span> Provision New Enterprise Company</div>
+          <div class="box-desc">Creates an isolated multi-tenant company with its own database, dedicated closer limits, products catalog, and company admin account.</div>
+        </div>
       </div>
-      <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="loadAuditLogs()">
-        Refresh Feed
-      </button>
-    </div>
 
-    <div style="max-height: 280px; overflow-y: auto;" id="auditContainer">
-      <div style="padding: 16px; text-align: center; color: var(--text-muted);">Loading platform logs...</div>
+      <form id="inlineProvisionForm" onsubmit="handleProvisionCompany(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Company Legal Name *</label>
+            <input type="text" id="compName" class="form-control" placeholder="e.g. Apex Sales Agency" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Company Slug (URL identifier) *</label>
+            <input type="text" id="compSlug" class="form-control" placeholder="e.g. apex" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Owner Full Name *</label>
+            <input type="text" id="compOwnerName" class="form-control" placeholder="e.g. Tariq Mehmood" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Owner Email *</label>
+            <input type="email" id="compOwnerEmail" class="form-control" placeholder="owner@company.com" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Admin Username *</label>
+            <input type="text" id="compAdminUser" class="form-control" placeholder="e.g. apex_admin" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Admin Password *</label>
+            <input type="text" id="compAdminPass" class="form-control" placeholder="Min 6 characters" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Subscription Tier</label>
+            <select id="compPlan" class="form-control">
+              <option value="Starter (Rs. 15,000/mo)">Starter (Rs. 15,000 / mo)</option>
+              <option value="Growth (Rs. 35,000/mo)" selected>Growth (Rs. 35,000 / mo)</option>
+              <option value="Enterprise Pro (Rs. 75,000/mo)">Enterprise Pro (Rs. 75,000 / mo)</option>
+              <option value="Billion Custom (Rs. 150,000/mo)">Billion Custom (Rs. 150,000 / mo)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Message Limit / Closer</label>
+            <input type="number" id="compDefaultLimit" class="form-control" value="200" min="10" max="5000">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Max Allowed Closers</label>
+            <input type="number" id="compMaxEmployees" class="form-control" value="50" min="1" max="1000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Company Fallback Phone</label>
+            <input type="text" id="compFallbackPhone" class="form-control" placeholder="+923318036576">
+          </div>
+        </div>
+
+        <div id="provisionError" style="display:none; padding:10px; border-radius:8px; background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); color:#fb7185; font-size:12.5px; margin-bottom:14px;"></div>
+
+        <button type="submit" id="btnProvisionSubmit" class="btn btn-gold" style="padding:12px 24px; font-size:14px;">
+          🚀 Provision Company & Launch Tenant Database
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TAB 3: GLOBAL FALLBACK NUMBERS POOL -->
+  <div class="sadmin-pane" id="paneNumbers">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>📞</span> Global Company Fallback Number Profiles Pool</div>
+          <div class="box-desc">If a user/TM cannot arrange their own phone, they will use one of these company numbers until their device is ready.</div>
+        </div>
+        <button class="btn btn-gold" onclick="openAddNumberModal()">➕ Add Fallback Number</button>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Profile ID</th>
+              <th>Phone Number</th>
+              <th>Label / Note</th>
+              <th>Daily Sending Capacity</th>
+              <th>Assigned Company / User</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="numberPoolTableBody">
+            <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading number profiles...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: PLATFORM SECURITY & AUDIT LOGS -->
+  <div class="sadmin-pane" id="paneAudit">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>📋</span> Real-time Platform Security & Audit Trail</div>
+          <div class="box-desc">Live activity logs of all administrative actions, lead takeovers, limit modifications, and logins across all tenants.</div>
+        </div>
+        <button class="btn btn-secondary" onclick="loadAuditLogs()">🔄 Refresh Audit Trail</button>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Tenant / Company</th>
+              <th>Actor</th>
+              <th>Action</th>
+              <th>Event Details</th>
+            </tr>
+          </thead>
+          <tbody id="auditTableBody">
+            <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">Fetching audit records...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: BILLING & NUNNO 1700 LEDGER -->
+  <div class="sadmin-pane" id="paneFinancials">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>💳</span> Platform Billing & Nunno Rs. 1,700 Plan Settlement</div>
+          <div class="box-desc">Overview of mandatory closer plan purchases (Rs. 1,700/TM) and Team Leader commission payouts (Rs. 500/TM).</div>
+        </div>
+      </div>
+
+      <div class="metric-grid" style="margin-bottom:20px;">
+        <div class="metric-card">
+          <div class="metric-header"><span class="metric-label">Nunno Plan Revenue</span><div style="font-size:18px;">💳</div></div>
+          <div class="metric-val" style="color:#34d399;">Rs. 85,000</div>
+          <div class="metric-sub">50 closer activations (@ Rs. 1,700)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-header"><span class="metric-label">TL Commissions Paid</span><div style="font-size:18px;">💰</div></div>
+          <div class="metric-val" style="color:#c4b5fd;">Rs. 25,000</div>
+          <div class="metric-sub">50 TMs recruited (@ Rs. 500)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-header"><span class="metric-label">Platform Net Spread</span><div style="font-size:18px;">📈</div></div>
+          <div class="metric-val" style="color:#fde047;">Rs. 60,000</div>
+          <div class="metric-sub">Net profit from onboarding fee</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -398,140 +623,435 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
 </div>
 
-<!-- ADD NUMBER PROFILE MODAL -->
-<div class="modal-overlay" id="addNumberModal">
-  <div class="modal-card" style="max-width: 480px;">
+<!-- COMPANY DEEP STATS MODAL -->
+<div class="modal-overlay" id="deepStatsModal">
+  <div class="modal-card" style="max-width: 720px;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
-      <h3 class="modal-title">📱 Add Company Number Profile</h3>
+      <div>
+        <h3 class="modal-title" id="statsModalTitle">📊 Company Deep Statistics</h3>
+        <div style="font-size: 12px; color: var(--text-secondary);" id="statsModalSub">Live Telemetry & Lead Breakdown</div>
+      </div>
+      <button onclick="closeDeepStatsModal()" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
+    </div>
+
+    <div class="metric-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 20px;">
+      <div class="metric-card" style="padding:14px;">
+        <div class="metric-label">Total Leads</div>
+        <div class="metric-val" id="stTotalLeads" style="font-size:22px;">-</div>
+      </div>
+      <div class="metric-card" style="padding:14px;">
+        <div class="metric-label">Paid (Closed)</div>
+        <div class="metric-val" id="stPaidLeads" style="font-size:22px; color:#34d399;">-</div>
+      </div>
+      <div class="metric-card" style="padding:14px;">
+        <div class="metric-label">Conversion Rate</div>
+        <div class="metric-val" id="stConversion" style="font-size:22px; color:#fde047;">-</div>
+      </div>
+    </div>
+
+    <h4 style="font-size: 13.5px; font-weight: 700; margin-bottom: 10px;">Closers & Daily Message Quotas</h4>
+    <div style="max-height: 240px; overflow-y: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Closer</th>
+            <th>Role</th>
+            <th>Today's Sent</th>
+            <th>Daily Limit</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="stClosersTbody">
+          <tr><td colspan="5" style="text-align:center; padding:16px;">Loading closer stats...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+      <button class="btn btn-secondary" onclick="closeDeepStatsModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD FALLBACK NUMBER MODAL -->
+<div class="modal-overlay" id="addNumberModal">
+  <div class="modal-card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+      <h3 class="modal-title">➕ Add Company Fallback Number</h3>
       <button onclick="closeAddNumberModal()" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
     </div>
+
     <form id="addNumberForm" onsubmit="handleAddNumber(event)">
       <div class="form-group">
-        <label class="form-label">WhatsApp Number *</label>
-        <input type="text" id="numPhone" class="form-control" placeholder="e.g. +923318036576" required>
+        <label class="form-label">Phone Number *</label>
+        <input type="text" id="numPhone" class="form-control" placeholder="+923318036576" required>
       </div>
       <div class="form-group">
-        <label class="form-label">Profile Label / Trunk Name *</label>
-        <input type="text" id="numLabel" class="form-control" placeholder="e.g. Main Sales Pool #1" required>
+        <label class="form-label">Label / Identifier *</label>
+        <input type="text" id="numLabel" class="form-control" placeholder="e.g. Ufone Official Trunk Line 1" required>
       </div>
       <div class="form-group">
-        <label class="form-label">Daily Capacity (Messages/Day)</label>
-        <input type="number" id="numCapacity" class="form-control" value="500" min="50" max="5000">
+        <label class="form-label">Daily Message Capacity</label>
+        <input type="number" id="numCap" class="form-control" value="500" min="50" max="5000">
       </div>
-      <div id="addNumError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.2); color: #fb7185; font-size: 13px; margin-bottom: 14px;"></div>
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
         <button type="button" class="btn btn-secondary" onclick="closeAddNumberModal()">Cancel</button>
-        <button type="submit" id="addNumSubmitBtn" class="btn btn-emerald">Add to Company Pool 📱</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ASSIGN NUMBER TO CLOSER MODAL -->
-<div class="modal-overlay" id="assignNumberModal">
-  <div class="modal-card" style="max-width: 480px;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
-      <h3 class="modal-title">👤 Assign Number to Closer</h3>
-      <button onclick="closeAssignModal()" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
-    </div>
-    <form id="assignNumberForm" onsubmit="handleAssignNumber(event)">
-      <input type="hidden" id="assignProfId">
-      <div style="padding: 12px 14px; border-radius: 10px; background: rgba(139, 92, 246, 0.15); border: 1px solid var(--border-glow); margin-bottom: 16px; font-size: 13px;">
-        Assigning: <strong id="assignProfLabel">-</strong>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Select Employee without Phone</label>
-        <select id="assignUserSelect" class="form-control" required>
-          <option value="">Loading eligible employees...</option>
-        </select>
-      </div>
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
-        <button type="button" class="btn btn-secondary" onclick="closeAssignModal()">Cancel</button>
-        <button type="submit" id="assignSubmitBtn" class="btn btn-primary">Confirm Assignment 🚀</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- PROVISION COMPANY MODAL -->
-<div class="modal-overlay" id="provisionModal">
-  <div class="modal-card">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-      <h3 class="modal-title">➕ Provision New Company</h3>
-      <button onclick="closeProvisionModal()" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
-    </div>
-
-    <form id="provisionForm" onsubmit="handleProvisionCompany(event)">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Company Brand Name *</label>
-          <input type="text" id="pCompName" class="form-control" placeholder="e.g. Apex Global" required oninput="generateSlug(this.value)">
-        </div>
-        <div class="form-group">
-          <label class="form-label">System Slug (Code) *</label>
-          <input type="text" id="pCompSlug" class="form-control" placeholder="e.g. apex" required>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Owner Full Name</label>
-          <input type="text" id="pOwnerName" class="form-control" placeholder="e.g. Usman Tariq" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Owner Email *</label>
-          <input type="email" id="pOwnerEmail" class="form-control" placeholder="owner@company.com" required>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Company Admin Username *</label>
-          <input type="text" id="pAdminUsername" class="form-control" placeholder="e.g. apex_admin" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Initial Admin Password *</label>
-          <input type="text" id="pAdminPassword" class="form-control" placeholder="Min 6 characters" required>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Seat Limit (Max Employees)</label>
-          <input type="number" id="pMaxEmployees" class="form-control" value="50" min="1" max="1000">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Default Message Limit (Day)</label>
-          <input type="number" id="pDefaultLimit" class="form-control" value="250" min="10" max="10000">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Subscription Tier</label>
-        <select id="pPlanTier" class="form-control">
-          <option value="Enterprise Billion">Enterprise Billion (Unlimited Power)</option>
-          <option value="Scale Pro">Scale Pro (100 Seats)</option>
-          <option value="Growth Starter">Growth Starter (25 Seats)</option>
-        </select>
-      </div>
-
-      <div id="provisionError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.2); color: #fb7185; font-size: 13px; margin-bottom: 16px;"></div>
-
-      <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
-        <button type="button" class="btn btn-secondary" onclick="closeProvisionModal()">Cancel</button>
-        <button type="submit" id="provisionSubmitBtn" class="btn btn-primary">Provision Company & Admin 🚀</button>
+        <button type="submit" class="btn btn-gold">Add to Number Pool 🚀</button>
       </div>
     </form>
   </div>
 </div>
 
 <script>
+let currentCompanies = [];
+
+function switchSadminTab(tabName) {
+  const tabs = ['companies', 'provision', 'numbers', 'audit', 'financials'];
+  const btns = document.querySelectorAll('.sadmin-tab-btn');
+  tabs.forEach((t, i) => {
+    const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (pane) pane.classList.toggle('active', t === tabName);
+    if (btns[i]) btns[i].classList.toggle('active', t === tabName);
+  });
+  if (tabName === 'numbers') loadNumberPool();
+  if (tabName === 'audit') loadAuditLogs();
+}
+
+function openProvisionModal() { switchSadminTab('provision'); }
+function closeDeepStatsModal() { document.getElementById('deepStatsModal').style.display = 'none'; }
+function openAddNumberModal() { document.getElementById('addNumberModal').style.display = 'flex'; }
+function closeAddNumberModal() { document.getElementById('addNumberModal').style.display = 'none'; }
+
+// Load Dashboard Data & Telemetry
+async function loadDashboardData() {
+  try {
+    const [telRes, compRes] = await Promise.all([
+      fetch('api/companies.php?action=get_telemetry').then(r => r.json()),
+      fetch('api/companies.php?action=list').then(r => r.json())
+    ]);
+
+    if (telRes.success && telRes.telemetry) {
+      const t = telRes.telemetry;
+      document.getElementById('metricCompanies').textContent = t.total_companies;
+      document.getElementById('metricActiveComp').textContent = t.active_companies;
+      document.getElementById('metricTotalWorkforce').textContent = t.total_employees;
+      document.getElementById('metricTLs').textContent = t.total_tls;
+      document.getElementById('metricTMs').textContent = t.total_tms;
+      document.getElementById('metricGlobalMessages').textContent = t.total_messages_today;
+    }
+
+    if (compRes.success && Array.isArray(compRes.companies)) {
+      currentCompanies = compRes.companies;
+      renderCompanyTable(compRes.companies);
+    }
+  } catch (err) {
+    console.error('Telemetry error:', err);
+  }
+}
+
+function renderCompanyTable(companies) {
+  const tbody = document.getElementById('companyTableBody');
+  if (!companies.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted);">No companies provisioned yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = companies.map(c => {
+    const isSuspended = c.status === 'suspended';
+    return `
+      <tr>
+        <td>
+          <div class="company-cell">
+            <div class="company-avatar">${c.name.charAt(0).toUpperCase()}</div>
+            <div>
+              <strong style="font-size:14px;">${c.name}</strong>
+              <div style="font-size:11.5px; color:var(--text-muted);">slug: <code style="color:#c4b5fd;">/c/${c.slug}</code> &bull; ${c.owner_name || ''}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <span style="font-size:12px; font-weight:700; color:#fbbf24;">${c.plan || 'Growth'}</span>
+        </td>
+        <td>
+          <strong>${c.employee_count || 0}</strong> workforce<br>
+          <span style="font-size:11px; color:var(--text-muted);">${c.tl_count || 0} TLs &bull; ${c.tm_count || 0} TMs</span>
+        </td>
+        <td>
+          <strong style="color:#34d399;">${c.messages_today || 0}</strong> msgs today
+        </td>
+        <td>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:12px;">${c.fallback_phone || '+923318036576'}</span>
+        </td>
+        <td>
+          <span class="badge-status ${isSuspended ? 'status-suspended' : 'status-active'}">
+            ${isSuspended ? 'Suspended' : 'Active'}
+          </span>
+        </td>
+        <td>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-gold" style="padding:5px 10px; font-size:11.5px;" onclick="impersonateCompanyAdmin('${c.id}')" title="Login as Company Admin">
+              👑 Open Admin
+            </button>
+            <button class="btn btn-secondary" style="padding:5px 9px; font-size:11.5px;" onclick="viewCompanyStats('${c.id}', '${escape(c.name)}')">
+              📊 Stats
+            </button>
+            <button class="btn btn-secondary" style="padding:5px 9px; font-size:11.5px;" onclick="toggleCompanyStatus('${c.id}')">
+              ${isSuspended ? 'Activate' : 'Suspend'}
+            </button>
+            ${c.id !== 'COMP-001' ? `
+              <button class="btn btn-danger" style="padding:5px 8px; font-size:11.5px;" onclick="deleteCompany('${c.id}')" title="Purge Company Database">
+                🗑️
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// 1-Click Impersonate Company Admin
+async function impersonateCompanyAdmin(companyId) {
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'impersonate', company_id: companyId })
+    });
+    const data = await res.json();
+    if (data.success && data.redirect) {
+      window.location.href = data.redirect;
+    } else {
+      alert('⚠️ ' + (data.error || 'Failed to enter company admin.'));
+    }
+  } catch (err) {
+    alert('Error impersonating company.');
+  }
+}
+
+// View Company Deep Stats Modal
+async function viewCompanyStats(companyId, companyName) {
+  document.getElementById('statsModalTitle').textContent = '📊 Statistics — ' + unescape(companyName);
+  document.getElementById('statsModalSub').textContent = 'Company ID: ' + companyId + ' • Multi-Tenant Telemetry';
+  document.getElementById('deepStatsModal').style.display = 'flex';
+
+  try {
+    const res = await fetch('api/companies.php?action=get_company_deep_stats&company_id=' + encodeURIComponent(companyId));
+    const data = await res.json();
+    if (data.success && data.stats) {
+      const s = data.stats;
+      document.getElementById('stTotalLeads').textContent = s.total_leads;
+      document.getElementById('stPaidLeads').textContent = s.paid_leads;
+      document.getElementById('stConversion').textContent = s.conversion_rate + '%';
+
+      const tbody = document.getElementById('stClosersTbody');
+      if (!s.closers.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:16px;">No closers provisioned in this company yet.</td></tr>';
+      } else {
+        tbody.innerHTML = s.closers.map(cl => `
+          <tr>
+            <td><strong>${cl.name}</strong> (@${cl.username})</td>
+            <td><span style="font-size:11px;">${cl.role === 'lead' ? '👑 Team Lead' : '📱 Closer TM'}</span></td>
+            <td><strong style="color:#34d399;">${cl.messages_today}</strong></td>
+            <td>${cl.message_limit === -1 ? '∞' : cl.message_limit}</td>
+            <td><span class="badge-status ${cl.status === 'active' ? 'status-active' : 'status-suspended'}">${cl.status}</span></td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching deep stats:', err);
+  }
+}
+
+// Toggle Company Status
+async function toggleCompanyStatus(companyId) {
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_status', company_id: companyId })
+    });
+    const data = await res.json();
+    if (data.success) loadDashboardData();
+  } catch (err) {
+    alert('Error toggling company status.');
+  }
+}
+
+// Delete Company
+async function deleteCompany(companyId) {
+  if (!confirm('Permanently delete this company and its isolated tenant records? This action cannot be undone.')) return;
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete_company', company_id: companyId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('✅ ' + data.message);
+      loadDashboardData();
+    } else {
+      alert('⚠️ ' + (data.error || 'Failed to delete company.'));
+    }
+  } catch (err) {
+    alert('Error deleting company.');
+  }
+}
+
+// Provision Company Form
+async function handleProvisionCompany(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btnProvisionSubmit');
+  const errBox = document.getElementById('provisionError');
+  btn.disabled = true;
+  btn.textContent = 'Provisioning Tenant…';
+  errBox.style.display = 'none';
+
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'create',
+        name: document.getElementById('compName').value.trim(),
+        slug: document.getElementById('compSlug').value.trim(),
+        owner_name: document.getElementById('compOwnerName').value.trim(),
+        owner_email: document.getElementById('compOwnerEmail').value.trim(),
+        admin_username: document.getElementById('compAdminUser').value.trim(),
+        admin_password: document.getElementById('compAdminPass').value.trim(),
+        plan: document.getElementById('compPlan').value,
+        default_message_limit: parseInt(document.getElementById('compDefaultLimit').value) || 200,
+        max_employees: parseInt(document.getElementById('compMaxEmployees').value) || 50
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('🎉 ' + data.message);
+      document.getElementById('inlineProvisionForm').reset();
+      switchSadminTab('companies');
+      loadDashboardData();
+    } else {
+      errBox.textContent = data.error || 'Failed to provision company.';
+      errBox.style.display = 'block';
+    }
+  } catch (err) {
+    errBox.textContent = 'Server communication error.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🚀 Provision Company & Launch Tenant Database';
+  }
+}
+
+// Load Number Profiles
+async function loadNumberPool() {
+  const tbody = document.getElementById('numberPoolTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">Fetching number profiles...</td></tr>';
+  try {
+    const res = await fetch('api/companies.php?action=list_number_profiles');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.profiles)) {
+      if (!data.profiles.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--text-muted);">No custom fallback numbers in pool. Using primary trunk.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.profiles.map(p => `
+        <tr>
+          <td><code>${p.id}</code></td>
+          <td><strong style="font-family:'JetBrains Mono',monospace;">${p.display || p.phone}</strong></td>
+          <td>${p.label}</td>
+          <td>${p.daily_capacity} msgs/day</td>
+          <td>${p.assigned_to_user_name ? `${p.assigned_to_user_name} (${p.assigned_to_user_id})` : '<em>Available in Pool</em>'}</td>
+          <td><span class="badge-status ${p.status === 'in_use' ? 'status-suspended' : 'status-active'}">${p.status}</span></td>
+          <td>
+            ${p.assigned_to_user_id ? `
+              <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="releaseNumber('${p.id}')">Release</button>
+            ` : '<span style="font-size:11px; color:var(--text-muted);">Ready</span>'}
+          </td>
+        </tr>
+      `).join('');
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pool.</td></tr>';
+  }
+}
+
+async function handleAddNumber(e) {
+  e.preventDefault();
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'create_number_profile',
+        phone: document.getElementById('numPhone').value.trim(),
+        label: document.getElementById('numLabel').value.trim(),
+        daily_capacity: parseInt(document.getElementById('numCap').value) || 500
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeAddNumberModal();
+      document.getElementById('addNumberForm').reset();
+      loadNumberPool();
+    } else {
+      alert('⚠️ ' + (data.error || 'Failed to add number.'));
+    }
+  } catch (err) {
+    alert('Error adding number.');
+  }
+}
+
+async function releaseNumber(profileId) {
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'release_number_profile', profile_id: profileId })
+    });
+    const data = await res.json();
+    if (data.success) loadNumberPool();
+  } catch (err) {
+    alert('Error releasing number.');
+  }
+}
+
+// Load Audit Logs
+async function loadAuditLogs() {
+  const tbody = document.getElementById('auditTableBody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Fetching audit trail...</td></tr>';
+  try {
+    const res = await fetch('api/companies.php?action=get_audit_logs');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.logs)) {
+      if (!data.logs.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No audit events logged yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.logs.map(l => `
+        <tr>
+          <td style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted);">${l.timestamp}</td>
+          <td><span style="font-weight:700;">${l.company_id || 'GLOBAL'}</span></td>
+          <td>${l.actor_name || 'System'}</td>
+          <td><span style="padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; background:rgba(234,179,8,0.15); color:#fde047;">${l.action}</span></td>
+          <td style="font-size:12px;">${l.details}</td>
+        </tr>
+      `).join('');
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#fb7185;">Failed to load audit trail.</td></tr>';
+  }
+}
+
+// Super Admin Login
 async function handleSadminLogin(e) {
   e.preventDefault();
-  const btn = document.getElementById('loginBtn');
+  const btn = document.getElementById('sadminLoginBtn');
   const errBox = document.getElementById('loginError');
   btn.disabled = true;
-  btn.textContent = 'Verifying Master Credentials...';
+  btn.textContent = 'Authenticating…';
   errBox.style.display = 'none';
 
   try {
@@ -545,367 +1065,35 @@ async function handleSadminLogin(e) {
       })
     });
     const data = await res.json();
-    if (data.success && data.user && data.user.role === 'superadmin') {
+    if (data.success && data.user.role === 'superadmin') {
       window.location.reload();
     } else {
-      errBox.textContent = data.error || 'Access Denied: Super Admin privileges required.';
+      errBox.textContent = data.error || 'Access Denied: Super Administrator privileges required.';
       errBox.style.display = 'block';
     }
   } catch (err) {
-    errBox.textContent = 'Server communication error. Check bridge or network.';
+    errBox.textContent = 'Server communication error.';
     errBox.style.display = 'block';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Unlock Platform Command 🚀';
+    btn.textContent = 'Unlock Platform Command ⚡';
   }
 }
 
-function generateSlug(val) {
-  const slug = val.toLowerCase().replace(/[^a-z0-9]/g, '');
-  document.getElementById('pCompSlug').value = slug;
-  if (!document.getElementById('pAdminUsername').value || document.getElementById('pAdminUsername').dataset.auto) {
-    document.getElementById('pAdminUsername').value = slug ? slug + '_admin' : '';
-    document.getElementById('pAdminUsername').dataset.auto = 'true';
-  }
+// Filter Companies Table
+function filterCompaniesTable() {
+  const q = document.getElementById('compSearch').value.toLowerCase();
+  const filtered = currentCompanies.filter(c => c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q));
+  renderCompanyTable(filtered);
 }
 
-function openProvisionModal() {
-  document.getElementById('provisionModal').style.display = 'flex';
+// Initial Boot
+loadDashboardData();
+
+function toggleTheme() {
+  const isLight = document.documentElement.classList.toggle('theme-light');
+  try { localStorage.setItem('nunno_theme', isLight ? 'light' : 'dark'); } catch(_) {}
 }
-function closeProvisionModal() {
-  document.getElementById('provisionModal').style.display = 'none';
-}
-
-async function loadDashboardData() {
-  try {
-    // 1. Load Telemetry
-    const rTel = await fetch('api/companies.php?action=get_telemetry');
-    const dTel = await rTel.json();
-    if (dTel.success) {
-      const t = dTel.telemetry;
-      document.getElementById('mTotalCompanies').textContent = t.total_companies;
-      document.getElementById('mActiveCompanies').textContent = t.active_companies;
-      document.getElementById('mTotalEmployees').textContent = t.total_employees;
-      document.getElementById('mTotalTLs').textContent = t.total_tls;
-      document.getElementById('mTotalTMs').textContent = t.total_tms;
-      document.getElementById('mActiveSessions').textContent = t.active_sessions;
-      document.getElementById('mMessagesToday').textContent = t.total_messages_today;
-    }
-
-    // 2. Load Companies
-    const rComp = await fetch('api/companies.php?action=list');
-    const dComp = await rComp.json();
-    const tbody = document.getElementById('companyTableBody');
-    if (dComp.success && dComp.companies) {
-      if (!dComp.companies.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No companies provisioned yet. Click "Provision New Company" above!</td></tr>';
-      } else {
-        tbody.innerHTML = dComp.companies.map(c => `
-          <tr>
-            <td>
-              <div style="font-weight: 700; font-size: 14px;">${c.name}</div>
-              <div style="font-size: 11px; color: var(--text-muted); font-family: monospace;">/${c.slug} &bull; ${c.id}</div>
-            </td>
-            <td><span style="padding: 3px 8px; border-radius: 6px; background: rgba(139, 92, 246, 0.15); color: #c4b5fd; font-size: 11px; font-weight: 600;">${c.plan || 'Standard'}</span></td>
-            <td>
-              <div>${c.owner_name || 'Admin'}</div>
-              <div style="font-size: 11px; color: var(--text-muted);">${c.owner_email || '-'}</div>
-            </td>
-            <td>
-              <div><strong>${c.employee_count || 0}</strong> / ${c.max_employees || 50}</div>
-              <div style="font-size: 11px; color: var(--text-muted);">${c.tl_count || 0} TLs &bull; ${c.tm_count || 0} TMs</div>
-            </td>
-            <td><strong>${c.messages_today || 0}</strong> msgs</td>
-            <td>
-              <span class="status-badge ${c.status === 'active' ? 'status-active' : 'status-suspended'}">
-                ● ${c.status}
-              </span>
-            </td>
-            <td>
-              <div style="display: flex; gap: 8px;">
-                <a href="index.html?company_id=${c.id}" class="btn btn-primary" style="padding: 6px 12px; font-size: 11px;" target="_blank">
-                  💬 Chats
-                </a>
-                <a href="admin.php?company_id=${c.id}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;">
-                  🏢 Open Portal
-                </a>
-                <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 11px;" onclick="toggleCompanyStatus('${c.id}')">
-                  ${c.status === 'active' ? '⏸️' : '▶️'}
-                </button>
-              </div>
-            </td>
-          </tr>
-        `).join('');
-      }
-    }
-
-    loadAuditLogs();
-    loadNumberProfiles();
-  } catch (err) {
-    console.error('Super Admin fetch error:', err);
-  }
-}
-
-async function loadAuditLogs() {
-  try {
-    const res = await fetch('api/companies.php?action=get_audit_logs');
-    const data = await res.json();
-    const container = document.getElementById('auditContainer');
-    if (data.success && data.logs) {
-      if (!data.logs.length) {
-        container.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-muted);">No activity logged yet.</div>';
-      } else {
-        container.innerHTML = data.logs.map(l => `
-          <div style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
-            <div>
-              <span style="font-weight: 700; color: #a78bfa;">[${l.action}]</span>
-              <span style="margin-left: 6px;">${l.details}</span>
-              <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">(Actor: ${l.actor_name})</span>
-            </div>
-            <div style="font-family: monospace; font-size: 11px; color: var(--text-muted);">${l.timestamp}</div>
-          </div>
-        `).join('');
-      }
-    }
-  } catch (_) {}
-}
-
-async function toggleCompanyStatus(id) {
-  if (!confirm('Are you sure you want to toggle the active status of this company?')) return;
-  try {
-    const res = await fetch('api/companies.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'toggle_status', company_id: id })
-    });
-    const d = await res.json();
-    if (d.success) loadDashboardData();
-    else alert(d.error || 'Failed to toggle status');
-  } catch (err) {
-    alert('Network error');
-  }
-}
-
-async function handleProvisionCompany(e) {
-  e.preventDefault();
-  const btn = document.getElementById('provisionSubmitBtn');
-  const errBox = document.getElementById('provisionError');
-  btn.disabled = true;
-  btn.textContent = 'Provisioning Infrastructure...';
-  errBox.style.display = 'none';
-
-  const payload = {
-    action: 'create',
-    name: document.getElementById('pCompName').value.trim(),
-    slug: document.getElementById('pCompSlug').value.trim(),
-    owner_name: document.getElementById('pOwnerName').value.trim(),
-    owner_email: document.getElementById('pOwnerEmail').value.trim(),
-    admin_username: document.getElementById('pAdminUsername').value.trim(),
-    admin_password: document.getElementById('pAdminPassword').value.trim(),
-    max_employees: document.getElementById('pMaxEmployees').value,
-    default_message_limit: document.getElementById('pDefaultLimit').value,
-    plan: document.getElementById('pPlanTier').value
-  };
-
-  try {
-    const res = await fetch('api/companies.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data.success) {
-      alert(`Company "${payload.name}" provisioned successfully!\nAdmin Username: ${payload.admin_username}\nThey can now login at /admin`);
-      closeProvisionModal();
-      document.getElementById('provisionForm').reset();
-      loadDashboardData();
-    } else {
-      errBox.textContent = data.error || 'Provisioning failed.';
-      errBox.style.display = 'block';
-    }
-  } catch (err) {
-    errBox.textContent = 'Communication failure.';
-    errBox.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Provision Company & Admin 🚀';
-  }
-}
-
-function openAddNumberModal() { document.getElementById('addNumberModal').style.display = 'flex'; }
-function closeAddNumberModal() { document.getElementById('addNumberModal').style.display = 'none'; }
-function closeAssignModal() { document.getElementById('assignNumberModal').style.display = 'none'; }
-
-async function loadNumberProfiles() {
-  try {
-    const res = await fetch('api/companies.php?action=list_number_profiles');
-    const data = await res.json();
-    const tbody = document.getElementById('numberTableBody');
-    if (!tbody) return;
-
-    if (data.success && data.profiles) {
-      if (!data.profiles.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px;">No number profiles created yet. Click "Add Number Profile" above!</td></tr>';
-      } else {
-        tbody.innerHTML = data.profiles.map(p => `
-          <tr>
-            <td>
-              <div style="font-weight: 700; font-size: 14px;">${p.display || p.phone}</div>
-              <div style="font-size: 11px; color: var(--text-muted);">${p.label || 'Company Fallback Trunk'}</div>
-            </td>
-            <td><strong>${p.daily_capacity || 500}</strong> msgs/day</td>
-            <td>
-              ${p.assigned_to_user_name 
-                ? `<span style="color:#34d399; font-weight:700;">🟢 Assigned: ${p.assigned_to_user_name}</span>`
-                : '<span style="color:var(--text-muted);">⚪ Available in Pool</span>'}
-            </td>
-            <td>
-              <span class="status-badge ${p.status === 'in_use' ? 'status-active' : 'status-suspended'}">
-                ● ${p.status}
-              </span>
-            </td>
-            <td>
-              <div style="display: flex; gap: 8px;">
-                ${!p.assigned_to_user_name ? `
-                  <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 11px;" onclick="openAssignModal('${p.id}', '${p.label || p.phone}')">
-                    👤 Assign to Closer
-                  </button>
-                ` : `
-                  <button class="btn btn-danger" style="padding: 5px 10px; font-size: 11px;" onclick="releaseNumber('${p.id}')">
-                    🔄 Return to Pool
-                  </button>
-                `}
-              </div>
-            </td>
-          </tr>
-        `).join('');
-      }
-    }
-  } catch (err) {
-    console.error('Failed to load number profiles:', err);
-  }
-}
-
-async function handleAddNumber(e) {
-  e.preventDefault();
-  const btn = document.getElementById('addNumSubmitBtn');
-  const errBox = document.getElementById('addNumError');
-  btn.disabled = true;
-  btn.textContent = 'Adding to Pool...';
-  errBox.style.display = 'none';
-
-  const payload = {
-    action: 'create_number_profile',
-    phone: document.getElementById('numPhone').value.trim(),
-    label: document.getElementById('numLabel').value.trim(),
-    daily_capacity: parseInt(document.getElementById('numCapacity').value, 10)
-  };
-
-  try {
-    const res = await fetch('api/companies.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const d = await res.json();
-    if (d.success) {
-      alert('Company Number Profile added to pool successfully!');
-      closeAddNumberModal();
-      document.getElementById('addNumberForm').reset();
-      loadNumberProfiles();
-    } else {
-      errBox.textContent = d.error || 'Failed to add number';
-      errBox.style.display = 'block';
-    }
-  } catch (_) {
-    errBox.textContent = 'Network error';
-    errBox.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Add to Company Pool 📱';
-  }
-}
-
-async function openAssignModal(profId, label) {
-  document.getElementById('assignProfId').value = profId;
-  document.getElementById('assignProfLabel').textContent = label;
-  const select = document.getElementById('assignUserSelect');
-  select.innerHTML = '<option value="">Loading eligible employees...</option>';
-  document.getElementById('assignNumberModal').style.display = 'flex';
-
-  try {
-    const res = await fetch('api/auth.php?action=list_company_employees');
-    const d = await res.json();
-    if (d.success && d.employees) {
-      const needPhone = d.employees.filter(e => !e.phone || e.using_company_fallback);
-      if (!needPhone.length) {
-        select.innerHTML = '<option value="">All active closers currently have numbers!</option>';
-      } else {
-        select.innerHTML = '<option value="">-- Choose Employee --</option>' + 
-          needPhone.map(e => `<option value="${e.id}">${e.name} (@${e.username}) - ${e.role === 'lead' ? 'Team Lead' : 'Closer'}</option>`).join('');
-      }
-    }
-  } catch (_) {
-    select.innerHTML = '<option value="">Failed to load employees</option>';
-  }
-}
-
-async function handleAssignNumber(e) {
-  e.preventDefault();
-  const btn = document.getElementById('assignSubmitBtn');
-  const profId = document.getElementById('assignProfId').value;
-  const userId = document.getElementById('assignUserSelect').value;
-  if (!userId) return alert('Please select an employee');
-
-  btn.disabled = true;
-  btn.textContent = 'Assigning...';
-
-  try {
-    const res = await fetch('api/companies.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'assign_number_profile', profile_id: profId, user_id: userId })
-    });
-    const d = await res.json();
-    if (d.success) {
-      alert(d.message);
-      closeAssignModal();
-      loadNumberProfiles();
-      loadDashboardData();
-    } else {
-      alert(d.error || 'Failed to assign number');
-    }
-  } catch (_) {
-    alert('Network error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Confirm Assignment 🚀';
-  }
-}
-
-async function releaseNumber(profId) {
-  if (!confirm('Release this company number back to the available pool?')) return;
-  try {
-    const res = await fetch('api/companies.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'release_number_profile', profile_id: profId })
-    });
-    const d = await res.json();
-    if (d.success) {
-      loadNumberProfiles();
-      loadDashboardData();
-    } else {
-      alert(d.error || 'Failed to release number');
-    }
-  } catch (_) {
-    alert('Network error');
-  }
-}
-
-<?php if ($isSuperAdmin): ?>
-document.addEventListener('DOMContentLoaded', loadDashboardData);
-<?php endif; ?>
 </script>
 </body>
 </html>

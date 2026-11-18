@@ -486,6 +486,269 @@ switch ($action) {
         echo json_encode(['success' => true, 'message' => 'Company product and pitch configuration updated successfully.', 'config' => $config]);
         exit;
 
+    // 12. Delete Company (Super Admin)
+    case 'delete_company':
+        requireSuperAdmin($currentUser);
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $companyId = trim($data['company_id'] ?? '');
+
+        if (!$companyId || $companyId === 'COMP-001') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Cannot delete default primary company.']);
+            exit;
+        }
+
+        $companies = getCompanies($companiesFile);
+        $deleted = false;
+        $deletedName = '';
+        $newCompanies = [];
+        foreach ($companies as $comp) {
+            if ($comp['id'] === $companyId) {
+                $deleted = true;
+                $deletedName = $comp['name'];
+            } else {
+                $newCompanies[] = $comp;
+            }
+        }
+
+        if (!$deleted) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Company not found.']);
+            exit;
+        }
+
+        saveCompanies($companiesFile, $newCompanies);
+        logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_deleted', "Deleted company $deletedName ($companyId)");
+        echo json_encode(['success' => true, 'message' => "Company '$deletedName' has been purged successfully."]);
+        exit;
+
+    // 13. Update Company Details (Super Admin)
+    case 'update_company':
+        requireSuperAdmin($currentUser);
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $companyId = trim($data['company_id'] ?? '');
+
+        if (!$companyId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Company ID is required.']);
+            exit;
+        }
+
+        $companies = getCompanies($companiesFile);
+        $found = false;
+        foreach ($companies as &$comp) {
+            if ($comp['id'] === $companyId) {
+                if (isset($data['name']) && trim($data['name'])) $comp['name'] = trim($data['name']);
+                if (isset($data['owner_name'])) $comp['owner_name'] = trim($data['owner_name']);
+                if (isset($data['owner_email'])) $comp['owner_email'] = trim($data['owner_email']);
+                if (isset($data['plan'])) $comp['plan'] = trim($data['plan']);
+                if (isset($data['max_employees'])) $comp['max_employees'] = max(1, (int)$data['max_employees']);
+                if (isset($data['default_message_limit'])) $comp['default_message_limit'] = max(10, (int)$data['default_message_limit']);
+                if (isset($data['fallback_phone'])) $comp['fallback_phone'] = trim($data['fallback_phone']);
+                $found = true;
+                logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_updated', "Updated profile settings for {$comp['name']}");
+                break;
+            }
+        }
+        unset($comp);
+
+        if (!$found) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Company not found.']);
+            exit;
+        }
+
+        saveCompanies($companiesFile, $companies);
+        echo json_encode(['success' => true, 'message' => 'Company details updated successfully.']);
+        exit;
+
+    // 14. Deep Company Stats (Super Admin)
+    case 'get_company_deep_stats':
+        requireSuperAdmin($currentUser);
+        $companyId = trim($_GET['company_id'] ?? ($_POST['company_id'] ?? 'COMP-001'));
+        
+        $leadsFile = getTenantLeadsFile($companyId);
+        $leads = file_exists($leadsFile) ? json_decode(file_get_contents($leadsFile), true) : [];
+        if (!is_array($leads)) $leads = [];
+
+        $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+        if (!is_array($users)) $users = [];
+        $compUsers = array_values(array_filter($users, fn($u) => ($u['company_id'] ?? '') === $companyId));
+
+        $totalLeads = count($leads);
+        $paidLeads = count(array_filter($leads, fn($l) => in_array(strtolower($l['leadState'] ?? ($l['status'] ?? '')), ['paid', 'verified', 'approved'], true)));
+        $ongoingLeads = count(array_filter($leads, fn($l) => in_array(strtolower($l['leadState'] ?? ($l['status'] ?? '')), ['ongoing', 'in-progress', 'in_talk'], true)));
+        $wontPayLeads = count(array_filter($leads, fn($l) => in_array(strtolower($l['leadState'] ?? ($l['status'] ?? '')), ['wont_pay', 'rejected', 'lost'], true)));
+        $conversionRate = $totalLeads > 0 ? round(($paidLeads / $totalLeads) * 100, 1) : 0;
+
+        $totalSentToday = array_sum(array_column($compUsers, 'messages_sent_today'));
+
+        echo json_encode([
+            'success' => true,
+            'company_id' => $companyId,
+            'stats' => [
+                'total_leads'     => $totalLeads,
+                'paid_leads'      => $paidLeads,
+                'ongoing_leads'   => $ongoingLeads,
+                'wont_pay_leads'  => $wontPayLeads,
+                'conversion_rate' => $conversionRate,
+                'total_employees' => count($compUsers),
+                'tls_count'       => count(array_filter($compUsers, fn($u) => ($u['role'] ?? '') === 'lead')),
+                'tms_count'       => count(array_filter($compUsers, fn($u) => ($u['role'] ?? '') === 'member')),
+                'messages_today'  => $totalSentToday,
+                'closers'         => array_map(fn($u) => [
+                    'id' => $u['id'],
+                    'name' => $u['name'],
+                    'username' => $u['username'],
+                    'role' => $u['role'],
+                    'phone' => $u['phone'] ?? '',
+                    'status' => $u['status'] ?? 'active',
+                    'messages_today' => (int)($u['messages_sent_today'] ?? 0),
+                    'message_limit' => (int)($u['message_limit'] ?? 150)
+                ], $compUsers)
+            ]
+        ]);
+        exit;
+
+    // 15. Impersonate Company Admin (Super Admin)
+    case 'impersonate':
+        requireSuperAdmin($currentUser);
+        $companyId = trim($_GET['company_id'] ?? ($_POST['company_id'] ?? 'COMP-001'));
+        
+        $companies = getCompanies($companiesFile);
+        $targetCompany = null;
+        foreach ($companies as $c) {
+            if ($c['id'] === $companyId) {
+                $targetCompany = $c;
+                break;
+            }
+        }
+        if (!$targetCompany) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Company not found.']);
+            exit;
+        }
+
+        // Find company admin user or create on-the-fly proxy admin session
+        $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+        $targetUser = null;
+        foreach ($users as $u) {
+            if (($u['company_id'] ?? '') === $companyId && ($u['role'] ?? '') === 'admin') {
+                $targetUser = $u;
+                break;
+            }
+        }
+
+        if (!$targetUser) {
+            $targetUser = [
+                'id'          => 'USR-PROXY-' . $companyId,
+                'name'        => $targetCompany['name'] . ' Administrator',
+                'username'    => $targetCompany['slug'] . '_admin',
+                'email'       => $targetCompany['owner_email'],
+                'role'        => 'admin',
+                'designation' => 'Company Admin',
+                'company_id'  => $companyId,
+                'status'      => 'active'
+            ];
+        }
+
+        $_SESSION['omnidesk_user'] = [
+            'id'             => $targetUser['id'],
+            'name'           => $targetUser['name'],
+            'username'       => $targetUser['username'],
+            'email'          => $targetUser['email'],
+            'role'           => 'admin',
+            'designation'    => 'Company Admin (Impersonated by Super Admin)',
+            'company_id'     => $companyId,
+            'is_impersonated'=> true,
+            'status'         => 'active'
+        ];
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Successfully assumed Admin identity for '{$targetCompany['name']}'!",
+            'redirect' => "admin.php?company_id=" . urlencode($companyId)
+        ]);
+        exit;
+
+    // 16. Get Company Leads for Live Board (Company Admin & Super Admin)
+    case 'get_company_leads':
+        requireCompanyAdmin($currentUser);
+        $companyId = resolveActiveCompanyId();
+        $leadsFile = getTenantLeadsFile($companyId);
+        $leads = file_exists($leadsFile) ? json_decode(file_get_contents($leadsFile), true) : [];
+        if (!is_array($leads)) $leads = [];
+
+        echo json_encode([
+            'success' => true,
+            'company_id' => $companyId,
+            'leads' => array_values($leads)
+        ]);
+        exit;
+
+    // 17. Admin Lead Takeover with Protected Closer Commission (Request 8)
+    case 'takeover_lead':
+        requireCompanyAdmin($currentUser);
+        $companyId = resolveActiveCompanyId();
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $leadPhone = preg_replace('/\D+/', '', trim($data['lead_phone'] ?? ''));
+
+        if (!$leadPhone) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Lead phone number is required.']);
+            exit;
+        }
+
+        $leadsFile = getTenantLeadsFile($companyId);
+        $leads = file_exists($leadsFile) ? json_decode(file_get_contents($leadsFile), true) : [];
+        if (!is_array($leads)) $leads = [];
+
+        $found = false;
+        $targetLead = null;
+        foreach ($leads as &$lead) {
+            $lp = preg_replace('/\D+/', '', $lead['phone'] ?? '');
+            if ($lp && ($lp === $leadPhone || substr($lp, -10) === substr($leadPhone, -10))) {
+                // Record takeover details while protecting original closer's commission
+                $origOwner = $lead['ownerName'] ?? 'Assigned Closer';
+                $origOwnerId = $lead['ownerId'] ?? '';
+                
+                $lead['isTakeover'] = true;
+                $lead['originalOwnerName'] = $origOwner;
+                $lead['originalOwnerId'] = $origOwnerId;
+                $lead['takenOverBy'] = $currentUser['name'];
+                $lead['takenOverById'] = $currentUser['id'];
+                $lead['takenOverAt'] = date('Y-m-d H:i:s');
+                $lead['commissionProtected'] = true;
+                $lead['commissionNote'] = "Full closer commission guaranteed to $origOwner upon completion.";
+                $lead['ownerName'] = $currentUser['name'] . ' (Admin Takeover)';
+                $lead['ownerId'] = $currentUser['id'];
+                
+                $found = true;
+                $targetLead = $lead;
+                break;
+            }
+        }
+        unset($lead);
+
+        if (!$found) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Lead not found in company pipeline.']);
+            exit;
+        }
+
+        file_put_contents($leadsFile, json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'lead_takeover', "Admin took over lead {$targetLead['name']} ({$leadPhone}). Closer commission preserved for {$targetLead['originalOwnerName']}.");
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Lead {$targetLead['name']} taken over successfully! Closer commission remains 100% protected.",
+            'lead'    => $targetLead
+        ]);
+        exit;
+
     default:
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid or unknown company action.']);
