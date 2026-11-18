@@ -699,7 +699,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
             </div>
 
             <div style="margin-top: 24px; font-size: 13px; color: var(--wa-text-secondary); display: flex; align-items: center; gap: 16px;">
-              <a href="javascript:void(0)" onclick="refreshQRCode()" class="footer-link">🔄 Refresh QR code</a>
+              <a href="javascript:void(0)" onclick="refreshQRCode(true)" class="footer-link">🔄 Refresh QR code</a>
               <span>•</span>
               <a href="admin.php" class="footer-link">Company Admin Portal</a>
               <span>•</span>
@@ -711,7 +711,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
           <div class="qr-column">
             <div class="wa-qr-frame">
               <div class="qr-scan-line"></div>
-              <img id="landingQrImage" src="https://api.qrserver.com/v1/create-qr-code/?size=230x230&margin=2&data=OMNIDESK-PAIRING-SYNC-2026" alt="WhatsApp QR Code" class="wa-qr-img">
+              <img id="landingQrImage" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='230' height='230' viewBox='0 0 230 230'><rect width='230' height='230' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b' font-weight='700'>⚡ Generating QR Code...</text></svg>" alt="WhatsApp QR Code" class="wa-qr-img">
               <div class="wa-qr-center-logo">
                 <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
               </div>
@@ -966,10 +966,21 @@ function triggerLoginAnimation(brandName, subtext, redirectUrl) {
 let qrPollTimer = null;
 let lastKnownState = '';
 
-async function refreshQRCode() {
+async function refreshQRCode(force = false) {
   const qrImg = document.getElementById('landingQrImage');
   const statusTxt = document.getElementById('qrStatusText');
   try {
+    if (force) {
+      statusTxt.textContent = '🔄 Generating fresh WhatsApp QR code...';
+      try {
+        await fetch('api/direct_sender.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reset_whatsapp' })
+        });
+      } catch (_) {}
+      lastKnownState = '';
+    }
     const res = await fetch('api/direct_sender.php?action=get_sender_info');
     const data = await res.json();
     if (data.success) {
@@ -977,13 +988,19 @@ async function refreshQRCode() {
         qrImg.src = data.qr;
         statusTxt.textContent = 'Pure WebSocket Bridge • Scan with WhatsApp';
       } else if (data.is_connected && data.connected_number) {
-        statusTxt.textContent = `Connected: +${data.connected_number}! Logging in...`;
-        // Auto-authenticate as TM closer
+        statusTxt.textContent = `Connected: +${data.connected_number}! Verifying Account...`;
         if (lastKnownState !== 'connected') {
           lastKnownState = 'connected';
           clearInterval(qrPollTimer);
-          instantTMTestLogin(data.connected_number);
+          handleConnectedPhone(data.connected_number);
         }
+      } else if (data.state === 'idle' || data.state === 'disconnected') {
+        fetch('api/direct_sender.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'connect_whatsapp' })
+        });
+        statusTxt.textContent = 'Initializing WhatsApp bridge…';
       } else {
         statusTxt.textContent = data.message || 'Connecting to WhatsApp bridge…';
       }
@@ -993,8 +1010,49 @@ async function refreshQRCode() {
   }
 }
 
+// Connected Phone Verification & Routing (TM Joining Cycle)
+async function handleConnectedPhone(phone) {
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check_phone', phone: phone })
+    });
+    const data = await res.json();
+    if (data.exists && data.user) {
+      if (data.user.status === 'pending') {
+        const compName = data.user.company_name || data.user.company_id || 'Company';
+        document.getElementById('successCompName').textContent = compName;
+        document.getElementById('modalTMSuccess').style.display = 'flex';
+      } else if (data.user.status === 'active') {
+        const loginRes = await fetch('api/auth.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'qr_login', phone: phone })
+        });
+        const loginData = await loginRes.json();
+        if (loginData.success) {
+          triggerLoginAnimation(loginData.user.name, 'Sales Closer Desk Activated • Starting Pipeline', 'index.php');
+        } else {
+          pendingMatchedUser = data.user;
+          document.getElementById('phoneExistsUser').textContent = '@' + data.user.username;
+          document.getElementById('phoneExistsBtnUser').textContent = data.user.username;
+          document.getElementById('modalPhoneExists').style.display = 'flex';
+        }
+      } else {
+        alert('Your closer account is ' + data.user.status + '. Please contact your company administrator.');
+      }
+    } else {
+      // Brand new TM closer: open registration modal with locked phone
+      openTMRegisterModal(phone);
+    }
+  } catch (err) {
+    openTMRegisterModal(phone);
+  }
+}
+
 // Polling interval
-qrPollTimer = setInterval(refreshQRCode, 4000);
+qrPollTimer = setInterval(refreshQRCode, 3500);
 refreshQRCode();
 
 // Instant Closer Demo Login

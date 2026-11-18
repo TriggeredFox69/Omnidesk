@@ -65,7 +65,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
     bridge.server.once('error', reject);
     bridge.server.listen(bridgePort, '127.0.0.1', resolve);
   });
-  if (restoreSession) bridge.connect();
+  bridge.connect();
   const bridgeUrl = `http://127.0.0.1:${bridge.server.address().port}`;
   const usersPath = path.join(root, 'data/users.json');
   function loadLocalUsers() {
@@ -319,9 +319,27 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'qr_login') {
-            const closerUser = allUsers.find(u => u.username === 'hamza') || allUsers.find(u => u.role === 'member') || {
-              id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', status: 'active', company_id: 'COMP-001'
-            };
+            const phone = String(body.phone || '').replace(/\D/g, '');
+            let closerUser = null;
+            if (phone) {
+              closerUser = allUsers.find(u => {
+                const uPhone = String(u.phone || '').replace(/\D/g, '');
+                return uPhone && (uPhone === phone || (uPhone.length >= 9 && phone.length >= 9 && uPhone.slice(-9) === phone.slice(-9)));
+              });
+            }
+            if (!closerUser && body.demo) {
+              closerUser = allUsers.find(u => u.username === 'hamza') || allUsers.find(u => u.role === 'member') || {
+                id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', status: 'active', company_id: 'COMP-001'
+              };
+            }
+            if (!closerUser) {
+              json(404, { success: false, error: 'No account linked to this WhatsApp number. Please complete registration.' });
+              return;
+            }
+            if (closerUser.status === 'pending') {
+              json(403, { success: false, error: 'Your account is pending company approval.', status: 'pending', user: closerUser });
+              return;
+            }
             currentLocalUser = closerUser;
             json(200, { success: true, message: 'Closer session activated via WhatsApp Web pairing.', user: closerUser });
             return;
@@ -937,13 +955,20 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
 
         // 5. Direct Sender API (Baileys WhatsApp Web Bridge)
         if (url.pathname === '/api/direct_sender.php') {
-          const routes = { get_sender_info: '/status', connect_whatsapp: '/connect', send_direct: '/send',
+          const routes = {
+            get_sender_info: '/status',
+            connect_whatsapp: '/connect',
+            reconnect_whatsapp: '/reconnect',
+            reset_whatsapp: '/reset',
+            send_direct: '/send',
             get_events: '/events?after=' + encodeURIComponent(body.after || 0),
-            get_media: '/media?id=' + encodeURIComponent(body.message_id || ''), sync_chat: '/sync-chat',
+            get_media: '/media?id=' + encodeURIComponent(body.message_id || ''),
+            sync_chat: '/sync-chat',
             get_presence: '/presence?phone=' + encodeURIComponent(body.phone || ''),
-            get_send_status: '/receipt?id=' + encodeURIComponent(body.message_id || '') };
+            get_send_status: '/receipt?id=' + encodeURIComponent(body.message_id || '')
+          };
           if (routes[action]) {
-            const post = ['connect_whatsapp', 'send_direct', 'sync_chat'].includes(action);
+            const post = ['connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'sync_chat'].includes(action);
             if (post && req.method !== 'POST') { json(405, { success: false }); return; }
             if (action === 'send_direct') {
               body.phone = String(body.phone || '').replace(/\D/g, '');
