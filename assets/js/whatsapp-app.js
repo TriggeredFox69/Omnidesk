@@ -602,11 +602,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  const COMPANY_BRAND_CATALOG = {
+    'COMP-001': {
+      name: 'Nunno Official',
+      short_name: 'Nunno',
+      logo: 'assets/images/nunno-logo.svg',
+      badge: 'Scalper Alpha & SaaS',
+      brand_color: '#8b5cf6'
+    },
+    'COMP-002': {
+      name: 'Apex Crypto Signals',
+      short_name: 'Apex Signals',
+      logo: 'assets/images/apex-logo.svg',
+      badge: 'Institutional Signals & VIP Alpha',
+      brand_color: '#3b82f6'
+    },
+    'COMP-003': {
+      name: 'Pak Trade Academy',
+      short_name: 'Pak Trade',
+      logo: 'assets/images/paktrade-logo.svg',
+      badge: 'Mentorship & Trade Bootcamp',
+      brand_color: '#10b981'
+    }
+  };
+
+  function applyCompanyBranding(companyId) {
+    const compId = companyId || state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    state.currentCompanyId = compId;
+    let brand = COMPANY_BRAND_CATALOG[compId] || {
+      name: state.currentUser?.company_name || 'Nunno Official',
+      short_name: (state.currentUser?.company_name || 'Nunno').split(' ')[0],
+      logo: 'assets/images/nunno-logo.svg',
+      badge: 'Omni-Desk Workspace',
+      brand_color: '#00a884'
+    };
+
+    const logoImg = document.getElementById('mainBrandLogoImg') || document.querySelector('.brand-logo-img');
+    const brandName = document.getElementById('mainBrandName') || document.querySelector('.brand-heading span:first-child');
+    const brandBadge = document.getElementById('mainBrandBadge') || document.querySelector('.brand-badge');
+    const brandSub = document.getElementById('mainBrandSubtitle') || document.querySelector('.brand-info .text-xs');
+    const compContextName = document.getElementById('companyContextName');
+
+    if (logoImg) {
+      logoImg.src = brand.logo;
+      logoImg.alt = brand.name;
+    }
+    if (brandName) brandName.textContent = brand.short_name;
+    if (brandSub) brandSub.textContent = brand.badge;
+    if (compContextName) compContextName.textContent = brand.name;
+
+    // Transition & Animation overlays
+    const animLogos = document.querySelectorAll('.anim-logo-img, .chat-transition-logo');
+    animLogos.forEach(img => { img.src = brand.logo; });
+
+    document.title = `${brand.short_name} — OmniDesk Sales Closing Platform`;
+
+    // Dynamic fetch from companies API to ensure real-time consistency
+    fetch('api/companies.php?action=list')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.success && Array.isArray(data.companies)) {
+          const match = data.companies.find(c => c.id === compId);
+          if (match) {
+            if (logoImg && match.logo) logoImg.src = match.logo;
+            if (brandName && match.short_name) brandName.textContent = match.short_name;
+            if (compContextName && match.name) compContextName.textContent = match.name;
+            if (brandSub && (match.badge || match.plan)) brandSub.textContent = match.badge || match.plan;
+          }
+        }
+      }).catch(() => {});
+  }
+
   // Render Multi-Tenant Company Context Badge in Topbar
   function renderCompanyContextPill() {
     if (!els.companyContextBadge) return;
-    const compName = state.companyConfig?.company_name || (state.currentCompanyId === 'COMP-001' ? 'Nunno Official' : state.currentCompanyId);
-    if (els.companyContextName) els.companyContextName.textContent = compName;
+    const compId = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    applyCompanyBranding(compId);
     els.companyContextBadge.style.display = 'inline-flex';
 
     // If Super Admin, populate switcher dropdown
@@ -4802,6 +4873,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyUserSession(user) {
     state.currentUser = user;
+    applyCompanyBranding(user.company_id);
     renderConnectedNumber();
     const selfLead = (state.leads || []).find(l => l.id === 'lead_self');
     if (selfLead && user.phone) {

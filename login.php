@@ -1264,13 +1264,25 @@ async function handleSadminLogin(e) {
         </div>
       </div>
 
-      <div class="input-group">
+      <div class="input-group" style="margin-bottom: 6px;">
         <label class="input-label">Select Company * (Where you are applying as Closer)</label>
-        <select id="regTMCompany" class="input-field" required style="cursor:pointer; font-weight:600;">
+        <select id="regTMCompany" class="input-field" required style="cursor:pointer; font-weight:600;" onchange="updateSelectedCompanyPreview()">
           <option value="COMP-001">Nunno Official — Scalper Alpha &amp; SaaS</option>
           <option value="COMP-002">Apex Crypto Signals — Institutional Trading</option>
           <option value="COMP-003">Pak Trade Academy — Mentorship &amp; Signals</option>
         </select>
+      </div>
+
+      <!-- Live Company Brand & Logo Preview Card -->
+      <div id="companyBrandPreviewCard" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(0,168,132,0.3); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease;">
+        <img id="previewCompLogo" src="assets/images/nunno-logo.svg" alt="Company Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: contain; background: #0c0a18; border: 1px solid rgba(255,255,255,0.15); padding: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <strong id="previewCompName" style="color: var(--wa-text-primary); font-size: 13.5px; font-weight: 800;">Nunno Official</strong>
+            <span id="previewCompBadge" style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.4);">Enterprise Billion</span>
+          </div>
+          <div id="previewCompTagline" style="font-size: 11px; color: var(--wa-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Scalper Alpha &amp; SaaS</div>
+        </div>
       </div>
 
       <div class="input-group">
@@ -1313,7 +1325,9 @@ async function handleSadminLogin(e) {
 <!-- MODAL: TM Application Submitted Confirmation -->
 <div id="modalTMSuccess" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
   <div style="background:var(--wa-card-bg); border:1px solid rgba(0,168,132,0.4); border-radius:20px; padding:32px; max-width:460px; width:90%; box-shadow:0 25px 60px rgba(0,0,0,0.6); text-align:center;">
-    <div style="font-size:52px; margin-bottom:14px;">⏳</div>
+    <div style="display:flex; justify-content:center; margin-bottom:12px;">
+      <img id="successCompLogo" src="assets/images/nunno-logo.svg" alt="Company Logo" style="width:64px; height:64px; border-radius:16px; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.18); padding:5px; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+    </div>
     <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Closer Application Received!</h3>
     <p style="font-size:13px; color:var(--wa-text-secondary); line-height:1.6; margin-bottom:20px;">
       Your application has been dispatched to <strong id="successCompName" style="color:#00a884;">Company</strong> administration.<br><br>
@@ -1409,11 +1423,14 @@ function closeTMSuccessModal() {
   toggleTMSubMode('password');
 }
 
+let loadedCompaniesCache = [];
+
 async function loadCompaniesForRegister() {
   try {
     const res = await fetch('api/companies.php?action=list');
     const data = await res.json();
     if (data.success && Array.isArray(data.companies)) {
+      loadedCompaniesCache = data.companies;
       const sel = document.getElementById('regTMCompany');
       sel.innerHTML = '';
       data.companies.forEach(c => {
@@ -1422,8 +1439,30 @@ async function loadCompaniesForRegister() {
         opt.textContent = `${c.name} (${c.plan || 'Enterprise'})`;
         sel.appendChild(opt);
       });
+      updateSelectedCompanyPreview();
     }
   } catch (_) {}
+}
+
+function updateSelectedCompanyPreview() {
+  const sel = document.getElementById('regTMCompany');
+  if (!sel) return;
+  const compId = sel.value;
+  const comp = (loadedCompaniesCache && loadedCompaniesCache.find(c => c.id === compId)) || {
+    id: compId || 'COMP-001',
+    name: 'Nunno Official',
+    logo: 'assets/images/nunno-logo.svg',
+    plan: 'Enterprise Billion',
+    badge: 'Scalper Alpha & SaaS'
+  };
+  const logoEl = document.getElementById('previewCompLogo');
+  const nameEl = document.getElementById('previewCompName');
+  const badgeEl = document.getElementById('previewCompBadge');
+  const taglineEl = document.getElementById('previewCompTagline');
+  if (logoEl) logoEl.src = comp.logo || 'assets/images/nunno-logo.svg';
+  if (nameEl) nameEl.textContent = comp.name;
+  if (badgeEl) badgeEl.textContent = comp.plan || 'Verified Company';
+  if (taglineEl) taglineEl.textContent = comp.badge || (comp.plan + ' • Verified Closing Workspace');
 }
 
 async function handleTMRegisterSubmit(e) {
@@ -1465,6 +1504,10 @@ async function handleTMRegisterSubmit(e) {
       const compSelect = document.getElementById('regTMCompany');
       const compName = compSelect.options[compSelect.selectedIndex]?.text || 'Company';
       document.getElementById('successCompName').textContent = compName;
+      const compMatch = loadedCompaniesCache.find(c => c.id === company_id);
+      if (compMatch && compMatch.logo) {
+        document.getElementById('successCompLogo').src = compMatch.logo;
+      }
       document.getElementById('modalTMSuccess').style.display = 'flex';
       document.getElementById('tmDirectUsername').value = username;
     } else {

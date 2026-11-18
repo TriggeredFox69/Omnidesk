@@ -22,13 +22,24 @@ function templateAdminPhp(content, currentUser) {
   } else {
     rendered = rendered.replace(/<\?php if \(!\$isAdmin\): \?>([\s\S]*?)<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$2');
   }
-  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['name'\]\); \?>/g, 'Nunno Official');
-  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['plan'\] \?\? 'Enterprise Pro'\); \?>/g, 'Enterprise Billion');
+  let compName = 'Nunno Official';
+  let compPlan = 'Enterprise Billion';
+  const compId = currentUser?.company_id || 'COMP-001';
+  try {
+    const comps = JSON.parse(fs.readFileSync(path.join(root, 'data/companies.json'), 'utf8') || '[]');
+    const match = comps.find(c => c.id === compId);
+    if (match) {
+      compName = match.name || compName;
+      compPlan = match.plan || compPlan;
+    }
+  } catch (_) {}
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['name'\]\); \?>/g, compName);
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['plan'\] \?\? 'Enterprise Pro'\); \?>/g, compPlan);
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['fallback_phone'\] \?\? '\+923318036576'\); \?>/g, '+923318036576');
-  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['id'\]\); \?>/g, currentUser?.company_id || 'COMP-001');
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['id'\]\); \?>/g, compId);
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$currentUser\['name'\] \?\? 'Admin'\); \?>/g, currentUser?.name || 'System Administrator');
-  rendered = rendered.replace(/<\?php echo urlencode\(\$activeCompany\['id'\]\); \?>/g, currentUser?.company_id || 'COMP-001');
-  rendered = rendered.replace(/<\?php echo \$activeCompany\['id'\]; \?>/g, currentUser?.company_id || 'COMP-001');
+  rendered = rendered.replace(/<\?php echo urlencode\(\$activeCompany\['id'\]\); \?>/g, compId);
+  rendered = rendered.replace(/<\?php echo \$activeCompany\['id'\]; \?>/g, compId);
   rendered = rendered.replace(/<\?php[\s\S]*?\?>/g, '');
   return rendered;
 }
