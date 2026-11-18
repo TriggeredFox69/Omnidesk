@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Default Team Agents (Strict Roles: Admin, Team Lead, Team Member)
   const defaultAgents = [
-    { id: 'EMP-101', name: 'Hamza Khan', role: 'Team Member', avatar: '👨‍💼', color: '#6366f1' },
+    { id: 'EMP-101', name: 'Hamza Khan', role: 'Team Member', avatar: '👨‍💼', color: '#0fa968' },
     { id: 'EMP-102', name: 'Bilal Tariq', role: 'Team Lead', avatar: '🧑‍💻', color: '#06b6d4' },
     { id: 'EMP-103', name: 'Ayesha Noor', role: 'Team Member', avatar: '👩‍💼', color: '#ec4899' },
     { id: 'EMP-104', name: 'Zain Ahmed', role: 'Team Member', avatar: '👨‍🦱', color: '#10b981' }
@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.themeToggleBtn.innerHTML = `<svg class="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${icon}</svg><span>${label}</span>`;
   }
 
-  setTheme(localStorage.getItem('nunno_theme') === 'dark' ? 'dark' : 'light');
+  setTheme(localStorage.getItem('nunno_theme') === 'light' ? 'light' : 'dark');
   els.themeToggleBtn?.addEventListener('click', () => {
     setTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
   });
@@ -608,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
       short_name: 'Nunno',
       logo: 'assets/images/nunno-logo.png',
       badge: 'Scalper Alpha & SaaS',
-      brand_color: '#8b5cf6'
+      brand_color: '#14c27a'
     },
     'COMP-002': {
       name: 'Apex Crypto Signals',
@@ -648,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Main Platform Brand stays Chatly
     if (logoImg) {
-      logoImg.src = 'assets/images/chatly-logo.jpg';
+      logoImg.src = 'assets/images/chatly-logo-light.png';
       logoImg.alt = 'Chatly';
     }
     if (brandName) brandName.textContent = 'Chatly';
@@ -663,9 +663,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Chat Transition & Splash animation use Chatly Icon!
     const animLogos = document.querySelectorAll('.anim-logo-img');
-    animLogos.forEach(img => { img.src = 'assets/images/chatly-icon.jpg'; });
+    animLogos.forEach(img => { img.src = 'assets/images/chatly-icon.png'; });
     const chatTransLogos = document.querySelectorAll('.chat-transition-logo');
-    chatTransLogos.forEach(img => { img.src = 'assets/images/chatly-icon.jpg'; });
+    chatTransLogos.forEach(img => { img.src = 'assets/images/chatly-icon.png'; });
 
     document.title = `${brand.name} — Chatly Sales Closing Platform`;
 
@@ -5000,7 +5000,7 @@ document.addEventListener('DOMContentLoaded', () => {
       name: user.name,
       role: user.designation || (user.role === 'admin' ? 'Master Admin' : 'Closer'),
       avatar: user.role === 'admin' ? '👑' : (user.gender === 'female' ? '👩' : '👨'),
-      color: user.role === 'admin' ? '#a855f7' : '#25d366'
+      color: user.role === 'admin' ? '#2de89a' : '#25d366'
     };
 
     renderAgentProfile();
@@ -5235,7 +5235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .finally(() => {
       if (els.authSubmitBtn) {
         els.authSubmitBtn.disabled = false;
-        els.authSubmitBtn.innerHTML = '<span>Sign In to Omni-Desk</span>';
+        els.authSubmitBtn.innerHTML = '<span>Sign In to Chatly</span>';
       }
     });
   }
@@ -5247,26 +5247,48 @@ document.addEventListener('DOMContentLoaded', () => {
     els.authAlert.style.display = 'block';
   }
 
-  function handleLogout() {
-    if (!confirm('Are you sure you want to log out of Omni-Desk?')) return;
-    fetch('api/auth.php?action=logout', { method: 'POST' }).catch(() => {});
+  async function handleLogout() {
+    try {
+      localStorage.removeItem('nunno_active_session');
+      localStorage.removeItem('omnidesk_impersonated_from_admin');
+      localStorage.removeItem('omnidesk_impersonated_user');
+      localStorage.removeItem('omnidesk_impersonated_name');
+      localStorage.removeItem('omnidesk_active_chat_phone');
+      sessionStorage.clear();
+      sessionStorage.setItem('chatly_logged_out', '1');
+      state.currentUser = null;
+      window.NUNNO_ACTIVE_USER = null;
+    } catch (_) {}
+
+    try {
+      await fetch('api/auth.php?action=logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' })
+      });
+    } catch (_) {}
+
+    try {
+      await fetch('api/auth.php?action=logout', { method: 'GET' });
+    } catch (_) {}
+
     document.body.classList.remove('mobile-in-chat');
     if (els.viewInbox) els.viewInbox.classList.remove('mobile-chat-open');
     toggleDossierDrawer(false);
-    localStorage.removeItem('nunno_active_session');
+
     if (location.protocol !== 'file:') {
-      window.location.href = 'login.php';
+      window.location.href = 'login.php?action=logout&switch=1';
       return;
     }
+
     triggerLogoutAnimation(() => {
-      state.currentUser = null;
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'none';
       if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'none';
       hideAccountSuspendedScreen();
       if (els.authUsername) els.authUsername.value = '';
       if (els.authPassword) els.authPassword.value = '';
       showAuthOverlay();
-      showToast('Logged out of Omni-Desk.');
+      showToast('Logged out of Chatly.');
     });
   }
 
@@ -5423,7 +5445,7 @@ document.addEventListener('DOMContentLoaded', () => {
         template_id: 'welcome',
         subject: `Welcome to OmniDesk — Your Closer Account is Ready [${username}]`,
         badge: 'Account Ready',
-        message_html: `<h3>Welcome to the Team, ${escapeHtml(name)}! 👋</h3><p>Your authorized OmniDesk sales closer workspace has been provisioned by the Administrator.</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Workspace URL:</strong> <a href="${window.location.origin}">${window.location.origin}</a><br><strong>Username:</strong> <code style="background:#ede9fe;color:#5b21b6;padding:2px 6px;border-radius:4px;font-weight:700;">${escapeHtml(username)}</code><br><strong>Initial Password:</strong> <code style="background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-weight:700;">${escapeHtml(password)}</code><br><strong>Designation:</strong> ${escapeHtml(designation)}</div><p style="font-size:12px;color:#64748b;">Please sign in and change your initial password immediately.</p>`,
+        message_html: `<h3>Welcome to the Team, ${escapeHtml(name)}! 👋</h3><p>Your authorized OmniDesk sales closer workspace has been provisioned by the Administrator.</p><div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Workspace URL:</strong> <a href="${window.location.origin}">${window.location.origin}</a><br><strong>Username:</strong> <code style="background:#e4faf0;color:#065f3c;padding:2px 6px;border-radius:4px;font-weight:700;">${escapeHtml(username)}</code><br><strong>Initial Password:</strong> <code style="background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-weight:700;">${escapeHtml(password)}</code><br><strong>Designation:</strong> ${escapeHtml(designation)}</div><p style="font-size:12px;color:#64748b;">Please sign in and change your initial password immediately.</p>`,
         variables: { name, username, password, role: designation, email, portal_url: window.location.origin }
       })
     })
@@ -6001,7 +6023,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const v = item.substring(idx + 1).trim();
           html += '<tr><td style="color:#64748b;font-weight:600;width:140px;vertical-align:top;padding:4px 10px 4px 0;">' + escapeHtml(k) + ':</td><td style="color:#0f172a;font-weight:700;padding:4px 0;">' + escapeHtml(v) + '</td></tr>\n';
         } else {
-          html += '<tr><td style="color:#6366f1;width:20px;vertical-align:top;padding:4px 0;">&bull;</td><td style="color:#334155;font-weight:600;padding:4px 0;">' + escapeHtml(item) + '</td></tr>\n';
+          html += '<tr><td style="color:#0fa968;width:20px;vertical-align:top;padding:4px 0;">&bull;</td><td style="color:#334155;font-weight:600;padding:4px 0;">' + escapeHtml(item) + '</td></tr>\n';
         }
         isFirst = false;
         continue;
@@ -6015,7 +6037,7 @@ document.addEventListener('DOMContentLoaded', () => {
         continue;
       }
       if (/^[A-Za-z0-9\s—]+:\s*$/.test(trimmed)) {
-        html += '<div style="font-size:11.5px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.04em;margin-top:16px;margin-bottom:6px;">' + escapeHtml(trimmed) + '</div>\n';
+        html += '<div style="font-size:11.5px;font-weight:800;color:#0fa968;text-transform:uppercase;letter-spacing:0.04em;margin-top:16px;margin-bottom:6px;">' + escapeHtml(trimmed) + '</div>\n';
         isFirst = false;
         continue;
       }
@@ -7054,7 +7076,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="mono" style="text-align:center;font-weight:700;color:#e2e8f0;">${c.dealsWon}</div>
               <div class="mono" style="text-align:right;font-weight:700;color:#38bdf8;">Rs. ${c.revenue.toLocaleString()}</div>
               <div class="mono" style="text-align:right;color:${c.baseSalary > 0 ? '#38bdf8' : '#64748b'};font-weight:600;">Rs. ${c.baseSalary.toLocaleString()}</div>
-              <div class="mono" style="text-align:right;color:${c.commissions > 0 ? '#a855f7' : '#64748b'};font-weight:600;">Rs. ${c.commissions.toLocaleString()}</div>
+              <div class="mono" style="text-align:right;color:${c.commissions > 0 ? '#2de89a' : '#64748b'};font-weight:600;">Rs. ${c.commissions.toLocaleString()}</div>
               <div class="mono" style="text-align:right;font-weight:900;color:#10b981;font-size:13px;">Rs. ${c.totalPayout.toLocaleString()}</div>
             </div>
           `;

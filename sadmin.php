@@ -34,7 +34,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
     session_destroy();
-    header('Location: sadmin.php');
+    header('Location: login.php?action=logout&switch=1');
     exit;
 }
 ?>
@@ -44,14 +44,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Chatly Super Admin — Platform Owner Command Center</title>
-  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
+  <link rel="icon" type="image/png" href="assets/images/chatly-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <script>
     (function(){
       try {
-        if (localStorage.getItem('nunno_theme') === 'light' || (!localStorage.getItem('nunno_theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+        if (localStorage.getItem('nunno_theme') === 'light') {
           document.documentElement.classList.add('theme-light');
         }
       } catch(_) {}
@@ -59,33 +59,38 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   </script>
   <style>
     :root {
-      --bg-base: #06050b;
-      --bg-surface: #0c0b16;
-      --bg-surface-elevated: #131124;
-      --border-subtle: rgba(255, 255, 255, 0.08);
+      --bg-base: #050b09;
+      --bg-surface: #09130f;
+      --bg-surface-elevated: #0d1c16;
+      --border-subtle: rgba(31, 224, 138, 0.11);
       --border-accent: rgba(234, 179, 8, 0.4);
       --border-glow: rgba(234, 179, 8, 0.6);
-      --text-main: #f8fafc;
-      --text-secondary: #94a3b8;
-      --text-muted: #64748b;
+      --text-main: #effff7;
+      --text-secondary: #8db5a3;
+      --text-muted: #5c8070;
       --accent-gold: #eab308;
-      --accent-purple: #8b5cf6;
-      --accent-emerald: #10b981;
+      --accent-purple: #2dd4bf;
+      --accent-emerald: #1fe08a;
       --accent-rose: #f43f5e;
       --accent-blue: #3b82f6;
     }
 
     html.theme-light {
-      --bg-base: #f8fafc;
+      --bg-base: #f0faf5;
       --bg-surface: #ffffff;
-      --bg-surface-elevated: #f1f5f9;
-      --border-subtle: #e2e8f0;
+      --bg-surface-elevated: #e9f7f0;
+      --border-subtle: #cfe8dc;
       --border-accent: rgba(234, 179, 8, 0.5);
       --border-glow: rgba(234, 179, 8, 0.3);
-      --text-main: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #94a3b8;
+      --text-main: #07140f;
+      --text-secondary: #3f6354;
+      --text-muted: #7a9a8c;
     }
+
+    .chatly-logo { height: 34px; width: auto; display: block; filter: drop-shadow(0 2px 10px rgba(31, 224, 138, 0.28)); }
+    .chatly-logo--light { display: none; }
+    html.theme-light .chatly-logo--dark { display: none; }
+    html.theme-light .chatly-logo--light { display: block; }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -102,7 +107,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     .bg-mesh {
       position: fixed; inset: 0; pointer-events: none; z-index: 0;
       background: radial-gradient(circle at 15% 15%, rgba(234, 179, 8, 0.08) 0%, transparent 45%),
-                  radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.06) 0%, transparent 45%);
+                  radial-gradient(circle at 85% 85%, rgba(31, 224, 138, 0.06) 0%, transparent 45%);
     }
 
     .sadmin-container {
@@ -324,7 +329,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   <header class="top-bar">
     <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
       <a href="sadmin.php" title="Chatly Global" style="display:flex; align-items:center; text-decoration:none;">
-        <img src="assets/images/chatly-logo.jpg" alt="Chatly" style="height:34px; width:auto; border-radius:6px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,0.2);">
+        <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
       <div class="sadmin-logo">⚡</div>
@@ -354,7 +359,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   </header>
 
   <!-- 0.01s HIGH-FREQUENCY REAL-TIME TELEMETRY HUD -->
-  <div style="background:linear-gradient(90deg, rgba(234,179,8,0.12), rgba(139,92,246,0.12), rgba(16,185,129,0.12)); border:1px solid rgba(234,179,8,0.35); border-radius:14px; padding:12px 20px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; box-shadow:0 0 25px rgba(234,179,8,0.15);">
+  <div style="background:linear-gradient(90deg, rgba(234,179,8,0.12), rgba(31, 224, 138,0.12), rgba(16,185,129,0.12)); border:1px solid rgba(234,179,8,0.35); border-radius:14px; padding:12px 20px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; box-shadow:0 0 25px rgba(234,179,8,0.15);">
     <div style="display:flex; align-items:center; gap:10px;">
       <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#eab308; box-shadow:0 0 12px #eab308; animation:pulseDot 0.8s infinite alternate;"></span>
       <span style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#fde047;">REALTIME CLOCK (0.01s Heartbeat):</span>
@@ -372,7 +377,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
       </div>
       <div>
         <span style="color:var(--text-secondary); font-size:11px;">ACTIVE SOCKETS:</span>
-        <strong id="liveSockets" style="color:#c4b5fd; margin-left:4px;">8 Nodes</strong>
+        <strong id="liveSockets" style="color:#8ff5c8; margin-left:4px;">8 Nodes</strong>
       </div>
       <div>
         <span style="color:var(--text-secondary); font-size:11px;">PENDING CLOSERS:</span>
@@ -413,7 +418,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     <div class="metric-card">
       <div class="metric-header">
         <span class="metric-label">Messages Today (Global)</span>
-        <div class="metric-icon" style="background: rgba(139, 92, 246, 0.15); color: #c4b5fd;">💬</div>
+        <div class="metric-icon" style="background: rgba(31, 224, 138, 0.15); color: #8ff5c8;">💬</div>
       </div>
       <div class="metric-val" id="metricGlobalMessages">-</div>
       <div class="metric-sub">Across all company closer sessions</div>
@@ -758,7 +763,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         </div>
         <div class="metric-card">
           <div class="metric-header"><span class="metric-label">TL Commissions Paid</span><div style="font-size:18px;">💰</div></div>
-          <div class="metric-val" style="color:#c4b5fd;">Rs. 25,000</div>
+          <div class="metric-val" style="color:#8ff5c8;">Rs. 25,000</div>
           <div class="metric-sub">50 TMs recruited (@ Rs. 500)</div>
         </div>
         <div class="metric-card">
@@ -1001,7 +1006,7 @@ function renderChatterStream() {
           <div style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--text-secondary);">${msg.lead_phone || 'WhatsApp'}</div>
         </td>
         <td>
-          <span style="font-size:12px; font-weight:600; color:#c4b5fd;">@${msg.closer_name}</span>
+          <span style="font-size:12px; font-weight:600; color:#8ff5c8;">@${msg.closer_name}</span>
         </td>
         <td style="max-width:320px;">
           <div style="font-size:12.5px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${msg.text}">
@@ -1042,7 +1047,7 @@ async function loadLoginsData() {
         const roleBadges = {
           superadmin: 'background:rgba(234,179,8,0.2); color:#fde047;',
           admin: 'background:rgba(245,158,11,0.2); color:#fbbf24;',
-          lead: 'background:rgba(139,92,246,0.2); color:#c4b5fd;',
+          lead: 'background:rgba(31, 224, 138,0.2); color:#8ff5c8;',
           member: 'background:rgba(16,185,129,0.2); color:#34d399;'
         };
         return `
@@ -1218,7 +1223,7 @@ function renderCompanyTable(companies) {
             <div class="company-avatar">${c.name.charAt(0).toUpperCase()}</div>
             <div>
               <strong style="font-size:14px;">${c.name}</strong>
-              <div style="font-size:11.5px; color:var(--text-muted);">slug: <code style="color:#c4b5fd;">/c/${c.slug}</code> &bull; ${c.owner_name || ''}</div>
+              <div style="font-size:11.5px; color:var(--text-muted);">slug: <code style="color:#8ff5c8;">/c/${c.slug}</code> &bull; ${c.owner_name || ''}</div>
             </div>
           </div>
         </td>

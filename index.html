@@ -10,7 +10,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Chatly — WhatsApp Closing Platform &amp; Infrastructure</title>
   <meta name="description" content="Chatly brings your WhatsApp closing conversations, campaigns, and multi-tenant sales operations into one focused workspace.">
-  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
+  <link rel="icon" type="image/png" href="assets/images/chatly-icon.png">
+  <meta name="theme-color" content="#050b09">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/whatsapp.css?v=14.0">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=14.0">
   <script>
@@ -34,13 +38,18 @@
   </script>
 </head>
 <body>
+  <script>
+    /* Chatly is dark-first: apply the saved theme before first paint to avoid a light flash */
+    try { if (localStorage.getItem('nunno_theme') !== 'light') document.body.classList.add('theme-dark'); } catch (_) { document.body.classList.add('theme-dark'); }
+  </script>
 
-  <!-- FULLSCREEN 360 ROTATE & ZOOM-OUT OVERLAY -->
+  <!-- CHATLY LAUNCH LOADER OVERLAY -->
   <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true" role="status" aria-live="polite">
     <div class="anim-aura"></div>
     <div class="anim-scene">
-      <div class="anim-logo-box" style="width:72px; height:72px; border-radius:20px; overflow:hidden;">
-        <img src="assets/images/chatly-icon.jpg" alt="Chatly" class="anim-logo-img" style="width:100%; height:100%; object-fit:cover;">
+      <div class="anim-logo-box">
+        <svg class="anim-ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="anim-ring-track" cx="60" cy="60" r="54"/><circle class="anim-ring-arc" cx="60" cy="60" r="54"/></svg>
+        <img src="assets/images/chatly-icon.png" alt="Chatly" class="anim-logo-img">
       </div>
       <div class="anim-label">
         <div class="anim-brand-text">
@@ -48,6 +57,7 @@
           <span class="anim-role-tag" id="animRoleTag">Closer Portal</span>
         </div>
         <div class="anim-subtext" id="animSubtext">Opening closer workspace…</div>
+        <div class="anim-dots" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
   </div>
@@ -68,7 +78,9 @@
   ════════════════════════════════════════════════════════ -->
   <header class="topbar">
     <div class="brand-wrap" style="display:flex; align-items:center; gap:12px;">
-      <img id="mainBrandLogoImg" src="assets/images/chatly-logo.jpg" alt="Chatly" class="brand-logo-img" style="height:34px; width:auto; border-radius:6px; object-fit:contain;">
+      <img id="mainBrandLogoImg" src="assets/images/chatly-logo-light.png" alt="Chatly" class="brand-logo-img chatly-logo--light">
+      <img src="assets/images/chatly-logo.png" alt="Chatly" class="brand-logo-img chatly-logo--dark">
+      <img src="assets/images/chatly-icon.png" alt="Chatly" class="brand-icon-only">
     </div>
 
     <!-- Main Navigation Tabs -->
@@ -93,7 +105,7 @@
     <!-- Top Right Actions -->
     <div class="topbar-actions" style="display:flex;align-items:center;gap:6px;">
       <!-- Closer Daily Message Quota Pill -->
-      <div class="header-quota-pill" id="headerQuotaPill" style="display:none; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; font-size:11px; font-weight:700; background:rgba(139, 92, 246, 0.15); border:1px solid rgba(139, 92, 246, 0.3); color:#c4b5fd;" title="Daily Message Limit">
+      <div class="header-quota-pill" id="headerQuotaPill" style="display:none; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; font-size:11px; font-weight:700; background:rgba(31, 224, 138, 0.15); border:1px solid rgba(31, 224, 138, 0.3); color:#8ff5c8;" title="Daily Message Limit">
         <span>⚡</span>
         <span id="headerQuotaCount">0</span>/<span id="headerQuotaLimit">150</span> msgs
       </div>
@@ -107,7 +119,7 @@
 
       <!-- Active Tenant / Company Context Indicator -->
       <div id="companyContextBadge" style="display:none; align-items:center; gap:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:999px; padding:4px 12px 4px 6px; font-size:12px; font-weight:750; color:#fff;" title="Active Company Tenant">
-        <img id="companyBadgeLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:22px; height:22px; border-radius:50%; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.2); padding:2px; flex-shrink:0;">
+        <img id="companyBadgeLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:22px; height:22px; border-radius:50%; object-fit:contain; background:#07140f; border:1px solid rgba(255,255,255,0.2); padding:2px; flex-shrink:0;">
         <span id="companyContextName">Nunno Official</span>
         <select id="companyContextSwitcher" style="display:none; background:transparent; border:none; color:inherit; font-size:11px; font-weight:750; cursor:pointer; outline:none; margin-left:2px;"></select>
       </div>
@@ -119,7 +131,7 @@
       </a>
 
       <!-- Super Admin Link -->
-      <a href="sadmin.php" class="btn-header-admin" id="headerSadminLink" style="display:none; text-decoration:none; background:rgba(139, 92, 246, 0.2); border-color:rgba(139, 92, 246, 0.5); color:#c4b5fd;" title="Super Admin Command">
+      <a href="sadmin.php" class="btn-header-admin" id="headerSadminLink" style="display:none; text-decoration:none; background:rgba(31, 224, 138, 0.2); border-color:rgba(31, 224, 138, 0.5); color:#8ff5c8;" title="Super Admin Command">
         <span>⚡</span>
         <span>Super Admin</span>
       </a>
@@ -177,7 +189,7 @@
 
         <!-- Live Company Logo & Info Badge right in TM's Portal -->
         <div class="profile-company-badge" id="profileCompanyBadge" style="display:flex; align-items:center; gap:10px; padding:7px 14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:12px; margin-left:auto; backdrop-filter:blur(8px);">
-          <img id="profileCompanyLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:34px; height:34px; border-radius:9px; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.18); padding:2px; box-shadow:0 4px 12px rgba(0,0,0,0.3); flex-shrink:0;">
+          <img id="profileCompanyLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:34px; height:34px; border-radius:9px; object-fit:contain; background:#07140f; border:1px solid rgba(255,255,255,0.18); padding:2px; box-shadow:0 4px 12px rgba(0,0,0,0.3); flex-shrink:0;">
           <div style="display:flex; flex-direction:column;">
             <span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Representing Company</span>
             <strong id="profileCompanyName" style="font-size:13px; font-weight:800; color:#fff; white-space:nowrap;">Nunno Official</strong>
@@ -524,7 +536,7 @@
     <section class="chat-thread-col" id="chatThreadCol" style="position:relative;">
       <div class="chat-transition-overlay" id="chatTransitionOverlay" aria-hidden="true">
         <div class="chat-transition-logo-box">
-          <img src="assets/images/chatly-icon.jpg" alt="Chatly" class="chat-transition-logo" style="width:52px; height:52px; border-radius:14px; object-fit:cover; box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+          <img src="assets/images/chatly-icon.png" alt="Chatly" class="chat-transition-logo">
         </div>
         <div class="chat-transition-spinner"></div>
         <span class="chat-transition-text">Opening Chatly conversation…</span>
@@ -960,7 +972,7 @@
         </div>
 
         <!-- Variation 2 Container: Image Attachment -->
-        <div id="campaignImageContainer" style="display:none;background:rgba(99,102,241,0.04);border:1px dashed rgba(99,102,241,0.3);border-radius:10px;padding:10px;">
+        <div id="campaignImageContainer" style="display:none;background:rgba(31, 224, 138,0.04);border:1px dashed rgba(31, 224, 138,0.3);border-radius:10px;padding:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <label class="form-label" style="margin:0;font-size:11.5px;font-weight:700;">Promotional Flyer / Image</label>
             <button type="button" class="btn btn-ghost btn-xs" id="clearCampaignImgBtn" style="color:#ef4444;font-size:10px;display:none;">✕ Remove</button>
@@ -1172,13 +1184,13 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <div class="bg-grid"></div>
 
     <main class="login-container" id="loginMainContainer">
-      <!-- HERO NUNNO LOGO WITH PURPLE EDGE GLOW -->
+      <!-- HERO CHATLY ICON WITH MINT GLOW -->
       <header class="brand-hero">
         <div class="logo-frame" id="logoHeroFrame">
-          <img src="assets/images/nunno-logo.png" alt="Nunno Omni-Desk" class="logo-img">
+          <img src="assets/images/chatly-icon.png" alt="Chatly" class="logo-img">
         </div>
         <h1 class="brand-title">
-          Nunno
+          Chatly
           <span class="brand-badge">Omni-Desk</span>
         </h1>
         <p class="brand-subtitle">Your WhatsApp workspace</p>
@@ -1227,7 +1239,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           </div>
 
           <button type="submit" id="authSubmitBtn" class="submit-btn">
-            Sign In to Omni-Desk
+            Sign In to Chatly
           </button>
 
           <div class="quick-fill-bar" style="display:flex;flex-direction:column;gap:6px;margin-top:14px;">
@@ -1259,13 +1271,13 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
       <!-- Modal Header -->
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 16px; border-bottom: 1px solid var(--glass-border-subtle); padding-bottom: 14px;">
         <div style="display:flex; align-items:center; gap:14px;">
-          <div style="width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.25)); border:1px solid rgba(168,85,247,0.4); display:flex; align-items:center; justify-content:center; font-size:22px;">
+          <div style="width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg, rgba(31, 224, 138,0.2), rgba(45, 232, 154,0.25)); border:1px solid rgba(45, 232, 154,0.4); display:flex; align-items:center; justify-content:center; font-size:22px;">
             👥
           </div>
           <div>
             <div style="display:flex; align-items:center; gap:8px;">
               <h2 style="font-size:18px; font-weight:800; color:var(--text-primary); margin:0;">Active Closer Team &amp; Login Desk</h2>
-              <span style="background:rgba(99,102,241,0.15); color:#818cf8; border:1px solid rgba(99,102,241,0.3); font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; text-transform:uppercase;">👑 Admin Portal</span>
+              <span style="background:rgba(31, 224, 138,0.15); color:#4cecab; border:1px solid rgba(31, 224, 138,0.3); font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; text-transform:uppercase;">👑 Admin Portal</span>
             </div>
             <p style="font-size:12px; color:var(--text-secondary); margin:3px 0 0 0;">View closer login credentials, inspect WhatsApp links &amp; 1-click login directly into any employee's portal.</p>
           </div>
@@ -1798,13 +1810,13 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <div class="emp-modal-box" style="max-width:1040px;">
       <div class="emp-modal-header">
         <div class="emp-modal-title-group">
-          <div class="emp-modal-icon" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#6366f1;">
+          <div class="emp-modal-icon" style="background:rgba(31, 224, 138,0.12);border-color:rgba(31, 224, 138,0.3);color:#0fa968;">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           </div>
           <div>
             <div class="emp-modal-title">
               <span>Admin Email &amp; Communications Studio</span>
-              <span class="badge-role-admin" style="background:rgba(99,102,241,0.15);color:#6366f1;border-color:rgba(99,102,241,0.3);">Dispatch Hub</span>
+              <span class="badge-role-admin" style="background:rgba(31, 224, 138,0.15);color:#0fa968;border-color:rgba(31, 224, 138,0.3);">Dispatch Hub</span>
             </div>
             <div class="text-xs text-muted">Dispatch targeted credentials, 24-hour payout confirmations, status alerts &amp; team directives.</div>
           </div>

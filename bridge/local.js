@@ -145,10 +145,11 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         if (!['GET', 'POST'].includes(req.method)) { json(405, { success: false }); return; }
         let body = {};
         if (req.method === 'POST') {
-          if (!req.headers['content-type']?.startsWith('application/json')) { json(415, { success: false }); return; }
           let raw = '';
           for await (const chunk of req) { raw += chunk; if (Buffer.byteLength(raw) > 15*1024*1024) { json(413, { success: false }); return; } }
-          body = JSON.parse(raw || '{}');
+          if (raw && raw.trim()) {
+            try { body = JSON.parse(raw); } catch (_) { body = {}; }
+          }
         }
         const action = body.action || url.searchParams.get('action');
 
@@ -410,6 +411,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
           if (action === 'logout') {
             currentLocalUser = null;
+            res.setHeader('Set-Cookie', 'nunno_local=; HttpOnly; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
             json(200, { success: true, message: 'Logged out successfully.' });
             return;
           }
@@ -1038,11 +1040,15 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       if (relative.startsWith('/')) relative = relative.slice(1);
 
       // Handle GET logout or switch account parameter
-      if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1') {
+      if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('logout') === '1') {
         currentLocalUser = null;
-        res.writeHead(302, { 'Location': '/login.php' });
-        res.end();
-        return;
+        if (relative === 'login.php' || relative === 'login' || relative === 'login.html') {
+          relative = 'login.php';
+        } else {
+          res.writeHead(302, { 'Location': '/login.php?action=logout&switch=1' });
+          res.end();
+          return;
+        }
       }
       
       // Default / -> login.php (The authentic WhatsApp Web landing page)
@@ -1083,6 +1089,9 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         res.setHeader('Set-Cookie', `nunno_local=${session}; HttpOnly; SameSite=Strict; Path=/`);
         let content = fs.readFileSync(file, 'utf8');
         if (relative === 'login.php') {
+          if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('logout') === '1') {
+            currentLocalUser = null;
+          }
           content = templateLoginPhp(content);
         } else if (relative === 'admin.php') {
           content = templateAdminPhp(content, currentLocalUser);

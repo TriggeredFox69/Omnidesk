@@ -33,7 +33,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
     session_destroy();
-    header('Location: admin.php');
+    header('Location: login.php?action=logout&switch=1');
     exit;
 }
 
@@ -70,14 +70,14 @@ if (!$activeCompany) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Chatly Company Admin — <?php echo htmlspecialchars($activeCompany['name']); ?></title>
-  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
+  <link rel="icon" type="image/png" href="assets/images/chatly-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <script>
     (function(){
       try {
-        if (localStorage.getItem('nunno_theme') === 'light' || (!localStorage.getItem('nunno_theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+        if (localStorage.getItem('nunno_theme') === 'light') {
           document.documentElement.classList.add('theme-light');
         }
       } catch(_) {}
@@ -85,36 +85,42 @@ if (!$activeCompany) {
   </script>
   <style>
     :root {
-      --bg-base: #06070a;
-      --bg-surface: #0c0e14;
-      --bg-surface-elevated: #12151f;
-      --bg-surface-hover: #171b28;
-      --border-subtle: rgba(255, 255, 255, 0.07);
-      --border-accent: rgba(16, 185, 129, 0.35);
-      --border-glow: rgba(16, 185, 129, 0.5);
-      --text-main: #f8fafc;
-      --text-secondary: #94a3b8;
-      --text-muted: #64748b;
-      --accent-emerald: #10b981;
-      --accent-emerald-dark: #059669;
-      --accent-purple: #8b5cf6;
+      --bg-base: #050b09;
+      --bg-surface: #09130f;
+      --bg-surface-elevated: #0d1c16;
+      --bg-surface-hover: #12261e;
+      --border-subtle: rgba(31, 224, 138, 0.11);
+      --border-accent: rgba(31, 224, 138, 0.38);
+      --border-glow: rgba(31, 224, 138, 0.5);
+      --text-main: #effff7;
+      --text-secondary: #8db5a3;
+      --text-muted: #5c8070;
+      --accent-emerald: #1fe08a;
+      --accent-emerald-dark: #0fa968;
+      --accent-purple: #2dd4bf;
       --accent-amber: #f59e0b;
       --accent-rose: #f43f5e;
       --accent-blue: #3b82f6;
     }
 
     html.theme-light {
-      --bg-base: #f8fafc;
+      --bg-base: #f0faf5;
       --bg-surface: #ffffff;
-      --bg-surface-elevated: #f1f5f9;
-      --bg-surface-hover: #e2e8f0;
-      --border-subtle: #e2e8f0;
-      --border-accent: rgba(16, 185, 129, 0.4);
-      --border-glow: rgba(16, 185, 129, 0.25);
-      --text-main: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #94a3b8;
+      --bg-surface-elevated: #e9f7f0;
+      --bg-surface-hover: #d9f0e5;
+      --border-subtle: #cfe8dc;
+      --border-accent: rgba(15, 169, 104, 0.4);
+      --border-glow: rgba(15, 169, 104, 0.25);
+      --text-main: #07140f;
+      --text-secondary: #3f6354;
+      --text-muted: #7a9a8c;
+      --accent-emerald: #0fa968;
     }
+
+    .chatly-logo { height: 34px; width: auto; display: block; filter: drop-shadow(0 2px 10px rgba(31, 224, 138, 0.28)); }
+    .chatly-logo--light { display: none; }
+    html.theme-light .chatly-logo--dark { display: none; }
+    html.theme-light .chatly-logo--light { display: block; }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -131,7 +137,7 @@ if (!$activeCompany) {
     .bg-mesh {
       position: fixed; inset: 0; pointer-events: none; z-index: 0;
       background: radial-gradient(circle at 10% 10%, rgba(16, 185, 129, 0.07) 0%, transparent 45%),
-                  radial-gradient(circle at 90% 90%, rgba(139, 92, 246, 0.05) 0%, transparent 45%);
+                  radial-gradient(circle at 90% 90%, rgba(31, 224, 138, 0.05) 0%, transparent 45%);
     }
 
     .admin-container {
@@ -167,7 +173,7 @@ if (!$activeCompany) {
       width: 44px;
       height: 44px;
       border-radius: 12px;
-      background: #0c0a18;
+      background: #07140f;
       border: 1.5px solid rgba(255, 255, 255, 0.15);
       object-fit: contain;
       padding: 3px;
@@ -205,15 +211,15 @@ if (!$activeCompany) {
       white-space: nowrap;
     }
     .btn-emerald {
-      background: linear-gradient(135deg, #10b981, #059669);
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      background: linear-gradient(135deg, #4cecab, #1fe08a 45%, #0fa968);
+      color: #03130c;
+      box-shadow: 0 4px 14px rgba(31, 224, 138, 0.35);
     }
     .btn-emerald:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5); }
     .btn-purple {
-      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+      background: linear-gradient(135deg, #5eead4, #2dd4bf 45%, #0d9488);
+      color: #021a17;
+      box-shadow: 0 4px 14px rgba(45, 212, 191, 0.35);
     }
     .btn-secondary {
       background: rgba(255, 255, 255, 0.05);
@@ -345,7 +351,7 @@ if (!$activeCompany) {
     .user-profile-cell { display: flex; align-items: center; gap: 12px; }
     .avatar-circle {
       width: 36px; height: 36px; border-radius: 50%;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      background: linear-gradient(135deg, #3b82f6, #14c27a);
       color: #fff; font-weight: 800; font-size: 14px;
       display: flex; align-items: center; justify-content: center;
     }
@@ -464,7 +470,7 @@ if (!$activeCompany) {
   <header class="top-bar">
     <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
       <a href="admin.php" title="Chatly Enterprise" style="display:flex; align-items:center; text-decoration:none;">
-        <img src="assets/images/chatly-logo.jpg" alt="Chatly" style="height:34px; width:auto; border-radius:6px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,0.2);">
+        <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
       <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/nunno-logo.png'); ?>" alt="Company Logo" class="company-logo">
@@ -522,9 +528,9 @@ if (!$activeCompany) {
     <div class="metric-card">
       <div class="metric-header">
         <span class="metric-label">TL Commissions Accrued</span>
-        <div class="metric-icon" style="background: rgba(139, 92, 246, 0.15); color: #c4b5fd;">💰</div>
+        <div class="metric-icon" style="background: rgba(31, 224, 138, 0.15); color: #8ff5c8;">💰</div>
       </div>
-      <div class="metric-val" id="metricTLCommissions" style="color: #c4b5fd;">Rs. 0</div>
+      <div class="metric-val" id="metricTLCommissions" style="color: #8ff5c8;">Rs. 0</div>
       <div class="metric-sub">PKR 500 earned per joined TM</div>
     </div>
 
@@ -1156,7 +1162,7 @@ function renderEmployeeTable(employees) {
       <tr>
         <td>
           <div class="user-profile-cell">
-            <div class="avatar-circle" style="background:${isLead ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'linear-gradient(135deg, #3b82f6, #0284c7)'};">
+            <div class="avatar-circle" style="background:${isLead ? 'linear-gradient(135deg, #14c27a, #0b8a57)' : 'linear-gradient(135deg, #3b82f6, #0284c7)'};">
               ${emp.name.charAt(0).toUpperCase()}
             </div>
             <div>
@@ -1166,7 +1172,7 @@ function renderEmployeeTable(employees) {
           </div>
         </td>
         <td>
-          <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; ${isLead ? 'background:rgba(139,92,246,0.15); color:#c4b5fd; border:1px solid rgba(139,92,246,0.3);' : 'background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3);'}">
+          <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; ${isLead ? 'background:rgba(31, 224, 138,0.15); color:#8ff5c8; border:1px solid rgba(31, 224, 138,0.3);' : 'background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3);'}">
             ${isLead ? '👑 Team Lead' : '📱 Closer TM'}
           </span>
         </td>
@@ -1351,7 +1357,7 @@ function renderTLLedger(employees) {
         <td><strong>${tl.name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${tl.phone || 'No phone'}</span></td>
         <td><strong style="color:#34d399;">${recruited}</strong> active TMs</td>
         <td><span style="color:#10b981; font-weight:700;">✓ Verified</span></td>
-        <td><strong style="color:#c4b5fd; font-size:15px;">Rs. ${commission.toLocaleString()}</strong></td>
+        <td><strong style="color:#8ff5c8; font-size:15px;">Rs. ${commission.toLocaleString()}</strong></td>
         <td><span class="badge-status status-active">Accrued</span></td>
         <td>
           <button class="btn btn-secondary" style="padding:5px 12px; font-size:11.5px;" onclick="alert('Payout request marked for processing!')">
@@ -1415,7 +1421,7 @@ function renderLeadsTable(leads) {
         <td>
           ${isTakeover ? `
             <span class="badge-takeover">👑 Admin Takeover</span>
-            <div style="font-size:10px; color:#c4b5fd; margin-top:2px;">Commission Protected for: ${lead.originalOwnerName || 'Closer'}</div>
+            <div style="font-size:10px; color:#8ff5c8; margin-top:2px;">Commission Protected for: ${lead.originalOwnerName || 'Closer'}</div>
           ` : '<span style="font-size:11px; color:var(--text-muted);">Standard closer ownership</span>'}
         </td>
         <td>
@@ -1427,7 +1433,7 @@ function renderLeadsTable(leads) {
                 👑 Takeover Lead
               </button>
             `}
-            <button type="button" class="btn btn-secondary" style="font-size:10.5px; padding:3px 8px; border-radius:6px; font-weight:700; background:rgba(99,102,241,0.15); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3); cursor:pointer;" onclick="adminInspectFromAdmin('${lead.ownerUsername || 'hamza'}', '${lead.phone}')">
+            <button type="button" class="btn btn-secondary" style="font-size:10.5px; padding:3px 8px; border-radius:6px; font-weight:700; background:rgba(31, 224, 138,0.15); color:#a5b4fc; border:1px solid rgba(31, 224, 138,0.3); cursor:pointer;" onclick="adminInspectFromAdmin('${lead.ownerUsername || 'hamza'}', '${lead.phone}')">
               ⚡ Open Chat as TM ↗
             </button>
           </div>

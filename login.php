@@ -18,8 +18,15 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// If already logged in and not switching accounts, route directly to workspace
-if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
+// If action=logout or switch=1 or logout=1 is passed, completely wipe session
+if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['logout']) || isset($_GET['switch'])) {
+    $_SESSION = [];
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+    }
+    @session_destroy();
+} elseif (!empty($_SESSION['omnidesk_user'])) {
     $role = $_SESSION['omnidesk_user']['role'] ?? '';
     if ($role === 'superadmin' && isset($_GET['to_sadmin'])) {
         header('Location: sadmin.php');
@@ -39,14 +46,24 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Chatly — WhatsApp Closing Platform &amp; Multi-Role Gateway</title>
-  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
+  <link rel="icon" type="image/png" href="assets/images/chatly-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <script>
     (function(){
       try {
-        if (localStorage.getItem('nunno_theme') === 'light' || (!localStorage.getItem('nunno_theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+        var q = window.location.search || '';
+        if (q.indexOf('action=logout') !== -1 || q.indexOf('logout=1') !== -1 || q.indexOf('switch=1') !== -1) {
+          localStorage.removeItem('nunno_active_session');
+          localStorage.removeItem('omnidesk_impersonated_from_admin');
+          localStorage.removeItem('omnidesk_impersonated_user');
+          localStorage.removeItem('omnidesk_impersonated_name');
+          localStorage.removeItem('omnidesk_active_chat_phone');
+          sessionStorage.clear();
+          sessionStorage.setItem('chatly_logged_out', '1');
+        }
+        if (localStorage.getItem('nunno_theme') === 'light') {
           document.documentElement.classList.add('theme-light');
         }
       } catch(_) {}
@@ -54,38 +71,60 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
   </script>
   <style>
     :root {
-      --wa-green-header: #00a884;
-      --wa-teal: #128c7e;
-      --wa-bg: #111b21;
-      --wa-card-bg: #222e35;
-      --wa-card-border: rgba(255, 255, 255, 0.08);
-      --wa-text-primary: #e9edef;
-      --wa-text-secondary: #8696a0;
-      --wa-text-muted: #667781;
-      --wa-accent: #00a884;
-      --wa-qr-border: #00a884;
-      --tl-purple: #8b5cf6;
+      --wa-green-header: #0fa968;
+      --wa-teal: #0fa968;
+      --wa-bg: #050b09;
+      --wa-card-bg: #0b1713;
+      --wa-card-border: rgba(31, 224, 138, 0.14);
+      --wa-text-primary: #effff7;
+      --wa-text-secondary: #8db5a3;
+      --wa-text-muted: #5c8070;
+      --wa-accent: #1fe08a;
+      --wa-qr-border: #1fe08a;
+      --tl-purple: #2dd4bf;
       --admin-amber: #f59e0b;
       --sadmin-gold: #eab308;
-      --anim-overlay-bg: #111b21;
+      --anim-overlay-bg: radial-gradient(circle at 50% 40%, #0b2119 0%, #050b09 58%, #030706 100%);
+      --anim-aura-bg: radial-gradient(circle, rgba(31, 224, 138, 0.42) 0%, rgba(31, 224, 138, 0.12) 45%, rgba(31, 224, 138, 0) 70%);
+      --anim-text-color: #ffffff;
+      --anim-subtext-color: #8db5a3;
+      --anim-ring-track: rgba(31, 224, 138, 0.12);
+      --anim-ring-arc: #1fe08a;
+      --anim-tag-bg: rgba(31, 224, 138, 0.14);
+      --anim-tag-border: 1px solid rgba(31, 224, 138, 0.4);
+      --anim-glow-0: 0 0 22px rgba(31, 224, 138, 0.35);
+      --anim-glow-50: 0 0 60px rgba(31, 224, 138, 0.8);
     }
 
     html.theme-light {
-      --wa-green-header: #00a884;
-      --wa-teal: #128c7e;
-      --wa-bg: #eae6df;
+      --wa-green-header: #0fa968;
+      --wa-teal: #0fa968;
+      --wa-bg: #eaf7f0;
       --wa-card-bg: #ffffff;
-      --wa-card-border: rgba(0, 0, 0, 0.06);
-      --wa-text-primary: #41525d;
-      --wa-text-secondary: #3b4a54;
-      --wa-text-muted: #8696a0;
-      --anim-overlay-bg: #eae6df;
+      --wa-card-border: rgba(15, 169, 104, 0.16);
+      --wa-text-primary: #07140f;
+      --wa-text-secondary: #3f6354;
+      --wa-text-muted: #7a9a8c;
+      --wa-accent: #0fa968;
+      --wa-qr-border: #0fa968;
+      --tl-purple: #0d9488;
+      --anim-overlay-bg: radial-gradient(circle at 50% 38%, #ffffff 0%, #effaf5 60%, #dff5ea 100%);
+      --anim-aura-bg: radial-gradient(circle, rgba(31, 224, 138, 0.32) 0%, rgba(31, 224, 138, 0.1) 45%, rgba(31, 224, 138, 0) 70%);
+      --anim-text-color: #07140f;
+      --anim-subtext-color: #3f6354;
+      --anim-ring-track: rgba(15, 169, 104, 0.14);
+      --anim-ring-arc: #0fa968;
+      --anim-tag-bg: rgba(15, 169, 104, 0.12);
+      --anim-tag-border: 1px solid rgba(15, 169, 104, 0.35);
+      --anim-glow-0: 0 6px 18px rgba(6, 40, 26, 0.12);
+      --anim-glow-50: 0 18px 44px -4px rgba(31, 224, 138, 0.5);
     }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI', 'Inter', -apple-system, sans-serif;
       background-color: var(--wa-bg);
+      background-image: radial-gradient(ellipse 60% 40% at 8% -6%, rgba(31, 224, 138, 0.14), transparent 60%), radial-gradient(ellipse 50% 40% at 100% 0%, rgba(15, 169, 104, 0.1), transparent 60%);
+      background-attachment: fixed;
       color: var(--wa-text-primary);
       min-height: 100vh;
       display: flex;
@@ -99,7 +138,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     .wa-top-header {
       width: 100%;
       height: 222px;
-      background-color: var(--wa-green-header);
+      background: radial-gradient(ellipse 70% 120% at 15% -20%, rgba(31, 224, 138, 0.38), transparent 62%), linear-gradient(180deg, #08241a 0%, rgba(5, 11, 9, 0) 100%);
       position: absolute;
       top: 0; left: 0; right: 0;
       z-index: 0;
@@ -125,7 +164,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       justify-content: center;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
-    .wa-logo-icon svg { width: 24px; height: 24px; fill: #00a884; }
+    .wa-logo-icon svg { width: 24px; height: 24px; fill: var(--wa-accent); }
     .wa-brand-name {
       font-size: 15px;
       font-weight: 700;
@@ -293,8 +332,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
 
     /* TL Banner on Landing Page */
     .tl-cta-banner {
-      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(168, 85, 247, 0.08));
-      border: 1.5px solid rgba(139, 92, 246, 0.35);
+      background: linear-gradient(135deg, rgba(31, 224, 138, 0.15), rgba(45, 232, 154, 0.08));
+      border: 1.5px solid rgba(31, 224, 138, 0.35);
       border-radius: 12px;
       padding: 16px 20px;
       display: flex;
@@ -307,8 +346,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     }
     .tl-cta-banner:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(139, 92, 246, 0.25);
-      border-color: rgba(139, 92, 246, 0.6);
+      box-shadow: 0 8px 24px rgba(31, 224, 138, 0.25);
+      border-color: rgba(31, 224, 138, 0.6);
     }
     .tl-cta-badge {
       display: inline-flex;
@@ -317,8 +356,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
-      color: #c4b5fd;
-      background: rgba(139, 92, 246, 0.25);
+      color: #8ff5c8;
+      background: rgba(31, 224, 138, 0.25);
       padding: 2px 8px;
       border-radius: 4px;
       margin-bottom: 4px;
@@ -328,7 +367,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       font-weight: 700;
       color: #fff;
     }
-    html.theme-light .tl-cta-title { color: #5b21b6; }
+    html.theme-light .tl-cta-title { color: #065f3c; }
     .tl-cta-sub {
       font-size: 12px;
       color: var(--wa-text-secondary);
@@ -336,7 +375,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     .tl-cta-btn {
       padding: 8px 16px;
       border-radius: 8px;
-      background: #8b5cf6;
+      background: #14c27a;
       color: #ffffff;
       font-size: 12px;
       font-weight: 700;
@@ -361,7 +400,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 3px solid rgba(0, 168, 132, 0.3);
+      border: 3px solid rgba(31, 224, 138, 0.3);
       width: 270px;
       height: 270px;
     }
@@ -378,7 +417,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       height: 44px;
       border-radius: 50%;
       background: #ffffff;
-      border: 2px solid #00a884;
+      border: 2px solid var(--wa-accent);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -387,14 +426,14 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     .wa-qr-center-logo svg {
       width: 24px;
       height: 24px;
-      fill: #00a884;
+      fill: var(--wa-accent);
     }
     .qr-scan-line {
       position: absolute;
       width: calc(100% - 36px);
       height: 2px;
-      background: linear-gradient(90deg, transparent, #00a884, transparent);
-      box-shadow: 0 0 12px #00a884;
+      background: linear-gradient(90deg, transparent, var(--wa-accent), transparent);
+      box-shadow: 0 0 12px var(--wa-accent);
       animation: qrScanMove 2.6s ease-in-out infinite alternate;
       pointer-events: none;
     }
@@ -406,7 +445,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       margin-top: 16px;
       font-size: 12px;
       font-weight: 600;
-      color: #00a884;
+      color: var(--wa-accent);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -415,7 +454,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #00a884;
+      background: var(--wa-accent);
       animation: pulseAnim 1.6s infinite;
     }
     @keyframes pulseAnim {
@@ -444,9 +483,9 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       transition: all 0.2s;
     }
     .qr-quick-btn:hover {
-      background: rgba(0, 168, 132, 0.15);
-      color: #00a884;
-      border-color: #00a884;
+      background: rgba(31, 224, 138, 0.15);
+      color: var(--wa-accent);
+      border-color: var(--wa-accent);
     }
 
     /* AUTH FORMS (TL, ADMIN, SADMIN) */
@@ -507,7 +546,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     .input-field:focus {
       outline: none;
       border-color: var(--wa-accent);
-      box-shadow: 0 0 10px rgba(0, 168, 132, 0.25);
+      box-shadow: 0 0 10px rgba(31, 224, 138, 0.25);
     }
     .btn-action-primary {
       width: 100%;
@@ -525,8 +564,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       transform: translateY(-1px);
     }
     .btn-tl {
-      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
+      background: linear-gradient(135deg, #14c27a, #0b8a57);
+      box-shadow: 0 6px 20px rgba(31, 224, 138, 0.35);
     }
     .btn-admin {
       background: linear-gradient(135deg, #f59e0b, #d97706);
@@ -569,34 +608,63 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     }
     .footer-link:hover { text-decoration: underline; }
 
-    /* 360 Spin & Zoom-Out Animation */
+    /* Chatly launch loader (icon pop -> progress ring -> send-off) */
     .login-anim-overlay {
       position: fixed; inset: 0; background: var(--anim-overlay-bg);
       z-index: 9999999; display: flex; align-items: center; justify-content: center;
-      opacity: 0; visibility: hidden; pointer-events: none;
+      opacity: 0; visibility: hidden; pointer-events: none; overflow: hidden;
       transition: opacity 0.25s ease, visibility 0.25s ease;
     }
     .login-anim-overlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
-    .anim-logo-box {
-      width: 96px; height: 96px; border-radius: 24px;
-      background: var(--wa-card-bg); border: 1.5px solid var(--wa-accent);
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 35px rgba(0, 168, 132, 0.5);
+    .anim-aura { position: absolute; width: 360px; height: 360px; border-radius: 50%; background: var(--anim-aura-bg); filter: blur(36px); opacity: 0; transform: scale(0.7); pointer-events: none; }
+    .login-anim-overlay.active .anim-aura { animation: chatlyAura 1.5s ease-out forwards; }
+    @keyframes chatlyAura { 0% { opacity: 0; transform: scale(0.7); } 25% { opacity: 1; transform: scale(1.1); } 80% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0; transform: scale(1.6); } }
+    .anim-scene { display: flex; flex-direction: column; align-items: center; position: relative; z-index: 2; }
+    .anim-logo-box { position: relative; width: 112px; height: 112px; display: flex; align-items: center; justify-content: center; will-change: transform, opacity; }
+    .anim-logo-box::after { content: ''; position: absolute; width: 76px; height: 76px; border-radius: 24px; border: 2px solid var(--anim-ring-arc); opacity: 0; pointer-events: none; }
+    .anim-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+    .anim-ring circle { fill: none; stroke-width: 3; }
+    .anim-ring-track { stroke: var(--anim-ring-track); }
+    .anim-ring-arc { stroke: var(--anim-ring-arc); stroke-linecap: round; stroke-dasharray: 339.3; stroke-dashoffset: 339.3; filter: drop-shadow(0 0 6px rgba(31, 224, 138, 0.5)); }
+    .anim-logo-img { width: 76px; height: 76px; object-fit: contain; border-radius: 22px; display: block; box-shadow: var(--anim-glow-0); }
+    .login-anim-overlay.active .anim-logo-box { animation: chatlyLaunch 1.5s cubic-bezier(0.2, 0.85, 0.25, 1) forwards; }
+    .login-anim-overlay.active .anim-logo-box::after { animation: chatlyPulse 1.5s ease-out forwards; }
+    .login-anim-overlay.active .anim-ring-arc { animation: chatlyRing 1.5s cubic-bezier(0.45, 0.05, 0.25, 1) forwards; }
+    .login-anim-overlay.active .anim-logo-img { animation: chatlyGlow 1.5s ease-in-out forwards; }
+    @keyframes chatlyLaunch {
+      0% { opacity: 0; transform: scale(0.55); }
+      16% { opacity: 1; transform: scale(1.08); }
+      28% { opacity: 1; transform: scale(1); }
+      72% { opacity: 1; transform: scale(1) translate(0, -3px); }
+      82% { opacity: 1; transform: scale(0.94) translate(-6px, 4px) rotate(-4deg); }
+      100% { opacity: 0; transform: scale(0.45) translate(70px, -120px) rotate(-14deg); }
     }
-    .anim-logo-box img { width: 68px; height: 68px; object-fit: cover; border-radius: 17px; }
-    .login-anim-overlay.active .anim-logo-box {
-      animation: nunnoSpinZoomOut 1.5s cubic-bezier(0.2, 0.85, 0.25, 1) forwards;
+    @keyframes chatlyPulse { 0%, 12% { opacity: 0; transform: scale(1); } 20% { opacity: 0.85; transform: scale(1); } 60% { opacity: 0; transform: scale(1.9); } 100% { opacity: 0; transform: scale(1.9); } }
+    @keyframes chatlyRing { 0%, 14% { stroke-dashoffset: 339.3; opacity: 1; } 78% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+    @keyframes chatlyGlow { 0% { box-shadow: var(--anim-glow-0); } 45% { box-shadow: var(--anim-glow-50); } 100% { box-shadow: var(--anim-glow-0); } }
+    .anim-label { margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+    .login-anim-overlay.active .anim-label { animation: chatlyLabel 1.5s cubic-bezier(0.2, 0.85, 0.25, 1) forwards; }
+    @keyframes chatlyLabel { 0% { opacity: 0; transform: translateY(12px) scale(0.94); } 22% { opacity: 1; transform: translateY(0) scale(1); } 80% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-8px) scale(0.96); } }
+    .anim-brand-text { font-size: 21px; font-weight: 800; color: var(--anim-text-color); letter-spacing: -0.03em; text-align: center; }
+    .anim-subtext { font-size: 13.5px; font-weight: 500; color: var(--anim-subtext-color); text-align: center; }
+    .anim-dots { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 7px 11px; border-radius: 14px 14px 14px 4px; background: var(--anim-tag-bg); border: var(--anim-tag-border); }
+    .anim-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--anim-ring-arc); animation: chatlyDot 1s infinite ease-in-out both; }
+    .anim-dots i:nth-child(1) { animation-delay: -0.32s; } .anim-dots i:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes chatlyDot { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-5px); opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      .login-anim-overlay.active .anim-logo-box, .login-anim-overlay.active .anim-logo-box::after, .login-anim-overlay.active .anim-aura, .login-anim-overlay.active .anim-logo-img { animation: none; opacity: 1; }
+      .login-anim-overlay.active .anim-ring-arc { animation: none; stroke-dashoffset: 0; }
     }
-    @keyframes nunnoSpinZoomOut {
-      0% { opacity: 0; transform: scale(0.5) rotate(0deg); }
-      22% { opacity: 1; transform: scale(1.08) rotate(90deg); }
-      50% { opacity: 1; transform: scale(1) rotate(180deg); }
-      75% { opacity: 1; transform: scale(1.05) rotate(270deg); }
-      88% { opacity: 1; transform: scale(1) rotate(360deg); }
-      100% { opacity: 0; transform: scale(0) rotate(360deg); }
+
+    html.theme-light .wa-top-header {
+      background: radial-gradient(ellipse 70% 120% at 15% -20%, rgba(31, 224, 138, 0.45), transparent 62%), linear-gradient(180deg, #0b3d2a 0%, #0a5a3a 100%);
     }
-    .anim-brand-text { font-size: 20px; font-weight: 800; color: var(--wa-text-primary); margin-top: 20px; text-align: center; }
-    .anim-subtext { font-size: 13px; color: var(--wa-text-secondary); margin-top: 4px; text-align: center; }
+
+    /* Chatly logo + primary button contrast */
+    .chatly-header-logo { height: 38px; width: auto; display: block; filter: drop-shadow(0 4px 14px rgba(31, 224, 138, 0.35)); }
+    .btn-action-primary { color: #03130c; font-weight: 800; }
+    .btn-admin { color: #1a1000; }
+    .role-tab-btn.active { box-shadow: inset 0 -2px 18px -10px currentColor; }
   </style>
 </head>
 <body>
@@ -604,8 +672,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
 <!-- Green Header Banner -->
 <div class="wa-top-header">
   <a href="login.php" class="wa-brand-title" style="display:flex; align-items:center; gap:12px;">
-    <img src="assets/images/chatly-logo.jpg" alt="Chatly" style="height:36px; width:auto; border-radius:8px; object-fit:contain; box-shadow:0 4px 14px rgba(0,0,0,0.25);">
-    <span class="wa-brand-tag" style="background:rgba(255,255,255,0.22); color:#fff; font-weight:700;">WhatsApp Web 2026</span>
+    <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-header-logo">
+    <span class="wa-brand-tag" style="background:rgba(255,255,255,0.22); color:#fff; font-weight:700;">Sales Closing Platform</span>
   </a>
 
   <div style="display:flex; align-items:center; gap:16px;">
@@ -615,17 +683,21 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
   </div>
 </div>
 
-<!-- 360 Spin Animation Overlay -->
+<!-- Chatly launch loader -->
 <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true">
-  <div style="display:flex; flex-direction:column; align-items:center;">
-    <div class="anim-logo-box" style="width:72px; height:72px; border-radius:20px; overflow:hidden;">
-      <img src="assets/images/chatly-icon.jpg" alt="Chatly" style="width:100%; height:100%; object-fit:cover;">
+  <div class="anim-aura"></div>
+  <div class="anim-scene">
+    <div class="anim-logo-box">
+      <svg class="anim-ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="anim-ring-track" cx="60" cy="60" r="54"/><circle class="anim-ring-arc" cx="60" cy="60" r="54"/></svg>
+      <img src="assets/images/chatly-icon.png" alt="Chatly" class="anim-logo-img">
     </div>
-    <div class="anim-brand-text" id="animBrandText">Chatly Sales Desk</div>
-    <div class="anim-subtext" id="animSubtext">Initializing isolated workspace…</div>
+    <div class="anim-label">
+      <div class="anim-brand-text" id="animBrandText">Chatly Sales Desk</div>
+      <div class="anim-subtext" id="animSubtext">Initializing isolated workspace…</div>
+      <div class="anim-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+    </div>
   </div>
 </div>
-
 <!-- Main Floating Container -->
 <div class="landing-wrapper">
   <div class="wa-main-card">
@@ -716,8 +788,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
             <div class="wa-qr-frame">
               <div class="qr-scan-line"></div>
               <img id="landingQrImage" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='230' height='230' viewBox='0 0 230 230'><rect width='230' height='230' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b' font-weight='700'>⚡ Generating QR Code...</text></svg>" alt="WhatsApp QR Code" class="wa-qr-img">
-              <div class="wa-qr-center-logo" style="width:44px; height:44px; border-radius:12px; background:#0c0a18; border:2px solid #00a884; overflow:hidden; padding:2px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
-                <img src="assets/images/chatly-icon.jpg" alt="Chatly" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
+              <div class="wa-qr-center-logo" style="width:44px; height:44px; border-radius:12px; background:#07140f; border:2px solid var(--wa-accent); overflow:hidden; padding:2px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+                <img src="assets/images/chatly-icon.png" alt="Chatly" style="width:100%; height:100%; object-fit:contain; border-radius:8px;">
               </div>
             </div>
 
@@ -731,6 +803,21 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
               <span>Keep me signed in</span>
             </label>
 
+            <!-- Connected WhatsApp Closer Card (shown when WhatsApp bridge is already linked) -->
+            <div id="connectedPhoneActionsBox" style="display:none; width:100%; max-width:270px; margin-top:14px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.3); border-radius:14px; padding:14px; text-align:center;">
+              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.6px; color:var(--wa-accent); font-weight:800; margin-bottom:4px;">Connected WhatsApp Closer</div>
+              <div id="connectedCloserName" style="font-size:15px; font-weight:800; color:var(--wa-text-primary);">Closer Account</div>
+              <div id="connectedCloserPhone" style="font-size:12px; color:var(--wa-text-secondary); margin-bottom:12px;">+923046588806</div>
+              <div style="display:flex; gap:8px; justify-content:center;">
+                <button type="button" id="btnEnterConnectedCloser" class="btn-action-primary" style="margin:0; padding:9px 12px; font-size:12px; flex:1.3; white-space:nowrap;">
+                  Enter Desk →
+                </button>
+                <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:9px 10px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" title="Disconnect WhatsApp session and show fresh QR code">
+                  🔄 Disconnect
+                </button>
+              </div>
+            </div>
+
             <!-- Pair / Test WhatsApp Phone Input -->
             <div style="margin-top: 14px; width: 100%; max-width: 270px;">
               <div style="font-size: 11px; color: var(--wa-text-muted); margin-bottom: 5px; text-align: left;">
@@ -738,7 +825,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
               </div>
               <div style="display: flex; gap: 6px;">
                 <input type="text" id="simPhoneInput" placeholder="+923046588806" value="+923046588806" class="input-field" style="padding: 8px 10px; font-size: 13px; font-family: monospace;">
-                <button type="button" class="btn-action-primary" style="margin: 0; padding: 8px 12px; width: auto; font-size: 12px; background: #00a884; white-space: nowrap;" onclick="handlePhonePairSubmit()">
+                <button type="button" class="btn-action-primary" style="margin: 0; padding: 8px 12px; width: auto; font-size: 12px; background: var(--wa-accent); white-space: nowrap;" onclick="handlePhonePairSubmit()">
                   ⚡ Link
                 </button>
               </div>
@@ -752,7 +839,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       <div id="tmViewPassword" style="display:none;">
         <div class="form-container">
           <div class="form-header">
-            <div class="form-badge-icon" style="background:rgba(0, 168, 132, 0.18); color:#00a884;">🔑</div>
+            <div class="form-badge-icon" style="background:rgba(31, 224, 138, 0.18); color:var(--wa-accent);">🔑</div>
             <h2 class="form-title">Team Member (TM) Closer Login</h2>
             <p class="form-subtitle">Already registered &amp; approved? Sign in directly without scanning QR.</p>
           </div>
@@ -767,7 +854,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
               <input type="password" id="tmDirectPassword" class="input-field" placeholder="123456" required>
             </div>
             <div class="error-box" id="tmPasswordLoginError"></div>
-            <button type="submit" id="tmDirectLoginBtn" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); box-shadow:0 6px 20px rgba(0, 168, 132, 0.35);">
+            <button type="submit" id="tmDirectLoginBtn" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); box-shadow:0 6px 20px rgba(31, 224, 138, 0.35);">
               Sign In to Closer Workspace 🚀
             </button>
           </form>
@@ -784,7 +871,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     <div class="tab-pane" id="paneTL">
       <div class="form-container">
         <div class="form-header">
-          <div class="form-badge-icon" style="background:rgba(139, 92, 246, 0.2); color:#c4b5fd;">👑</div>
+          <div class="form-badge-icon" style="background:rgba(31, 224, 138, 0.2); color:#8ff5c8;">👑</div>
           <h2 class="form-title">Team Leader (TL) Commission Portal</h2>
           <p class="form-subtitle">Earn <strong>Rs. 500 PKR</strong> per joined TM. Recruit closers & manage quotas.</p>
         </div>
@@ -835,7 +922,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
         </form>
 
         <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
-          Demo accounts: <span style="font-family:monospace; color:#c4b5fd;">ali / ali123</span> &bull; <span style="font-family:monospace; color:#c4b5fd;">asima / asima123</span>
+          Demo accounts: <span style="font-family:monospace; color:#8ff5c8;">ali / ali123</span> &bull; <span style="font-family:monospace; color:#8ff5c8;">asima / asima123</span>
         </div>
       </div>
     </div>
@@ -905,7 +992,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
       <div>
         <span>Chatly Multi-Tenant Closing Infrastructure</span>
         <span style="margin: 0 6px;">&bull;</span>
-        <span style="color:#00a884; font-weight:700;">24/7 Pure WebSocket Engine</span>
+        <span style="color:var(--wa-accent); font-weight:700;">24/7 Pure WebSocket Engine</span>
       </div>
       <div style="display:flex; gap:16px;">
         <a href="login.php?switch=1" class="footer-link">Switch Account</a>
@@ -968,9 +1055,13 @@ let lastKnownState = '';
 async function refreshQRCode(force = false) {
   const qrImg = document.getElementById('landingQrImage');
   const statusTxt = document.getElementById('qrStatusText');
+  const scanLine = document.querySelector('.qr-scan-line');
+  const box = document.getElementById('connectedPhoneActionsBox');
   try {
     if (force) {
-      statusTxt.textContent = '🔄 Generating fresh WhatsApp QR code...';
+      if (statusTxt) statusTxt.textContent = '🔄 Generating fresh WhatsApp QR code...';
+      if (box) box.style.display = 'none';
+      if (scanLine) scanLine.style.display = 'block';
       try {
         await fetch('api/direct_sender.php', {
           method: 'POST',
@@ -984,29 +1075,115 @@ async function refreshQRCode(force = false) {
     const data = await res.json();
     if (data.success) {
       if (data.qr && data.state === 'qr') {
-        qrImg.src = data.qr;
-        statusTxt.textContent = 'Pure WebSocket Bridge • Scan with WhatsApp';
+        if (qrImg) qrImg.src = data.qr;
+        if (box) box.style.display = 'none';
+        if (scanLine) scanLine.style.display = 'block';
+        if (statusTxt) statusTxt.textContent = 'Pure WebSocket Bridge • Scan with WhatsApp';
+        lastKnownState = 'qr';
       } else if (data.is_connected && data.connected_number) {
-        statusTxt.textContent = `Connected: +${data.connected_number}! Verifying Account...`;
-        if (lastKnownState !== 'connected') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const isExplicitLogout = urlParams.get('action') === 'logout' || urlParams.get('switch') === '1' || urlParams.get('logout') === '1' || sessionStorage.getItem('chatly_logged_out') === '1';
+
+        // Auto-login only if user was actively looking at the QR code and just scanned it with their phone camera
+        if (lastKnownState === 'qr' && !isExplicitLogout) {
           lastKnownState = 'connected';
+          if (statusTxt) statusTxt.textContent = `Connected: +${data.connected_number}! Verifying Account...`;
           clearInterval(qrPollTimer);
           handleConnectedPhone(data.connected_number);
+        } else {
+          // Already connected from a previous background session or user just logged out
+          lastKnownState = 'already_connected';
+          showConnectedCloserBox(data.connected_number);
         }
       } else if (data.state === 'idle' || data.state === 'disconnected') {
+        if (box) box.style.display = 'none';
+        if (scanLine) scanLine.style.display = 'block';
         fetch('api/direct_sender.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'connect_whatsapp' })
         });
-        statusTxt.textContent = 'Initializing WhatsApp bridge…';
+        if (statusTxt) statusTxt.textContent = 'Initializing WhatsApp bridge…';
       } else {
-        statusTxt.textContent = data.message || 'Connecting to WhatsApp bridge…';
+        if (statusTxt) statusTxt.textContent = data.message || 'Connecting to WhatsApp bridge…';
       }
     }
   } catch (err) {
-    statusTxt.textContent = 'Bridge reconnecting…';
+    if (statusTxt) statusTxt.textContent = 'Bridge reconnecting…';
   }
+}
+
+async function showConnectedCloserBox(phone) {
+  const statusTxt = document.getElementById('qrStatusText');
+  const scanLine = document.querySelector('.qr-scan-line');
+  if (scanLine) scanLine.style.display = 'none';
+  if (statusTxt) statusTxt.innerHTML = '🟢 WhatsApp Paired: <strong>+' + phone + '</strong>';
+
+  const box = document.getElementById('connectedPhoneActionsBox');
+  const nameEl = document.getElementById('connectedCloserName');
+  const phoneEl = document.getElementById('connectedCloserPhone');
+  const enterBtn = document.getElementById('btnEnterConnectedCloser');
+  const discBtn = document.getElementById('btnDisconnectWhatsApp');
+
+  if (box) {
+    box.style.display = 'block';
+    if (phoneEl) phoneEl.textContent = '+' + phone;
+
+    try {
+      const res = await fetch('api/auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check_phone', phone: phone })
+      });
+      const data = await res.json();
+      if (data.exists && data.user) {
+        if (nameEl) nameEl.textContent = (data.user.name || 'Closer') + ' (@' + (data.user.username || 'closer') + ')';
+      } else {
+        if (nameEl) nameEl.textContent = 'Unregistered WhatsApp Closer';
+      }
+    } catch (_) {}
+
+    if (enterBtn) {
+      enterBtn.onclick = function() {
+        loginAsConnectedCloser(phone);
+      };
+    }
+    if (discBtn) {
+      discBtn.onclick = function() {
+        disconnectWhatsAppBridge();
+      };
+    }
+  }
+}
+
+async function loginAsConnectedCloser(phone) {
+  try {
+    sessionStorage.removeItem('chatly_logged_out');
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'qr_login', phone: phone })
+    });
+    const data = await res.json();
+    if (data.success && data.user) {
+      triggerLoginAnimation(data.user.name, 'Sales Closer Desk Activated • Starting Pipeline', 'index.php');
+    } else {
+      alert(data.error || 'Failed to activate session with connected number.');
+    }
+  } catch (err) {
+    alert('Login error: ' + err.message);
+  }
+}
+
+async function disconnectWhatsAppBridge() {
+  const statusTxt = document.getElementById('qrStatusText');
+  if (statusTxt) statusTxt.textContent = '🔄 Disconnecting WhatsApp & generating fresh QR code...';
+  const box = document.getElementById('connectedPhoneActionsBox');
+  if (box) box.style.display = 'none';
+  const scanLine = document.querySelector('.qr-scan-line');
+  if (scanLine) scanLine.style.display = 'block';
+  lastKnownState = '';
+  await refreshQRCode(true);
 }
 
 // Connected Phone Verification & Routing (TM Joining Cycle)
@@ -1226,10 +1403,10 @@ async function handleSadminLogin(e) {
     <div style="font-size:44px; margin-bottom:12px;">⚠️</div>
     <h3 style="font-size:18px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Phone Number Already in Use</h3>
     <p style="font-size:13px; color:var(--wa-text-secondary); line-height:1.5; margin-bottom:20px;" id="phoneExistsMsg">
-      This WhatsApp number is already linked to closer account <strong id="phoneExistsUser" style="color:#00a884;">@user</strong>.<br>Wanna login with your password instead?
+      This WhatsApp number is already linked to closer account <strong id="phoneExistsUser" style="color:var(--wa-accent);">@user</strong>.<br>Wanna login with your password instead?
     </p>
     <div style="display:flex; gap:10px;">
-      <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); margin:0;" onclick="switchTMToLogin()">
+      <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); margin:0;" onclick="switchTMToLogin()">
         🔑 Yes, Log In as @<span id="phoneExistsBtnUser">user</span>
       </button>
       <button type="button" class="btn-action-primary" style="background:rgba(255,255,255,0.08); color:var(--wa-text-primary); margin:0; width:auto; padding:12px 18px;" onclick="closePhoneExistsModal()">
@@ -1241,19 +1418,19 @@ async function handleSadminLogin(e) {
 
 <!-- MODAL: New TM Closer Registration Wizard -->
 <div id="modalTMRegister" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px); overflow-y:auto; padding:20px 0;">
-  <div style="background:var(--wa-card-bg); border:1px solid rgba(0,168,132,0.4); border-radius:20px; padding:30px; max-width:520px; width:92%; box-shadow:0 25px 60px rgba(0,0,0,0.6); position:relative;">
+  <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138,0.4); border-radius:20px; padding:30px; max-width:520px; width:92%; box-shadow:0 25px 60px rgba(0,0,0,0.6); position:relative;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
       <div>
-        <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#00a884; letter-spacing:0.05em;">Step-by-Step Onboarding</div>
+        <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--wa-accent); letter-spacing:0.05em;">Step-by-Step Onboarding</div>
         <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary);">🚀 New Closer WhatsApp Setup</h3>
       </div>
       <button type="button" onclick="closeTMRegisterModal()" style="background:none; border:none; color:var(--wa-text-muted); font-size:24px; cursor:pointer;">&times;</button>
     </div>
 
-    <div style="background:rgba(0,168,132,0.1); border:1px solid rgba(0,168,132,0.25); border-radius:10px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:#00a884; display:flex; align-items:center; gap:8px;">
+    <div style="background:rgba(31, 224, 138,0.1); border:1px solid rgba(31, 224, 138,0.25); border-radius:10px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:var(--wa-accent); display:flex; align-items:center; gap:8px;">
       <span>📱</span>
       <span>WhatsApp Number: <strong id="regDisplayPhone">+92 300 1234567</strong></span>
-      <span style="margin-left:auto; background:#00a884; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">VERIFIED</span>
+      <span style="margin-left:auto; background:var(--wa-accent); color:#03130c; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">VERIFIED</span>
     </div>
 
     <form id="formTMRegisterSubmit" onsubmit="handleTMRegisterSubmit(event)">
@@ -1278,12 +1455,12 @@ async function handleSadminLogin(e) {
       </div>
 
       <!-- Live Company Brand & Logo Preview Card -->
-      <div id="companyBrandPreviewCard" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(0,168,132,0.3); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease;">
-        <img id="previewCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: contain; background: #0c0a18; border: 1px solid rgba(255,255,255,0.15); padding: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;">
+      <div id="companyBrandPreviewCard" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(31, 224, 138,0.3); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease;">
+        <img id="previewCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: contain; background: #07140f; border: 1px solid rgba(255,255,255,0.15); padding: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;">
         <div style="flex: 1; min-width: 0;">
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
             <strong id="previewCompName" style="color: var(--wa-text-primary); font-size: 13.5px; font-weight: 800;">Nunno Official</strong>
-            <span id="previewCompBadge" style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.4);">Enterprise Billion</span>
+            <span id="previewCompBadge" style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(31, 224, 138, 0.2); color: #4cecab; border: 1px solid rgba(31, 224, 138, 0.4);">Enterprise Billion</span>
           </div>
           <div id="previewCompTagline" style="font-size: 11px; color: var(--wa-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Scalper Alpha &amp; SaaS</div>
         </div>
@@ -1315,7 +1492,7 @@ async function handleSadminLogin(e) {
 
       <div class="error-box" id="tmRegModalError"></div>
 
-      <button type="submit" id="btnSubmitTMReg" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); margin-top:8px;">
+      <button type="submit" id="btnSubmitTMReg" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); margin-top:8px;">
         Submit Closer Application for Company Approval ⏳
       </button>
       
@@ -1328,16 +1505,16 @@ async function handleSadminLogin(e) {
 
 <!-- MODAL: TM Application Submitted Confirmation -->
 <div id="modalTMSuccess" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
-  <div style="background:var(--wa-card-bg); border:1px solid rgba(0,168,132,0.4); border-radius:20px; padding:32px; max-width:460px; width:90%; box-shadow:0 25px 60px rgba(0,0,0,0.6); text-align:center;">
+  <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138,0.4); border-radius:20px; padding:32px; max-width:460px; width:90%; box-shadow:0 25px 60px rgba(0,0,0,0.6); text-align:center;">
     <div style="display:flex; justify-content:center; margin-bottom:12px;">
-      <img id="successCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:64px; height:64px; border-radius:16px; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.18); padding:5px; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+      <img id="successCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:64px; height:64px; border-radius:16px; object-fit:contain; background:#07140f; border:1px solid rgba(255,255,255,0.18); padding:5px; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
     </div>
     <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Closer Application Received!</h3>
     <p style="font-size:13px; color:var(--wa-text-secondary); line-height:1.6; margin-bottom:20px;">
-      Your application has been dispatched to <strong id="successCompName" style="color:#00a884;">Company</strong> administration.<br><br>
+      Your application has been dispatched to <strong id="successCompName" style="color:var(--wa-accent);">Company</strong> administration.<br><br>
       Once approved by the company, you can log in directly anytime using your <strong>Username &amp; Password</strong> without needing to scan the QR code again!
     </p>
-    <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); margin:0;" onclick="closeTMSuccessModal()">
+    <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); margin:0;" onclick="closeTMSuccessModal()">
       Understood, Continue to Login &rarr;
     </button>
   </div>

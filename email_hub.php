@@ -79,7 +79,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
       width: 40px;
       height: 40px;
       border-radius: 10px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: linear-gradient(135deg, #0fa968, #14c27a);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -89,7 +89,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
     .hub-tabs {
       display: flex;
       gap: 8px;
-      background: rgba(99, 102, 241, 0.08);
+      background: rgba(31, 224, 138, 0.08);
       padding: 4px;
       border-radius: 10px;
     }
@@ -136,9 +136,9 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      background: rgba(99, 102, 241, 0.1);
-      border: 1px solid rgba(99, 102, 241, 0.25);
-      color: #6366f1;
+      background: rgba(31, 224, 138, 0.1);
+      border: 1px solid rgba(31, 224, 138, 0.25);
+      color: #0fa968;
       font-family: var(--font-mono, monospace);
       font-size: 11px;
       font-weight: 700;
@@ -149,7 +149,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
       transition: all 0.15s;
     }
     .variable-chip:hover {
-      background: #6366f1;
+      background: #0fa968;
       color: #fff;
     }
     .log-table {
@@ -363,7 +363,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
             <label class="form-label">Reply-To Address</label>
             <input type="email" id="hubReplyTo" class="form-input" value="numeniousnexus@gmail.com">
           </div>
-          <div id="hubSmtpFields" style="display:none;flex-direction:column;gap:12px;background:rgba(99,102,241,0.04);padding:14px;border-radius:10px;border:1px solid var(--hub-border);">
+          <div id="hubSmtpFields" style="display:none;flex-direction:column;gap:12px;background:rgba(31, 224, 138,0.04);padding:14px;border-radius:10px;border:1px solid var(--hub-border);">
             <div style="font-size:11.5px;font-weight:700;color:var(--accent-brand);">Google / Gmail SMTP Configuration</div>
             <div class="form-group" style="margin:0;">
               <label class="form-label">SMTP Host</label>
@@ -575,7 +575,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
             const v = item.substring(idx + 1).trim();
             html += '<tr><td style="color:#64748b;font-weight:600;width:140px;vertical-align:top;padding:4px 10px 4px 0;">' + escapeHtml(k) + ':</td><td style="color:#0f172a;font-weight:700;padding:4px 0;">' + escapeHtml(v) + '</td></tr>\n';
           } else {
-            html += '<tr><td style="color:#6366f1;width:20px;vertical-align:top;padding:4px 0;">&bull;</td><td style="color:#334155;font-weight:600;padding:4px 0;">' + escapeHtml(item) + '</td></tr>\n';
+            html += '<tr><td style="color:#0fa968;width:20px;vertical-align:top;padding:4px 0;">&bull;</td><td style="color:#334155;font-weight:600;padding:4px 0;">' + escapeHtml(item) + '</td></tr>\n';
           }
           isFirst = false;
           continue;
@@ -589,7 +589,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
           continue;
         }
         if (/^[A-Za-z0-9\s—]+:\s*$/.test(trimmed)) {
-          html += '<div style="font-size:11.5px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.04em;margin-top:16px;margin-bottom:6px;">' + escapeHtml(trimmed) + '</div>\n';
+          html += '<div style="font-size:11.5px;font-weight:800;color:#0fa968;text-transform:uppercase;letter-spacing:0.04em;margin-top:16px;margin-bottom:6px;">' + escapeHtml(trimmed) + '</div>\n';
           isFirst = false;
           continue;
         }
@@ -650,11 +650,11 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
           <style>
             body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;margin:0;padding:20px;color:#1e293b; }
             .card { max-width:580px;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,0.06); }
-            .accent { height:5px;background:linear-gradient(90deg, #6366f1, #a855f7, #10b981); }
+            .accent { height:5px;background:linear-gradient(90deg, #0fa968, #2de89a, #10b981); }
             .head { padding:20px 24px 14px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center; }
             .brand { font-size:18px;font-weight:900;letter-spacing:-0.03em;color:#0f172a; }
-            .brand span { color:#6366f1; }
-            .badge { font-size:10.5px;font-weight:800;background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:999px; }
+            .brand span { color:#0fa968; }
+            .badge { font-size:10.5px;font-weight:800;background:#e4faf0;color:#065f3c;padding:3px 10px;border-radius:999px; }
             .body { padding:24px;font-size:13.5px;line-height:1.6; }
             .btn { display:inline-block;padding:11px 24px;background:#10b981;color:#fff;text-decoration:none;font-weight:700;border-radius:10px;font-size:13px; }
             .foot { background:#f8fafc;padding:14px 24px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b; }
@@ -751,7 +751,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
               <td class="mono" style="font-size:11px;color:var(--hub-muted);">${l.id}</td>
               <td><strong>${escapeHtml(l.recipient_name)}</strong><br><span style="font-size:11px;color:var(--hub-muted);">${escapeHtml(l.recipient_email)}</span></td>
               <td>${escapeHtml(l.subject)}</td>
-              <td><span style="font-size:10.5px;padding:2px 7px;border-radius:4px;background:rgba(99,102,241,0.1);color:#6366f1;font-weight:700;">${l.template_id}</span></td>
+              <td><span style="font-size:10.5px;padding:2px 7px;border-radius:4px;background:rgba(31, 224, 138,0.1);color:#0fa968;font-weight:700;">${l.template_id}</span></td>
               <td style="font-size:11px;color:var(--hub-muted);">${new Date(l.timestamp).toLocaleString()}</td>
               <td style="font-size:11px;">${escapeHtml(l.sent_by || 'Admin')}</td>
               <td><span style="padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;background:rgba(16,185,129,0.15);color:#059669;">✓ Sent</span></td>
