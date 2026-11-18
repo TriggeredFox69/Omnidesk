@@ -24,6 +24,7 @@ function templateAdminPhp(content, currentUser) {
   }
   let compName = 'Nunno Official';
   let compPlan = 'Enterprise Billion';
+  let compLogo = 'assets/images/nunno-logo.svg';
   const compId = currentUser?.company_id || 'COMP-001';
   try {
     const comps = JSON.parse(fs.readFileSync(path.join(root, 'data/companies.json'), 'utf8') || '[]');
@@ -31,10 +32,12 @@ function templateAdminPhp(content, currentUser) {
     if (match) {
       compName = match.name || compName;
       compPlan = match.plan || compPlan;
+      compLogo = match.logo || compLogo;
     }
   } catch (_) {}
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['name'\]\); \?>/g, compName);
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['plan'\] \?\? 'Enterprise Pro'\); \?>/g, compPlan);
+  rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['logo'\] \?\? '[^']*'\); \?>/g, compLogo);
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['fallback_phone'\] \?\? '\+923318036576'\); \?>/g, '+923318036576');
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['id'\]\); \?>/g, compId);
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$currentUser\['name'\] \?\? 'Admin'\); \?>/g, currentUser?.name || 'System Administrator');
@@ -339,8 +342,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               });
             }
             if (!closerUser && body.demo) {
-              closerUser = allUsers.find(u => u.username === 'hamza') || allUsers.find(u => u.role === 'member') || {
-                id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', status: 'active', company_id: 'COMP-001'
+              closerUser = allUsers.find(u => u.username === 'askari') || allUsers.find(u => u.role === 'member' && u.status === 'active') || {
+                id: 'EMP-TM-MWMK43N9', name: 'Askari Raza', username: 'askari', role: 'member', designation: 'Closer Specialist', status: 'active', company_id: 'COMP-001'
               };
             }
             if (!closerUser) {
@@ -728,7 +731,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
 
             if (stream.length === 0) {
               stream.push(
-                { id: 'LIVE-01', company_id: 'COMP-001', company_name: 'Nunno Official', lead_name: 'Ali Trader', lead_phone: '+923001234567', closer_name: 'Hamza Khan', sender: 'agent', text: 'Salam Ali bhai! Your Nunno Pro scalper license is active.', time: 'Just now', state: 'paid' },
+                { id: 'LIVE-01', company_id: 'COMP-001', company_name: 'Nunno Official', lead_name: 'Ali Trader', lead_phone: '+923001234567', closer_name: 'Askari Raza', sender: 'agent', text: 'Salam Ali bhai! Your license is active.', time: 'Just now', state: 'paid' },
                 { id: 'LIVE-02', company_id: 'COMP-002', company_name: 'Apex Crypto Signals', lead_name: 'Waqas BTC', lead_phone: '+923219988776', closer_name: 'Daniyal Sheikh', sender: 'lead', text: 'Bro whats the monthly VIP pricing?', time: '1 min ago', state: 'ongoing' }
               );
             }
@@ -1041,7 +1044,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         res.writeHead(404); res.end(); return;
       }
 
-      const types = { '.html': 'text/html', '.php': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
+      const types = { '.html': 'text/html', '.php': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
       res.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
 
       if (allowedPages.includes(relative)) {

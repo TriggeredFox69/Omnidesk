@@ -38,8 +38,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>WhatsApp Web — OmniDesk Sales Closing Platform</title>
-  <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
+  <title>Chatly — WhatsApp Closing Platform &amp; Multi-Role Gateway</title>
+  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -596,12 +596,9 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
 
 <!-- Green Header Banner -->
 <div class="wa-top-header">
-  <a href="login.php" class="wa-brand-title">
-    <div class="wa-logo-icon">
-      <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
-    </div>
-    <span class="wa-brand-name">OmniDesk • WhatsApp Web</span>
-    <span class="wa-brand-tag">SaaS 2026</span>
+  <a href="login.php" class="wa-brand-title" style="display:flex; align-items:center; gap:12px;">
+    <img src="assets/images/chatly-logo.jpg" alt="Chatly" style="height:36px; width:auto; border-radius:8px; object-fit:contain; box-shadow:0 4px 14px rgba(0,0,0,0.25);">
+    <span class="wa-brand-tag" style="background:rgba(255,255,255,0.22); color:#fff; font-weight:700;">WhatsApp Web 2026</span>
   </a>
 
   <div style="display:flex; align-items:center; gap:16px;">
@@ -614,10 +611,10 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
 <!-- 360 Spin Animation Overlay -->
 <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true">
   <div style="display:flex; flex-direction:column; align-items:center;">
-    <div class="anim-logo-box">
-      <img src="assets/images/nunno-logo.png" alt="Platform Logo">
+    <div class="anim-logo-box" style="width:72px; height:72px; border-radius:20px; overflow:hidden;">
+      <img src="assets/images/chatly-icon.jpg" alt="Chatly" style="width:100%; height:100%; object-fit:cover;">
     </div>
-    <div class="anim-brand-text" id="animBrandText">OmniDesk Sales Desk</div>
+    <div class="anim-brand-text" id="animBrandText">Chatly Sales Desk</div>
     <div class="anim-subtext" id="animSubtext">Initializing isolated workspace…</div>
   </div>
 </div>
@@ -661,7 +658,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
           
           <!-- Left: Step-by-Step Instructions -->
           <div>
-            <h1 class="wa-journey-title">To use OmniDesk on your computer:</h1>
+            <h1 class="wa-journey-title">To use Chatly on your computer:</h1>
 
             <ol class="wa-steps-list">
               <li class="wa-step-item">
@@ -712,8 +709,8 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
             <div class="wa-qr-frame">
               <div class="qr-scan-line"></div>
               <img id="landingQrImage" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='230' height='230' viewBox='0 0 230 230'><rect width='230' height='230' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b' font-weight='700'>⚡ Generating QR Code...</text></svg>" alt="WhatsApp QR Code" class="wa-qr-img">
-              <div class="wa-qr-center-logo">
-                <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
+              <div class="wa-qr-center-logo" style="width:44px; height:44px; border-radius:12px; background:#0c0a18; border:2px solid #00a884; overflow:hidden; padding:2px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+                <img src="assets/images/chatly-icon.jpg" alt="Chatly" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
               </div>
             </div>
 
@@ -733,7 +730,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
                 📱 Link WhatsApp Number:
               </div>
               <div style="display: flex; gap: 6px;">
-                <input type="text" id="simPhoneInput" placeholder="+923001234567" value="+923001234567" class="input-field" style="padding: 8px 10px; font-size: 13px; font-family: monospace;">
+                <input type="text" id="simPhoneInput" placeholder="+923046588806" value="+923046588806" class="input-field" style="padding: 8px 10px; font-size: 13px; font-family: monospace;">
                 <button type="button" class="btn-action-primary" style="margin: 0; padding: 8px 12px; width: auto; font-size: 12px; background: #00a884; white-space: nowrap;" onclick="handlePhonePairSubmit()">
                   ⚡ Link
                 </button>
@@ -755,12 +752,12 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
 
           <form id="formTMPasswordLogin" onsubmit="handleTMPasswordLogin(event)">
             <div class="input-group">
-              <label class="input-label">Username (e.g. hamza or your approved username)</label>
-              <input type="text" id="tmDirectUsername" class="input-field" placeholder="hamza" required>
+              <label class="input-label">Username (e.g. askari or your approved username)</label>
+              <input type="text" id="tmDirectUsername" class="input-field" placeholder="askari" required>
             </div>
             <div class="input-group">
               <label class="input-label">Password</label>
-              <input type="password" id="tmDirectPassword" class="input-field" placeholder="closer123" required>
+              <input type="password" id="tmDirectPassword" class="input-field" placeholder="123456" required>
             </div>
             <div class="error-box" id="tmPasswordLoginError"></div>
             <button type="submit" id="tmDirectLoginBtn" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); box-shadow:0 6px 20px rgba(0, 168, 132, 0.35);">
@@ -769,7 +766,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
           </form>
 
           <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
-            New to OmniDesk? <a href="javascript:void(0)" onclick="toggleTMSubMode('qr')" class="footer-link">Scan your WhatsApp QR to apply</a>
+            New to Chatly? <a href="javascript:void(0)" onclick="toggleTMSubMode('qr')" class="footer-link">Scan your WhatsApp QR to apply</a>
           </div>
         </div>
       </div>
@@ -899,7 +896,7 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
     <!-- WhatsApp Web Card Bottom Bar -->
     <div class="wa-card-footer">
       <div>
-        <span>OmniDesk Multi-Tenant Closing Infrastructure</span>
+        <span>Chatly Multi-Tenant Closing Infrastructure</span>
         <span style="margin: 0 6px;">&bull;</span>
         <span style="color:#00a884; font-weight:700;">24/7 Pure WebSocket Engine</span>
       </div>

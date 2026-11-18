@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check Impersonation Mode (Admin Direct Login into Closer)
     const isImpersonated = localStorage.getItem('omnidesk_impersonated_from_admin') === '1' || Boolean(user?._impersonated_by);
-    const impBanner = document.getElementById('adminImpersonationBanner');
+    const impBanner = document.getElementById('adminImpersonationBanner') || document.getElementById('impersonationBanner');
     if (impBanner) {
       if (isImpersonated) {
         impBanner.style.display = 'flex';
@@ -633,7 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
       name: state.currentUser?.company_name || 'Nunno Official',
       short_name: (state.currentUser?.company_name || 'Nunno').split(' ')[0],
       logo: 'assets/images/nunno-logo.svg',
-      badge: 'Omni-Desk Workspace',
+      badge: 'Scalper Alpha & SaaS',
       brand_color: '#00a884'
     };
 
@@ -642,20 +642,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const brandBadge = document.getElementById('mainBrandBadge') || document.querySelector('.brand-badge');
     const brandSub = document.getElementById('mainBrandSubtitle') || document.querySelector('.brand-info .text-xs');
     const compContextName = document.getElementById('companyContextName');
+    const companyBadgeLogo = document.getElementById('companyBadgeLogo');
+    const profileCompLogo = document.getElementById('profileCompanyLogo');
+    const profileCompName = document.getElementById('profileCompanyName');
 
+    // Main Platform Brand stays Chatly
     if (logoImg) {
-      logoImg.src = brand.logo;
-      logoImg.alt = brand.name;
+      logoImg.src = 'assets/images/chatly-logo.jpg';
+      logoImg.alt = 'Chatly';
     }
-    if (brandName) brandName.textContent = brand.short_name;
-    if (brandSub) brandSub.textContent = brand.badge;
+    if (brandName) brandName.textContent = 'Chatly';
+    if (brandBadge) brandBadge.textContent = 'Closing Desk';
+    if (brandSub) brandSub.textContent = brand.name;
+
+    // Company Tenant Context (Topbar & TM Portal)
     if (compContextName) compContextName.textContent = brand.name;
+    if (companyBadgeLogo) companyBadgeLogo.src = brand.logo;
+    if (profileCompLogo) profileCompLogo.src = brand.logo;
+    if (profileCompName) profileCompName.textContent = brand.name;
 
-    // Transition & Animation overlays
-    const animLogos = document.querySelectorAll('.anim-logo-img, .chat-transition-logo');
-    animLogos.forEach(img => { img.src = brand.logo; });
+    // Chat Transition & Splash animation use Chatly Icon!
+    const animLogos = document.querySelectorAll('.anim-logo-img');
+    animLogos.forEach(img => { img.src = 'assets/images/chatly-icon.jpg'; });
+    const chatTransLogos = document.querySelectorAll('.chat-transition-logo');
+    chatTransLogos.forEach(img => { img.src = 'assets/images/chatly-icon.jpg'; });
 
-    document.title = `${brand.short_name} — OmniDesk Sales Closing Platform`;
+    document.title = `${brand.name} — Chatly Sales Closing Platform`;
 
     // Dynamic fetch from companies API to ensure real-time consistency
     fetch('api/companies.php?action=list')
@@ -664,10 +676,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data?.success && Array.isArray(data.companies)) {
           const match = data.companies.find(c => c.id === compId);
           if (match) {
-            if (logoImg && match.logo) logoImg.src = match.logo;
-            if (brandName && match.short_name) brandName.textContent = match.short_name;
             if (compContextName && match.name) compContextName.textContent = match.name;
-            if (brandSub && (match.badge || match.plan)) brandSub.textContent = match.badge || match.plan;
+            if (companyBadgeLogo && match.logo) companyBadgeLogo.src = match.logo;
+            if (profileCompLogo && match.logo) profileCompLogo.src = match.logo;
+            if (profileCompName && match.name) profileCompName.textContent = match.name;
+            if (brandSub && match.name) brandSub.textContent = match.name;
           }
         }
       }).catch(() => {});
@@ -3923,6 +3936,16 @@ document.addEventListener('DOMContentLoaded', () => {
       avatarTarget.textContent = parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : employeeName.slice(0, 2).toUpperCase();
     }
 
+    // Live Company Logo & Name in Closer Portal
+    const profCompLogo = document.getElementById('profileCompanyLogo');
+    const profCompName = document.getElementById('profileCompanyName');
+    const userCompId = user.company_id || state.currentCompanyId || 'COMP-001';
+    const compCatalog = (typeof COMPANY_BRAND_CATALOG !== 'undefined' && COMPANY_BRAND_CATALOG[userCompId]) ? COMPANY_BRAND_CATALOG[userCompId] : null;
+    const resolvedCompName = user.company_name || compCatalog?.name || 'Company Workspace';
+    const resolvedCompLogo = compCatalog?.logo || 'assets/images/nunno-logo.svg';
+    if (profCompName) profCompName.textContent = resolvedCompName;
+    if (profCompLogo) profCompLogo.src = resolvedCompLogo;
+
     // 2. Compute the 5 Core Requested Metrics
     const activeId = user.id;
     const mine = isAdmin 
@@ -4674,19 +4697,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check active session on load
   function checkAuthSession() {
-    if (window.NUNNO_ACTIVE_USER && typeof window.NUNNO_ACTIVE_USER === 'object') {
+    if (window.NUNNO_ACTIVE_USER && typeof window.NUNNO_ACTIVE_USER === 'object' && window.NUNNO_ACTIVE_USER.id) {
       applyUserSession(window.NUNNO_ACTIVE_USER);
       return;
-    }
-    const localSession = localStorage.getItem('nunno_active_session');
-    if (localSession) {
-      try {
-        const u = JSON.parse(localSession);
-        if (u && (u.username || u.id)) {
-          applyUserSession(u);
-          return;
-        }
-      } catch (e) {}
     }
     fetch('api/auth.php?action=check')
       .then(res => res.json())
@@ -4694,31 +4707,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data && data.authenticated && data.user) {
           applyUserSession(data.user);
         } else {
-          // If on web server (local or hosted), redirect to landing page
+          // Unauthenticated: clear any stale cached session and redirect to login gateway
+          localStorage.removeItem('nunno_active_session');
           if (location.protocol !== 'file:') {
             window.location.href = 'login.php';
             return;
           }
-          // Check local offline fallback
-          const localSession = localStorage.getItem('nunno_active_session');
-          if (localSession) {
-            try {
-              const u = JSON.parse(localSession);
-              applyUserSession(u);
-              return;
-            } catch (e) {}
-          }
-          // Default to Closer session (Hamza Khan) so phone masking & role restrictions are active by default
-          const defaultCloser = {
-            id: 'USR-EMP-01',
-            name: 'Hamza Khan',
-            username: 'closer',
-            role: 'member',
-            designation: 'Closer Specialist',
-            gender: 'male',
-            status: 'active'
-          };
-          applyUserSession(defaultCloser);
+          showAuthOverlay();
         }
       })
       .catch(() => {
@@ -4727,20 +4722,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (localSession) {
           try {
             const u = JSON.parse(localSession);
-            applyUserSession(u);
-            return;
+            if (u && (u.username || u.id)) {
+              applyUserSession(u);
+              return;
+            }
           } catch (e) {}
         }
-        const defaultCloser = {
-          id: 'USR-EMP-01',
-          name: 'Hamza Khan',
-          username: 'closer',
-          role: 'member',
-          designation: 'Closer Specialist',
-          gender: 'male',
-          status: 'active'
-        };
-        applyUserSession(defaultCloser);
+        if (location.protocol !== 'file:') {
+          window.location.href = 'login.php';
+        } else {
+          showAuthOverlay();
+        }
       });
   }
 
@@ -5567,7 +5559,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('omnidesk_impersonated_user');
     localStorage.removeItem('omnidesk_impersonated_name');
     setTimeout(() => {
-      window.location.href = 'index.html';
+      window.location.href = 'admin.php';
     }, 200);
   };
   window.OmnideskToggleStatus = function(empId) {
@@ -5714,8 +5706,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.authAlert) els.authAlert.style.display = 'none';
   });
   document.getElementById('quickFillEmpBtn')?.addEventListener('click', () => {
-    if (els.authUsername) els.authUsername.value = 'hamza';
-    if (els.authPassword) els.authPassword.value = 'Agent@123';
+    if (els.authUsername) els.authUsername.value = 'askari';
+    if (els.authPassword) els.authPassword.value = '123456';
     if (els.authAlert) els.authAlert.style.display = 'none';
   });
 

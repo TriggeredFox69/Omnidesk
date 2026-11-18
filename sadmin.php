@@ -43,8 +43,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Super Admin — Platform Owner Command Center</title>
-  <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
+  <title>Chatly Super Admin — Platform Owner Command Center</title>
+  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -318,11 +318,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 <?php else: ?>
   <!-- SUPER ADMIN MASTER COMMAND CENTER -->
   <header class="top-bar">
-    <div class="brand-section">
+    <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
+      <a href="sadmin.php" title="Chatly Global" style="display:flex; align-items:center; text-decoration:none;">
+        <img src="assets/images/chatly-logo.jpg" alt="Chatly" style="height:34px; width:auto; border-radius:6px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,0.2);">
+      </a>
+      <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
       <div class="sadmin-logo">⚡</div>
       <div>
         <div class="sadmin-title">
-          <span>OmniDesk Master Headquarters</span>
+          <span>Chatly Master Headquarters</span>
           <span class="badge-sadmin">SADMIN Command</span>
         </div>
         <div class="sadmin-sub">Global Multi-Company Telemetry & Infrastructure Management</div>

@@ -69,8 +69,8 @@ if (!$activeCompany) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Company Admin — <?php echo htmlspecialchars($activeCompany['name']); ?></title>
-  <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
+  <title>Chatly Company Admin — <?php echo htmlspecialchars($activeCompany['name']); ?></title>
+  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -167,14 +167,12 @@ if (!$activeCompany) {
       width: 44px;
       height: 44px;
       border-radius: 12px;
-      background: linear-gradient(135deg, #10b981, #059669);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      font-weight: 900;
-      color: #fff;
-      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+      background: #0c0a18;
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      object-fit: contain;
+      padding: 3px;
+      display: block;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     }
     .company-info { display: flex; flex-direction: column; }
     .company-name-row { display: flex; align-items: center; gap: 8px; }
@@ -456,8 +454,12 @@ if (!$activeCompany) {
 <?php else: ?>
   <!-- EXECUTIVE COMPANY ADMIN DASHBOARD -->
   <header class="top-bar">
-    <div class="brand-section">
-      <div class="company-logo">🏢</div>
+    <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
+      <a href="admin.php" title="Chatly Enterprise" style="display:flex; align-items:center; text-decoration:none;">
+        <img src="assets/images/chatly-logo.jpg" alt="Chatly" style="height:34px; width:auto; border-radius:6px; object-fit:contain; box-shadow:0 2px 10px rgba(0,0,0,0.2);">
+      </a>
+      <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
+      <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/nunno-logo.svg'); ?>" alt="Company Logo" class="company-logo">
       <div class="company-info">
         <div class="company-name-row">
           <span class="company-name"><?php echo htmlspecialchars($activeCompany['name']); ?></span>

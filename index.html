@@ -8,9 +8,9 @@
     }
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>OmniDesk — WhatsApp inbox & campaigns</title>
-  <meta name="description" content="OmniDesk brings your WhatsApp conversations and campaigns into one focused workspace.">
-  <link rel="icon" type="image/png" href="assets/images/nunno-logo.png">
+  <title>Chatly — WhatsApp Closing Platform &amp; Infrastructure</title>
+  <meta name="description" content="Chatly brings your WhatsApp closing conversations, campaigns, and multi-tenant sales operations into one focused workspace.">
+  <link rel="icon" type="image/jpeg" href="assets/images/chatly-icon.jpg">
   <link rel="stylesheet" href="assets/css/whatsapp.css?v=14.0">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=14.0">
   <script>
@@ -35,19 +35,19 @@
 </head>
 <body>
 
-  <!-- FULLSCREEN NUNNO 360 ROTATE & ZOOM-OUT OVERLAY -->
+  <!-- FULLSCREEN 360 ROTATE & ZOOM-OUT OVERLAY -->
   <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true" role="status" aria-live="polite">
     <div class="anim-aura"></div>
     <div class="anim-scene">
-      <div class="anim-logo-box">
-        <img src="assets/images/nunno-logo.png" alt="Nunno" class="anim-logo-img">
+      <div class="anim-logo-box" style="width:72px; height:72px; border-radius:20px; overflow:hidden;">
+        <img src="assets/images/chatly-icon.jpg" alt="Chatly" class="anim-logo-img" style="width:100%; height:100%; object-fit:cover;">
       </div>
       <div class="anim-label">
         <div class="anim-brand-text">
-          <span>Nunno</span>
-          <span class="anim-role-tag" id="animRoleTag">Omni-Desk</span>
+          <span>Chatly</span>
+          <span class="anim-role-tag" id="animRoleTag">Closer Portal</span>
         </div>
-        <div class="anim-subtext" id="animSubtext">Opening workspace…</div>
+        <div class="anim-subtext" id="animSubtext">Opening closer workspace…</div>
       </div>
     </div>
   </div>
@@ -67,15 +67,8 @@
        TOP NAVIGATION BAR
   ════════════════════════════════════════════════════════ -->
   <header class="topbar">
-    <div class="brand-wrap">
-      <img id="mainBrandLogoImg" src="assets/images/nunno-logo.svg" alt="Company Logo" class="brand-logo-img" style="object-fit:contain;">
-      <div class="brand-info">
-        <div class="brand-heading">
-          <span id="mainBrandName">Nunno</span>
-          <span class="brand-badge" id="mainBrandBadge">Omni-Desk</span>
-        </div>
-        <span class="text-xs" id="mainBrandSubtitle">Multi-Agent WhatsApp CRM</span>
-      </div>
+    <div class="brand-wrap" style="display:flex; align-items:center; gap:12px;">
+      <img id="mainBrandLogoImg" src="assets/images/chatly-logo.jpg" alt="Chatly" class="brand-logo-img" style="height:34px; width:auto; border-radius:6px; object-fit:contain;">
     </div>
 
     <!-- Main Navigation Tabs -->
@@ -113,8 +106,8 @@
       </button>
 
       <!-- Active Tenant / Company Context Indicator -->
-      <div id="companyContextBadge" style="display:none; align-items:center; gap:6px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:999px; padding:4px 10px; font-size:11px; font-weight:750; color:#a5b4fc;" title="Active Company Tenant Database">
-        <span style="font-size:13px;">🏢</span>
+      <div id="companyContextBadge" style="display:none; align-items:center; gap:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:999px; padding:4px 12px 4px 6px; font-size:12px; font-weight:750; color:#fff;" title="Active Company Tenant">
+        <img id="companyBadgeLogo" src="assets/images/nunno-logo.svg" alt="Company Logo" style="width:22px; height:22px; border-radius:50%; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.2); padding:2px; flex-shrink:0;">
         <span id="companyContextName">Nunno Official</span>
         <select id="companyContextSwitcher" style="display:none; background:transparent; border:none; color:inherit; font-size:11px; font-weight:750; cursor:pointer; outline:none; margin-left:2px;"></select>
       </div>
@@ -224,15 +217,24 @@
         </div>
         <div class="profile-hero-details">
           <div class="profile-hero-name-row">
-            <h1 id="profileCloserName">Ali Raza</h1>
-            <span class="profile-pill-role" id="profileCloserRole">✦ Sales Team Lead</span>
+            <h1 id="profileCloserName">Closer Specialist</h1>
+            <span class="profile-pill-role" id="profileCloserRole">✦ Sales Closer</span>
           </div>
           <div class="profile-hero-meta-row">
-            <span class="profile-badge id-badge" id="profileCloserId">EMP-TL-01</span>
+            <span class="profile-badge id-badge" id="profileCloserId">EMP-TM-01</span>
             <span class="profile-badge status-pulse-badge" id="profileGenderBadge">
               <span class="pulse-spark"></span>
-              <span id="profileStatusTag">Active Now</span>
+              <span id="profileStatusTag">Live Closer</span>
             </span>
+          </div>
+        </div>
+
+        <!-- Live Company Logo & Info Badge right in TM's Portal -->
+        <div class="profile-company-badge" id="profileCompanyBadge" style="display:flex; align-items:center; gap:10px; padding:7px 14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); border-radius:12px; margin-left:auto; backdrop-filter:blur(8px);">
+          <img id="profileCompanyLogo" src="assets/images/nunno-logo.svg" alt="Company Logo" style="width:34px; height:34px; border-radius:9px; object-fit:contain; background:#0c0a18; border:1px solid rgba(255,255,255,0.18); padding:2px; box-shadow:0 4px 12px rgba(0,0,0,0.3); flex-shrink:0;">
+          <div style="display:flex; flex-direction:column;">
+            <span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Representing Company</span>
+            <strong id="profileCompanyName" style="font-size:13px; font-weight:800; color:#fff; white-space:nowrap;">Nunno Official</strong>
           </div>
         </div>
       </div>
@@ -576,10 +578,10 @@
     <section class="chat-thread-col" id="chatThreadCol" style="position:relative;">
       <div class="chat-transition-overlay" id="chatTransitionOverlay" aria-hidden="true">
         <div class="chat-transition-logo-box">
-          <img src="assets/images/nunno-logo.png" alt="Nunno" class="chat-transition-logo">
+          <img src="assets/images/chatly-icon.jpg" alt="Chatly" class="chat-transition-logo" style="width:52px; height:52px; border-radius:14px; object-fit:cover; box-shadow:0 8px 24px rgba(0,0,0,0.35);">
         </div>
         <div class="chat-transition-spinner"></div>
-        <span class="chat-transition-text">Opening conversation…</span>
+        <span class="chat-transition-text">Opening Chatly conversation…</span>
       </div>
       <div class="chat-header">
         <div class="chat-lead-info">
@@ -654,7 +656,7 @@
 
       <!-- Other closer notice -->
       <div id="otherCloserNotice" class="other-closer-notice" style="display:none;">
-        👑 <strong id="otherCloserName">Hamza Khan</strong> is handling this lead. (Admin Monitoring Mode)
+        👑 <strong id="otherCloserName">Closer Specialist</strong> is handling this lead. (Admin Monitoring Mode)
       </div>
 
       <!-- Admin Takeover Notice Banner -->
@@ -814,7 +816,7 @@
         <div class="closer-profile-card">
           <div class="closer-avatar" id="dossierOwnerAvatar">👨‍💼</div>
           <div class="closer-info">
-            <div class="closer-name" id="dossierOwner">Hamza Khan</div>
+            <div class="closer-name" id="dossierOwner">Closer Specialist</div>
             <div class="closer-role" id="dossierOwnerRole">Team Member • EMP-101</div>
           </div>
         </div>
@@ -1288,7 +1290,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
               <button type="button" class="quick-fill-btn" id="quickFillAdminBtn">👑 Admin</button>
               <button type="button" class="quick-fill-btn" id="quickFillMaleLeadBtn">👨 Ali (Male Team Lead)</button>
               <button type="button" class="quick-fill-btn" id="quickFillFemaleLeadBtn">👩 Asima (Female Team Lead)</button>
-              <button type="button" class="quick-fill-btn" id="quickFillEmpBtn">💼 Hamza</button>
+              <button type="button" class="quick-fill-btn" id="quickFillEmpBtn">💼 Askari</button>
             </div>
           </div>
         </form>
@@ -1473,7 +1475,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         </div>
         <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.18);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;font-size:11.5px;">
           <span style="color:var(--text-muted);">Attributed Closer:</span>
-          <span style="font-weight:700;color:var(--emerald);" id="paidCloserName">Hamza Khan</span>
+          <span style="font-weight:700;color:var(--emerald);" id="paidCloserName">Closer Specialist</span>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button type="button" class="btn btn-ghost btn-sm" id="cancelMarkPaidBtn">Cancel</button>
@@ -1716,7 +1718,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
             <div class="perf-hero-left">
               <div class="perf-hero-avatar" id="perfHeroAvatar">👤</div>
               <div>
-                <div class="perf-hero-name" id="perfHeroName">Hamza Khan</div>
+                <div class="perf-hero-name" id="perfHeroName">Closer Specialist</div>
                 <div class="perf-hero-role" id="perfHeroRole">Team Member &bull; EMP-101</div>
               </div>
             </div>

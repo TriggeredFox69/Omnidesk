@@ -243,27 +243,29 @@ switch ($action) {
         echo json_encode(['success' => true, 'stream' => array_slice(array_reverse($stream), 0, 50)]);
         exit;
 
-    // 2. List All Companies (Super Admin)
+    // 2. List All Companies (Public / Super Admin)
+    case 'public_list':
     case 'list':
-        requireSuperAdmin($currentUser);
         $companies = getCompanies($companiesFile);
         $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
         if (!is_array($users)) $users = [];
 
-        // Aggregate statistics per company
-        foreach ($companies as &$comp) {
+        $isSuper = ($currentUser && ($currentUser['role'] ?? '') === 'superadmin');
+        $result = [];
+        foreach ($companies as $comp) {
+            if (!$isSuper && ($comp['status'] ?? 'active') !== 'active') continue;
             $cId = $comp['id'];
             $compUsers = array_filter($users, fn($u) => ($u['company_id'] ?? '') === $cId);
             $comp['employee_count'] = count($compUsers);
             $comp['tl_count']       = count(array_filter($compUsers, fn($u) => ($u['role'] ?? '') === 'lead'));
             $comp['tm_count']       = count(array_filter($compUsers, fn($u) => ($u['role'] ?? '') === 'member'));
             $comp['messages_today'] = array_sum(array_column($compUsers, 'messages_sent_today'));
+            $result[] = $comp;
         }
-        unset($comp);
 
         echo json_encode([
             'success'   => true,
-            'companies' => $companies
+            'companies' => $result
         ]);
         exit;
 
