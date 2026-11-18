@@ -22,7 +22,8 @@ $senderConfigFile = __DIR__ . '/../data/sender_config.json';
 $senderConfig = file_exists($senderConfigFile) ? json_decode(file_get_contents($senderConfigFile), true) : [];
 if (!is_array($senderConfig)) $senderConfig = [];
 
-$currentNumber = getenv('WHATSAPP_DISPLAY_PHONE_NUMBER') ?: ($senderConfig['connected_number'] ?? $config['connected_whatsapp_number'] ?? '');
+$userPhone = $_SESSION['omnidesk_user']['phone'] ?? '';
+$currentNumber = getenv('WHATSAPP_DISPLAY_PHONE_NUMBER') ?: ($userPhone ?: ($senderConfig['connected_number'] ?? ($config['connected_whatsapp_number'] ?? '')));
 $cloudToken = getenv('WHATSAPP_ACCESS_TOKEN') ?: '';
 $cloudConfigured = !empty($cloudToken) && !empty(getenv('WHATSAPP_PHONE_NUMBER_ID')) && !empty(getenv('WHATSAPP_GRAPH_API_VERSION'));
 
@@ -88,10 +89,10 @@ if ($action === 'get_sender_info') {
     }
     echo json_encode([
         'success'          => true,
-        'connected_number' => $currentNumber ?: '923318036576',
-        'is_connected'     => true,
+        'connected_number' => $currentNumber ?: '',
+        'is_connected'     => !empty($currentNumber),
         'mode'             => 'whatsapp_web',
-        'is_configured'    => true
+        'is_configured'    => !empty($currentNumber)
     ]);
     exit;
 }

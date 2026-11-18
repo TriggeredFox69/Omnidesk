@@ -25,7 +25,7 @@ $user = $_SESSION['omnidesk_user'];
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 $templates = json_encode(array_column($config['default_templates'], null, 'id'), $jsonFlags);
 $publicConfig = json_encode([
-    'connected_whatsapp_number' => $config['connected_whatsapp_number'] ?? '+923318036576',
+    'connected_whatsapp_number' => $user['phone'] ?? ($config['connected_whatsapp_number'] ?? ''),
     'sender_engine' => $config['sender_engine'] ?? [],
 ], $jsonFlags);
 $userJson = json_encode($user, $jsonFlags);
