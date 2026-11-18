@@ -549,6 +549,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.tabEmployee) els.tabEmployee.style.display = 'inline-flex';
     }
 
+    // Check Impersonation Mode (Admin Direct Login into Closer)
+    const isImpersonated = localStorage.getItem('omnidesk_impersonated_from_admin') === '1' || Boolean(user?._impersonated_by);
+    const impBanner = document.getElementById('adminImpersonationBanner');
+    if (impBanner) {
+      if (isImpersonated) {
+        impBanner.style.display = 'flex';
+        const nameEl = document.getElementById('impersonatedUserName');
+        const handleEl = document.getElementById('impersonatedUserHandle');
+        if (nameEl) nameEl.textContent = user?.name || 'Closer';
+        if (handleEl) handleEl.textContent = '@' + (user?.username || 'closer');
+      } else {
+        impBanner.style.display = 'none';
+      }
+    }
+
     // Update global counters
     const unreadCount = state.leads.filter(l => l.status === 'unread').length;
     if (els.unreadGlobalBadge) els.unreadGlobalBadge.textContent = unreadCount;
@@ -5289,53 +5304,101 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  function renderRosterList(employees) {
+  let currentRosterFilter = 'all';
+
+  function renderRosterList(employees, isFiltered = false) {
     if (!els.teamRosterList) return;
+
+    // Update filter counts
+    const allEmps = state.employees || [];
+    const countAllEl = document.getElementById('countFilterAll');
+    const countTLEl = document.getElementById('countFilterTL');
+    const countTMEl = document.getElementById('countFilterTM');
+    if (countAllEl) countAllEl.textContent = allEmps.length;
+    if (countTLEl) countTLEl.textContent = allEmps.filter(e => e.role === 'lead').length;
+    if (countTMEl) countTMEl.textContent = allEmps.filter(e => e.role === 'member').length;
+
     if (!employees || employees.length === 0) {
-      els.teamRosterList.innerHTML = '<div class="text-xs text-muted" style="text-align:center;padding:24px;">No employees registered yet. Add your first closer above!</div>';
+      els.teamRosterList.innerHTML = `
+        <div style="text-align:center; padding:36px 16px; background:var(--glass-surface-subtle); border-radius:12px; border:1px dashed var(--glass-border-subtle);">
+          <div style="font-size:28px; margin-bottom:8px;">👥</div>
+          <div style="font-weight:700; color:var(--text-primary); font-size:14px;">No closers match this view</div>
+          <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Click "+ Add New Closer" above or clear the filter query.</div>
+        </div>
+      `;
       return;
     }
 
     els.teamRosterList.innerHTML = employees.map(emp => {
-      const isAdmin = emp.role === 'admin';
+      const isLead = emp.role === 'lead';
       const isSuspended = emp.status === 'suspended';
-      const initials = (emp.name || 'Emp').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      const initials = (emp.name || 'Closer').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       const isMale = (emp.gender || 'male') === 'male';
       const genderTag = isMale ? '👨 Male' : '👩 Female';
-      const vmStatus = isMale ? '<span style="color:#ef4444;font-size:10px;font-weight:700;">🚫 VM Disabled</span>' : '<span style="color:#10b981;font-size:10px;font-weight:700;">🎙️ VM Active</span>';
+      const vmStatus = isMale 
+        ? '<span style="color:#ef4444; font-size:10px; font-weight:700;">🚫 VM Disabled</span>' 
+        : '<span style="color:#10b981; font-size:10px; font-weight:700;">🎙️ VM Active</span>';
+      
+      const passVal = emp.password || 'closer123';
+      const cleanPhone = (emp.phone || '').trim();
+      const formattedPhone = cleanPhone ? (cleanPhone.startsWith('+') ? cleanPhone : ('+' + cleanPhone)) : 'Not linked';
 
       return `
-        <article class="emp-roster-card ${isSuspended ? 'suspended' : ''}">
-          <div class="emp-card-user">
-            <div class="emp-avatar ${isAdmin ? 'admin-av' : ''}">${initials}</div>
-            <div class="emp-card-identity">
-              <div class="emp-card-name">
-                <span>${escapeHtml(emp.name)}</span>
-                ${isAdmin ? '<span class="badge-role-admin" style="font-size:9px;">Admin</span>' : ''}
+        <article class="emp-roster-card-v2 ${isSuspended ? 'suspended' : ''}">
+          <!-- Left: Identity & Badges -->
+          <div style="display:flex; align-items:center; gap:14px; min-width:260px; flex:1;">
+            <div class="emp-avatar ${isLead ? 'admin-av' : ''}" style="width:42px; height:42px; font-size:14px; flex-shrink:0;">${initials}</div>
+            <div>
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="font-weight:800; font-size:14.5px; color:var(--text-primary);">${escapeHtml(emp.name)}</span>
+                <span class="${isLead ? 'badge-role-tl' : 'badge-role-closer'}">
+                  ${isLead ? '👑 Team Lead' : '📱 Closer TM'}
+                </span>
+                <span class="emp-status-badge ${isSuspended ? 'suspended' : 'active'}" style="padding:2px 7px; font-size:10.5px;">
+                  <span class="emp-status-indicator" aria-hidden="true"></span>${isSuspended ? 'Suspended' : 'Active'}
+                </span>
               </div>
-              <div class="emp-card-sub">
-                <span class="emp-card-username">@${escapeHtml(emp.username)}</span>
-                <span class="emp-card-role">${escapeHtml(emp.designation || emp.role)}</span>
-                <span style="font-size:10.5px;color:var(--text-muted);margin-left:6px;">${genderTag} • ${vmStatus}</span>
-                ${emp.email ? `<span style="font-size:10.5px;color:var(--text-secondary);display:block;margin-top:2px;">✉️ ${escapeHtml(emp.email)}</span>` : ''}
+              <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary); margin-top:3px; flex-wrap:wrap;">
+                <span>${genderTag} • ${vmStatus}</span>
+                ${emp.email ? `<span style="color:var(--text-muted);">✉️ ${escapeHtml(emp.email)}</span>` : ''}
               </div>
             </div>
           </div>
-          <div class="emp-actions-group">
-            <span class="emp-status-badge ${isSuspended ? 'suspended' : 'active'}">
-              <span class="emp-status-indicator" aria-hidden="true"></span>${isSuspended ? '🔴 Suspended' : '🟢 Active'}
-            </span>
-            ${!isAdmin ? `
-              <button type="button" class="btn-emp-action ${isSuspended ? 'reactivate' : 'suspend'}" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Reactivate Employee Access' : 'Suspend Employee Access'}">
-                ${isSuspended ? '✅ Reactivate' : '🚫 Suspend'}
-              </button>
-              <button type="button" class="btn-emp-action mail" onclick="window.OmnideskQuickEmail('${emp.id}')" title="Send Email to ${escapeHtml(emp.name)}">
-                ✉️ Email
-              </button>
-              <button type="button" class="btn-emp-action delete" onclick="window.OmnideskDeleteEmp('${emp.id}', '${escapeHtml(emp.name)}')" title="Remove employee" aria-label="Remove ${escapeHtml(emp.name)}">
-                ✕ Remove
-              </button>
-            ` : ''}
+
+          <!-- Middle: Explicit Login Credentials & WA Link -->
+          <div class="emp-cred-chip-box">
+            <div class="emp-cred-chip" title="Closer Username">
+              <span class="cred-label">USER:</span>
+              <span class="cred-val">@${escapeHtml(emp.username)}</span>
+              <button type="button" class="btn-cred-copy" onclick="window.OmnideskCopyCred('${escapeHtml(emp.username)}', 'Username')" title="Copy Username">📋</button>
+            </div>
+            <div class="emp-cred-chip" title="Closer Login Password">
+              <span class="cred-label">PASS:</span>
+              <span class="cred-val" style="color:#ec4899;">${escapeHtml(passVal)}</span>
+              <button type="button" class="btn-cred-copy" onclick="window.OmnideskCopyCred('${escapeHtml(passVal)}', 'Password')" title="Copy Password">📋</button>
+            </div>
+            <div class="emp-cred-chip" title="Linked WhatsApp Number" style="border-left:1px solid rgba(148,163,184,0.25); padding-left:8px;">
+              <span class="cred-label">WA:</span>
+              <span class="cred-val" style="color:${cleanPhone ? '#10b981' : '#94a3b8'};">${escapeHtml(formattedPhone)}</span>
+            </div>
+          </div>
+
+          <!-- Right: ⚡ Direct Login & Quick Controls -->
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <!-- DIRECT LOGIN BUTTON -->
+            <button type="button" class="btn-direct-login" onclick="window.OmnideskDirectLogin('${escapeHtml(emp.username)}')" title="Directly log into ${escapeHtml(emp.name)}'s closer desk">
+              <span>⚡ Direct Login</span>
+            </button>
+
+            <button type="button" class="btn-emp-action ${isSuspended ? 'reactivate' : 'suspend'}" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Reactivate Access' : 'Suspend Access'}">
+              ${isSuspended ? '✅ Reactivate' : '🚫 Suspend'}
+            </button>
+            <button type="button" class="btn-emp-action mail" onclick="window.OmnideskQuickEmail('${emp.id}')" title="Dispatch Credentials Email">
+              ✉️
+            </button>
+            <button type="button" class="btn-emp-action delete" onclick="window.OmnideskDeleteEmp('${emp.id}', '${escapeHtml(emp.name)}')" title="Remove Closer">
+              ✕
+            </button>
           </div>
         </article>
       `;
@@ -5343,6 +5406,98 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Global window hooks for inline onclicks in roster
+  window.OmnideskToggleAddDrawer = function() {
+    const drawer = document.getElementById('addEmpDrawer');
+    const btnText = document.getElementById('addDrawerBtnText');
+    if (!drawer) return;
+    const isHidden = drawer.style.display === 'none' || !drawer.style.display;
+    drawer.style.display = isHidden ? 'block' : 'none';
+    if (btnText) btnText.textContent = isHidden ? '✕ Close Form' : '➕ Add New Closer';
+    if (isHidden) {
+      const inp = document.getElementById('newEmpName');
+      if (inp) inp.focus();
+    }
+  };
+
+  window.OmnideskSetRosterFilter = function(filter) {
+    currentRosterFilter = filter;
+    document.querySelectorAll('.roster-filter-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-filter') === filter);
+    });
+    window.OmnideskFilterRoster();
+  };
+
+  window.OmnideskFilterRoster = function() {
+    const query = (document.getElementById('rosterSearchInput')?.value || '').toLowerCase().trim();
+    const all = state.employees || [];
+    const filtered = all.filter(emp => {
+      if (currentRosterFilter !== 'all' && emp.role !== currentRosterFilter) return false;
+      if (!query) return true;
+      return (emp.name || '').toLowerCase().includes(query) ||
+             (emp.username || '').toLowerCase().includes(query) ||
+             (emp.phone || '').includes(query) ||
+             (emp.email || '').toLowerCase().includes(query);
+    });
+    renderRosterList(filtered, true);
+  };
+
+  window.OmnideskCopyCred = function(text, label) {
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`📋 Copied ${label}: ${text}`);
+      }).catch(() => {
+        showToast(`📋 Copied: ${text}`);
+      });
+    } else {
+      showToast(`📋 Copied: ${text}`);
+    }
+  };
+
+  // ⚡ Direct Login (Impersonation) Handler
+  window.OmnideskDirectLogin = async function(username) {
+    if (!username) return;
+    if (!confirm(`⚡ Switch to Closer Desk (@${username})?\n\nYou will be logged into this closer's live workspace with their chats and leads. You can return to Admin anytime via the top banner.`)) return;
+
+    try {
+      showToast(`⚡ Switching session to @${username}...`);
+      const res = await fetch('api/auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'direct_login', username: username })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        localStorage.setItem('omnidesk_impersonated_from_admin', '1');
+        localStorage.setItem('omnidesk_impersonated_user', username);
+        localStorage.setItem('omnidesk_impersonated_name', data.user?.name || username);
+        setTimeout(() => {
+          window.location.reload();
+        }, 300);
+      } else {
+        alert(data.error || 'Failed to switch to closer account.');
+      }
+    } catch (err) {
+      alert('Error during direct login: ' + err.message);
+    }
+  };
+
+  window.OmnideskReturnToAdmin = async function() {
+    try {
+      showToast('↩ Restoring Company Admin Portal...');
+      await fetch('api/auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'return_to_admin' })
+      });
+    } catch (_) {}
+    localStorage.removeItem('omnidesk_impersonated_from_admin');
+    localStorage.removeItem('omnidesk_impersonated_user');
+    localStorage.removeItem('omnidesk_impersonated_name');
+    setTimeout(() => {
+      window.location.href = 'index.html';
+    }, 200);
+  };
   window.OmnideskToggleStatus = function(empId) {
     const targetEmp = (state.employees || []).find(e => e.id === empId);
     const willSuspend = targetEmp && targetEmp.status !== 'suspended';

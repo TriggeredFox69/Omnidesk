@@ -1200,7 +1200,7 @@ function renderEmployeeTable(employees) {
             </div>
             <div>
               <div class="user-name">${emp.name}</div>
-              <div class="user-meta">@${emp.username} &bull; ${emp.email || ''}</div>
+              <div class="user-meta">@${emp.username} &bull; Pass: <code style="color:#ec4899; font-weight:700; background:rgba(0,0,0,0.25); padding:1px 5px; border-radius:4px;">${emp.password || 'closer123'}</code> &bull; ${emp.email || ''}</div>
             </div>
           </div>
         </td>
@@ -1231,6 +1231,9 @@ function renderEmployeeTable(employees) {
         </td>
         <td>
           <div style="display:flex; gap:6px;">
+            <button class="btn btn-emerald" style="padding:5px 10px; font-size:11.5px; font-weight:800; white-space:nowrap;" onclick="directLoginAsEmployee('${emp.username}')" title="Directly log into ${emp.name}'s closer portal">
+              ⚡ Direct Login
+            </button>
             <button class="btn btn-secondary" style="padding:5px 10px; font-size:11.5px;" onclick="toggleEmployeeStatus('${emp.id}')">
               ${isSuspended ? 'Activate' : 'Suspend'}
             </button>
@@ -1244,6 +1247,28 @@ function renderEmployeeTable(employees) {
   }).join('');
 
   renderTLLedger(employees);
+}
+
+async function directLoginAsEmployee(username) {
+  if (!username) return;
+  if (!confirm(`Directly switch to @${username}'s closer portal?\n\nYou will be logged into their live workspace to view their chats and leads. You can return to this Admin Portal anytime.`)) return;
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'direct_login', username: username })
+    });
+    const data = await res.json();
+    if (data.success) {
+      localStorage.setItem('omnidesk_impersonated_from_admin', '1');
+      localStorage.setItem('omnidesk_impersonated_user', username);
+      window.location.href = 'index.html';
+    } else {
+      alert(data.error || 'Failed to switch user.');
+    }
+  } catch (err) {
+    alert('Error during direct login: ' + err.message);
+  }
 }
 
 function quickAdjustLimit(empId, delta) {

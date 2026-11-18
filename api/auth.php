@@ -805,6 +805,53 @@ switch ($action) {
         ]);
         exit;
 
+    // 5b. Direct Login as Employee (ADMIN IMPERSONATION)
+    case 'direct_login':
+    case 'impersonate':
+        if (!$currentUser || !in_array($currentUser['role'], ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Admin authorization required.']);
+            exit;
+        }
+        $targetId = trim($input['username'] ?? ($input['id'] ?? ''));
+        $users = getUsers($usersFile);
+        $found = null;
+        foreach ($users as $u) {
+            if (strcasecmp($u['username'], $targetId) === 0 || ($u['id'] ?? '') === $targetId) {
+                $found = $u;
+                break;
+            }
+        }
+        if (!$found) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Employee account not found.']);
+            exit;
+        }
+        $_SESSION['omnidesk_admin_original'] = $currentUser;
+        $_SESSION['omnidesk_user'] = sanitizeUser($found);
+        echo json_encode(['success' => true, 'message' => "Logged in directly as {$found['name']}", 'user' => sanitizeUser($found)]);
+        exit;
+
+    case 'return_to_admin':
+        if (!empty($_SESSION['omnidesk_admin_original'])) {
+            $_SESSION['omnidesk_user'] = $_SESSION['omnidesk_admin_original'];
+            unset($_SESSION['omnidesk_admin_original']);
+            echo json_encode(['success' => true, 'message' => 'Restored administrator session.', 'user' => $_SESSION['omnidesk_user']]);
+            exit;
+        }
+        $users = getUsers($usersFile);
+        $admin = null;
+        foreach ($users as $u) {
+            if ($u['role'] === 'admin') { $admin = $u; break; }
+        }
+        if ($admin) {
+            $_SESSION['omnidesk_user'] = sanitizeUser($admin);
+            echo json_encode(['success' => true, 'message' => 'Restored administrator session.', 'user' => $_SESSION['omnidesk_user']]);
+            exit;
+        }
+        echo json_encode(['success' => false, 'error' => 'No admin session to restore.']);
+        exit;
+
     // 6. Toggle Employee Status (ADMIN ONLY)
     case 'toggle_status':
         if (!$currentUser || $currentUser['role'] !== 'admin') {

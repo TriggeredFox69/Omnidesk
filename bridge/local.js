@@ -369,6 +369,25 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             json(200, { success: true, message: 'Logged out successfully.' });
             return;
           }
+          if (action === 'direct_login' || action === 'impersonate') {
+            const targetId = String(body.username || body.id || '').trim().toLowerCase();
+            const target = allUsers.find(u => u.username.toLowerCase() === targetId || u.id === targetId);
+            if (!target) {
+              json(404, { success: false, error: 'Employee account not found.' });
+              return;
+            }
+            const prevAdmin = currentLocalUser || allUsers.find(u => u.role === 'admin');
+            target._impersonated_by = prevAdmin?.username || 'admin';
+            currentLocalUser = target;
+            json(200, { success: true, message: `Logged in directly as ${target.name}`, user: target });
+            return;
+          }
+          if (action === 'return_to_admin') {
+            const admin = allUsers.find(u => u.role === 'admin') || allUsers.find(u => u.role === 'superadmin');
+            currentLocalUser = admin;
+            json(200, { success: true, message: 'Restored administrator session.', user: admin });
+            return;
+          }
           if (action === 'list_employees') {
             const compId = url.searchParams.get('company_id') || currentLocalUser?.company_id || 'COMP-001';
             const closers = allUsers.filter(u => {
