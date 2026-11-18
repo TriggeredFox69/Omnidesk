@@ -150,6 +150,244 @@ $currentUser = getCurrentUser($usersFile);
 
 switch ($action) {
 
+    // 0a. Check if Phone Number Already Exists in Database (Closer TM Onboarding Duplicate Check)
+    case 'check_phone':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $phone = preg_replace('/\D+/', '', trim($data['phone'] ?? ''));
+
+        if (!$phone) {
+            echo json_encode(['success' => false, 'error' => 'Phone number is required.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        $matched = null;
+        foreach ($users as $u) {
+            $cleanUPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
+            if ($cleanUPhone && ($cleanUPhone === $phone || (strlen($cleanUPhone) >= 9 && substr($cleanUPhone, -9) === substr($phone, -9)))) {
+                $matched = $u;
+                break;
+            }
+        }
+
+        if ($matched) {
+            echo json_encode([
+                'success' => true,
+                'exists'  => true,
+                'user'    => [
+                    'id'         => $matched['id'],
+                    'name'       => $matched['name'],
+                    'username'   => $matched['username'],
+                    'phone'      => $matched['phone'],
+                    'status'     => $matched['status'] ?? 'active',
+                    'company_id' => $matched['company_id'] ?? 'COMP-001'
+                ]
+            ]);
+        } else {
+            echo json_encode([
+                'success' => true,
+                'exists'  => false
+            ]);
+        }
+        exit;
+
+    // 0b. TM Self-Registration (Pending Company Manual Approval)
+    case 'tm_register':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $username = strtolower(trim($data['username'] ?? ''));
+        $password = trim($data['password'] ?? '');
+        $name = trim($data['name'] ?? ($data['full_name'] ?? ''));
+        $phone = trim($data['phone'] ?? '');
+        $email = trim($data['email'] ?? ($username . '@closer.cloud'));
+        $companyId = trim($data['company_id'] ?? 'COMP-001');
+        $city = trim($data['city'] ?? 'Pakistan');
+        $gender = trim($data['gender'] ?? 'male');
+        $pfp = trim($data['pfp'] ?? '');
+
+        if (!$username || !$password || !$name || !$phone) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Username, Password, Full Name, and WhatsApp Phone are required.']);
+            exit;
+        }
+
+        $cleanPhone = preg_replace('/\D+/', '', $phone);
+        $users = getUsers($usersFile);
+
+        foreach ($users as $u) {
+            if (strcasecmp($u['username'], $username) === 0) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => "Username '@$username' is already taken. Please choose another."]);
+                exit;
+            }
+            $cleanUPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
+            if ($cleanUPhone && ($cleanUPhone === $cleanPhone || (strlen($cleanUPhone) >= 9 && substr($cleanUPhone, -9) === substr($cleanPhone, -9)))) {
+                http_response_code(409);
+                echo json_encode([
+                    'success' => false,
+                    'error'   => "This WhatsApp number ($phone) is already registered to user @{$u['username']}.",
+                    'exists'  => true,
+                    'username'=> $u['username']
+                ]);
+                exit;
+            }
+        }
+
+        $newTM = [
+            'id'                  => 'EMP-TM-' . time(),
+            'name'                => $name,
+            'username'            => $username,
+            'email'               => $email,
+            'password_hash'       => password_hash($password, PASSWORD_BCRYPT),
+            'role'                => 'member',
+            'designation'         => 'Closer Specialist (Applicant)',
+            'gender'              => $gender,
+            'city'                => $city,
+            'phone'               => $phone,
+            'pfp'                 => $pfp ?: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+            'status'              => 'pending', // Awaiting manual Company Admin approval
+            'company_id'          => $companyId,
+            'message_limit'       => 150,
+            'messages_sent_today' => 0,
+            'quota_reset_date'    => date('Y-m-d'),
+            'applied_at'          => date('Y-m-d H:i:s'),
+            'created_at'          => date('Y-m-d H:i:s')
+        ];
+
+        $users[] = $newTM;
+        saveUsers($usersFile, $users);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Application submitted successfully! Your account is pending manual approval by company administration.',
+            'user'    => sanitizeUser($newTM)
+        ]);
+        exit;
+
+    // 0c. List Pending TMs (Company Admin or Super Admin)
+    case 'list_pending_tms':
+        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        $pending = [];
+        $isSuper = ($currentUser['role'] === 'superadmin');
+        $targetComp = $isSuper ? ($_GET['company_id'] ?? null) : ($currentUser['company_id'] ?? 'COMP-001');
+
+        foreach ($users as $u) {
+            if (($u['status'] ?? '') === 'pending') {
+                if ($isSuper && !$targetComp) {
+                    $pending[] = sanitizeUser($u);
+                } elseif (($u['company_id'] ?? 'COMP-001') === $targetComp) {
+                    $pending[] = sanitizeUser($u);
+                }
+            }
+        }
+
+        echo json_encode(['success' => true, 'pending' => $pending, 'count' => count($pending)]);
+        exit;
+
+    // 0d. Approve Pending TM (Set Status to Active and Message Limit)
+    case 'approve_tm':
+        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied.']);
+            exit;
+        }
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $userId = trim($data['user_id'] ?? ($data['id'] ?? ''));
+        $msgLimit = intval($data['message_limit'] ?? 150);
+
+        if (!$userId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'User ID is required.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        $found = false;
+        foreach ($users as &$u) {
+            if ($u['id'] === $userId) {
+                $u['status'] = 'active';
+                $u['designation'] = 'Closer Specialist';
+                $u['message_limit'] = $msgLimit > 0 ? $msgLimit : 150;
+                $u['approved_at'] = date('Y-m-d H:i:s');
+                $u['approved_by'] = $currentUser['username'];
+                $found = true;
+                break;
+            }
+        }
+
+        if ($found) {
+            saveUsers($usersFile, $users);
+            echo json_encode(['success' => true, 'message' => 'Closer applicant approved and activated!']);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Applicant not found.']);
+        }
+        exit;
+
+    // 0e. Reject Pending TM
+    case 'reject_tm':
+        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied.']);
+            exit;
+        }
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $userId = trim($data['user_id'] ?? ($data['id'] ?? ''));
+
+        $users = getUsers($usersFile);
+        $newUsers = [];
+        $found = false;
+        foreach ($users as $u) {
+            if ($u['id'] === $userId) {
+                $found = true;
+            } else {
+                $newUsers[] = $u;
+            }
+        }
+
+        if ($found) {
+            saveUsers($usersFile, $newUsers);
+            echo json_encode(['success' => true, 'message' => 'Applicant rejected and removed.']);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Applicant not found.']);
+        }
+        exit;
+
+    // 0f. List Global Logins (Super Admin or Company Admin)
+    case 'list_logins':
+        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied.']);
+            exit;
+        }
+
+        $loginsFile = __DIR__ . '/../data/logins.json';
+        $logins = file_exists($loginsFile) ? json_decode(file_get_contents($loginsFile), true) : [];
+        if (!is_array($logins)) $logins = [];
+
+        $isSuper = ($currentUser['role'] === 'superadmin');
+        if (!$isSuper) {
+            $userComp = $currentUser['company_id'] ?? 'COMP-001';
+            $logins = array_values(array_filter($logins, function($item) use ($userComp) {
+                return ($item['company_id'] ?? '') === $userComp;
+            }));
+        }
+
+        echo json_encode(['success' => true, 'logins' => $logins]);
+        exit;
+
     // 0. QR Code Authentication & Auto-Provisioning (Closer TM Login Journey)
     case 'qr_login':
         $raw = file_get_contents('php://input');
@@ -347,7 +585,38 @@ switch ($action) {
             exit;
         }
 
-        if ($matchedUser['status'] !== 'active' && $matchedUser['status'] !== 'suspended') {
+        if (($matchedUser['status'] ?? 'active') === 'pending') {
+            http_response_code(403);
+            $compName = 'Company';
+            $compsFile = __DIR__ . '/../data/companies.json';
+            if (file_exists($compsFile)) {
+                $comps = json_decode(file_get_contents($compsFile), true);
+                if (is_array($comps)) {
+                    foreach ($comps as $c) {
+                        if ($c['id'] === ($matchedUser['company_id'] ?? '')) {
+                            $compName = $c['name'];
+                            break;
+                        }
+                    }
+                }
+            }
+            echo json_encode([
+                'success' => false,
+                'error'   => "⏳ Your account is pending manual approval by {$compName} administration. Please contact your company administrator or wait for approval."
+            ]);
+            exit;
+        }
+
+        if (($matchedUser['status'] ?? 'active') === 'suspended') {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'error'   => '🚫 Your account has been suspended by company administration. Please contact your administrator.'
+            ]);
+            exit;
+        }
+
+        if ($matchedUser['status'] !== 'active') {
             http_response_code(403);
             echo json_encode([
                 'success' => false,
@@ -360,6 +629,29 @@ switch ($action) {
         $matchedUser['last_login'] = date('Y-m-d H:i:s');
         $users[$userIndex] = $matchedUser;
         saveUsers($usersFile, $users);
+
+        // Record in data/logins.json
+        try {
+            $loginsFile = __DIR__ . '/../data/logins.json';
+            $logins = file_exists($loginsFile) ? json_decode(file_get_contents($loginsFile), true) : [];
+            if (!is_array($logins)) $logins = [];
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'Web Browser';
+            array_unshift($logins, [
+                'id'           => 'LOG-' . time() . '-' . rand(100, 999),
+                'timestamp'    => date('Y-m-d H:i:s'),
+                'username'     => $matchedUser['username'],
+                'name'         => $matchedUser['name'],
+                'role'         => $matchedUser['role'],
+                'company_id'   => $matchedUser['company_id'] ?? 'COMP-001',
+                'company_name' => $matchedUser['company_id'] === 'GLOBAL' ? 'Platform HQ' : 'Tenant Workspace',
+                'ip'           => $ip,
+                'city'         => 'Online',
+                'device'       => substr($ua, 0, 40),
+                'status'       => 'active'
+            ]);
+            file_put_contents($loginsFile, json_encode(array_slice($logins, 0, 100), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        } catch (\Throwable $e) {}
 
         $safeUser = sanitizeUser($matchedUser);
         session_regenerate_id(true);

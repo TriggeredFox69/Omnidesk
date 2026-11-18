@@ -644,83 +644,141 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
 
     <!-- TAB 1: TM CLOSER QR CODE JOURNEY (WhatsApp Web Mirror) -->
     <div class="tab-pane active" id="paneTM">
-      <div class="wa-journey-layout">
-        
-        <!-- Left: Step-by-Step Instructions -->
-        <div>
-          <h1 class="wa-journey-title">To use OmniDesk on your computer:</h1>
-
-          <ol class="wa-steps-list">
-            <li class="wa-step-item">
-              <span class="wa-step-num">1.</span>
-              <div>Open <strong>WhatsApp</strong> on your mobile phone</div>
-            </li>
-            <li class="wa-step-item">
-              <span class="wa-step-num">2.</span>
-              <div>
-                Tap <strong>Menu <span class="wa-icon-hint">⋮</span></strong> on Android, or <strong>Settings <span class="wa-icon-hint">⚙️</span></strong> on iPhone
-              </div>
-            </li>
-            <li class="wa-step-item">
-              <span class="wa-step-num">3.</span>
-              <div>
-                Tap <strong>Linked devices</strong> and then <strong>Link a device</strong>
-              </div>
-            </li>
-            <li class="wa-step-item">
-              <span class="wa-step-num">4.</span>
-              <div>
-                Point your phone to this screen to capture the QR code
-              </div>
-            </li>
-          </ol>
-
-          <!-- Continue as TL Highlight Banner -->
-          <div class="tl-cta-banner" onclick="switchRole('tl')">
-            <div>
-              <div class="tl-cta-badge">👑 Team Leader Opportunity</div>
-              <div class="tl-cta-title">Or Continue as a Team Leader (TL)</div>
-              <div class="tl-cta-sub">Earn Rs. 500 PKR commission per joined TM closer with an instant recruitment dashboard.</div>
-            </div>
-            <button class="tl-cta-btn">Access TL Portal &rarr;</button>
-          </div>
-
-          <div style="margin-top: 24px; font-size: 13px; color: var(--wa-text-secondary); display: flex; align-items: center; gap: 16px;">
-            <a href="javascript:void(0)" onclick="refreshQRCode()" class="footer-link">🔄 Refresh QR code</a>
-            <span>•</span>
-            <a href="admin.php" class="footer-link">Company Admin Portal</a>
-            <span>•</span>
-            <a href="sadmin.php" class="footer-link">Super Admin</a>
-          </div>
-        </div>
-
-        <!-- Right: WhatsApp Web QR Frame -->
-        <div class="qr-column">
-          <div class="wa-qr-frame">
-            <div class="qr-scan-line"></div>
-            <img id="landingQrImage" src="https://api.qrserver.com/v1/create-qr-code/?size=230x230&margin=2&data=OMNIDESK-PAIRING-SYNC-2026" alt="WhatsApp QR Code" class="wa-qr-img">
-            <div class="wa-qr-center-logo">
-              <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
-            </div>
-          </div>
-
-          <div class="qr-status-badge" id="qrStatusBadge">
-            <span class="pulse-dot"></span>
-            <span id="qrStatusText">Pure WebSocket Bridge • Ready to Pair</span>
-          </div>
-
-          <label class="qr-checkbox-row">
-            <input type="checkbox" id="keepSignedIn" checked>
-            <span>Keep me signed in</span>
-          </label>
-
-          <!-- Instant TM Closer Demo (Skip phone scan) -->
-          <button class="qr-quick-btn" onclick="instantTMTestLogin()">
-            ⚡ Instant Closer Demo (Skip phone scan)
-          </button>
-        </div>
-
+      
+      <!-- Sub-Toggle: QR Pair vs Direct Password Login -->
+      <div style="display:flex; gap:10px; margin-bottom:22px; max-width:540px; margin-left:auto; margin-right:auto;">
+        <button type="button" class="role-tab-btn active" id="btnTMSubQR" onclick="toggleTMSubMode('qr')" style="flex:1; border-radius:10px; font-weight:700;">
+          <span>📱</span> Scan WhatsApp QR Code
+        </button>
+        <button type="button" class="role-tab-btn" id="btnTMSubPW" onclick="toggleTMSubMode('password')" style="flex:1; border-radius:10px; font-weight:700;">
+          <span>🔑</span> Continue with Username &amp; Password
+        </button>
       </div>
+
+      <!-- VIEW A: WhatsApp Web QR Pairing -->
+      <div id="tmViewQR">
+        <div class="wa-journey-layout">
+          
+          <!-- Left: Step-by-Step Instructions -->
+          <div>
+            <h1 class="wa-journey-title">To use OmniDesk on your computer:</h1>
+
+            <ol class="wa-steps-list">
+              <li class="wa-step-item">
+                <span class="wa-step-num">1.</span>
+                <div>Open <strong>WhatsApp</strong> on your mobile phone</div>
+              </li>
+              <li class="wa-step-item">
+                <span class="wa-step-num">2.</span>
+                <div>
+                  Tap <strong>Menu <span class="wa-icon-hint">⋮</span></strong> on Android, or <strong>Settings <span class="wa-icon-hint">⚙️</span></strong> on iPhone
+                </div>
+              </li>
+              <li class="wa-step-item">
+                <span class="wa-step-num">3.</span>
+                <div>
+                  Tap <strong>Linked devices</strong> and then <strong>Link a device</strong>
+                </div>
+              </li>
+              <li class="wa-step-item">
+                <span class="wa-step-num">4.</span>
+                <div>
+                  Point your phone to this screen to capture the QR code
+                </div>
+              </li>
+            </ol>
+
+            <!-- Continue as TL Highlight Banner -->
+            <div class="tl-cta-banner" onclick="switchRole('tl')">
+              <div>
+                <div class="tl-cta-badge">👑 Team Leader Opportunity</div>
+                <div class="tl-cta-title">Or Continue as a Team Leader (TL)</div>
+                <div class="tl-cta-sub">Earn Rs. 500 PKR commission per joined TM closer with an instant recruitment dashboard.</div>
+              </div>
+              <button class="tl-cta-btn">Access TL Portal &rarr;</button>
+            </div>
+
+            <div style="margin-top: 24px; font-size: 13px; color: var(--wa-text-secondary); display: flex; align-items: center; gap: 16px;">
+              <a href="javascript:void(0)" onclick="refreshQRCode()" class="footer-link">🔄 Refresh QR code</a>
+              <span>•</span>
+              <a href="admin.php" class="footer-link">Company Admin Portal</a>
+              <span>•</span>
+              <a href="sadmin.php" class="footer-link">Super Admin</a>
+            </div>
+          </div>
+
+          <!-- Right: WhatsApp Web QR Frame -->
+          <div class="qr-column">
+            <div class="wa-qr-frame">
+              <div class="qr-scan-line"></div>
+              <img id="landingQrImage" src="https://api.qrserver.com/v1/create-qr-code/?size=230x230&margin=2&data=OMNIDESK-PAIRING-SYNC-2026" alt="WhatsApp QR Code" class="wa-qr-img">
+              <div class="wa-qr-center-logo">
+                <svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/></svg>
+              </div>
+            </div>
+
+            <div class="qr-status-badge" id="qrStatusBadge">
+              <span class="pulse-dot"></span>
+              <span id="qrStatusText">Pure WebSocket Bridge • Ready to Pair</span>
+            </div>
+
+            <label class="qr-checkbox-row">
+              <input type="checkbox" id="keepSignedIn" checked>
+              <span>Keep me signed in</span>
+            </label>
+
+            <!-- Pair / Test WhatsApp Phone Input -->
+            <div style="margin-top: 14px; width: 100%; max-width: 270px;">
+              <div style="font-size: 11px; color: var(--wa-text-muted); margin-bottom: 5px; text-align: left;">
+                📱 Link WhatsApp Number:
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <input type="text" id="simPhoneInput" placeholder="+923001234567" value="+923001234567" class="input-field" style="padding: 8px 10px; font-size: 13px; font-family: monospace;">
+                <button type="button" class="btn-action-primary" style="margin: 0; padding: 8px 12px; width: auto; font-size: 12px; background: #00a884; white-space: nowrap;" onclick="handlePhonePairSubmit()">
+                  ⚡ Link
+                </button>
+              </div>
+            </div>
+
+            <!-- Instant Closer Demo (Skip phone scan) -->
+            <button class="qr-quick-btn" onclick="instantTMTestLogin()">
+              ⚡ Instant Closer Demo (Hamza Closer)
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- VIEW B: Direct TM Username & Password Login -->
+      <div id="tmViewPassword" style="display:none;">
+        <div class="form-container">
+          <div class="form-header">
+            <div class="form-badge-icon" style="background:rgba(0, 168, 132, 0.18); color:#00a884;">🔑</div>
+            <h2 class="form-title">Team Member (TM) Closer Login</h2>
+            <p class="form-subtitle">Already registered &amp; approved? Sign in directly without scanning QR.</p>
+          </div>
+
+          <form id="formTMPasswordLogin" onsubmit="handleTMPasswordLogin(event)">
+            <div class="input-group">
+              <label class="input-label">Username (e.g. hamza or your approved username)</label>
+              <input type="text" id="tmDirectUsername" class="input-field" placeholder="hamza" required>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Password</label>
+              <input type="password" id="tmDirectPassword" class="input-field" placeholder="closer123" required>
+            </div>
+            <div class="error-box" id="tmPasswordLoginError"></div>
+            <button type="submit" id="tmDirectLoginBtn" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); box-shadow:0 6px 20px rgba(0, 168, 132, 0.35);">
+              Sign In to Closer Workspace 🚀
+            </button>
+          </form>
+
+          <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
+            New to OmniDesk? <a href="javascript:void(0)" onclick="toggleTMSubMode('qr')" class="footer-link">Scan your WhatsApp QR to apply</a>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- TAB 2: TEAM LEADER (TL) COMMISSION PORTAL -->
@@ -1101,6 +1159,305 @@ async function handleSadminLogin(e) {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Unlock Super Command (/sadmin) ⚡';
+  }
+}
+
+<!-- MODAL: Phone Already Registered Check -->
+<div id="modalPhoneExists" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
+  <div style="background:var(--wa-card-bg); border:1px solid var(--wa-card-border); border-radius:18px; padding:28px; max-width:440px; width:90%; box-shadow:0 20px 40px rgba(0,0,0,0.5); text-align:center;">
+    <div style="font-size:44px; margin-bottom:12px;">⚠️</div>
+    <h3 style="font-size:18px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Phone Number Already in Use</h3>
+    <p style="font-size:13px; color:var(--wa-text-secondary); line-height:1.5; margin-bottom:20px;" id="phoneExistsMsg">
+      This WhatsApp number is already linked to closer account <strong id="phoneExistsUser" style="color:#00a884;">@user</strong>.<br>Wanna login with your password instead?
+    </p>
+    <div style="display:flex; gap:10px;">
+      <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); margin:0;" onclick="switchTMToLogin()">
+        🔑 Yes, Log In as @<span id="phoneExistsBtnUser">user</span>
+      </button>
+      <button type="button" class="btn-action-primary" style="background:rgba(255,255,255,0.08); color:var(--wa-text-primary); margin:0; width:auto; padding:12px 18px;" onclick="closePhoneExistsModal()">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New TM Closer Registration Wizard -->
+<div id="modalTMRegister" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px); overflow-y:auto; padding:20px 0;">
+  <div style="background:var(--wa-card-bg); border:1px solid rgba(0,168,132,0.4); border-radius:20px; padding:30px; max-width:520px; width:92%; box-shadow:0 25px 60px rgba(0,0,0,0.6); position:relative;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+      <div>
+        <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#00a884; letter-spacing:0.05em;">Step-by-Step Onboarding</div>
+        <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary);">🚀 New Closer WhatsApp Setup</h3>
+      </div>
+      <button type="button" onclick="closeTMRegisterModal()" style="background:none; border:none; color:var(--wa-text-muted); font-size:24px; cursor:pointer;">&times;</button>
+    </div>
+
+    <div style="background:rgba(0,168,132,0.1); border:1px solid rgba(0,168,132,0.25); border-radius:10px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:#00a884; display:flex; align-items:center; gap:8px;">
+      <span>📱</span>
+      <span>WhatsApp Number: <strong id="regDisplayPhone">+92 300 1234567</strong></span>
+      <span style="margin-left:auto; background:#00a884; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">VERIFIED</span>
+    </div>
+
+    <form id="formTMRegisterSubmit" onsubmit="handleTMRegisterSubmit(event)">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Set Desired Username *</label>
+          <input type="text" id="regTMUsername" class="input-field" placeholder="e.g. ali_closer" required style="font-size:13px;">
+        </div>
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Set Password *</label>
+          <input type="password" id="regTMPassword" class="input-field" placeholder="Min 6 chars" required style="font-size:13px;">
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Select Company * (Where you are applying as Closer)</label>
+        <select id="regTMCompany" class="input-field" required style="cursor:pointer; font-weight:600;">
+          <option value="COMP-001">Nunno Official — Scalper Alpha &amp; SaaS</option>
+          <option value="COMP-002">Apex Crypto Signals — Institutional Trading</option>
+          <option value="COMP-003">Pak Trade Academy — Mentorship &amp; Signals</option>
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Full Name *</label>
+        <input type="text" id="regTMFullName" class="input-field" placeholder="e.g. Ali Ahmed" required>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">City *</label>
+          <input type="text" id="regTMCity" class="input-field" placeholder="e.g. Lahore / Karachi" required>
+        </div>
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Gender</label>
+          <select id="regTMGender" class="input-field">
+            <option value="male">Male Closer</option>
+            <option value="female">Female Closer</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Profile Picture (PFP Avatar URL - Optional)</label>
+        <input type="text" id="regTMPfp" class="input-field" placeholder="https://... (or leave default avatar)">
+      </div>
+
+      <div class="error-box" id="tmRegModalError"></div>
+
+      <button type="submit" id="btnSubmitTMReg" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); margin-top:8px;">
+        Submit Closer Application for Company Approval ⏳
+      </button>
+      
+      <div style="font-size:11px; color:var(--wa-text-muted); text-align:center; margin-top:10px;">
+        ℹ️ Once submitted, company administration reviews and approves your account with a custom daily message quota.
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: TM Application Submitted Confirmation -->
+<div id="modalTMSuccess" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
+  <div style="background:var(--wa-card-bg); border:1px solid rgba(0,168,132,0.4); border-radius:20px; padding:32px; max-width:460px; width:90%; box-shadow:0 25px 60px rgba(0,0,0,0.6); text-align:center;">
+    <div style="font-size:52px; margin-bottom:14px;">⏳</div>
+    <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Closer Application Received!</h3>
+    <p style="font-size:13px; color:var(--wa-text-secondary); line-height:1.6; margin-bottom:20px;">
+      Your application has been dispatched to <strong id="successCompName" style="color:#00a884;">Company</strong> administration.<br><br>
+      Once approved by the company, you can log in directly anytime using your <strong>Username &amp; Password</strong> without needing to scan the QR code again!
+    </p>
+    <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #00a884, #059669); margin:0;" onclick="closeTMSuccessModal()">
+      Understood, Continue to Login &rarr;
+    </button>
+  </div>
+</div>
+
+<script>
+// TM Sub-Mode Switcher (QR vs Password)
+function toggleTMSubMode(mode) {
+  const vQR = document.getElementById('tmViewQR');
+  const vPW = document.getElementById('tmViewPassword');
+  const bQR = document.getElementById('btnTMSubQR');
+  const bPW = document.getElementById('btnTMSubPW');
+  if (mode === 'password') {
+    vQR.style.display = 'none';
+    vPW.style.display = 'block';
+    bPW.classList.add('active');
+    bQR.classList.remove('active');
+  } else {
+    vQR.style.display = 'block';
+    vPW.style.display = 'none';
+    bQR.classList.add('active');
+    bPW.classList.remove('active');
+  }
+}
+
+// Global matched user for phone duplicate check
+let pendingMatchedUser = null;
+
+// Handle phone pairing / linking submit
+async function handlePhonePairSubmit() {
+  const phoneInput = document.getElementById('simPhoneInput');
+  const phone = (phoneInput.value || '').trim();
+  if (!phone) {
+    alert('Please enter a WhatsApp phone number.');
+    return;
+  }
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check_phone', phone: phone })
+    });
+    const data = await res.json();
+    if (data.exists && data.user) {
+      // Case A: Phone already in DB!
+      pendingMatchedUser = data.user;
+      document.getElementById('phoneExistsUser').textContent = '@' + data.user.username;
+      document.getElementById('phoneExistsBtnUser').textContent = data.user.username;
+      document.getElementById('modalPhoneExists').style.display = 'flex';
+    } else {
+      // Case B: Phone is brand new -> open registration wizard!
+      openTMRegisterModal(phone);
+    }
+  } catch (err) {
+    // If local offline fallback, still allow registration
+    openTMRegisterModal(phone);
+  }
+}
+
+function switchTMToLogin() {
+  closePhoneExistsModal();
+  toggleTMSubMode('password');
+  if (pendingMatchedUser) {
+    document.getElementById('tmDirectUsername').value = pendingMatchedUser.username;
+    document.getElementById('tmDirectPassword').focus();
+  }
+}
+
+function closePhoneExistsModal() {
+  document.getElementById('modalPhoneExists').style.display = 'none';
+}
+
+function openTMRegisterModal(phone) {
+  document.getElementById('regDisplayPhone').textContent = phone;
+  document.getElementById('modalTMRegister').style.display = 'flex';
+  document.getElementById('regTMUsername').focus();
+  loadCompaniesForRegister();
+}
+
+function closeTMRegisterModal() {
+  document.getElementById('modalTMRegister').style.display = 'none';
+}
+
+function closeTMSuccessModal() {
+  document.getElementById('modalTMSuccess').style.display = 'none';
+  toggleTMSubMode('password');
+}
+
+async function loadCompaniesForRegister() {
+  try {
+    const res = await fetch('api/companies.php?action=list');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.companies)) {
+      const sel = document.getElementById('regTMCompany');
+      sel.innerHTML = '';
+      data.companies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.name} (${c.plan || 'Enterprise'})`;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (_) {}
+}
+
+async function handleTMRegisterSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btnSubmitTMReg');
+  const errBox = document.getElementById('tmRegModalError');
+  btn.disabled = true;
+  btn.textContent = 'Submitting Application…';
+  errBox.style.display = 'none';
+
+  const phone = document.getElementById('regDisplayPhone').textContent.trim();
+  const username = document.getElementById('regTMUsername').value.trim();
+  const password = document.getElementById('regTMPassword').value.trim();
+  const company_id = document.getElementById('regTMCompany').value;
+  const fullName = document.getElementById('regTMFullName').value.trim();
+  const city = document.getElementById('regTMCity').value.trim();
+  const gender = document.getElementById('regTMGender').value;
+  const pfp = document.getElementById('regTMPfp').value.trim();
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'tm_register',
+        username,
+        password,
+        name: fullName,
+        phone,
+        company_id,
+        city,
+        gender,
+        pfp
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeTMRegisterModal();
+      const compSelect = document.getElementById('regTMCompany');
+      const compName = compSelect.options[compSelect.selectedIndex]?.text || 'Company';
+      document.getElementById('successCompName').textContent = compName;
+      document.getElementById('modalTMSuccess').style.display = 'flex';
+      document.getElementById('tmDirectUsername').value = username;
+    } else {
+      errBox.textContent = data.error || 'Registration failed.';
+      errBox.style.display = 'block';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network communication error.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit Closer Application for Company Approval ⏳';
+  }
+}
+
+// Handle TM Direct Password Login
+async function handleTMPasswordLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('tmDirectLoginBtn');
+  const errBox = document.getElementById('tmPasswordLoginError');
+  btn.disabled = true;
+  btn.textContent = 'Authenticating Closer…';
+  errBox.style.display = 'none';
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'login',
+        username: document.getElementById('tmDirectUsername').value.trim(),
+        password: document.getElementById('tmDirectPassword').value.trim()
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      triggerLoginAnimation(data.user.name, 'Sales Closer Desk Activated • Starting Pipeline', 'index.php');
+    } else {
+      errBox.textContent = data.error || 'Invalid closer credentials.';
+      errBox.style.display = 'block';
+    }
+  } catch (err) {
+    errBox.textContent = 'Network communication error.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In to Closer Workspace 🚀';
   }
 }
 

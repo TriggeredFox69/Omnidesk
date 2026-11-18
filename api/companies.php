@@ -98,13 +98,27 @@ switch ($action) {
         $totalMessagesToday = 0;
         $activeSessions = 0;
 
+        $pendingTMs = 0;
         foreach ($users as $u) {
             if (($u['role'] ?? '') === 'superadmin') continue;
+            if (($u['status'] ?? '') === 'pending') {
+                $pendingTMs++;
+                continue;
+            }
             $totalEmployees++;
             if (($u['role'] ?? '') === 'lead') $totalTLs++;
             if (($u['role'] ?? '') === 'member') $totalTMs++;
             $totalMessagesToday += (int)($u['messages_sent_today'] ?? 0);
             if (!empty($u['phone']) && ($u['status'] ?? '') === 'active') $activeSessions++;
+        }
+
+        // Platform MRR (Nunno Enterprise plan + Closer seats)
+        $platformMRR = 0;
+        foreach ($companies as $c) {
+            $plan = $c['plan'] ?? 'Enterprise';
+            if (stripos($plan, 'Billion') !== false || stripos($plan, 'VIP') !== false) $platformMRR += 250000;
+            elseif (stripos($plan, 'Pro') !== false) $platformMRR += 150000;
+            else $platformMRR += 75000;
         }
 
         echo json_encode([
@@ -115,12 +129,118 @@ switch ($action) {
                 'total_employees'        => $totalEmployees,
                 'total_tls'              => $totalTLs,
                 'total_tms'              => $totalTMs,
+                'pending_tms'            => $pendingTMs,
                 'total_messages_today'   => $totalMessagesToday,
                 'active_sessions'        => $activeSessions,
+                'platform_mrr'           => $platformMRR,
                 'system_health'          => 'optimal',
+                'subsecond_tick'         => microtime(true),
                 'server_time'            => date('Y-m-d H:i:s')
             ]
         ]);
+        exit;
+
+    // 1b. Get Real-Time Cross-Company Live Chatter Stream (Super Admin)
+    case 'get_live_chat_stream':
+        requireSuperAdmin($currentUser);
+        $companies = getCompanies($companiesFile);
+        $companyMap = [];
+        foreach ($companies as $c) {
+            $companyMap[$c['id']] = $c['name'];
+        }
+
+        $stream = [];
+        $tenantsDir = __DIR__ . '/../data/tenants';
+        if (is_dir($tenantsDir)) {
+            $tenantFolders = scandir($tenantsDir);
+            foreach ($tenantFolders as $folder) {
+                if ($folder === '.' || $folder === '..') continue;
+                $leadsPath = $tenantsDir . '/' . $folder . '/leads.json';
+                if (file_exists($leadsPath)) {
+                    $tenantLeads = @json_decode(file_get_contents($leadsPath), true);
+                    if (is_array($tenantLeads)) {
+                        foreach ($tenantLeads as $lead) {
+                            $leadName = $lead['name'] ?? ($lead['display'] ?? 'Contact');
+                            $phone = $lead['phone'] ?? '';
+                            $closer = $lead['ownerName'] ?? 'Closer';
+                            $msgs = $lead['messages'] ?? [];
+                            foreach ($msgs as $m) {
+                                $stream[] = [
+                                    'id'           => $lead['id'] . '-' . rand(1000, 9999),
+                                    'company_id'   => $folder,
+                                    'company_name' => $companyMap[$folder] ?? $folder,
+                                    'lead_name'    => $leadName,
+                                    'lead_phone'   => $phone,
+                                    'closer_name'  => $closer,
+                                    'sender'       => $m['sender'] ?? 'lead',
+                                    'text'         => $m['text'] ?? '',
+                                    'time'         => $m['time'] ?? 'Just now',
+                                    'state'        => $lead['leadState'] ?? 'ongoing'
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Also include root data/leads.json if exists
+        $rootLeadsPath = __DIR__ . '/../data/leads.json';
+        if (file_exists($rootLeadsPath)) {
+            $rootLeads = @json_decode(file_get_contents($rootLeadsPath), true);
+            if (is_array($rootLeads)) {
+                foreach ($rootLeads as $lead) {
+                    $leadName = $lead['name'] ?? ($lead['display'] ?? 'Contact');
+                    $msgs = $lead['messages'] ?? [];
+                    foreach ($msgs as $m) {
+                        $stream[] = [
+                            'id'           => $lead['id'] . '-' . rand(1000, 9999),
+                            'company_id'   => 'COMP-001',
+                            'company_name' => $companyMap['COMP-001'] ?? 'Nunno Official',
+                            'lead_name'    => $leadName,
+                            'lead_phone'   => $lead['phone'] ?? '',
+                            'closer_name'  => $lead['ownerName'] ?? 'Admin Closer',
+                            'sender'       => $m['sender'] ?? 'lead',
+                            'text'         => $m['text'] ?? '',
+                            'time'         => $m['time'] ?? 'Just now',
+                            'state'        => $lead['leadState'] ?? 'ongoing'
+                        ];
+                    }
+                }
+            }
+        }
+
+        // Fallback demo live events if empty
+        if (empty($stream)) {
+            $stream = [
+                [
+                    'id'           => 'LIVE-01',
+                    'company_id'   => 'COMP-001',
+                    'company_name' => 'Nunno Official',
+                    'lead_name'    => 'Ali Trader',
+                    'lead_phone'   => '+923001234567',
+                    'closer_name'  => 'Hamza Khan',
+                    'sender'       => 'agent',
+                    'text'         => 'Salam Ali bhai! Your Nunno Pro scalper license is active.',
+                    'time'         => date('h:i A'),
+                    'state'        => 'paid'
+                ],
+                [
+                    'id'           => 'LIVE-02',
+                    'company_id'   => 'COMP-002',
+                    'company_name' => 'Apex Crypto Signals',
+                    'lead_name'    => 'Waqas BTC',
+                    'lead_phone'   => '+923219988776',
+                    'closer_name'  => 'Daniyal Sheikh',
+                    'sender'       => 'lead',
+                    'text'         => 'Bro whats the monthly VIP pricing?',
+                    'time'         => date('h:i A', strtotime('-1 minute')),
+                    'state'        => 'ongoing'
+                ]
+            ];
+        }
+
+        echo json_encode(['success' => true, 'stream' => array_slice(array_reverse($stream), 0, 50)]);
         exit;
 
     // 2. List All Companies (Super Admin)

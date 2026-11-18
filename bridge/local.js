@@ -137,6 +137,131 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             }
             return;
           }
+          if (action === 'check_phone') {
+            const phone = String(body.phone || url.searchParams.get('phone') || '').replace(/\D/g, '');
+            const matched = allUsers.find(u => {
+              const uPhone = String(u.phone || '').replace(/\D/g, '');
+              return uPhone && (uPhone === phone || (uPhone.length >= 9 && phone.length >= 9 && uPhone.slice(-9) === phone.slice(-9)));
+            });
+            if (matched) {
+              json(200, {
+                success: true,
+                exists: true,
+                user: {
+                  id: matched.id,
+                  name: matched.name,
+                  username: matched.username,
+                  phone: matched.phone,
+                  status: matched.status || 'active',
+                  company_id: matched.company_id || 'COMP-001'
+                }
+              });
+            } else {
+              json(200, { success: true, exists: false });
+            }
+            return;
+          }
+          if (action === 'tm_register') {
+            const username = String(body.username || '').trim().toLowerCase();
+            const password = String(body.password || '').trim();
+            const name = String(body.name || body.full_name || '').trim();
+            const phone = String(body.phone || '').trim();
+            const cleanPhone = phone.replace(/\D/g, '');
+            const email = body.email || (username + '@closer.cloud');
+            const company_id = body.company_id || 'COMP-001';
+            const gender = body.gender || 'male';
+            const city = body.city || 'Pakistan';
+            const pfp = body.pfp || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80';
+
+            if (!username || !password || !name || !phone) {
+              json(400, { success: false, error: 'Username, Password, Full Name, and WhatsApp Phone are required.' });
+              return;
+            }
+
+            const existingU = allUsers.find(u => u.username.toLowerCase() === username);
+            if (existingU) {
+              json(409, { success: false, error: `Username "@${username}" is already taken. Please choose another.` });
+              return;
+            }
+
+            const existingPhone = allUsers.find(u => {
+              const uPhone = String(u.phone || '').replace(/\D/g, '');
+              return uPhone && (uPhone === cleanPhone || (uPhone.length >= 9 && cleanPhone.length >= 9 && uPhone.slice(-9) === cleanPhone.slice(-9)));
+            });
+            if (existingPhone) {
+              json(409, { success: false, error: `This WhatsApp number (${phone}) is already registered to user @${existingPhone.username}.`, exists: true, username: existingPhone.username });
+              return;
+            }
+
+            const newTM = {
+              id: 'EMP-TM-' + Date.now().toString(36).toUpperCase(),
+              name: name,
+              username: username,
+              email: email,
+              password: password,
+              role: 'member',
+              designation: 'Closer Specialist (Applicant)',
+              gender: gender,
+              city: city,
+              phone: phone,
+              pfp: pfp,
+              status: 'pending', // Awaiting manual Company Admin approval
+              company_id: company_id,
+              message_limit: 150,
+              messages_sent_today: 0,
+              applied_at: new Date().toISOString(),
+              created_at: new Date().toISOString()
+            };
+            allUsers.push(newTM);
+            saveLocalUsers(allUsers);
+            json(200, { success: true, message: 'Application submitted successfully! Your account is pending manual approval by company administration.', user: newTM });
+            return;
+          }
+          if (action === 'list_pending_tms') {
+            const compId = url.searchParams.get('company_id') || (currentLocalUser?.role === 'superadmin' ? null : currentLocalUser?.company_id);
+            const pending = allUsers.filter(u => u.status === 'pending' && (!compId || u.company_id === compId));
+            json(200, { success: true, pending, count: pending.length });
+            return;
+          }
+          if (action === 'approve_tm') {
+            const userId = body.user_id || body.id;
+            const target = allUsers.find(u => u.id === userId);
+            if (target) {
+              target.status = 'active';
+              target.designation = 'Closer Specialist';
+              target.message_limit = Number(body.message_limit) || 150;
+              target.approved_at = new Date().toISOString();
+              target.approved_by = currentLocalUser?.username || 'admin';
+              saveLocalUsers(allUsers);
+              json(200, { success: true, message: 'Closer applicant approved and activated successfully!' });
+            } else {
+              json(404, { success: false, error: 'Applicant not found.' });
+            }
+            return;
+          }
+          if (action === 'reject_tm') {
+            const userId = body.user_id || body.id;
+            const idx = allUsers.findIndex(u => u.id === userId);
+            if (idx !== -1) {
+              allUsers.splice(idx, 1);
+              saveLocalUsers(allUsers);
+              json(200, { success: true, message: 'Applicant rejected and removed.' });
+            } else {
+              json(404, { success: false, error: 'Applicant not found.' });
+            }
+            return;
+          }
+          if (action === 'list_logins') {
+            const loginsFile = path.join(root, 'data/logins.json');
+            let logs = [];
+            try { logs = JSON.parse(fs.readFileSync(loginsFile, 'utf8') || '[]'); } catch (_) {}
+            if (currentLocalUser && currentLocalUser.role !== 'superadmin') {
+              const userComp = currentLocalUser.company_id || 'COMP-001';
+              logs = logs.filter(l => l.company_id === userComp);
+            }
+            json(200, { success: true, logins: logs });
+            return;
+          }
           if (action === 'login') {
             const username = String(body.username || '').trim().toLowerCase();
             const password = String(body.password || '').trim();
@@ -145,13 +270,48 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             if (matched) {
               if (matched.username === 'admin' && (password === 'admin123' || password === 'Admin@Omnidesk2026!')) isValid = true;
               else if ((matched.username === 'sadmin' || matched.role === 'superadmin') && (password === 'sadmin123' || password === 'SuperAdmin@2026!')) isValid = true;
+              else if (matched.username === 'apex_admin' && (password === 'admin123' || password === 'apex123')) isValid = true;
               else if (matched.username === 'ali' && (password === 'ali123' || password === 'Lead@123')) isValid = true;
               else if (matched.username === 'asima' && (password === 'asima123' || password === 'Lead@123')) isValid = true;
               else if (matched.username === 'hamza' && (password === 'closer123' || password === 'Agent@123')) isValid = true;
+              else if (matched.username === 'zain_closer' && (password === 'closer123' || password === 'zain123')) isValid = true;
               else if (matched.password && matched.password === password) isValid = true;
             }
             if (matched && isValid) {
+              if (matched.status === 'pending') {
+                json(403, {
+                  success: false,
+                  error: '⏳ Your account is pending manual approval by company administration. Please contact your company administrator or wait for approval.'
+                });
+                return;
+              }
+              if (matched.status === 'suspended') {
+                json(403, {
+                  success: false,
+                  error: '🚫 Your account has been suspended by company administration.'
+                });
+                return;
+              }
               currentLocalUser = matched;
+              // Append to logins audit
+              try {
+                const loginsFile = path.join(root, 'data/logins.json');
+                const logs = JSON.parse(fs.readFileSync(loginsFile, 'utf8') || '[]');
+                logs.unshift({
+                  id: 'LOG-' + Date.now().toString(36).toUpperCase(),
+                  timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+                  username: matched.username,
+                  name: matched.name,
+                  role: matched.role,
+                  company_id: matched.company_id || 'COMP-001',
+                  company_name: matched.company_id === 'GLOBAL' ? 'Platform HQ' : (matched.company_id || 'Nunno Official'),
+                  ip: '127.0.0.1',
+                  city: 'Localhost',
+                  device: req.headers['user-agent'] ? req.headers['user-agent'].slice(0, 40) : 'Chrome / Local',
+                  status: 'active'
+                });
+                fs.writeFileSync(loginsFile, JSON.stringify(logs.slice(0, 100), null, 2), 'utf8');
+              } catch (_) {}
               json(200, { success: true, authenticated: true, user: matched, message: 'Logged in successfully.' });
             } else {
               json(401, { success: false, error: 'Invalid username or password.' });
@@ -417,20 +577,98 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
 
           if (action === 'get_telemetry') {
             const comps = loadComps();
+            const pendingTMs = allUsers.filter(u => u.status === 'pending').length;
+            let mrr = 0;
+            comps.forEach(c => {
+              const p = (c.plan || '').toLowerCase();
+              if (p.includes('billion') || p.includes('vip')) mrr += 250000;
+              else if (p.includes('pro')) mrr += 150000;
+              else mrr += 75000;
+            });
             json(200, {
               success: true,
               telemetry: {
                 total_companies: comps.length,
                 active_companies: comps.filter(c => c.status === 'active').length,
-                total_employees: allUsers.filter(u => u.role !== 'superadmin').length,
+                total_employees: allUsers.filter(u => u.role !== 'superadmin' && u.status !== 'pending').length,
                 total_tls: allUsers.filter(u => u.role === 'lead').length,
-                total_tms: allUsers.filter(u => u.role === 'member').length,
+                total_tms: allUsers.filter(u => u.role === 'member' && u.status === 'active').length,
+                pending_tms: pendingTMs,
+                platform_mrr: mrr,
                 total_messages_today: allUsers.reduce((acc, u) => acc + (Number(u.messages_sent_today) || 0), 0),
                 active_sessions: allUsers.filter(u => u.phone && u.status === 'active').length,
                 system_health: 'optimal',
+                subsecond_tick: Date.now(),
                 server_time: new Date().toISOString()
               }
             });
+            return;
+          }
+          if (action === 'get_live_chat_stream') {
+            const comps = loadComps();
+            const compMap = {};
+            comps.forEach(c => { compMap[c.id] = c.name; });
+            const stream = [];
+            
+            // Check in-memory leads
+            leads.forEach(lead => {
+              const leadName = lead.name || lead.display || 'Lead';
+              (lead.messages || []).forEach(m => {
+                stream.push({
+                  id: lead.id + '-' + Math.floor(Math.random() * 9000 + 1000),
+                  company_id: lead.company_id || 'COMP-001',
+                  company_name: compMap[lead.company_id || 'COMP-001'] || 'Nunno Official',
+                  lead_name: leadName,
+                  lead_phone: lead.phone || '',
+                  closer_name: lead.ownerName || 'Closer Specialist',
+                  sender: m.sender || 'lead',
+                  text: m.text || '',
+                  time: m.time || 'Just now',
+                  state: lead.leadState || 'ongoing'
+                });
+              });
+            });
+
+            // Also check data/tenants/*/leads.json
+            try {
+              const tenantsDir = path.join(root, 'data/tenants');
+              if (fs.existsSync(tenantsDir)) {
+                fs.readdirSync(tenantsDir).forEach(tFolder => {
+                  const tFile = path.join(tenantsDir, tFolder, 'leads.json');
+                  if (fs.existsSync(tFile)) {
+                    const parsedLeads = JSON.parse(fs.readFileSync(tFile, 'utf8') || '[]');
+                    if (Array.isArray(parsedLeads)) {
+                      parsedLeads.forEach(l => {
+                        const lName = l.name || l.display || 'Lead';
+                        (l.messages || []).forEach(m => {
+                          stream.push({
+                            id: l.id + '-' + Math.floor(Math.random() * 9000 + 1000),
+                            company_id: tFolder,
+                            company_name: compMap[tFolder] || tFolder,
+                            lead_name: lName,
+                            lead_phone: l.phone || '',
+                            closer_name: l.ownerName || 'Closer Specialist',
+                            sender: m.sender || 'lead',
+                            text: m.text || '',
+                            time: m.time || 'Just now',
+                            state: l.leadState || 'ongoing'
+                          });
+                        });
+                      });
+                    }
+                  }
+                });
+              }
+            } catch (_) {}
+
+            if (stream.length === 0) {
+              stream.push(
+                { id: 'LIVE-01', company_id: 'COMP-001', company_name: 'Nunno Official', lead_name: 'Ali Trader', lead_phone: '+923001234567', closer_name: 'Hamza Khan', sender: 'agent', text: 'Salam Ali bhai! Your Nunno Pro scalper license is active.', time: 'Just now', state: 'paid' },
+                { id: 'LIVE-02', company_id: 'COMP-002', company_name: 'Apex Crypto Signals', lead_name: 'Waqas BTC', lead_phone: '+923219988776', closer_name: 'Daniyal Sheikh', sender: 'lead', text: 'Bro whats the monthly VIP pricing?', time: '1 min ago', state: 'ongoing' }
+              );
+            }
+
+            json(200, { success: true, stream: stream.reverse().slice(0, 50) });
             return;
           }
           if (action === 'list') {
@@ -691,6 +929,14 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       const pathname = decodeURIComponent(url.pathname);
       let relative = pathname;
       if (relative.startsWith('/')) relative = relative.slice(1);
+
+      // Handle GET logout or switch account parameter
+      if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1') {
+        currentLocalUser = null;
+        res.writeHead(302, { 'Location': '/login.php' });
+        res.end();
+        return;
+      }
       
       // Default / -> login.php (The authentic WhatsApp Web landing page)
       if (!relative) {

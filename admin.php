@@ -474,8 +474,8 @@ if (!$activeCompany) {
     </div>
 
     <div class="header-actions">
-      <button class="btn btn-emerald" onclick="openAddEmployeeModal()">
-        <span>➕</span> Add Closer / TL
+      <button class="btn btn-emerald" onclick="switchDashboardTab('pending')">
+        <span>⏳</span> Pending Applications <span id="headerPendingBadge" style="display:none; background:#ef4444; color:#fff; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:800; margin-left:4px;">0</span>
       </button>
       <a href="index.html?company_id=<?php echo urlencode($activeCompany['id']); ?>" class="btn btn-purple" target="_blank">
         <span>💬</span> Open Sales Desk
@@ -539,24 +539,63 @@ if (!$activeCompany) {
 
   <!-- Navigation Tabs -->
   <div class="dashboard-tabs">
-    <button class="dash-tab-btn active" onclick="switchDashboardTab('closers')">
-      <span>👥</span> Closer Roster & Message Limiter
+    <button class="dash-tab-btn active" id="tabBtnClosers" onclick="switchDashboardTab('closers')">
+      <span>👥</span> Closer Roster &amp; Message Limiter
     </button>
-    <button class="dash-tab-btn" onclick="switchDashboardTab('leads')">
-      <span>👑</span> Live Leads & Admin Takeover
+    <button class="dash-tab-btn" id="tabBtnPending" onclick="switchDashboardTab('pending')">
+      <span>⏳</span> Pending Closer Applications <span id="badgePendingTMCount" style="display:none; background:#ef4444; color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; font-weight:800; margin-left:6px;">0</span>
     </button>
-    <button class="dash-tab-btn" onclick="switchDashboardTab('campaigns')">
+    <button class="dash-tab-btn" id="tabBtnLeads" onclick="switchDashboardTab('leads')">
+      <span>👑</span> Live Leads &amp; Admin Takeover
+    </button>
+    <button class="dash-tab-btn" id="tabBtnCampaigns" onclick="switchDashboardTab('campaigns')">
       <span>🚀</span> Campaign Dispatcher (3 Variations)
     </button>
-    <button class="dash-tab-btn" onclick="switchDashboardTab('trunk')">
-      <span>📞</span> Company Trunk & Fallback Numbers
+    <button class="dash-tab-btn" id="tabBtnTrunk" onclick="switchDashboardTab('trunk')">
+      <span>📞</span> Company Trunk &amp; Fallback Numbers
     </button>
-    <button class="dash-tab-btn" onclick="switchDashboardTab('commissions')">
-      <span>💰</span> TL Commission & Plan Ledger
+    <button class="dash-tab-btn" id="tabBtnCommissions" onclick="switchDashboardTab('commissions')">
+      <span>💰</span> TL Commission &amp; Plan Ledger
     </button>
-    <button class="dash-tab-btn" onclick="switchDashboardTab('products')">
-      <span>⚙️</span> Products & Pitch Config
+    <button class="dash-tab-btn" id="tabBtnProducts" onclick="switchDashboardTab('products')">
+      <span>⚙️</span> Products &amp; Pitch Config
     </button>
+  </div>
+
+  <!-- TAB 0: PENDING CLOSER APPLICATIONS -->
+  <div class="dash-pane" id="panePending">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>⏳</span> Pending Closer (TM) Applications</div>
+          <div class="box-desc">
+            Closers self-onboard by scanning their WhatsApp QR on the landing page and selecting your company. 
+            Review their credentials and assigned details below to <strong>Approve</strong> (assign starting daily message quota) or <strong>Decline</strong>.
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-secondary" onclick="loadPendingTMs()">🔄 Refresh Applications</button>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Applicant Profile</th>
+              <th>Applicant Credentials (For Company)</th>
+              <th>Connected WhatsApp Phone</th>
+              <th>Location &amp; Gender</th>
+              <th>Applied Date</th>
+              <th>Decision / Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingTableBody">
+            <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading pending applications...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- TAB 1: CLOSER ROSTER & MESSAGE LIMITER -->
@@ -564,13 +603,20 @@ if (!$activeCompany) {
     <div class="content-box">
       <div class="box-header">
         <div>
-          <div class="box-title"><span>👥</span> Closer Roster & Daily Message Limiter Control</div>
+          <div class="box-title"><span>👥</span> Closer Roster &amp; Daily Message Limiter Control</div>
           <div class="box-desc">Control how many WhatsApp messages each closer can dispatch per day. Set to <strong>-1</strong> for Unlimited.</div>
         </div>
         <div style="display:flex; gap:10px; align-items:center;">
           <input type="text" id="closerSearch" oninput="filterCloserTable()" placeholder="Search closer by name or phone..." class="form-control" style="width:260px; padding:8px 12px; font-size:12.5px;">
-          <button class="btn btn-emerald" onclick="openAddEmployeeModal()">➕ Add Closer</button>
         </div>
+      </div>
+
+      <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:12px 18px; margin-bottom:18px; font-size:12px; color:#34d399; display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span>ℹ️</span>
+          <span><strong>Per-Closer WhatsApp Isolation Active:</strong> Each team member connects their own individual WhatsApp line. New closers self-onboard on the landing page.</span>
+        </div>
+        <button class="btn btn-emerald" style="padding:4px 10px; font-size:11px;" onclick="switchDashboardTab('pending')">Review Pending Closers ⏳</button>
       </div>
 
       <div style="overflow-x: auto;">
@@ -883,20 +929,211 @@ if (!$activeCompany) {
   </div>
 </div>
 
+<!-- MODAL: Approve Pending TM Closer -->
+<div id="modalApproveTM" class="modal-backdrop">
+  <div class="modal-box" style="max-width: 480px;">
+    <div class="modal-header">
+      <div>
+        <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#10b981; letter-spacing:0.05em;">Manual Verification</div>
+        <div class="modal-title">Approve Closer Application</div>
+      </div>
+      <button class="modal-close" onclick="closeApproveTMModal()">&times;</button>
+    </div>
+
+    <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:12px 16px; margin-bottom:18px;">
+      <div style="font-size:13px; font-weight:700; color:#34d399;" id="approveTMName">Applicant Name</div>
+      <div style="font-size:12px; color:var(--text-secondary);" id="approveTMUsername">@username</div>
+    </div>
+
+    <form onsubmit="submitApproveTM(event)">
+      <input type="hidden" id="approveTMId">
+      
+      <div class="form-group">
+        <label class="form-label">Assign Daily Message Quota *</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="number" id="approveTMLimit" class="form-control" value="150" min="10" max="5000" required style="font-size:15px; font-weight:700;">
+          <button type="button" class="btn btn-secondary" onclick="adjustApproveLimit(50)">+50</button>
+          <button type="button" class="btn btn-secondary" onclick="adjustApproveLimit(100)">+100</button>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:5px;">This closer will be able to dispatch this many messages per day. (You can adjust anytime).</div>
+      </div>
+
+      <div id="approveTMError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; font-size: 12.5px; margin-bottom: 14px;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeApproveTMModal()">Cancel</button>
+        <button type="submit" id="approveTMSubmitBtn" class="btn btn-emerald">Approve &amp; Activate Closer 🚀</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 let currentEmployees = [];
 let currentCompanyLeads = [];
+let currentPendingTMs = [];
 
 function switchDashboardTab(tabName) {
-  const tabs = ['closers', 'leads', 'campaigns', 'trunk', 'commissions', 'products'];
-  const btns = document.querySelectorAll('.dash-tab-btn');
-  tabs.forEach((t, i) => {
+  const tabs = ['closers', 'pending', 'leads', 'campaigns', 'trunk', 'commissions', 'products'];
+  tabs.forEach((t) => {
     const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
+    const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
     if (pane) pane.classList.toggle('active', t === tabName);
-    if (btns[i]) btns[i].classList.toggle('active', t === tabName);
+    if (btn) btn.classList.toggle('active', t === tabName);
   });
+  if (tabName === 'pending') loadPendingTMs();
   if (tabName === 'leads') loadCompanyLeads();
   if (tabName === 'products') loadCompanyConfig();
+}
+
+function adjustApproveLimit(delta) {
+  const inp = document.getElementById('approveTMLimit');
+  inp.value = (parseInt(inp.value) || 150) + delta;
+}
+
+function openApproveTMModal(id, name, username) {
+  document.getElementById('approveTMId').value = id;
+  document.getElementById('approveTMName').textContent = name;
+  document.getElementById('approveTMUsername').textContent = '@' + username;
+  document.getElementById('approveTMLimit').value = 150;
+  document.getElementById('approveTMError').style.display = 'none';
+  document.getElementById('modalApproveTM').classList.add('active');
+}
+
+function closeApproveTMModal() {
+  document.getElementById('modalApproveTM').classList.remove('active');
+}
+
+async function submitApproveTM(e) {
+  e.preventDefault();
+  const btn = document.getElementById('approveTMSubmitBtn');
+  const errBox = document.getElementById('approveTMError');
+  btn.disabled = true;
+  btn.textContent = 'Activating Closer…';
+  errBox.style.display = 'none';
+
+  const userId = document.getElementById('approveTMId').value;
+  const limit = parseInt(document.getElementById('approveTMLimit').value) || 150;
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'approve_tm',
+        user_id: userId,
+        message_limit: limit
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeApproveTMModal();
+      alert('🎉 Closer approved and activated! They can now log in using their credentials.');
+      loadPendingTMs();
+      loadEmployees();
+    } else {
+      errBox.textContent = data.error || 'Failed to approve closer.';
+      errBox.style.display = 'block';
+    }
+  } catch (err) {
+    errBox.textContent = 'Server communication error.';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Approve & Activate Closer 🚀';
+  }
+}
+
+async function rejectTM(userId, name) {
+  if (!confirm(`Are you sure you want to decline and remove application for "${name}"?`)) return;
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject_tm', user_id: userId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('Application rejected.');
+      loadPendingTMs();
+    } else {
+      alert('⚠️ ' + (data.error || 'Failed to reject applicant.'));
+    }
+  } catch (err) {
+    alert('Server communication error.');
+  }
+}
+
+async function loadPendingTMs() {
+  const tbody = document.getElementById('pendingTableBody');
+  const badge = document.getElementById('badgePendingTMCount');
+  const headerBadge = document.getElementById('headerPendingBadge');
+  try {
+    const res = await fetch('api/auth.php?action=list_pending_tms&company_id=<?php echo $activeCompany['id']; ?>');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.pending)) {
+      currentPendingTMs = data.pending;
+      const count = currentPendingTMs.length;
+      if (badge) {
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
+      }
+      if (headerBadge) {
+        headerBadge.textContent = count;
+        headerBadge.style.display = count > 0 ? 'inline-block' : 'none';
+      }
+
+      if (!count) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">✨ No pending closer applications right now. When users scan their WhatsApp QR and select your company, they will appear here.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = currentPendingTMs.map(app => {
+        const pfp = app.pfp || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80';
+        return `
+          <tr>
+            <td>
+              <div class="user-profile-cell">
+                <img src="${pfp}" alt="${app.name}" style="width:38px; height:38px; border-radius:10px; object-fit:cover; border:1px solid rgba(255,255,255,0.1);">
+                <div>
+                  <div class="user-name">${app.name}</div>
+                  <div class="user-meta">Applicant</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div style="font-weight:700; color:#10b981; font-family:'JetBrains Mono',monospace;">@${app.username}</div>
+              <div style="font-size:11px; color:var(--text-secondary);">${app.email || 'No email'}</div>
+            </td>
+            <td>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#f8fafc; font-weight:600;">
+                📱 ${app.phone || '<em>Not linked</em>'}
+              </span>
+            </td>
+            <td>
+              <div style="font-size:12px; font-weight:600;">${app.city || 'Pakistan'}</div>
+              <div style="font-size:11px; color:var(--text-muted); text-transform:capitalize;">${app.gender || 'male'} closer</div>
+            </td>
+            <td>
+              <span style="font-size:11.5px; color:var(--text-secondary);">${app.applied_at || app.created_at || 'Just now'}</span>
+            </td>
+            <td>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-emerald" style="padding:6px 12px; font-size:11.5px;" onclick="openApproveTMModal('${app.id}', '${app.name.replace(/'/g, "\\'")}', '${app.username}')">
+                  ✅ Approve (Set Limit)
+                </button>
+                <button class="btn btn-danger" style="padding:6px 10px; font-size:11.5px;" onclick="rejectTM('${app.id}', '${app.name.replace(/'/g, "\\'")}')">
+                  ❌ Decline
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pending applications.</td></tr>';
+  }
 }
 
 function selectCampaignVar(v) {
@@ -1345,7 +1582,9 @@ async function saveProductConfig() {
 
 // Initial boot
 loadEmployees();
+loadPendingTMs();
 loadCompanyLeads();
+setInterval(loadPendingTMs, 8000);
 
 function toggleTheme() {
   const isLight = document.documentElement.classList.toggle('theme-light');
