@@ -304,8 +304,8 @@ if (!$activeCompany) {
       <button class="btn btn-emerald" onclick="openAddEmployeeModal()">
         <span>➕</span> Add Employee
       </button>
-      <a href="index.php" class="btn btn-secondary" target="_blank">
-        <span>💬</span> Open Sales Desk
+      <a href="index.html?company_id=<?php echo urlencode($activeCompany['id']); ?>" class="btn btn-secondary" target="_blank">
+        <span>💬</span> Open Sales Desk &amp; Chats
       </a>
       <a href="admin.php?action=logout" class="btn btn-danger">
         <span>🚪</span> Logout

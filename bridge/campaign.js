@@ -55,6 +55,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
   let state = {
     id: null,
     name: 'OmniDesk campaign',
+    companyId: 'COMP-001',
     status: 'idle', // 'idle' | 'running' | 'paused' | 'stopped' | 'completed'
     audience: [],
     currentIndex: 0,
@@ -105,7 +106,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
 
   function updateCrmLead(contact, crmMessage, assignMode, closer) {
     try {
-      const leadsFile = typeof getLeadsPath === 'function' ? getLeadsPath() : null;
+      const leadsFile = typeof getLeadsPath === 'function' ? getLeadsPath(state.companyId) : null;
       if (!leadsFile || !fs.existsSync(leadsFile)) return;
       let leads = JSON.parse(fs.readFileSync(leadsFile, 'utf8'));
       if (!Array.isArray(leads)) return;
@@ -126,6 +127,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
       } else {
         const newLead = {
           id: `lead_${Date.now()}_${contact.phone}`,
+          company_id: state.companyId || 'COMP-001',
           name: contact.name || contact.display || `+${cleanPhone}`,
           phone: cleanPhone,
           display: contact.display || `+${cleanPhone}`,
@@ -256,13 +258,14 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
     saveState();
   }
 
-  function start({ name, message, audience, minDelay, maxDelay, assignMode, closer, variation, media }) {
+  function start({ name, message, audience, minDelay, maxDelay, assignMode, closer, variation, media, company_id }) {
     clearTimeout(loopTimer);
     clearInterval(countdownTimer);
     inFlight = false;
 
     state.id = 'camp_' + Date.now();
     state.name = (name || '').trim() || 'OmniDesk campaign';
+    state.companyId = company_id || 'COMP-001';
     state.messageTemplate = message || '';
     state.variation = variation || 'text';
     state.media = media || null;

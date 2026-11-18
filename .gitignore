@@ -13,6 +13,8 @@ desktop.ini
 # (Protects client phone numbers, chats and financial records from leaking publicly or being overwritten)
 data/*.json
 data/backups/
+data/tenants/
+!data/tenants/.gitkeep
 data/whatsapp-bridge/
 !data/.gitkeep
 

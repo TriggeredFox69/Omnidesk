@@ -19,17 +19,19 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
   const campaignManager = createCampaignManager({
     send,
     dataDir: storageFile ? require('node:path').dirname(storageFile) : process.cwd(),
-    getLeadsPath: () => {
-      const dir = storageFile ? require('node:path').dirname(storageFile) : process.cwd();
-      const candidates = [
-        require('node:path').resolve(dir, '../leads.json'),
-        require('node:path').resolve(__dirname, '../data/leads.json'),
-        require('node:path').resolve(__dirname, '../../data/leads.json')
-      ];
-      for (const c of candidates) {
-        if (require('node:fs').existsSync(c)) return c;
+    getLeadsPath: (companyId = 'COMP-001') => {
+      const cleanId = String(companyId || 'COMP-001').replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
+      const tenantPath = require('node:path').resolve(__dirname, `../data/tenants/${cleanId}/leads.json`);
+      if (require('node:fs').existsSync(tenantPath)) return tenantPath;
+      if (cleanId === 'COMP-001') {
+        const legacy = require('node:path').resolve(__dirname, '../data/leads.json');
+        if (require('node:fs').existsSync(legacy)) return legacy;
       }
-      return candidates[0];
+      const dir = require('node:path').dirname(tenantPath);
+      if (!require('node:fs').existsSync(dir)) {
+        try { require('node:fs').mkdirSync(dir, { recursive: true }); } catch (_) {}
+      }
+      return tenantPath;
     }
   });
   const ackStatus = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';

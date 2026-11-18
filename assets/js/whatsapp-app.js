@@ -143,6 +143,10 @@ document.addEventListener('DOMContentLoaded', () => {
     connectedWaNumber: '',
     senderConfigured: false,
 
+    // Multi-Tenant Company Isolation Context
+    currentCompanyId: 'COMP-001',
+    companyConfig: null,
+
     // Campaign Studio queue state
     campaignQueue: [...initialLeads],
     campaignIndex: 0,
@@ -214,6 +218,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Connected WhatsApp Direct Number Pill & Modal
     connectedNumberPill: document.getElementById('connectedNumberPill'),
     connectedNumberText: document.getElementById('connectedNumberText'),
+    quickReconnectWaBtn: document.getElementById('quickReconnectWaBtn'),
+    forceRelinkWaBtn: document.getElementById('forceRelinkWaBtn'),
+    companyContextBadge: document.getElementById('companyContextBadge'),
+    companyContextName: document.getElementById('companyContextName'),
+    companyContextSwitcher: document.getElementById('companyContextSwitcher'),
     campaignConnectionStatus: document.getElementById('campaignConnectionStatus'),
     connectWaModal: document.getElementById('connectWaModal'),
     closeConnectWaModalBtn: document.getElementById('closeConnectWaModalBtn'),
@@ -553,11 +562,39 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderConnectedNumber() {
     if (!els.connectedNumberText) return;
     if (state.senderConfigured) {
-      els.connectedNumberText.textContent = state.connectedWaNumber || 'Business API configured';
+      els.connectedNumberText.textContent = state.connectedWaNumber ? ('+' + state.connectedWaNumber) : 'Connected (+92 331 8036576)';
       els.connectedNumberText.style.color = 'var(--c-wa)';
+      if (els.quickReconnectWaBtn) els.quickReconnectWaBtn.style.display = 'none';
     } else {
-      els.connectedNumberText.textContent = 'Sender not connected (Click to set up)';
-      els.connectedNumberText.style.color = '#94a3b8';
+      els.connectedNumberText.textContent = 'Disconnected (+92 331 8036576) · Click to Link';
+      els.connectedNumberText.style.color = '#f59e0b';
+      if (els.quickReconnectWaBtn) els.quickReconnectWaBtn.style.display = 'inline-flex';
+    }
+  }
+
+  // Render Multi-Tenant Company Context Badge in Topbar
+  function renderCompanyContextPill() {
+    if (!els.companyContextBadge) return;
+    const compName = state.companyConfig?.company_name || (state.currentCompanyId === 'COMP-001' ? 'Nunno Official' : state.currentCompanyId);
+    if (els.companyContextName) els.companyContextName.textContent = compName;
+    els.companyContextBadge.style.display = 'inline-flex';
+
+    // If Super Admin, populate switcher dropdown
+    const isSuper = state.currentUser?.role === 'superadmin' || state.currentUser?.company_id === 'GLOBAL';
+    if (isSuper && els.companyContextSwitcher) {
+      els.companyContextSwitcher.style.display = 'inline-block';
+      if (!els.companyContextSwitcher.dataset.loaded) {
+        fetch('api/companies.php?action=list')
+          .then(r => r.json())
+          .then(data => {
+            if (data?.success && Array.isArray(data.companies)) {
+              els.companyContextSwitcher.innerHTML = data.companies.map(c => `
+                <option value="${c.id}" ${c.id === state.currentCompanyId ? 'selected' : ''}>🏢 ${escapeHtml(c.name)} (${c.id})</option>
+              `).join('');
+              els.companyContextSwitcher.dataset.loaded = 'true';
+            }
+          }).catch(() => {});
+      }
     }
   }
 
@@ -735,7 +772,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const payload = {
       ...((window.NUNNO_LOCAL_LIVE || window.NUNNO_OFFLINE_PREVIEW) ? lead : {}),
       action: 'update_lead',
+      company_id: state.currentCompanyId || 'COMP-001',
       id: lead.id,
+      phone: lead.phone,
+      name: lead.name,
+      email: lead.email || '',
       leadState: lead.leadState,
       status: lead.status,
       ownerId: lead.ownerId,
@@ -760,27 +801,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch(() => {});
   }
 
-  // Fetch Centralized Leads on cPanel
+  // Fetch Centralized Leads on cPanel (Tenant Isolated per Company)
   function fetchServerLeads() {
     if (window.NUNNO_LOCAL_LIVE) return;
-    fetch('api/leads_sync.php?action=get_leads')
+    const urlParams = new URLSearchParams(window.location.search);
+    const compParam = urlParams.get('company_id') || state.currentCompanyId || '';
+    const query = compParam ? ('?action=get_leads&company_id=' + encodeURIComponent(compParam)) : '?action=get_leads';
+
+    fetch('api/leads_sync.php' + query)
       .then(res => res.json())
       .then(data => {
-        if (data && data.success && Array.isArray(data.leads) && data.leads.length > 0) {
-          state.leads = data.leads.map(l => {
-            const raw = (l.name || '').trim();
-            const lower = raw.toLowerCase();
-            if (!raw || lower === 'trader' || lower === 'alishba' || lower === 'new contact' || lower === 'unknown') {
-              l.name = l.display || (l.phone ? '+' + l.phone : '');
+        if (data && data.success) {
+          if (data.company_id) state.currentCompanyId = data.company_id;
+          if (data.company_config) state.companyConfig = data.company_config;
+          renderCompanyContextPill();
+
+          if (Array.isArray(data.leads)) {
+            state.leads = data.leads.map(l => {
+              const raw = (l.name || '').trim();
+              const lower = raw.toLowerCase();
+              if (!raw || lower === 'trader' || lower === 'alishba' || lower === 'new contact' || lower === 'unknown') {
+                l.name = l.display || (l.phone ? '+' + l.phone : '');
+              }
+              return l;
+            });
+            if (!state.activeLeadId || !state.leads.some(l => l.id === state.activeLeadId)) {
+              state.activeLeadId = state.leads.length ? state.leads[0].id : null;
             }
-            return l;
-          });
-          if (!state.activeLeadId || !state.leads.some(l => l.id === state.activeLeadId)) {
-            state.activeLeadId = state.leads[0].id;
+            renderConversationsList();
+            renderActiveChat();
+            renderAgentProfile();
           }
-          renderConversationsList();
-          renderActiveChat();
-          renderAgentProfile();
         }
       })
       .catch(() => {});
@@ -5963,12 +6014,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const closerName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
     if (els.paidCloserName) els.paidCloserName.textContent = closerName;
 
+    // Dynamically render products for active company
+    if (els.paidPlanSelect) {
+      const companyProducts = state.companyConfig?.products;
+      if (Array.isArray(companyProducts) && companyProducts.length > 0) {
+        els.paidPlanSelect.innerHTML = companyProducts.map(p => `
+          <option value="${escapeHtml(p.name)}" data-amount="${p.amount}">${escapeHtml(p.badge || '📦')} ${escapeHtml(p.name)} (Rs. ${Number(p.amount).toLocaleString()})</option>
+        `).join('') + `<option value="Custom Plan" data-amount="0">💼 Custom Deal</option>`;
+      }
+    }
+
     // Default plan & amount based on lead interest
     let defPlan = 'Pro';
     let defAmount = 5000;
     if (lead.paidDetails && lead.paidDetails.plan) {
       defPlan = lead.paidDetails.plan;
       defAmount = lead.paidDetails.amount || 5000;
+    } else if (state.companyConfig?.products?.length) {
+      defPlan = state.companyConfig.products[0].name;
+      defAmount = state.companyConfig.products[0].amount;
     } else if (lead.interest && lead.interest.includes('Starter')) {
       defPlan = 'Starter';
       defAmount = 1700;
@@ -5992,11 +6056,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (els.paidPlanSelect) {
     els.paidPlanSelect.addEventListener('change', () => {
-      const p = els.paidPlanSelect.value;
-      if (p === 'Pro') els.paidAmountInput.value = 5000;
-      else if (p === 'Starter') els.paidAmountInput.value = 1700;
-      else if (p === 'Whale VIP') els.paidAmountInput.value = 15000;
-      else if (p === 'Enterprise 3-Month') els.paidAmountInput.value = 12000;
+      const opt = els.paidPlanSelect.selectedOptions[0];
+      if (opt && opt.dataset.amount) {
+        const amt = parseInt(opt.dataset.amount, 10);
+        if (amt > 0 && els.paidAmountInput) els.paidAmountInput.value = amt;
+      }
     });
   }
 
@@ -7564,6 +7628,35 @@ document.addEventListener('DOMContentLoaded', () => {
   window.seekAudio = seekAudio;
   window.simulateClientAudioMessage = simulateClientAudioMessage;
   window.simulateClientTyping = simulateClientTyping;
+
+  // 1-Click WhatsApp Quick Reconnect & Relink Listeners (+92 331 8036576)
+  if (els.quickReconnectWaBtn) {
+    els.quickReconnectWaBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openConnectWaModal();
+      reconnectWhatsApp();
+    });
+  }
+  if (els.forceRelinkWaBtn) {
+    els.forceRelinkWaBtn.addEventListener('click', () => {
+      reconnectWhatsApp();
+    });
+  }
+
+  // Super Admin / Platform Multi-Tenant Company Switcher
+  if (els.companyContextSwitcher) {
+    els.companyContextSwitcher.addEventListener('change', (e) => {
+      const newComp = e.target.value;
+      if (newComp && newComp !== state.currentCompanyId) {
+        state.currentCompanyId = newComp;
+        const u = new URL(window.location.href);
+        u.searchParams.set('company_id', newComp);
+        window.history.pushState({}, '', u.toString());
+        fetchServerLeads();
+        showToast(`🏢 Switched workspace to ${newComp}!`);
+      }
+    });
+  }
 
   // Mark Paid Modal Event Listeners
   if (els.closeMarkPaidModalBtn) els.closeMarkPaidModalBtn.addEventListener('click', closeMarkPaidModal);

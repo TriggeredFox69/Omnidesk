@@ -101,6 +101,13 @@
         <span style="padding:2px 6px; border-radius:4px; background:#10b981; color:#fff; font-size:10px;">➕ Recruit TM</span>
       </button>
 
+      <!-- Active Tenant / Company Context Indicator -->
+      <div id="companyContextBadge" style="display:none; align-items:center; gap:6px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:999px; padding:4px 10px; font-size:11px; font-weight:750; color:#a5b4fc;" title="Active Company Tenant Database">
+        <span style="font-size:13px;">🏢</span>
+        <span id="companyContextName">Nunno Official</span>
+        <select id="companyContextSwitcher" style="display:none; background:transparent; border:none; color:inherit; font-size:11px; font-weight:750; cursor:pointer; outline:none; margin-left:2px;"></select>
+      </div>
+
       <!-- Company Admin Link -->
       <a href="admin.php" class="btn-header-admin" id="headerAdminLink" style="display:none; text-decoration:none;" title="Company Admin Portal">
         <span>🏢</span>
@@ -151,6 +158,9 @@
         <span class="conn-label">Direct WA:</span>
         <span class="conn-number mono" id="connectedNumberText">Checking connection…</span>
       </div>
+      <button type="button" class="btn btn-warning btn-xs" id="quickReconnectWaBtn" style="display:none;padding:3px 10px;font-size:11px;font-weight:750;border-radius:6px;gap:5px;cursor:pointer;" title="Click to relink +923318036576 or scan QR code">
+        <span>⚡ Relink +923318036576</span>
+      </button>
       <div class="kpi-widget-group">
         <button type="button" class="kpi-stat-pill active" data-filter="all" id="kpiFilterAll">
           <span class="kpi-dot dot-all"></span>
@@ -1175,7 +1185,8 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         <img id="waQrImage" alt="Scan this QR code using WhatsApp Linked devices" width="280" height="280" hidden style="max-width:100%;background:#fff;border-radius:10px;">
       </div>
       <p id="waPendingCampaign" class="text-xs text-muted" hidden>Your campaign will start automatically once your phone is linked. Cancel to stop this pending launch.</p>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+        <button class="btn btn-warning btn-sm" id="forceRelinkWaBtn" style="font-weight:750;">⚡ Relink +923318036576 / Scan QR</button>
         <button class="btn btn-ghost btn-sm" id="cancelConnectWaBtn">Cancel</button>
         <button class="btn btn-wa btn-sm" id="saveConnectedWaBtn">Connect WhatsApp</button>
       </div>

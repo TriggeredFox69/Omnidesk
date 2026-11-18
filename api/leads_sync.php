@@ -28,14 +28,17 @@ if ($sessionUser && isset($sessionUser['status']) && $sessionUser['status'] === 
     }
 }
 
-$dataFile = __DIR__ . '/../data/leads.json';
+require_once __DIR__ . '/tenant_manager.php';
+$activeCompanyId = resolveActiveCompanyId();
+$dataFile = getTenantLeadsFile($activeCompanyId);
+$companyConfig = getTenantConfig($activeCompanyId);
 
 // Helper: Read current centralized leads
 function getStoredLeads($dataFile) {
     if (file_exists($dataFile)) {
         $content = file_get_contents($dataFile);
         $decoded = json_decode($content, true);
-        if (is_array($decoded) && count($decoded) > 0) {
+        if (is_array($decoded)) {
             return $decoded;
         }
     }
@@ -44,9 +47,15 @@ function getStoredLeads($dataFile) {
 
 // Helper: Save centralized leads safely with atomic write and automatic rolling backups
 function saveStoredLeads($dataFile, $leads) {
+    global $activeCompanyId;
     $tempFile = $dataFile . '.tmp.' . uniqid();
     file_put_contents($tempFile, json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     rename($tempFile, $dataFile);
+
+    // Keep legacy data/leads.json mirrored for COMP-001 for backwards compatibility
+    if ($activeCompanyId === 'COMP-001') {
+        @file_put_contents(__DIR__ . '/../data/leads.json', json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
 
     // Automated rolling snapshot backup (keeps hourly / daily fallback)
     try {
@@ -87,8 +96,9 @@ $defaultLeads = [
 // Initialize if not present
 $currentLeads = getStoredLeads($dataFile);
 if ($currentLeads === null) {
-    saveStoredLeads($dataFile, $defaultLeads);
-    $currentLeads = $defaultLeads;
+    $initLeads = ($activeCompanyId === 'COMP-001') ? $defaultLeads : [];
+    saveStoredLeads($dataFile, $initLeads);
+    $currentLeads = $initLeads;
 }
 
 // Router
@@ -106,6 +116,7 @@ if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
             'display' => '+92 331 8036576',
             'city' => 'Connected Number',
             'network' => 'Ufone',
+            'company_id' => $activeCompanyId,
             'ownerId' => 'USR-ADMIN-01',
             'ownerName' => 'System Administrator',
             'leadState' => 'ongoing',
@@ -229,9 +240,11 @@ if ($action === 'get_leads') {
         saveStoredLeads($dataFile, $currentLeads);
     }
     echo json_encode([
-        'success' => true,
-        'leads'   => $currentLeads,
-        'count'   => count($currentLeads)
+        'success'        => true,
+        'leads'          => $currentLeads,
+        'count'          => count($currentLeads),
+        'company_id'     => $activeCompanyId,
+        'company_config' => $companyConfig
     ]);
     exit;
 }
@@ -334,6 +347,7 @@ if ($action === 'update_lead') {
             'display' => '+' . $targetPhone,
             'city' => 'Inbound',
             'network' => 'WhatsApp',
+            'company_id' => $activeCompanyId,
             'ownerId' => 'USR-ADMIN-01',
             'ownerName' => 'System Administrator',
             'leadState' => 'fresh',

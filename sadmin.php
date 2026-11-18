@@ -623,6 +623,9 @@ async function loadDashboardData() {
             </td>
             <td>
               <div style="display: flex; gap: 8px;">
+                <a href="index.html?company_id=${c.id}" class="btn btn-primary" style="padding: 6px 12px; font-size: 11px;" target="_blank">
+                  💬 Chats
+                </a>
                 <a href="admin.php?company_id=${c.id}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;">
                   🏢 Open Portal
                 </a>

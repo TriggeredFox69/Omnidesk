@@ -24,6 +24,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 $companiesFile = __DIR__ . '/../data/companies.json';
 $usersFile     = __DIR__ . '/../data/users.json';
 $auditFile     = __DIR__ . '/../data/audit_logs.json';
+require_once __DIR__ . '/tenant_manager.php';
 
 function getCompanies($file) {
     if (!file_exists($file)) return [];
@@ -227,7 +228,33 @@ switch ($action) {
         saveCompanies($companiesFile, $companies);
         file_put_contents($usersFile, json_encode($users, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_provisioned', "Provisioned $name ($slug) with admin '$adminUsername'.");
+        // Auto-provision Tenant isolated database structure
+        getTenantDir($companyId);
+        getTenantLeadsFile($companyId);
+        getTenantCampaignLogsFile($companyId);
+        $configFile = getTenantConfigFile($companyId);
+        
+        // Save tenant configuration with custom products or defaults
+        $customProducts = (!empty($data['products']) && is_array($data['products'])) ? $data['products'] : [
+            ['id' => 'p_standard', 'name' => $name . ' Standard', 'amount' => 5000, 'commission' => 1500, 'badge' => '⭐ Recommended'],
+            ['id' => 'p_starter',  'name' => $name . ' Starter',  'amount' => 2000, 'commission' => 500,  'badge' => '⚡ Quick Start'],
+            ['id' => 'p_vip',      'name' => $name . ' Premium',  'amount' => 12000,'commission' => 4000, 'badge' => '👑 High Value']
+        ];
+        $customPitch = !empty($data['default_pitch']) 
+            ? trim($data['default_pitch']) 
+            : "{Salam|AoA|Hello} {name}! Welcome to $name. Special limited-time offers available today.";
+
+        $compConfig = [
+            'company_id'    => $companyId,
+            'company_name'  => $name,
+            'company_slug'  => $slug,
+            'products'      => $customProducts,
+            'default_pitch' => $customPitch,
+            'created_at'    => date('Y-m-d H:i:s')
+        ];
+        file_put_contents($configFile, json_encode($compConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_provisioned', "Provisioned $name ($slug) with admin '$adminUsername' and isolated tenant database.");
 
         echo json_encode([
             'success' => true,
@@ -430,6 +457,33 @@ switch ($action) {
         logAudit($auditFile, 'GLOBAL', $currentUser['id'], $currentUser['name'], 'number_profile_released', "Released number profile {$profId} back to available pool.");
 
         echo json_encode(['success' => true, 'message' => 'Number profile released back to pool.']);
+        exit;
+
+    // 10. Get Company Products & Pitch Config
+    case 'get_company_config':
+        requireCompanyAdmin($currentUser);
+        $companyId = resolveActiveCompanyId();
+        $config = getTenantConfig($companyId);
+        echo json_encode(['success' => true, 'company_id' => $companyId, 'config' => $config]);
+        exit;
+
+    // 11. Update Company Products & Pitch Config
+    case 'update_company_config':
+        requireCompanyAdmin($currentUser);
+        $companyId = resolveActiveCompanyId();
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        
+        $config = getTenantConfig($companyId);
+        if (isset($data['company_name'])) $config['company_name'] = trim($data['company_name']);
+        if (isset($data['products']) && is_array($data['products'])) $config['products'] = $data['products'];
+        if (isset($data['default_pitch'])) $config['default_pitch'] = trim($data['default_pitch']);
+        
+        $configFile = getTenantConfigFile($companyId);
+        file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        
+        logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_config_updated', "Updated products and campaign pitch template.");
+        echo json_encode(['success' => true, 'message' => 'Company product and pitch configuration updated successfully.', 'config' => $config]);
         exit;
 
     default:

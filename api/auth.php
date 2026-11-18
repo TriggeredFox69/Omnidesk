@@ -343,6 +343,7 @@ switch ($action) {
 
         // Generate clean ID
         $newId = 'EMP-' . (100 + count($users) + 1);
+        $companyId = $currentUser['company_id'] ?? 'COMP-001';
 
         $newEmployee = [
             'id'            => $newId,
@@ -354,6 +355,7 @@ switch ($action) {
             'designation'   => $designation,
             'gender'        => $gender,
             'phone'         => $phone,
+            'company_id'    => $companyId,
             'status'        => 'active',
             'created_at'    => date('Y-m-d H:i:s'),
             'last_login'    => null
@@ -371,7 +373,7 @@ switch ($action) {
 
     // 5. List Employees (ADMIN ONLY)
     case 'list_employees':
-        if (!$currentUser || $currentUser['role'] !== 'admin') {
+        if (!$currentUser || !in_array($currentUser['role'], ['admin', 'superadmin'], true)) {
             http_response_code(403);
             echo json_encode([
                 'success' => false,
@@ -381,6 +383,13 @@ switch ($action) {
         }
 
         $users = getUsers($usersFile);
+        $userComp = $currentUser['company_id'] ?? 'COMP-001';
+        $isSuper = ($currentUser['role'] === 'superadmin' || $userComp === 'GLOBAL');
+
+        if (!$isSuper) {
+            $users = array_values(array_filter($users, fn($u) => ($u['company_id'] ?? 'COMP-001') === $userComp));
+        }
+
         $cleanList = array_map('sanitizeUser', $users);
 
         echo json_encode([
