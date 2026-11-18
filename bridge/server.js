@@ -82,10 +82,9 @@ service.server.listen(port, host, () => {
     })();
   }
 
-  // Restore a saved session on startup; a fresh install waits for Connect in the app.
-  const hasSavedSession = fs.existsSync(path.join(dataPath, 'auth', 'session')) ||
-    fs.existsSync(path.join(dataPath, 'baileys_auth', 'creds.json'));
-  if (hasSavedSession) service.connect();
+  // Connect automatically on server startup:
+  // Restores saved session if valid, or generates fresh QR code immediately for linking.
+  service.connect();
 });
 
 // Crash-prevention: Never let unexpected socket disconnects or rejections kill the bridge process

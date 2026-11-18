@@ -28,3 +28,5 @@ data/whatsapp-bridge/
 bridge/data/
 bridge/node_modules/
 scratch/
+
+cookies.txt

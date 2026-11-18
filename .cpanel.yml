@@ -7,10 +7,11 @@ deployment:
     - export DEPLOYPATH=/home/dailygol/omnidesk.lalagpt.pk/
     - /bin/mkdir -p $DEPLOYPATH
     - /bin/cp -R api assets $DEPLOYPATH
-    - /bin/cp -f index.php index.html email_hub.php login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH
     - /bin/mkdir -p $DEPLOYPATH/bridge
     - /bin/cp -R bridge/dist $DEPLOYPATH/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/package.json $DEPLOYPATH/bridge/
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $DEPLOYPATH/bridge/
+    - /bin/chmod +x $DEPLOYPATH/bridge/*.sh 2>/dev/null || true
     - /bin/cp -f .htaccess $DEPLOYPATH 2>/dev/null || true
     - /bin/mkdir -p $DEPLOYPATH/data
     - /bin/cp -f data/.htaccess $DEPLOYPATH/data/.htaccess 2>/dev/null || true
@@ -20,10 +21,11 @@ deployment:
     - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
     - /bin/mkdir -p $DEPLOYPATH2
     - /bin/cp -R api assets $DEPLOYPATH2
-    - /bin/cp -f index.php index.html email_hub.php login.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH2
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH2
     - /bin/mkdir -p $DEPLOYPATH2/bridge
     - /bin/cp -R bridge/dist $DEPLOYPATH2/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/package.json $DEPLOYPATH2/bridge/
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $DEPLOYPATH2/bridge/
+    - /bin/chmod +x $DEPLOYPATH2/bridge/*.sh 2>/dev/null || true
     - /bin/cp -f .htaccess $DEPLOYPATH2 2>/dev/null || true
     - /bin/mkdir -p $DEPLOYPATH2/data
     - /bin/cp -f data/.htaccess $DEPLOYPATH2/data/.htaccess 2>/dev/null || true

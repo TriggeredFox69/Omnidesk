@@ -197,21 +197,35 @@ class BaileysClient extends EventEmitter {
     }, delay);
   }
 
+  _isValidCreds(filePath) {
+    try {
+      if (!fs.existsSync(filePath) || fs.statSync(filePath).size < 100) return false;
+      const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      return Boolean(content && (content.me?.id || content.registered === true));
+    } catch (_) {
+      return false;
+    }
+  }
+
   async initialize() {
     this._destroyed = false;
     fs.mkdirSync(this.authPath, { recursive: true, mode: 0o700 });
 
-    // Auto-restore credentials from backup if main creds.json was deleted or corrupted
+    // Auto-restore credentials from backup ONLY if the backup contains a valid registered session
     const credsFile = path.join(this.authPath, 'creds.json');
     const backupFile = path.join(this.authPath, '../creds.json.bak');
     const altBackup = path.join(this.authPath + '.bak', 'creds.json');
-    if (!fs.existsSync(credsFile) || fs.statSync(credsFile).size < 50) {
-      if (fs.existsSync(backupFile) && fs.statSync(backupFile).size > 100) {
+    if (!this._isValidCreds(credsFile)) {
+      if (this._isValidCreds(backupFile)) {
         console.log('[Baileys] Restoring creds.json from automatic backup...');
         try { fs.copyFileSync(backupFile, credsFile); } catch (_) {}
-      } else if (fs.existsSync(altBackup) && fs.statSync(altBackup).size > 100) {
+      } else if (this._isValidCreds(altBackup)) {
         console.log('[Baileys] Restoring creds.json from alternate backup...');
         try { fs.copyFileSync(altBackup, credsFile); } catch (_) {}
+      } else {
+        // Stale or unauthenticated backup files - delete them to prevent infinite invalid auth loops
+        try { if (fs.existsSync(backupFile)) fs.unlinkSync(backupFile); } catch (_) {}
+        try { if (fs.existsSync(altBackup)) fs.rmSync(path.dirname(altBackup), { recursive: true, force: true }); } catch (_) {}
       }
     }
 
@@ -323,12 +337,12 @@ class BaileysClient extends EventEmitter {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
         if (loggedOut) {
+          console.warn('[Baileys] WhatsApp session logged out or revoked. Purging credentials and backups...');
           try {
-            const credsFile = path.join(this.authPath, 'creds.json');
             const backupFile = path.join(this.authPath, '../creds.json.bak');
-            if (fs.existsSync(credsFile)) {
-              try { fs.copyFileSync(credsFile, backupFile); } catch (_) {}
-            }
+            const altBak = this.authPath + '.bak';
+            if (fs.existsSync(backupFile)) try { fs.unlinkSync(backupFile); } catch (_) {}
+            if (fs.existsSync(altBak)) try { fs.rmSync(altBak, { recursive: true, force: true }); } catch (_) {}
             if (fs.existsSync(this.authPath)) {
               fs.rmSync(this.authPath, { recursive: true, force: true });
             }
@@ -353,6 +367,14 @@ class BaileysClient extends EventEmitter {
         if (this.sock.user?.lid) {
           this._recordLidPhone(this.sock.user.lid, userNum);
         }
+        // Save verified working credentials to backup
+        try {
+          const credsFile = path.join(this.authPath, 'creds.json');
+          const backupFile = path.join(this.authPath, '../creds.json.bak');
+          if (fs.existsSync(credsFile) && fs.statSync(credsFile).size > 100) {
+            fs.copyFileSync(credsFile, backupFile);
+          }
+        } catch (_) {}
         this._syncLeadsLids().catch(() => {});
         this.emit('authenticated');
         this.emit('ready');

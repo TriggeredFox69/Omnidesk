@@ -46,8 +46,14 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
         @rename($dataDir . '/whatsapp-bridge/baileys_auth', $dataDir . '/baileys_auth');
     }
     if (!file_exists($dataDir . '/baileys_auth/creds.json') && file_exists($dataDir . '/creds.json.bak')) {
-        @mkdir($dataDir . '/baileys_auth', 0775, true);
-        @copy($dataDir . '/creds.json.bak', $dataDir . '/baileys_auth/creds.json');
+        $bakContent = @file_get_contents($dataDir . '/creds.json.bak');
+        $bakJson = $bakContent ? json_decode($bakContent, true) : null;
+        if (!empty($bakJson['me']['id']) || !empty($bakJson['registered'])) {
+            @mkdir($dataDir . '/baileys_auth', 0775, true);
+            @copy($dataDir . '/creds.json.bak', $dataDir . '/baileys_auth/creds.json');
+        } else {
+            @unlink($dataDir . '/creds.json.bak');
+        }
     }
 
     $daemonScript = $bridgeDir . '/run-daemon.sh';

@@ -64,7 +64,7 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
       client = createClient();
       const active = client;
       client.on('qr', async value => {
-        phase = 'qr'; qr = null;
+        phase = 'qr';
         try {
           const rendered = await qrImage(value);
           if (client === active && phase === 'qr') qr = rendered;
@@ -89,6 +89,10 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         if (phase === 'ready' || number) {
           phase = 'starting';
           error = 'WhatsApp connection interrupted. Reconnecting automatically...';
+        } else if (phase === 'qr' || phase === 'starting') {
+          // Socket was closed while waiting for QR scan (normal Baileys QR rotation or handshake retry).
+          // Keep QR state alive and do NOT wipe qr or revert to disconnected!
+          error = 'Waiting for QR scan...';
         } else {
           phase = 'disconnected';
           qr = null;
