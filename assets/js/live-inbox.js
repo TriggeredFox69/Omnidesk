@@ -15,16 +15,41 @@
       else if (c.startsWith('3') && c.length === 10) c = '92' + c;
       return c;
     };
+    function isTMUser() {
+      const userRole = (state.currentUser?.role || '').toLowerCase();
+      const designation = (state.currentUser?.designation || '').toLowerCase();
+      return userRole === 'member' || userRole === 'closer' || designation.includes('closer');
+    }
+
+    function shouldFilterNonCampaignMessages() {
+      // TMs only get campaign-oriented messages.
+      // If someone else messages the TM's linked WhatsApp number from outside, ignore it.
+      if (isTMUser()) return true;
+
+      // Note: later we will apply this logic to TLs
+      const enableForTL = false;
+      const userRole = (state.currentUser?.role || '').toLowerCase();
+      if (enableForTL && (userRole === 'lead' || userRole === 'tl')) return true;
+
+      return false;
+    }
+
     function merge(item) {
       const itemPhone = cleanDigits(item.phone);
       let lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
       if (!lead) {
+        if (shouldFilterNonCampaignMessages()) {
+          // Outbound/outside non-campaign message arriving on TM's personal WhatsApp -> strictly ignore!
+          return null;
+        }
+
         const defaultNumber = itemPhone ? ('+' + itemPhone) : (item.phone ? '+' + cleanDigits(item.phone) : '');
         lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: defaultNumber,
           name: defaultNumber, city: '', network: '', ownerId: null, leadState: 'fresh',
           status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
         state.leads.unshift(lead);
       }
+      if (!lead) return null;
       const previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
       // Contact names are user-managed only; do not auto-override with WhatsApp push names
       const fields = { ...item, time: new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -65,15 +90,20 @@
         if (epoch && epoch !== result.epoch) { cursor = 0; epoch = result.epoch; hydrated = false; return; }
         epoch = result.epoch;
         let activeChanged = false;
+        let mergedAny = false;
         for (const item of result.messages || []) {
-          const lead = merge(item); if (lead.id === state.activeLeadId) activeChanged = true;
+          const lead = merge(item);
+          if (lead) {
+            mergedAny = true;
+            if (lead.id === state.activeLeadId) activeChanged = true;
+          }
         }
         cursor = result.cursor;
         hydrated = true;
         if (result.presences && typeof window.onWhatsAppPresencesUpdate === 'function') {
           window.onWhatsAppPresencesUpdate(result.presences);
         }
-        if (result.messages?.length) { renderList(); if (activeChanged) renderChat(); }
+        if (mergedAny) { renderList(); if (activeChanged) renderChat(); }
         if (!state.senderConfigured) {
           activePhone = '';
           const el = document.getElementById('chatPresence');
