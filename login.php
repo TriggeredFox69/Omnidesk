@@ -739,11 +739,6 @@ if (!empty($_SESSION['omnidesk_user']) && !isset($_GET['switch'])) {
                 </button>
               </div>
             </div>
-
-            <!-- Instant Closer Demo (Skip phone scan) -->
-            <button class="qr-quick-btn" onclick="instantTMTestLogin()">
-              ⚡ Instant Closer Demo (Hamza Closer)
-            </button>
           </div>
 
         </div>
