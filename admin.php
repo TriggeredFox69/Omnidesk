@@ -930,19 +930,19 @@ if (!$activeCompany) {
 </div>
 
 <!-- MODAL: Approve Pending TM Closer -->
-<div id="modalApproveTM" class="modal-backdrop">
-  <div class="modal-box" style="max-width: 480px;">
-    <div class="modal-header">
+<div id="modalApproveTM" class="modal-overlay" style="display: none;">
+  <div class="modal-card" style="max-width: 480px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
       <div>
         <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#10b981; letter-spacing:0.05em;">Manual Verification</div>
-        <div class="modal-title">Approve Closer Application</div>
+        <h3 class="modal-title" style="margin:0;">Approve Closer Application</h3>
       </div>
-      <button class="modal-close" onclick="closeApproveTMModal()">&times;</button>
+      <button type="button" onclick="closeApproveTMModal()" style="background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer;">&times;</button>
     </div>
 
     <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:12px 16px; margin-bottom:18px;">
-      <div style="font-size:13px; font-weight:700; color:#34d399;" id="approveTMName">Applicant Name</div>
-      <div style="font-size:12px; color:var(--text-secondary);" id="approveTMUsername">@username</div>
+      <div style="font-size:14px; font-weight:800; color:#34d399;" id="approveTMName">Applicant Name</div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;" id="approveTMUsername">@username</div>
     </div>
 
     <form onsubmit="submitApproveTM(event)">
@@ -991,17 +991,18 @@ function adjustApproveLimit(delta) {
   inp.value = (parseInt(inp.value) || 150) + delta;
 }
 
-function openApproveTMModal(id, name, username) {
-  document.getElementById('approveTMId').value = id;
-  document.getElementById('approveTMName').textContent = name;
-  document.getElementById('approveTMUsername').textContent = '@' + username;
+function openApproveTMModal(id) {
+  const app = currentPendingTMs.find(a => a.id === id) || { id: id, name: 'Applicant', username: 'closer' };
+  document.getElementById('approveTMId').value = app.id;
+  document.getElementById('approveTMName').textContent = app.name;
+  document.getElementById('approveTMUsername').textContent = '@' + app.username;
   document.getElementById('approveTMLimit').value = 150;
   document.getElementById('approveTMError').style.display = 'none';
-  document.getElementById('modalApproveTM').classList.add('active');
+  document.getElementById('modalApproveTM').style.display = 'flex';
 }
 
 function closeApproveTMModal() {
-  document.getElementById('modalApproveTM').classList.remove('active');
+  document.getElementById('modalApproveTM').style.display = 'none';
 }
 
 async function submitApproveTM(e) {
@@ -1044,7 +1045,9 @@ async function submitApproveTM(e) {
   }
 }
 
-async function rejectTM(userId, name) {
+async function rejectTM(userId) {
+  const app = currentPendingTMs.find(a => a.id === userId);
+  const name = app ? app.name : 'this applicant';
   if (!confirm(`Are you sure you want to decline and remove application for "${name}"?`)) return;
   try {
     const res = await fetch('api/auth.php', {
@@ -1119,10 +1122,10 @@ async function loadPendingTMs() {
             </td>
             <td>
               <div style="display:flex; gap:8px;">
-                <button class="btn btn-emerald" style="padding:6px 12px; font-size:11.5px;" onclick="openApproveTMModal('${app.id}', '${app.name.replace(/'/g, "\\'")}', '${app.username}')">
+                <button class="btn btn-emerald" style="padding:6px 12px; font-size:11.5px;" onclick="openApproveTMModal('${app.id}')">
                   ✅ Approve (Set Limit)
                 </button>
-                <button class="btn btn-danger" style="padding:6px 10px; font-size:11.5px;" onclick="rejectTM('${app.id}', '${app.name.replace(/'/g, "\\'")}')">
+                <button class="btn btn-danger" style="padding:6px 10px; font-size:11.5px;" onclick="rejectTM('${app.id}')">
                   ❌ Decline
                 </button>
               </div>
