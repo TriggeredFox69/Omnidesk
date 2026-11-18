@@ -1161,6 +1161,7 @@ async function handleSadminLogin(e) {
     btn.textContent = 'Unlock Super Command (/sadmin) ⚡';
   }
 }
+</script>
 
 <!-- MODAL: Phone Already Registered Check -->
 <div id="modalPhoneExists" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(6px);">
