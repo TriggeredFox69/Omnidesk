@@ -271,6 +271,12 @@ if ($action === 'update_lead') {
             if (isset($input['status'])) $lead['status'] = $input['status'];
             if (array_key_exists('ownerId', $input)) $lead['ownerId'] = $input['ownerId'];
             if (array_key_exists('ownerName', $input)) $lead['ownerName'] = $input['ownerName'];
+            if (isset($input['isTakeover'])) $lead['isTakeover'] = (bool)$input['isTakeover'];
+            if (array_key_exists('originalOwnerId', $input)) $lead['originalOwnerId'] = $input['originalOwnerId'];
+            if (array_key_exists('originalOwnerName', $input)) $lead['originalOwnerName'] = $input['originalOwnerName'];
+            if (isset($input['takenOverBy'])) $lead['takenOverBy'] = $input['takenOverBy'];
+            if (isset($input['takenOverById'])) $lead['takenOverById'] = $input['takenOverById'];
+            if (isset($input['takenOverAt'])) $lead['takenOverAt'] = $input['takenOverAt'];
             if (isset($input['name']) && trim($input['name']) !== '') {
                 $lead['name'] = trim($input['name']);
             }

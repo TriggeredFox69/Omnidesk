@@ -277,6 +277,161 @@ switch ($action) {
         ]);
         exit;
 
+    // 6. List Number Profiles (Super Admin or Company Admin)
+    case 'list_number_profiles':
+        requireCompanyAdmin($currentUser);
+        $numFile = __DIR__ . '/../data/company_numbers.json';
+        $nums = file_exists($numFile) ? json_decode(file_get_contents($numFile), true) : [];
+        if (!is_array($nums)) $nums = [];
+        echo json_encode(['success' => true, 'profiles' => $nums]);
+        exit;
+
+    // 7. Create Number Profile (Super Admin)
+    case 'create_number_profile':
+        requireSuperAdmin($currentUser);
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $phone = preg_replace('/\D+/', '', trim($data['phone'] ?? ''));
+        $label = trim($data['label'] ?? 'Company WhatsApp Trunk');
+        $cap = max(50, (int)($data['daily_capacity'] ?? 500));
+        $comp = trim($data['company_id'] ?? 'COMP-001');
+
+        if (!$phone || strlen($phone) < 10) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Valid phone number is required (min 10 digits).']);
+            exit;
+        }
+
+        $numFile = __DIR__ . '/../data/company_numbers.json';
+        $nums = file_exists($numFile) ? json_decode(file_get_contents($numFile), true) : [];
+        if (!is_array($nums)) $nums = [];
+
+        $newProf = [
+            'id'                    => 'NUM-' . str_pad(count($nums) + 1, 3, '0', STR_PAD_LEFT),
+            'phone'                 => $phone,
+            'display'               => '+' . $phone,
+            'label'                 => $label,
+            'company_id'            => $comp,
+            'assigned_to_user_id'   => null,
+            'assigned_to_user_name' => null,
+            'daily_capacity'        => $cap,
+            'messages_sent_today'   => 0,
+            'status'                => 'available',
+            'created_at'            => date('Y-m-d H:i:s')
+        ];
+        $nums[] = $newProf;
+        file_put_contents($numFile, json_encode($nums, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        logAudit($auditFile, $comp, $currentUser['id'], $currentUser['name'], 'number_profile_created', "Added fallback number {$phone} ({$label})");
+
+        echo json_encode(['success' => true, 'profile' => $newProf, 'message' => 'Company number profile created.']);
+        exit;
+
+    // 8. Assign Number Profile to User who has no number (Super Admin)
+    case 'assign_number_profile':
+        requireSuperAdmin($currentUser);
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $profId = trim($data['profile_id'] ?? '');
+        $userId = trim($data['user_id'] ?? '');
+
+        if (!$profId || !$userId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Profile ID and User ID are required.']);
+            exit;
+        }
+
+        $numFile = __DIR__ . '/../data/company_numbers.json';
+        $nums = file_exists($numFile) ? json_decode(file_get_contents($numFile), true) : [];
+        $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+
+        $targetUser = null;
+        foreach ($users as &$u) {
+            if ($u['id'] === $userId) {
+                $targetUser = &$u;
+                break;
+            }
+        }
+        unset($u);
+
+        if (!$targetUser) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Target employee not found.']);
+            exit;
+        }
+
+        $assignedPhone = '';
+        $foundProf = false;
+        foreach ($nums as &$np) {
+            if ($np['id'] === $profId) {
+                $np['assigned_to_user_id'] = $targetUser['id'];
+                $np['assigned_to_user_name'] = $targetUser['name'];
+                $np['status'] = 'in_use';
+                $assignedPhone = $np['phone'];
+                $foundProf = true;
+                break;
+            }
+        }
+        unset($np);
+
+        if (!$foundProf) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Number profile not found.']);
+            exit;
+        }
+
+        $targetUser['phone'] = $assignedPhone;
+        $targetUser['using_company_fallback'] = true;
+        $targetUser['fallback_number_id'] = $profId;
+
+        file_put_contents($numFile, json_encode($nums, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        file_put_contents($usersFile, json_encode($users, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        logAudit($auditFile, $targetUser['company_id'] ?? 'COMP-001', $currentUser['id'], $currentUser['name'], 'number_profile_assigned', "Assigned company number {$assignedPhone} to {$targetUser['name']}");
+
+        echo json_encode(['success' => true, 'message' => "Company number {$assignedPhone} assigned to {$targetUser['name']}!"]);
+        exit;
+
+    // 9. Release Number Profile back to Pool
+    case 'release_number_profile':
+        requireSuperAdmin($currentUser);
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $profId = trim($data['profile_id'] ?? '');
+
+        $numFile = __DIR__ . '/../data/company_numbers.json';
+        $nums = file_exists($numFile) ? json_decode(file_get_contents($numFile), true) : [];
+        $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+
+        $releasedUser = null;
+        foreach ($nums as &$np) {
+            if ($np['id'] === $profId) {
+                $releasedUser = $np['assigned_to_user_id'];
+                $np['assigned_to_user_id'] = null;
+                $np['assigned_to_user_name'] = null;
+                $np['status'] = 'available';
+                break;
+            }
+        }
+        unset($np);
+
+        if ($releasedUser) {
+            foreach ($users as &$u) {
+                if ($u['id'] === $releasedUser) {
+                    $u['using_company_fallback'] = false;
+                    $u['fallback_number_id'] = null;
+                    break;
+                }
+            }
+            unset($u);
+            file_put_contents($usersFile, json_encode($users, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+
+        file_put_contents($numFile, json_encode($nums, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        logAudit($auditFile, 'GLOBAL', $currentUser['id'], $currentUser['name'], 'number_profile_released', "Released number profile {$profId} back to available pool.");
+
+        echo json_encode(['success' => true, 'message' => 'Number profile released back to pool.']);
+        exit;
+
     default:
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid or unknown company action.']);

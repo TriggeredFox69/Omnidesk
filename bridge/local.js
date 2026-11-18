@@ -487,6 +487,75 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             json(200, { success: true, logs: logs.reverse().slice(0, 50) });
             return;
           }
+          const numFile = path.join(root, 'data/company_numbers.json');
+          const loadNums = () => {
+            try { return JSON.parse(fs.readFileSync(numFile, 'utf8') || '[]'); } catch (_) { return []; }
+          };
+          const saveNums = (arr) => {
+            try { fs.writeFileSync(numFile, JSON.stringify(arr, null, 2), 'utf8'); } catch (_) {}
+          };
+          if (action === 'list_number_profiles') {
+            json(200, { success: true, profiles: loadNums() });
+            return;
+          }
+          if (action === 'create_number_profile' && req.method === 'POST') {
+            const nums = loadNums();
+            const phone = String(body.phone || '').replace(/\D/g, '');
+            const newProf = {
+              id: 'NUM-' + String(nums.length + 1).padStart(3, '0'),
+              phone: phone,
+              display: '+' + phone,
+              label: body.label || 'Company WhatsApp Trunk',
+              company_id: body.company_id || 'COMP-001',
+              assigned_to_user_id: null,
+              assigned_to_user_name: null,
+              daily_capacity: Number(body.daily_capacity) || 500,
+              messages_sent_today: 0,
+              status: 'available',
+              created_at: new Date().toISOString()
+            };
+            nums.push(newProf);
+            saveNums(nums);
+            json(200, { success: true, profile: newProf });
+            return;
+          }
+          if (action === 'assign_number_profile' && req.method === 'POST') {
+            const nums = loadNums();
+            const users = loadLocalUsers();
+            const prof = nums.find(p => p.id === body.profile_id);
+            const user = users.find(u => u.id === body.user_id);
+            if (!prof || !user) { json(404, { success: false, error: 'Profile or User not found' }); return; }
+            prof.assigned_to_user_id = user.id;
+            prof.assigned_to_user_name = user.name;
+            prof.status = 'in_use';
+            user.phone = prof.phone;
+            user.using_company_fallback = true;
+            saveNums(nums);
+            saveLocalUsers(users);
+            json(200, { success: true, message: `Number ${prof.display} assigned to ${user.name}` });
+            return;
+          }
+          if (action === 'release_number_profile' && req.method === 'POST') {
+            const nums = loadNums();
+            const prof = nums.find(p => p.id === body.profile_id);
+            if (!prof) { json(404, { success: false, error: 'Profile not found' }); return; }
+            const prevUserId = prof.assigned_to_user_id;
+            prof.assigned_to_user_id = null;
+            prof.assigned_to_user_name = null;
+            prof.status = 'available';
+            if (prevUserId) {
+              const users = loadLocalUsers();
+              const u = users.find(x => x.id === prevUserId);
+              if (u && u.using_company_fallback) {
+                u.phone = '';
+                delete u.using_company_fallback;
+                saveLocalUsers(users);
+              }
+            }
+            saveNums(nums);
+            json(200, { success: true, message: 'Number returned to pool' });
+            return;
+          }
         }
         if (url.pathname === '/api/direct_sender.php') {
           const routes = { get_sender_info: '/status', connect_whatsapp: '/connect', send_direct: '/send',

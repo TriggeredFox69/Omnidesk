@@ -344,6 +344,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     </div>
   </div>
 
+  <!-- Company Number Profiles & Fallback Trunk Pool -->
+  <div class="content-box">
+    <div class="box-header">
+      <div>
+        <div class="box-title">
+          <span>📱</span> Company Number Profiles & Fallback Pool
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 3px;">
+          Company-owned WhatsApp numbers assigned to closers who cannot arrange their own phone until they pair a personal device.
+        </div>
+      </div>
+      <button class="btn btn-emerald" style="padding: 8px 16px; font-size: 12px;" onclick="openAddNumberModal()">
+        <span>➕</span> Add Number Profile
+      </button>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Number Profile & Tag</th>
+            <th>Daily Message Capacity</th>
+            <th>Assigned Closer</th>
+            <th>Pool State</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="numberTableBody">
+          <tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Loading company number profiles...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Global Audit Feed -->
   <div class="content-box">
     <div class="box-header">
@@ -362,6 +396,61 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
 <?php endif; ?>
 
+</div>
+
+<!-- ADD NUMBER PROFILE MODAL -->
+<div class="modal-overlay" id="addNumberModal">
+  <div class="modal-card" style="max-width: 480px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+      <h3 class="modal-title">📱 Add Company Number Profile</h3>
+      <button onclick="closeAddNumberModal()" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
+    </div>
+    <form id="addNumberForm" onsubmit="handleAddNumber(event)">
+      <div class="form-group">
+        <label class="form-label">WhatsApp Number *</label>
+        <input type="text" id="numPhone" class="form-control" placeholder="e.g. +923318036576" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Profile Label / Trunk Name *</label>
+        <input type="text" id="numLabel" class="form-control" placeholder="e.g. Main Sales Pool #1" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Daily Capacity (Messages/Day)</label>
+        <input type="number" id="numCapacity" class="form-control" value="500" min="50" max="5000">
+      </div>
+      <div id="addNumError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.2); color: #fb7185; font-size: 13px; margin-bottom: 14px;"></div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+        <button type="button" class="btn btn-secondary" onclick="closeAddNumberModal()">Cancel</button>
+        <button type="submit" id="addNumSubmitBtn" class="btn btn-emerald">Add to Company Pool 📱</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ASSIGN NUMBER TO CLOSER MODAL -->
+<div class="modal-overlay" id="assignNumberModal">
+  <div class="modal-card" style="max-width: 480px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+      <h3 class="modal-title">👤 Assign Number to Closer</h3>
+      <button onclick="closeAssignModal()" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
+    </div>
+    <form id="assignNumberForm" onsubmit="handleAssignNumber(event)">
+      <input type="hidden" id="assignProfId">
+      <div style="padding: 12px 14px; border-radius: 10px; background: rgba(139, 92, 246, 0.15); border: 1px solid var(--border-glow); margin-bottom: 16px; font-size: 13px;">
+        Assigning: <strong id="assignProfLabel">-</strong>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Select Employee without Phone</label>
+        <select id="assignUserSelect" class="form-control" required>
+          <option value="">Loading eligible employees...</option>
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+        <button type="button" class="btn btn-secondary" onclick="closeAssignModal()">Cancel</button>
+        <button type="submit" id="assignSubmitBtn" class="btn btn-primary">Confirm Assignment 🚀</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- PROVISION COMPANY MODAL -->
@@ -548,6 +637,7 @@ async function loadDashboardData() {
     }
 
     loadAuditLogs();
+    loadNumberProfiles();
   } catch (err) {
     console.error('Super Admin fetch error:', err);
   }
@@ -636,6 +726,177 @@ async function handleProvisionCompany(e) {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Provision Company & Admin 🚀';
+  }
+}
+
+function openAddNumberModal() { document.getElementById('addNumberModal').style.display = 'flex'; }
+function closeAddNumberModal() { document.getElementById('addNumberModal').style.display = 'none'; }
+function closeAssignModal() { document.getElementById('assignNumberModal').style.display = 'none'; }
+
+async function loadNumberProfiles() {
+  try {
+    const res = await fetch('api/companies.php?action=list_number_profiles');
+    const data = await res.json();
+    const tbody = document.getElementById('numberTableBody');
+    if (!tbody) return;
+
+    if (data.success && data.profiles) {
+      if (!data.profiles.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:18px;">No number profiles created yet. Click "Add Number Profile" above!</td></tr>';
+      } else {
+        tbody.innerHTML = data.profiles.map(p => `
+          <tr>
+            <td>
+              <div style="font-weight: 700; font-size: 14px;">${p.display || p.phone}</div>
+              <div style="font-size: 11px; color: var(--text-muted);">${p.label || 'Company Fallback Trunk'}</div>
+            </td>
+            <td><strong>${p.daily_capacity || 500}</strong> msgs/day</td>
+            <td>
+              ${p.assigned_to_user_name 
+                ? `<span style="color:#34d399; font-weight:700;">🟢 Assigned: ${p.assigned_to_user_name}</span>`
+                : '<span style="color:var(--text-muted);">⚪ Available in Pool</span>'}
+            </td>
+            <td>
+              <span class="status-badge ${p.status === 'in_use' ? 'status-active' : 'status-suspended'}">
+                ● ${p.status}
+              </span>
+            </td>
+            <td>
+              <div style="display: flex; gap: 8px;">
+                ${!p.assigned_to_user_name ? `
+                  <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 11px;" onclick="openAssignModal('${p.id}', '${p.label || p.phone}')">
+                    👤 Assign to Closer
+                  </button>
+                ` : `
+                  <button class="btn btn-danger" style="padding: 5px 10px; font-size: 11px;" onclick="releaseNumber('${p.id}')">
+                    🔄 Return to Pool
+                  </button>
+                `}
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load number profiles:', err);
+  }
+}
+
+async function handleAddNumber(e) {
+  e.preventDefault();
+  const btn = document.getElementById('addNumSubmitBtn');
+  const errBox = document.getElementById('addNumError');
+  btn.disabled = true;
+  btn.textContent = 'Adding to Pool...';
+  errBox.style.display = 'none';
+
+  const payload = {
+    action: 'create_number_profile',
+    phone: document.getElementById('numPhone').value.trim(),
+    label: document.getElementById('numLabel').value.trim(),
+    daily_capacity: parseInt(document.getElementById('numCapacity').value, 10)
+  };
+
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert('Company Number Profile added to pool successfully!');
+      closeAddNumberModal();
+      document.getElementById('addNumberForm').reset();
+      loadNumberProfiles();
+    } else {
+      errBox.textContent = d.error || 'Failed to add number';
+      errBox.style.display = 'block';
+    }
+  } catch (_) {
+    errBox.textContent = 'Network error';
+    errBox.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Add to Company Pool 📱';
+  }
+}
+
+async function openAssignModal(profId, label) {
+  document.getElementById('assignProfId').value = profId;
+  document.getElementById('assignProfLabel').textContent = label;
+  const select = document.getElementById('assignUserSelect');
+  select.innerHTML = '<option value="">Loading eligible employees...</option>';
+  document.getElementById('assignNumberModal').style.display = 'flex';
+
+  try {
+    const res = await fetch('api/auth.php?action=list_company_employees');
+    const d = await res.json();
+    if (d.success && d.employees) {
+      const needPhone = d.employees.filter(e => !e.phone || e.using_company_fallback);
+      if (!needPhone.length) {
+        select.innerHTML = '<option value="">All active closers currently have numbers!</option>';
+      } else {
+        select.innerHTML = '<option value="">-- Choose Employee --</option>' + 
+          needPhone.map(e => `<option value="${e.id}">${e.name} (@${e.username}) - ${e.role === 'lead' ? 'Team Lead' : 'Closer'}</option>`).join('');
+      }
+    }
+  } catch (_) {
+    select.innerHTML = '<option value="">Failed to load employees</option>';
+  }
+}
+
+async function handleAssignNumber(e) {
+  e.preventDefault();
+  const btn = document.getElementById('assignSubmitBtn');
+  const profId = document.getElementById('assignProfId').value;
+  const userId = document.getElementById('assignUserSelect').value;
+  if (!userId) return alert('Please select an employee');
+
+  btn.disabled = true;
+  btn.textContent = 'Assigning...';
+
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'assign_number_profile', profile_id: profId, user_id: userId })
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert(d.message);
+      closeAssignModal();
+      loadNumberProfiles();
+      loadDashboardData();
+    } else {
+      alert(d.error || 'Failed to assign number');
+    }
+  } catch (_) {
+    alert('Network error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Confirm Assignment 🚀';
+  }
+}
+
+async function releaseNumber(profId) {
+  if (!confirm('Release this company number back to the available pool?')) return;
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'release_number_profile', profile_id: profId })
+    });
+    const d = await res.json();
+    if (d.success) {
+      loadNumberProfiles();
+      loadDashboardData();
+    } else {
+      alert(d.error || 'Failed to release number');
+    }
+  } catch (_) {
+    alert('Network error');
   }
 }
 

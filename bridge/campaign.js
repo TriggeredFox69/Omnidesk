@@ -177,11 +177,15 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
 
     inFlight = true;
     try {
-      const result = await send({
+      const sendPayload = {
         phone: contact.phone,
         message: personalizedMsg,
         request_id: contact.requestId
-      });
+      };
+      if (state.media) {
+        sendPayload.media = state.media;
+      }
+      const result = await send(sendPayload);
 
       contact.status = 'accepted';
       contact.sentAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -252,7 +256,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
     saveState();
   }
 
-  function start({ name, message, audience, minDelay, maxDelay, assignMode, closer }) {
+  function start({ name, message, audience, minDelay, maxDelay, assignMode, closer, variation, media }) {
     clearTimeout(loopTimer);
     clearInterval(countdownTimer);
     inFlight = false;
@@ -260,6 +264,8 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
     state.id = 'camp_' + Date.now();
     state.name = (name || '').trim() || 'OmniDesk campaign';
     state.messageTemplate = message || '';
+    state.variation = variation || 'text';
+    state.media = media || null;
     state.audience = (audience || []).map(c => ({
       id: c.id || ('c_' + Math.random().toString(36).slice(2, 9)),
       phone: String(c.phone || '').replace(/\D/g, ''),

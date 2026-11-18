@@ -2743,8 +2743,20 @@ body:not(.theme-dark) .emp-modal-box .form-select:focus {
   transition: all 0.15s ease;
 }
 body:not(.theme-dark) .emp-roster-card {
-  background: #ffffff;
-  border-color: #e2e8f0;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+body:not(.theme-dark) .emp-card-name {
+  color: #0f172a !important;
+}
+body:not(.theme-dark) .emp-card-sub {
+  color: #64748b !important;
+}
+body:not(.theme-dark) .btn-emp-action {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
 }
 .emp-roster-card:hover {
   border-color: var(--glass-border);
@@ -3096,6 +3108,191 @@ body.theme-dark .campaign-progress-bar {
   border-radius: var(--radius-pill);
   background: var(--accent-wa);
   transition: width 0.3s ease;
+}
+
+/* ─── CAMPAIGN 3 STARTING VARIATIONS & LIVE PREVIEWS ─────────── */
+.campaign-variation-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.btn-var-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--glass-surface-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  gap: 4px;
+  transition: all 0.18s ease;
+}
+.btn-var-select:hover {
+  background: var(--glass-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-brand);
+}
+.btn-var-select.active {
+  border-color: #6366f1 !important;
+  background: rgba(99, 102, 241, 0.12) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+body:not(.theme-dark) .btn-var-select {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+body:not(.theme-dark) .btn-var-select.active {
+  background: #eef2ff !important;
+  border-color: #6366f1 !important;
+  color: #312e81 !important;
+}
+
+.campaign-message-bubble {
+  position: relative;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 12px;
+  padding: 10px 14px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  max-width: 95%;
+  margin: 8px auto 0;
+  word-break: break-word;
+}
+body.theme-dark .campaign-message-bubble {
+  background: #005c4b;
+  color: #e9edef;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.campaign-preview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #64748b;
+}
+body.theme-dark .campaign-preview-meta {
+  color: rgba(241, 245, 249, 0.7);
+}
+.campaign-preview-checks {
+  color: #53bdeb;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+/* WhatsApp PTT Voice Note Live Preview Bubble */
+.campaign-voice-bubble {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  padding: 12px 14px;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  margin: 8px auto 0;
+  max-width: 95%;
+}
+body.theme-dark .campaign-voice-bubble {
+  background: #005c4b;
+  color: #e9edef;
+}
+.voice-bubble-av {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.voice-bubble-mic-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: #10b981;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  width: 17px;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+}
+.voice-bubble-play {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 12px;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+}
+.voice-bubble-waveform {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  flex: 1;
+  height: 26px;
+}
+.waveform-bar {
+  flex: 1;
+  min-width: 2px;
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+.waveform-bar.active {
+  background: #10b981;
+}
+body.theme-dark .waveform-bar {
+  background: rgba(255, 255, 255, 0.3);
+}
+body.theme-dark .waveform-bar.active {
+  background: #34d399;
+}
+
+/* WhatsApp Image + Caption Bubble */
+.campaign-image-bubble {
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  margin: 8px auto 0;
+  max-width: 95%;
+}
+body.theme-dark .campaign-image-bubble {
+  background: #005c4b;
+  color: #e9edef;
+}
+.campaign-image-bubble img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  display: block;
+}
+.campaign-image-bubble .image-caption-text {
+  padding: 8px 12px 10px;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 /* ─── 18. EMPLOYEE WORKSPACE VIEW (#viewEmployee) ─────────── */

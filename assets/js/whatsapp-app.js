@@ -316,6 +316,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Can't Handle & Lead Lock Shield Elements
     cantHandleBtn: document.getElementById('cantHandleBtn'),
+    adminTakeoverBtn: document.getElementById('adminTakeoverBtn'),
+    adminTakeoverNotice: document.getElementById('adminTakeoverNotice'),
+    takeoverAdminName: document.getElementById('takeoverAdminName'),
+    takeoverOriginalCloser: document.getElementById('takeoverOriginalCloser'),
+    pipelineFilterTakeover: document.getElementById('pipelineFilterTakeover'),
+    inboxFilterTakeover: document.getElementById('inboxFilterTakeover'),
     leadLockedShield: document.getElementById('leadLockedShield'),
     lockedCloserName: document.getElementById('lockedCloserName'),
 
@@ -404,6 +410,23 @@ document.addEventListener('DOMContentLoaded', () => {
     campaignAutoOpenWa: document.getElementById('campaignAutoOpenWa'),
     campaignWaTargetType: document.getElementById('campaignWaTargetType'),
     campaignPitchPreset: document.getElementById('campaignPitchPreset'),
+    campaignPitchPresetGroup: document.getElementById('campaignPitchPresetGroup'),
+    btnVarText: document.getElementById('btnVarText'),
+    btnVarTextImage: document.getElementById('btnVarTextImage'),
+    btnVarAudio: document.getElementById('btnVarAudio'),
+    campaignImageContainer: document.getElementById('campaignImageContainer'),
+    campaignAudioContainer: document.getElementById('campaignAudioContainer'),
+    campaignImageInput: document.getElementById('campaignImageInput'),
+    campaignImageDrop: document.getElementById('campaignImageDrop'),
+    campaignImagePreviewThumb: document.getElementById('campaignImagePreviewThumb'),
+    campaignImagePlaceholder: document.getElementById('campaignImagePlaceholder'),
+    clearCampaignImgBtn: document.getElementById('clearCampaignImgBtn'),
+    campaignAudioPreset: document.getElementById('campaignAudioPreset'),
+    campaignAudioFileInput: document.getElementById('campaignAudioFileInput'),
+    campaignAudioPlayBtn: document.getElementById('campaignAudioPlayBtn'),
+    campaignAudioTitle: document.getElementById('campaignAudioTitle'),
+    campaignAudioDuration: document.getElementById('campaignAudioDuration'),
+    campaignAudioBar: document.getElementById('campaignAudioBar'),
     campaignCustomMsg: document.getElementById('campaignCustomMsg'),
     campaignBubblePreview: document.getElementById('campaignBubblePreview'),
     startCampaignBtn: document.getElementById('startCampaignBtn'),
@@ -717,6 +740,12 @@ document.addEventListener('DOMContentLoaded', () => {
       status: lead.status,
       ownerId: lead.ownerId,
       ownerName: lead.ownerName,
+      isTakeover: lead.isTakeover || false,
+      originalOwnerId: lead.originalOwnerId || null,
+      originalOwnerName: lead.originalOwnerName || null,
+      takenOverBy: lead.takenOverBy || null,
+      takenOverById: lead.takenOverById || null,
+      takenOverAt: lead.takenOverAt || null,
       verificationStatus: lead.verificationStatus,
       paidDetails: lead.paidDetails,
       notes: lead.notes,
@@ -878,6 +907,64 @@ document.addEventListener('DOMContentLoaded', () => {
     renderActiveChat();
     renderAgentProfile();
     syncLeadToServer(lead);
+  }
+
+  // ⚡ Admin Takeover Action (Company Admin / Super Admin)
+  // Transfers active command while strictly preserving original closer sales target & commission
+  function executeAdminTakeover(leadId) {
+    const lead = getLead(leadId);
+    if (!lead) return;
+    const user = state.currentUser;
+    const isAdmin = user && ['admin', 'superadmin'].includes(user.role);
+    if (!isAdmin) {
+      showToast('❌ Only Company Admins or Super Admins can execute lead takeover.');
+      return;
+    }
+
+    const originalCloser = lead.originalOwnerName || lead.ownerName || 'Assigned Closer';
+    const ok = confirm(`⚡ Confirm Lead Takeover?\n\n` +
+      `• Lead Prospect: ${lead.name || lead.display || lead.phone}\n` +
+      `• Original Closer: ${originalCloser}\n\n` +
+      `As Administrator, you will take active command of this conversation to close the deal.\n\n` +
+      `🛡️ Commission Protection Guarantee: Closer ${originalCloser} will STILL receive 100% of their commission target credit upon payment approval!`);
+
+    if (!ok) return;
+
+    if (!lead.originalOwnerId) {
+      lead.originalOwnerId = lead.ownerId;
+      lead.originalOwnerName = lead.ownerName;
+    }
+    lead.isTakeover = true;
+    lead.takenOverBy = user.name || 'System Administrator';
+    lead.takenOverById = user.id;
+    lead.takenOverAt = new Date().toISOString();
+    lead.ownerId = user.id;
+    lead.ownerName = user.name || 'System Administrator';
+    lead.leadState = 'ongoing';
+
+    lead.messages.push({
+      sender: 'agent',
+      agentName: '⚡ Executive Takeover Protocol',
+      text: `⚡ ADMIN TAKEOVER ACTIVATED:\n• Executive In Command: ${lead.takenOverBy}\n• Original Closer: ${lead.originalOwnerName}\n• Deal Protection: Closer ${lead.originalOwnerName} retains 100% sales commission upon completion.`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+
+    showToast(`⚡ Lead taken over! Closer ${lead.originalOwnerName}'s commission is fully secured.`);
+    renderConversationsList();
+    renderActiveChat();
+    renderAgentProfile();
+
+    syncLeadToServer(lead, {
+      isTakeover: true,
+      originalOwnerId: lead.originalOwnerId,
+      originalOwnerName: lead.originalOwnerName,
+      takenOverBy: lead.takenOverBy,
+      takenOverById: lead.takenOverById,
+      takenOverAt: lead.takenOverAt,
+      ownerId: lead.ownerId,
+      ownerName: lead.ownerName,
+      newMessage: lead.messages[lead.messages.length - 1]
+    });
   }
 
   // ==========================================
@@ -1207,12 +1294,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.inboxFilter === 'pending_verification' || state.inboxFilter === 'pending') return lState === 'pending_verification';
       if (state.inboxFilter === 'paid') return lState === 'paid';
       if (state.inboxFilter === 'useless') return lState === 'useless';
+      if (state.inboxFilter === 'takeover') return l.isTakeover === true;
       if (state.inboxFilter === 'mine') {
         const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-        return l.ownerId === myId || l.paidDetails?.closedById === myId;
+        return l.ownerId === myId || l.originalOwnerId === myId || l.paidDetails?.closedById === myId;
       }
       return true;
     });
+
+    // Update Admin Takeover Filter Pill Visibility
+    const isMasterRole = state.currentUser && ['admin', 'superadmin', 'lead'].includes(state.currentUser.role);
+    if (els.inboxFilterTakeover) els.inboxFilterTakeover.style.display = isMasterRole ? 'inline-flex' : 'none';
+    if (els.pipelineFilterTakeover) els.pipelineFilterTakeover.style.display = isMasterRole ? 'inline-block' : 'none';
 
     // Update Subbar KPI widgets and badges
     const countAll = state.leads.length;
@@ -1515,6 +1608,38 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // ⚡ Header Admin Takeover Button (ONLY visible to Admin or Super Admin)
+    if (els.adminTakeoverBtn) {
+      if (isAdmin && leadState !== 'paid') {
+        if (lead.isTakeover && lead.takenOverById === myId) {
+          els.adminTakeoverBtn.style.display = 'inline-flex';
+          els.adminTakeoverBtn.innerHTML = `<span>⚡ Taken Over</span>`;
+          els.adminTakeoverBtn.style.opacity = '0.75';
+          els.adminTakeoverBtn.onclick = null;
+        } else if (lead.ownerId && lead.ownerId !== myId) {
+          els.adminTakeoverBtn.style.display = 'inline-flex';
+          els.adminTakeoverBtn.innerHTML = `<span>⚡ Takeover</span>`;
+          els.adminTakeoverBtn.style.opacity = '1';
+          els.adminTakeoverBtn.onclick = () => executeAdminTakeover(lead.id);
+        } else {
+          els.adminTakeoverBtn.style.display = 'none';
+        }
+      } else {
+        els.adminTakeoverBtn.style.display = 'none';
+      }
+    }
+
+    // ⚡ Header Admin Takeover Notice Banner
+    if (els.adminTakeoverNotice) {
+      if (lead.isTakeover) {
+        els.adminTakeoverNotice.style.display = 'flex';
+        if (els.takeoverAdminName) els.takeoverAdminName.textContent = lead.takenOverBy || 'Admin';
+        if (els.takeoverOriginalCloser) els.takeoverOriginalCloser.textContent = lead.originalOwnerName || 'Closer';
+      } else {
+        els.adminTakeoverNotice.style.display = 'none';
+      }
+    }
+
     // Header Verification & Mark Paid Buttons
     if (leadState === 'pending_verification') {
       if (isAdmin) {
@@ -1573,7 +1698,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // UNAUTHORIZED CLOSER: Show Anti-Theft Security Shield
       if (els.leadLockedShield) {
         els.leadLockedShield.style.display = 'flex';
-        if (els.lockedCloserName) els.lockedCloserName.textContent = closerDisplayName;
+        if (lead.isTakeover && lead.originalOwnerId === myId) {
+          if (els.lockedCloserName) els.lockedCloserName.innerHTML = `${lead.takenOverBy || 'Admin'} (Executive Takeover)<br><span style="color:#10b981;font-size:12px;font-weight:600;">🛡️ Your sales commission target credit is 100% protected!</span>`;
+        } else {
+          if (els.lockedCloserName) els.lockedCloserName.textContent = closerDisplayName;
+        }
         const initials = (closerDisplayName || 'CL').split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
         const avEl = document.getElementById('lockedCloserAvatar');
         if (avEl) avEl.textContent = initials;
@@ -1589,9 +1718,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (quickBar) quickBar.style.display = 'flex';
       if (compBar) compBar.style.display = 'block';
 
-      // Admin Monitoring Notice
+      // Admin Monitoring Notice (Hidden if Takeover Banner is already shown)
       if (els.otherCloserNotice) {
-        if (isLockedOngoing && isAdmin) {
+        if (isLockedOngoing && isAdmin && !lead.isTakeover) {
           els.otherCloserNotice.style.display = 'block';
           if (els.otherCloserName) els.otherCloserName.textContent = closerDisplayName;
         } else {
@@ -2180,6 +2309,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const campaignState = {
     name: 'OmniDesk campaign',
+    variation: 'text', // 'text' | 'text_image' | 'audio'
+    imageMedia: null,
+    audioMedia: null,
     audience: [],
     currentIndex: 0,
     isRunning: false,
@@ -2261,8 +2393,96 @@ document.addEventListener('DOMContentLoaded', () => {
     return msg;
   }
 
+  function setCampaignVariation(variation) {
+    campaignState.variation = variation;
+    [els.btnVarText, els.btnVarTextImage, els.btnVarAudio].forEach(b => b?.classList.remove('active'));
+
+    if (variation === 'text') {
+      els.btnVarText?.classList.add('active');
+      if (els.campaignImageContainer) els.campaignImageContainer.style.display = 'none';
+      if (els.campaignAudioContainer) els.campaignAudioContainer.style.display = 'none';
+      if (els.campaignPitchPresetGroup) els.campaignPitchPresetGroup.style.display = 'block';
+    } else if (variation === 'text_image') {
+      els.btnVarTextImage?.classList.add('active');
+      if (els.campaignImageContainer) els.campaignImageContainer.style.display = 'block';
+      if (els.campaignAudioContainer) els.campaignAudioContainer.style.display = 'none';
+      if (els.campaignPitchPresetGroup) els.campaignPitchPresetGroup.style.display = 'block';
+    } else if (variation === 'audio') {
+      els.btnVarAudio?.classList.add('active');
+      if (els.campaignImageContainer) els.campaignImageContainer.style.display = 'none';
+      if (els.campaignAudioContainer) els.campaignAudioContainer.style.display = 'block';
+      if (els.campaignPitchPresetGroup) els.campaignPitchPresetGroup.style.display = 'none';
+    }
+    updateCampaignPreview();
+  }
+
   function updateCampaignPreview() {
     if (!els.campaignBubblePreview) return;
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // VARIATION 3: JUST AUDIO
+    if (campaignState.variation === 'audio') {
+      const audioTitle = els.campaignAudioTitle ? els.campaignAudioTitle.textContent : 'Crypto Voice Pitch';
+      const duration = els.campaignAudioDuration ? els.campaignAudioDuration.textContent : '0:24';
+      const initials = (state.currentUser?.name || 'ZT').split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
+
+      els.campaignBubblePreview.className = 'campaign-voice-bubble';
+      els.campaignBubblePreview.innerHTML = `
+        <div class="voice-bubble-av">
+          <span>${initials}</span>
+          <span class="voice-bubble-mic-badge">🎙️</span>
+        </div>
+        <button type="button" class="voice-bubble-play" id="previewVoicePlayBtn" title="Play Voice Note Preview">▶</button>
+        <div style="flex:1;">
+          <div class="voice-bubble-waveform">
+            ${Array.from({ length: 28 }).map((_, i) => {
+              const h = Math.floor(Math.sin(i * 0.45) * 8 + 14);
+              const isActive = i < 11;
+              return `<span class="waveform-bar ${isActive ? 'active' : ''}" style="height:${h}px;"></span>`;
+            }).join('')}
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:10.5px;color:var(--text-muted);">
+            <span>${duration}</span>
+            <div style="display:flex;align-items:center;gap:3px;">
+              <span>${timeStr}</span>
+              <span class="campaign-preview-checks">✓✓</span>
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // VARIATION 2: TEXT + IMAGE
+    if (campaignState.variation === 'text_image') {
+      const rawTemplate = els.campaignCustomMsg ? els.campaignCustomMsg.value : '';
+      const sampleContact = campaignState.audience.length > 0
+        ? campaignState.audience[0]
+        : { name: 'Sample contact', phone: '923000000000', display: '+92 300 0000000', city: 'Lahore' };
+      const personalized = personalizeMessage(rawTemplate || '{Salam|AoA} {name}! Check out Nunno Cloud Alpha.', sampleContact);
+      let formattedCaption = escapeHtml(personalized)
+        .replace(/\*([^*]+)\*/g, '<strong>$1</strong>')
+        .replace(/_([^_]+)_/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code class="campaign-inline-code">$1</code>')
+        .replace(/\n/g, '<br>');
+
+      const imgSrc = campaignState.imageMedia?.dataUrl || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%234f46e5"/><stop offset="100%" stop-color="%237c3aed"/></linearGradient></defs><rect fill="url(%23g)" width="400" height="200"/><circle cx="200" cy="80" r="32" fill="white" opacity="0.15"/><text fill="%23ffffff" font-family="sans-serif" font-size="20" font-weight="bold" x="50%" y="45%" text-anchor="middle">🚀 Nunno Cloud Alpha</text><text fill="%23e0e7ff" font-family="sans-serif" font-size="12" x="50%" y="60%" text-anchor="middle">Exclusive Whale Signal Terminal</text></svg>';
+      els.campaignBubblePreview.className = 'campaign-image-bubble';
+      els.campaignBubblePreview.innerHTML = `
+        <img src="${imgSrc}" alt="Promotional Flyer" style="width:100%;max-height:160px;object-fit:cover;display:block;">
+        <div class="image-caption-text">
+          <div>${formattedCaption}</div>
+          <div class="campaign-preview-meta">
+            <span>${timeStr}</span>
+            <span class="campaign-preview-checks">✓✓</span>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // VARIATION 1: TEXT ONLY (DEFAULT)
+    els.campaignBubblePreview.className = 'campaign-message-bubble';
     const rawTemplate = els.campaignCustomMsg ? els.campaignCustomMsg.value : '';
     if (!rawTemplate.trim()) {
       els.campaignBubblePreview.innerHTML = '<span class="campaign-preview-placeholder">Type a message or choose a template to preview it here.</span>';
@@ -2281,7 +2501,6 @@ document.addEventListener('DOMContentLoaded', () => {
     html = html.replace(/`([^`]+)`/g, '<code class="campaign-inline-code">$1</code>');
     html = html.replace(/\n/g, '<br>');
 
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     html += `<div class="campaign-preview-meta">
       <span>${timeStr}</span>
       <span class="campaign-preview-checks">✓✓</span>
@@ -2552,8 +2771,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    const isAudioVar = campaignState.variation === 'audio';
     const msg = els.campaignCustomMsg ? els.campaignCustomMsg.value.trim() : '';
-    if (!msg) {
+    if (!isAudioVar && !msg) {
       showToast('⚠️ Please write a campaign message!');
       return;
     }
@@ -2590,6 +2810,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const assignMode = els.campaignAssignSelect ? els.campaignAssignSelect.value : 'pool';
 
+    let mediaPayload = null;
+    if (campaignState.variation === 'text_image' && campaignState.imageMedia) {
+      mediaPayload = {
+        mimetype: campaignState.imageMedia.mimetype,
+        data: campaignState.imageMedia.data,
+        filename: campaignState.imageMedia.filename
+      };
+    } else if (campaignState.variation === 'audio') {
+      mediaPayload = campaignState.audioMedia ? {
+        mimetype: campaignState.audioMedia.mimetype,
+        data: campaignState.audioMedia.data,
+        filename: campaignState.audioMedia.filename,
+        voice: true
+      } : {
+        mimetype: 'audio/ogg; codecs=opus',
+        filename: 'voice_note.ogg',
+        voice: true,
+        preset: els.campaignAudioPreset?.value || 'preset_alpha'
+      };
+    }
+
     if (window.NUNNO_OFFLINE_PREVIEW) {
       campaignState.isRunning = true;
       campaignState.isPaused = false;
@@ -2601,7 +2842,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    logCampaignTerminal(`🚀 Launching server-side campaign <strong>"${escapeHtml(campaignName)}"</strong> with ${campaignState.audience.length} target contacts. Running 24/7 on server. You can safely close your browser!`, 'info');
+    logCampaignTerminal(`🚀 Launching server-side campaign <strong>"${escapeHtml(campaignName)}"</strong> (${campaignState.variation.toUpperCase()}) with ${campaignState.audience.length} target contacts. Running 24/7 on server. You can safely close your browser!`, 'info');
     showToast('🚀 Campaign running 24/7 on server! You can safely close your browser.');
 
     try {
@@ -2611,6 +2852,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           action: 'start_campaign',
           name: campaignName,
+          variation: campaignState.variation,
+          media: mediaPayload,
           message: msg,
           audience: campaignState.audience,
           minDelay: minD,
@@ -2972,6 +3215,120 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (els.campaignCustomMsg) {
     els.campaignCustomMsg.addEventListener('input', updateCampaignPreview);
+  }
+
+  // Campaign 3 Starting Variations Setup
+  if (els.btnVarText) els.btnVarText.addEventListener('click', () => setCampaignVariation('text'));
+  if (els.btnVarTextImage) els.btnVarTextImage.addEventListener('click', () => setCampaignVariation('text_image'));
+  if (els.btnVarAudio) els.btnVarAudio.addEventListener('click', () => setCampaignVariation('audio'));
+
+  if (els.campaignImageDrop) {
+    els.campaignImageDrop.addEventListener('click', () => els.campaignImageInput?.click());
+  }
+  if (els.campaignImageInput) {
+    els.campaignImageInput.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        const b64 = dataUrl.split(',')[1];
+        campaignState.imageMedia = {
+          mimetype: file.type || 'image/jpeg',
+          data: b64,
+          dataUrl: dataUrl,
+          filename: file.name
+        };
+        if (els.campaignImagePreviewThumb) {
+          els.campaignImagePreviewThumb.src = dataUrl;
+          els.campaignImagePreviewThumb.style.display = 'block';
+        }
+        if (els.campaignImagePlaceholder) els.campaignImagePlaceholder.style.display = 'none';
+        if (els.clearCampaignImgBtn) els.clearCampaignImgBtn.style.display = 'inline-flex';
+        updateCampaignPreview();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  if (els.clearCampaignImgBtn) {
+    els.clearCampaignImgBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      campaignState.imageMedia = null;
+      if (els.campaignImageInput) els.campaignImageInput.value = '';
+      if (els.campaignImagePreviewThumb) {
+        els.campaignImagePreviewThumb.src = '';
+        els.campaignImagePreviewThumb.style.display = 'none';
+      }
+      if (els.campaignImagePlaceholder) els.campaignImagePlaceholder.style.display = 'block';
+      els.clearCampaignImgBtn.style.display = 'none';
+      updateCampaignPreview();
+    });
+  }
+
+  if (els.campaignAudioPreset) {
+    els.campaignAudioPreset.addEventListener('change', e => {
+      const val = e.target.value;
+      if (val === 'custom_audio') {
+        els.campaignAudioFileInput?.click();
+      } else {
+        const presets = {
+          preset_alpha: { title: 'Crypto Scalper Intro Voice Note', duration: '0:24' },
+          preset_starter: { title: 'Nunno Starter 1700 Pitch', duration: '0:32' },
+          preset_whale: { title: 'Whale VIP Private Invite', duration: '0:45' }
+        };
+        const p = presets[val] || presets.preset_alpha;
+        if (els.campaignAudioTitle) els.campaignAudioTitle.textContent = p.title;
+        if (els.campaignAudioDuration) els.campaignAudioDuration.textContent = p.duration;
+        campaignState.audioMedia = {
+          mimetype: 'audio/ogg; codecs=opus',
+          filename: `${val}.ogg`,
+          voice: true,
+          preset: val
+        };
+        updateCampaignPreview();
+      }
+    });
+  }
+  if (els.campaignAudioFileInput) {
+    els.campaignAudioFileInput.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        const b64 = dataUrl.split(',')[1];
+        campaignState.audioMedia = {
+          mimetype: file.type || 'audio/ogg',
+          data: b64,
+          dataUrl: dataUrl,
+          filename: file.name,
+          voice: true
+        };
+        if (els.campaignAudioTitle) els.campaignAudioTitle.textContent = file.name;
+        if (els.campaignAudioDuration) els.campaignAudioDuration.textContent = 'Custom Voice Note';
+        updateCampaignPreview();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (els.campaignAudioPlayBtn) {
+    let isPlaying = false;
+    els.campaignAudioPlayBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      els.campaignAudioPlayBtn.innerHTML = isPlaying ? '⏸' : '▶';
+      if (els.campaignAudioBar) {
+        els.campaignAudioBar.style.width = isPlaying ? '85%' : '35%';
+        els.campaignAudioBar.style.transition = 'width 2s ease';
+      }
+      if (isPlaying) {
+        setTimeout(() => {
+          isPlaying = false;
+          if (els.campaignAudioPlayBtn) els.campaignAudioPlayBtn.innerHTML = '▶';
+          if (els.campaignAudioBar) els.campaignAudioBar.style.width = '35%';
+        }, 2200);
+      }
+    });
   }
 
   if (els.campaignPresetSelect) {
@@ -3506,7 +3863,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!els.employeeLeadList) return;
     let filteredMine = mine;
     if (currentPipelineFilter !== 'all') {
-      filteredMine = mine.filter(lead => getLeadState(lead) === currentPipelineFilter);
+      if (currentPipelineFilter === 'takeover') {
+        filteredMine = state.leads.filter(lead => lead.isTakeover === true);
+      } else {
+        filteredMine = mine.filter(lead => getLeadState(lead) === currentPipelineFilter);
+      }
     }
 
     const sorted = [...filteredMine].sort((a, b) => {
@@ -3520,7 +3881,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isPipelineDelete = pipelineDeleteMode;
-    const stateLabel = { ongoing: 'Ongoing', fresh: 'New', pending_verification: 'In Review', paid: 'Paid', useless: "Won't Pay" };
+    const stateLabel = { ongoing: 'Ongoing', fresh: 'New', pending_verification: 'In Review', paid: 'Paid', useless: "Won't Pay", takeover: 'Takeover' };
     els.employeeLeadList.innerHTML = sorted.map(lead => {
       const status = getLeadState(lead);
       const lastMessage = [...(lead.messages || [])].reverse().find(message => message.sender === 'lead')?.text || lead.notes || 'No message preview yet.';
@@ -5726,7 +6087,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const plan = lead.paidDetails?.plan || lead.interest || 'Nunno Pro';
     const amount = lead.paidDetails?.amount ? Number(lead.paidDetails.amount) : 5000;
-    const closerName = lead.paidDetails?.closedBy || lead.ownerName || 'Closer';
+    const closerName = lead.originalOwnerName || lead.paidDetails?.closedBy || lead.ownerName || 'Closer';
+    const isTakeoverDeal = lead.isTakeover && lead.originalOwnerName;
 
     lead.leadState = 'paid';
     lead.status = 'paid';
@@ -5737,7 +6099,7 @@ document.addEventListener('DOMContentLoaded', () => {
     lead.messages.push({
       sender: 'agent',
       agentName: 'Admin Audit Verification',
-      text: `🟢 PAYMENT VERIFIED & APPROVED (DEAL WON)!\n• Verified By: ${adminName}\n• Closer Credited: ${closerName}\n• Plan: ${plan} (Rs. ${amount.toLocaleString()})\n• Transaction officially verified on banking portal. Account activated! 🚀`,
+      text: `🟢 PAYMENT VERIFIED & APPROVED (DEAL WON)!\n• Verified By: ${adminName}\n• Closer Credited: ${closerName}${isTakeoverDeal ? ' (Original Closer — Commission Protected 🛡️)' : ''}\n• Plan: ${plan} (Rs. ${amount.toLocaleString()})\n• Transaction officially verified on banking portal. Account activated! 🚀`,
       time: now
     });
 
@@ -5924,15 +6286,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Core Calculator: Computes 10k target eligibility, Base Salary, and Post-Target Commissions
   function calculateCloserPerformance(closerId) {
     // Only VERIFIED deals count towards company revenue, 10k target, and commissions
+    // CRITICAL: Closer commission protection ensures deals closed after Admin Takeover still count!
     const paidLeads = state.leads.filter(l => 
       (l.leadState === 'paid' || l.status === 'paid') && 
-      (l.paidDetails?.closedById === closerId || l.ownerId === closerId)
+      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId)
     );
 
     // Pending deals undergoing Admin verification
     const pendingLeads = state.leads.filter(l => 
       (l.leadState === 'pending_verification' || l.status === 'pending_verification') && 
-      (l.paidDetails?.closedById === closerId || l.ownerId === closerId)
+      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId)
     );
 
     const TARGET = 10000;
