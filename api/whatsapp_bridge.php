@@ -225,6 +225,44 @@ function handleWhatsAppBridge(string $action, array $input): void {
             http_response_code(405);
             echo json_encode(['success' => false, 'message' => 'POST required.']); exit;
         }
+
+        // --- ENFORCE EMPLOYEE MESSAGE LIMITER ---
+        $usersFile = __DIR__ . '/../data/users.json';
+        $currentUserId = $user['id'] ?? '';
+        $userRole = strtolower($user['role'] ?? '');
+        $quotaUserIndex = -1;
+        $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+        if (!is_array($allUsers)) $allUsers = [];
+        $today = date('Y-m-d');
+
+        if ($currentUserId && !in_array($userRole, ['superadmin', 'admin'], true)) {
+            foreach ($allUsers as $idx => $u) {
+                if ($u['id'] === $currentUserId) {
+                    $quotaUserIndex = $idx;
+                    $userLimit = (int)($u['message_limit'] ?? 100);
+                    $userSent = (int)($u['messages_sent_today'] ?? 0);
+                    $resetDate = $u['quota_reset_date'] ?? '';
+
+                    if ($resetDate !== $today) {
+                        $userSent = 0;
+                        $allUsers[$idx]['messages_sent_today'] = 0;
+                        $allUsers[$idx]['quota_reset_date'] = $today;
+                    }
+
+                    if ($userLimit > 0 && $userSent >= $userLimit) {
+                        http_response_code(429);
+                        echo json_encode([
+                            'success'        => false,
+                            'quota_exceeded' => true,
+                            'message'        => "Daily message quota reached ({$userSent}/{$userLimit} sent today). Please contact your Company Administrator to increase your message allowance."
+                        ]);
+                        exit;
+                    }
+                    break;
+                }
+            }
+        }
+
         $phone = preg_replace('/\D+/', '', (string) ($input['phone'] ?? ''));
         if (str_starts_with($phone, '0092')) $phone = substr($phone, 2);
         elseif (str_starts_with($phone, '03') && strlen($phone) === 11) $phone = '92' . substr($phone, 1);
@@ -258,6 +296,19 @@ function handleWhatsAppBridge(string $action, array $input): void {
             exit;
         }
         if (!empty($result['success']) && !empty($result['message_id'])) {
+            // Increment message counter for quota tracking
+            if ($quotaUserIndex >= 0 && isset($allUsers[$quotaUserIndex])) {
+                $allUsers[$quotaUserIndex]['messages_sent_today'] = ((int)($allUsers[$quotaUserIndex]['messages_sent_today'] ?? 0)) + 1;
+                file_put_contents($usersFile, json_encode($allUsers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                $lim = (int)($allUsers[$quotaUserIndex]['message_limit'] ?? 100);
+                $cur = (int)$allUsers[$quotaUserIndex]['messages_sent_today'];
+                $result['quota_metrics'] = [
+                    'limit'     => $lim,
+                    'sent'      => $cur,
+                    'remaining' => ($lim < 0) ? 'Unlimited' : max(0, $lim - $cur)
+                ];
+            }
+
             $handle = fopen(__DIR__ . '/../data/campaign_logs.json', 'c+');
             if ($handle && flock($handle, LOCK_EX)) {
                 $logs = json_decode(stream_get_contents($handle) ?: '[]', true);

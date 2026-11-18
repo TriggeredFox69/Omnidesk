@@ -16,6 +16,11 @@ Options -Indexes
     RewriteEngine On
     RewriteRule ^data/.*$ - [F,L]
     RewriteRule ^bridge/.*$ - [F,L]
+
+    # Clean URL Routes for Multi-Tenant Enterprise Portals
+    RewriteRule ^sadmin/?$ sadmin.php [L,QSA]
+    RewriteRule ^admin/?$ admin.php [L,QSA]
+    RewriteRule ^login/?$ login.php [L,QSA]
 </IfModule>
 
 # 4. Enable Gzip Compression for Fast Assets Delivery

@@ -1906,7 +1906,19 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ action: 'send_direct', phone: lead.phone, message: text, request_id: crypto.randomUUID() })
       });
       sendResult = await response.json();
-      if (!response.ok || !sendResult.success) throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
+      if (!response.ok || !sendResult.success) {
+        if (sendResult && sendResult.quota_exceeded) {
+          showToast(`⚠️ Quota Blocked: ${sendResult.message}`, 6000);
+          return;
+        }
+        throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
+      }
+      if (sendResult && sendResult.quota_metrics) {
+        const countEl = document.getElementById('headerQuotaCount');
+        const limitEl = document.getElementById('headerQuotaLimit');
+        if (countEl) countEl.textContent = sendResult.quota_metrics.sent;
+        if (limitEl) limitEl.textContent = sendResult.quota_metrics.limit < 0 ? '∞' : sendResult.quota_metrics.limit;
+      }
     } catch (error) {
       showToast(`❌ WhatsApp message was not sent: ${describeSendError(error)}`);
       return;
@@ -4365,7 +4377,38 @@ document.addEventListener('DOMContentLoaded', () => {
     updateVoiceRecordingPermission();
 
     // If Admin, show Employees and Email Studio buttons and fetch roster
-    if (user.role === 'admin') {
+    const isSuperAdmin = (user.role === 'superadmin');
+    const isAdmin = (user.role === 'admin' || isSuperAdmin);
+    const isTL = (user.role === 'lead');
+
+    // Role-specific Header Badges & Actions
+    const openTlModalBtn = document.getElementById('openTlModalBtn');
+    const headerAdminLink = document.getElementById('headerAdminLink');
+    const headerSadminLink = document.getElementById('headerSadminLink');
+    const headerQuotaPill = document.getElementById('headerQuotaPill');
+    const headerQuotaCount = document.getElementById('headerQuotaCount');
+    const headerQuotaLimit = document.getElementById('headerQuotaLimit');
+    const headerTlCommission = document.getElementById('headerTlCommission');
+
+    if (openTlModalBtn) {
+      openTlModalBtn.style.display = isTL ? 'inline-flex' : 'none';
+      if (headerTlCommission) headerTlCommission.textContent = (user.tl_commission_balance || 0).toLocaleString();
+    }
+    if (headerAdminLink) headerAdminLink.style.display = (isAdmin && !isSuperAdmin) ? 'inline-flex' : 'none';
+    if (headerSadminLink) headerSadminLink.style.display = isSuperAdmin ? 'inline-flex' : 'none';
+
+    if (headerQuotaPill) {
+      if (!isAdmin) {
+        headerQuotaPill.style.display = 'inline-flex';
+        const lim = (user.message_limit !== undefined) ? user.message_limit : 150;
+        if (headerQuotaCount) headerQuotaCount.textContent = user.messages_sent_today || 0;
+        if (headerQuotaLimit) headerQuotaLimit.textContent = lim < 0 ? '∞' : lim;
+      } else {
+        headerQuotaPill.style.display = 'none';
+      }
+    }
+
+    if (isAdmin) {
       if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = 'inline-flex';
       if (els.openEmailModalBtn) els.openEmailModalBtn.style.display = 'inline-flex';
       fetchTeamRoster();
@@ -4396,6 +4439,91 @@ document.addEventListener('DOMContentLoaded', () => {
     const overlay = document.getElementById('accountSuspendedOverlay');
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
+  }
+
+  // ==========================================
+  // TEAM LEADER (TL) PROVISIONING & COMMISSIONS
+  // ==========================================
+  async function openTlModal() {
+    const modal = document.getElementById('tlProvisionModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    fetchTlData();
+  }
+
+  function closeTlModal() {
+    const modal = document.getElementById('tlProvisionModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function fetchTlData() {
+    try {
+      const res = await fetch('api/auth.php?action=list_my_tms');
+      const data = await res.json();
+      if (!data.success) return;
+
+      const balEl = document.getElementById('modalTlBalance');
+      const countEl = document.getElementById('modalTlTmCount');
+      const headerBal = document.getElementById('headerTlCommission');
+      const container = document.getElementById('tlTmListContainer');
+
+      if (balEl) balEl.textContent = (data.balance || 0).toLocaleString();
+      if (countEl) countEl.textContent = data.total_tms || 0;
+      if (headerBal) headerBal.textContent = (data.balance || 0).toLocaleString();
+
+      if (container) {
+        if (!data.tms || !data.tms.length) {
+          container.innerHTML = '<div style="padding:12px; text-align:center; color:var(--text-muted);">No Team Members recruited yet. Provision your first TM above to earn Rs. 500!</div>';
+        } else {
+          container.innerHTML = data.tms.map(tm => `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid rgba(255,255,255,0.04);">
+              <div>
+                <strong>${escapeHtml(tm.name)}</strong> <span style="color:var(--text-muted); font-size:11px;">(@${escapeHtml(tm.username)})</span>
+                <div style="font-size:11px; color:#34d399;">● Commission: PKR 500 Credited</div>
+              </div>
+              <div style="font-size:11px; padding:3px 8px; border-radius:6px; background:rgba(245,158,11,0.15); color:#fbbf24;">
+                Plan: 1,700 Pending
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+    } catch (_) {}
+  }
+
+  async function handleTlProvision(e) {
+    e.preventDefault();
+    const btn = document.getElementById('tlSubmitBtnForm');
+    if (btn) { btn.disabled = true; btn.textContent = 'Registering TM & Crediting 500 PKR...'; }
+
+    const payload = {
+      action: 'tl_create_tm',
+      name: document.getElementById('tlTmName').value.trim(),
+      username: document.getElementById('tlTmUsername').value.trim(),
+      password: document.getElementById('tlTmPassword').value.trim(),
+      gender: document.getElementById('tlTmGender').value,
+      phone: document.getElementById('tlTmPhone').value.trim()
+    };
+
+    try {
+      const res = await fetch('api/auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`🎉 Team Member created! Rs. 500 commission credited to your balance.`);
+        document.getElementById('tlProvisionForm').reset();
+        fetchTlData();
+      } else {
+        showToast(`❌ ${data.error || 'Failed to provision TM'}`);
+      }
+    } catch (err) {
+      showToast(`❌ Network error while provisioning TM`);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Register TM & Claim Rs. 500 Commission 🚀'; }
+    }
   }
 
   document.getElementById('suspendedLogoutBtn')?.addEventListener('click', () => {
@@ -4914,6 +5042,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.createEmpForm) els.createEmpForm.addEventListener('submit', handleCreateEmployee);
   if (els.submitNewEmpBtn) els.submitNewEmpBtn.addEventListener('click', handleCreateEmployee);
   if (els.refreshTeamBtn) els.refreshTeamBtn.addEventListener('click', fetchTeamRoster);
+
+  // Team Leader Modal Listeners
+  const openTlModalBtn = document.getElementById('openTlModalBtn');
+  const closeTlModalBtn = document.getElementById('closeTlModalBtn');
+  const tlForm = document.getElementById('tlProvisionForm');
+  if (openTlModalBtn) openTlModalBtn.addEventListener('click', openTlModal);
+  if (closeTlModalBtn) closeTlModalBtn.addEventListener('click', closeTlModal);
+  if (tlForm) tlForm.addEventListener('submit', handleTlProvision);
 
   // ==========================================
   // ADMIN EMAIL COMMUNICATIONS STUDIO CONTROLLER

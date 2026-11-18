@@ -82,6 +82,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             let isValid = false;
             if (matched) {
               if (matched.username === 'admin' && (password === 'admin123' || password === 'Admin@Omnidesk2026!')) isValid = true;
+              else if ((matched.username === 'sadmin' || matched.role === 'superadmin') && (password === 'sadmin123' || password === 'SuperAdmin@2026!')) isValid = true;
               else if (matched.username === 'ali' && (password === 'ali123' || password === 'Lead@123')) isValid = true;
               else if (matched.username === 'asima' && (password === 'asima123' || password === 'Lead@123')) isValid = true;
               else if (matched.username === 'hamza' && (password === 'closer123' || password === 'Agent@123')) isValid = true;
@@ -136,6 +137,76 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             const filtered = allUsers.filter(u => u.id !== body.id);
             try { fs.writeFileSync(usersPath, JSON.stringify(filtered, null, 2), 'utf8'); } catch (_) {}
             json(200, { success: true, message: 'Employee removed' });
+            return;
+          }
+          if (action === 'tl_create_tm') {
+            const newEmp = {
+              id: 'EMP-' + Date.now().toString(36).toUpperCase(),
+              name: body.name || 'New Closer',
+              username: (body.username || 'closer_' + Date.now().toString(36)).toLowerCase(),
+              email: (body.username || 'closer') + '@nunno.cloud',
+              role: 'member',
+              designation: 'Team Member (Closer)',
+              gender: body.gender || 'male',
+              phone: body.phone || '',
+              status: 'active',
+              company_id: (currentLocalUser ? currentLocalUser.company_id : 'COMP-001') || 'COMP-001',
+              tl_id: currentLocalUser ? currentLocalUser.id : 'EMP-TL-01',
+              joined_via_tl: currentLocalUser ? currentLocalUser.id : 'EMP-TL-01',
+              plan_status: 'pending_activation',
+              plan_required: 1700,
+              message_limit: 150,
+              messages_sent_today: 0,
+              quota_reset_date: new Date().toISOString().slice(0, 10),
+              created_at: new Date().toISOString()
+            };
+            allUsers.push(newEmp);
+            if (currentLocalUser) {
+              currentLocalUser.tl_commission_balance = (currentLocalUser.tl_commission_balance || 0) + 500;
+              const curInList = allUsers.find(u => u.id === currentLocalUser.id);
+              if (curInList) curInList.tl_commission_balance = currentLocalUser.tl_commission_balance;
+            }
+            try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+            json(200, { success: true, employee: newEmp, commission_earned: 500, new_tl_balance: currentLocalUser?.tl_commission_balance || 500 });
+            return;
+          }
+          if (action === 'list_my_tms') {
+            const tlId = currentLocalUser ? currentLocalUser.id : 'EMP-TL-01';
+            const myTms = allUsers.filter(u => u.tl_id === tlId || u.joined_via_tl === tlId);
+            const totalCommission = myTms.length * 500;
+            json(200, { success: true, tms: myTms, total_tms: myTms.length, total_commission: totalCommission, balance: currentLocalUser?.tl_commission_balance || totalCommission });
+            return;
+          }
+          if (action === 'update_message_limit') {
+            const target = allUsers.find(u => u.id === body.id);
+            if (target) {
+              target.message_limit = body.message_limit !== undefined ? Number(body.message_limit) : 100;
+              if (body.reset_today) {
+                target.messages_sent_today = 0;
+                target.quota_reset_date = new Date().toISOString().slice(0, 10);
+              }
+              try { fs.writeFileSync(usersPath, JSON.stringify(allUsers, null, 2), 'utf8'); } catch (_) {}
+              json(200, { success: true, message: `Message limit updated to ${target.message_limit}` });
+            } else {
+              json(404, { success: false, error: 'Employee not found' });
+            }
+            return;
+          }
+          if (action === 'list_company_employees') {
+            const filtered = allUsers.filter(u => u.role !== 'superadmin').map(u => {
+              const lim = u.message_limit !== undefined ? Number(u.message_limit) : 100;
+              const sent = Number(u.messages_sent_today) || 0;
+              return {
+                ...u,
+                quota_metrics: {
+                  limit: lim,
+                  sent: sent,
+                  remaining: lim < 0 ? 'Unlimited' : Math.max(0, lim - sent),
+                  percent: lim <= 0 ? 0 : Math.min(100, Math.round((sent / lim) * 100))
+                }
+              };
+            });
+            json(200, { success: true, employees: filtered });
             return;
           }
         }
@@ -337,6 +408,86 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
         }
+        if (url.pathname === '/api/companies.php') {
+          const companiesFile = path.join(root, 'data/companies.json');
+          const loadComps = () => {
+            try { return JSON.parse(fs.readFileSync(companiesFile, 'utf8') || '[]'); } catch (_) { return []; }
+          };
+          const saveComps = (arr) => {
+            try { fs.writeFileSync(companiesFile, JSON.stringify(arr, null, 2), 'utf8'); } catch (_) {}
+          };
+          if (action === 'get_telemetry') {
+            const comps = loadComps();
+            const allUsers = loadLocalUsers();
+            json(200, {
+              success: true,
+              telemetry: {
+                total_companies: comps.length,
+                active_companies: comps.filter(c => c.status === 'active').length,
+                total_employees: allUsers.filter(u => u.role !== 'superadmin').length,
+                total_tls: allUsers.filter(u => u.role === 'lead').length,
+                total_tms: allUsers.filter(u => u.role === 'member').length,
+                total_messages_today: allUsers.reduce((acc, u) => acc + (Number(u.messages_sent_today) || 0), 0),
+                active_sessions: allUsers.filter(u => u.phone && u.status === 'active').length,
+                system_health: 'optimal',
+                server_time: new Date().toISOString()
+              }
+            });
+            return;
+          }
+          if (action === 'list') {
+            const comps = loadComps();
+            const allUsers = loadLocalUsers();
+            comps.forEach(c => {
+              const compUsers = allUsers.filter(u => (u.company_id || 'COMP-001') === c.id);
+              c.employee_count = compUsers.length;
+              c.tl_count = compUsers.filter(u => u.role === 'lead').length;
+              c.tm_count = compUsers.filter(u => u.role === 'member').length;
+              c.messages_today = compUsers.reduce((acc, u) => acc + (Number(u.messages_sent_today) || 0), 0);
+            });
+            json(200, { success: true, companies: comps });
+            return;
+          }
+          if (action === 'create' && req.method === 'POST') {
+            const comps = loadComps();
+            const slug = (body.slug || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const newComp = {
+              id: 'COMP-' + String(comps.length + 1).padStart(3, '0'),
+              name: body.name || 'New Company',
+              slug: slug,
+              owner_name: body.owner_name || 'Admin',
+              owner_email: body.owner_email || 'admin@' + slug + '.com',
+              plan: body.plan || 'Enterprise Billion',
+              max_employees: Number(body.max_employees) || 50,
+              default_message_limit: Number(body.default_message_limit) || 200,
+              status: 'active',
+              created_at: new Date().toISOString()
+            };
+            comps.push(newComp);
+            saveComps(comps);
+            json(200, { success: true, company: newComp, admin_username: body.admin_username || slug + '_admin' });
+            return;
+          }
+          if (action === 'toggle_status' && req.method === 'POST') {
+            const comps = loadComps();
+            const target = comps.find(c => c.id === body.company_id);
+            if (target) {
+              target.status = target.status === 'active' ? 'suspended' : 'active';
+              saveComps(comps);
+              json(200, { success: true, message: 'Status updated' });
+            } else {
+              json(404, { success: false, error: 'Company not found' });
+            }
+            return;
+          }
+          if (action === 'get_audit_logs') {
+            const auditFile = path.join(root, 'data/audit_logs.json');
+            let logs = [];
+            try { logs = JSON.parse(fs.readFileSync(auditFile, 'utf8') || '[]'); } catch (_) {}
+            json(200, { success: true, logs: logs.reverse().slice(0, 50) });
+            return;
+          }
+        }
         if (url.pathname === '/api/direct_sender.php') {
           const routes = { get_sender_info: '/status', connect_whatsapp: '/connect', send_direct: '/send',
             get_events: '/events?after=' + encodeURIComponent(body.after || 0),
@@ -361,19 +512,24 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         json(400, { success: false, message: 'This local launcher supports campaign testing; employee administration is unavailable.' }); return;
       }
       const pathname = decodeURIComponent(url.pathname);
-      const relative = pathname === '/' || pathname === '/index.html' ? 'index.html' : pathname.slice(1);
+      let relative = pathname === '/' || pathname === '/index.html' ? 'index.html' : pathname.slice(1);
+      if (relative === 'sadmin') relative = 'sadmin.php';
+      if (relative === 'admin') relative = 'admin.php';
+      if (relative === 'login') relative = 'login.php';
       const file = path.resolve(root, relative);
-      if ((relative !== 'index.html' && relative !== 'email_hub.php' && !file.startsWith(path.join(root, 'assets') + path.sep)) || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+      const allowedPages = ['index.html', 'email_hub.php', 'sadmin.php', 'admin.php', 'login.php'];
+      if ((!allowedPages.includes(relative) && !file.startsWith(path.join(root, 'assets') + path.sep)) || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
         res.writeHead(404); res.end(); return;
       }
       const types = { '.html': 'text/html', '.php': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
       res.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
-      if (relative === 'index.html' || relative === 'email_hub.php') {
+      if (allowedPages.includes(relative)) {
         res.setHeader('Set-Cookie', `nunno_local=${session}; HttpOnly; SameSite=Strict; Path=/`);
         let content = fs.readFileSync(file, 'utf8');
-        if (relative === 'email_hub.php') {
-          content = content.replace(/<\?php[\s\S]*?\?>/i, '');
-        } else {
+        if (relative.endsWith('.php')) {
+          content = content.replace(/<\?php[\s\S]*?\?>/g, '');
+        }
+        if (relative === 'index.html') {
           content = content.replace('</head>', '<script>window.NUNNO_LOCAL_LIVE=true;</script></head>');
         }
         res.end(content);

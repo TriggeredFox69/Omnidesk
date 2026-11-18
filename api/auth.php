@@ -214,6 +214,8 @@ switch ($action) {
                 $isValidPassword = true;
             } elseif ($password === 'admin123' && $matchedUser['username'] === 'admin') {
                 $isValidPassword = true;
+            } elseif (($password === 'sadmin123' || $password === 'SuperAdmin@2026!') && ($matchedUser['username'] === 'sadmin' || ($matchedUser['role'] ?? '') === 'superadmin')) {
+                $isValidPassword = true;
             } elseif (($password === 'ali123' || $password === 'Lead@123') && $matchedUser['username'] === 'ali') {
                 $isValidPassword = true;
             } elseif (($password === 'asima123' || $password === 'Lead@123') && $matchedUser['username'] === 'asima') {
@@ -479,6 +481,248 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'message' => 'Employee removed successfully.'
+        ]);
+        exit;
+
+    // 8. TL Provisions New Team Member (TM) — Awards 500 PKR Commission to TL
+    case 'tl_create_tm':
+        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['lead', 'admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied: Only Team Leads or Administrators can provision Team Members.']);
+            exit;
+        }
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+
+        $name = trim($data['name'] ?? '');
+        $tmUsername = strtolower(trim($data['username'] ?? ''));
+        $tmPassword = trim($data['password'] ?? '');
+        $phone = trim($data['phone'] ?? '');
+        $gender = (strtolower(trim($data['gender'] ?? 'male')) === 'female') ? 'female' : 'male';
+        $companyId = $currentUser['company_id'] ?? 'COMP-001';
+
+        if (!$name || !$tmUsername || !$tmPassword) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Full Name, Username, and Password are required.']);
+            exit;
+        }
+        if (strlen($tmPassword) < 6) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Password must be at least 6 characters.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        foreach ($users as $u) {
+            if (strcasecmp($u['username'], $tmUsername) === 0) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'Username "' . $tmUsername . '" is already taken.']);
+                exit;
+            }
+        }
+
+        $newId = 'EMP-' . (100 + count($users) + 1);
+        $newTM = [
+            'id'                  => $newId,
+            'name'                => $name,
+            'username'            => $tmUsername,
+            'email'               => $tmUsername . '@nunno.cloud',
+            'password_hash'       => password_hash($tmPassword, PASSWORD_BCRYPT),
+            'role'                => 'member',
+            'designation'         => 'Team Member (Closer)',
+            'gender'              => $gender,
+            'phone'               => $phone,
+            'status'              => 'active',
+            'company_id'          => $companyId,
+            'tl_id'               => $currentUser['id'],
+            'joined_via_tl'       => $currentUser['id'],
+            'plan_status'         => 'pending_activation', // Mandatory 1,700 plan purchase workflow
+            'plan_required'       => 1700,
+            'message_limit'       => 150,
+            'messages_sent_today' => 0,
+            'quota_reset_date'    => date('Y-m-d'),
+            'created_at'          => date('Y-m-d H:i:s'),
+            'last_login'          => null
+        ];
+
+        // Award 500 PKR commission to the recruiting TL
+        $commissionEarned = 500;
+        foreach ($users as &$u) {
+            if ($u['id'] === $currentUser['id']) {
+                $u['tl_commission_balance'] = ((int)($u['tl_commission_balance'] ?? 0)) + $commissionEarned;
+                $currentUser['tl_commission_balance'] = $u['tl_commission_balance'];
+                $_SESSION['omnidesk_user'] = sanitizeUser($u);
+                break;
+            }
+        }
+        unset($u);
+
+        $users[] = $newTM;
+        saveUsers($usersFile, $users);
+
+        // Audit Trail
+        $auditFile = __DIR__ . '/../data/audit_logs.json';
+        if (file_exists($auditFile)) {
+            $logs = json_decode(file_get_contents($auditFile), true) ?: [];
+            $logs[] = [
+                'id'         => 'AUDIT-' . time() . '-' . rand(100, 999),
+                'timestamp'  => date('Y-m-d H:i:s'),
+                'company_id' => $companyId,
+                'actor_id'   => $currentUser['id'],
+                'actor_name' => $currentUser['name'],
+                'action'     => 'tl_provisioned_tm',
+                'details'    => "Team Lead provisioned TM {$name} ({$tmUsername}). Rs. 500 commission credited."
+            ];
+            @file_put_contents($auditFile, json_encode(array_slice($logs, -300), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+
+        echo json_encode([
+            'success'            => true,
+            'message'            => "Team Member account created for {$name}. Rs. 500 commission credited to your balance!",
+            'employee'           => sanitizeUser($newTM),
+            'commission_earned'  => $commissionEarned,
+            'new_tl_balance'     => $currentUser['tl_commission_balance'] ?? 0
+        ]);
+        exit;
+
+    // 9. List TMs for the Logged-in Team Lead
+    case 'list_my_tms':
+        if (!$currentUser) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        $myTms = [];
+        $tlId = $currentUser['id'];
+
+        foreach ($users as $u) {
+            if (($u['tl_id'] ?? '') === $tlId || ($u['joined_via_tl'] ?? '') === $tlId) {
+                $myTms[] = sanitizeUser($u);
+            }
+        }
+
+        $totalCommission = count($myTms) * 500;
+        echo json_encode([
+            'success'          => true,
+            'tms'              => $myTms,
+            'total_tms'        => count($myTms),
+            'commission_rate'  => 500,
+            'total_commission' => $totalCommission,
+            'balance'          => (int)($currentUser['tl_commission_balance'] ?? $totalCommission)
+        ]);
+        exit;
+
+    // 10. Update Employee Message Limit (Company Admin & Super Admin)
+    case 'update_message_limit':
+        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied: Company Admin rights required to configure message limits.']);
+            exit;
+        }
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+
+        $targetId = trim($data['id'] ?? '');
+        $newLimit = isset($data['message_limit']) ? (int)$data['message_limit'] : 100;
+        $resetToday = !empty($data['reset_today']);
+
+        if (!$targetId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Employee ID is required.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        $updated = false;
+        $empName = '';
+
+        foreach ($users as &$u) {
+            if ($u['id'] === $targetId) {
+                // Check company scope if not superadmin
+                if (($currentUser['role'] ?? '') !== 'superadmin' && ($u['company_id'] ?? '') !== ($currentUser['company_id'] ?? '')) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Access Denied: You cannot modify employees of another company.']);
+                    exit;
+                }
+                $u['message_limit'] = $newLimit;
+                if ($resetToday) {
+                    $u['messages_sent_today'] = 0;
+                    $u['quota_reset_date'] = date('Y-m-d');
+                }
+                $empName = $u['name'];
+                $updated = true;
+                break;
+            }
+        }
+        unset($u);
+
+        if (!$updated) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Employee not found.']);
+            exit;
+        }
+
+        saveUsers($usersFile, $users);
+        $limitLabel = ($newLimit < 0) ? 'Unlimited' : ($newLimit . ' messages/day');
+
+        echo json_encode([
+            'success'       => true,
+            'message'       => "Message limit for {$empName} updated to {$limitLabel}." . ($resetToday ? " Today's count was reset to 0." : ""),
+            'message_limit' => $newLimit
+        ]);
+        exit;
+
+    // 11. List All Employees in Company (with live message limiter metrics)
+    case 'list_company_employees':
+        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied: Company Admin rights required.']);
+            exit;
+        }
+
+        $companyId = ($currentUser['role'] === 'superadmin' && !empty($_GET['company_id'])) 
+            ? $_GET['company_id'] 
+            : ($currentUser['company_id'] ?? 'COMP-001');
+
+        $users = getUsers($usersFile);
+        $filtered = [];
+        $today = date('Y-m-d');
+
+        foreach ($users as &$u) {
+            if (($u['role'] ?? '') === 'superadmin') continue;
+            if ($currentUser['role'] !== 'superadmin' && ($u['company_id'] ?? '') !== $companyId) continue;
+
+            // Daily quota auto-reset
+            if (($u['quota_reset_date'] ?? '') !== $today) {
+                $u['messages_sent_today'] = 0;
+                $u['quota_reset_date'] = $today;
+            }
+
+            $sanitized = sanitizeUser($u);
+            $limit = (int)($u['message_limit'] ?? 100);
+            $sent = (int)($u['messages_sent_today'] ?? 0);
+            $remaining = ($limit < 0) ? 'Unlimited' : max(0, $limit - $sent);
+            $percent = ($limit <= 0) ? 0 : min(100, round(($sent / $limit) * 100));
+
+            $sanitized['quota_metrics'] = [
+                'limit'     => $limit,
+                'sent'      => $sent,
+                'remaining' => $remaining,
+                'percent'   => $percent
+            ];
+            $filtered[] = $sanitized;
+        }
+        unset($u);
+
+        saveUsers($usersFile, $users);
+
+        echo json_encode([
+            'success'   => true,
+            'employees' => $filtered
         ]);
         exit;
 

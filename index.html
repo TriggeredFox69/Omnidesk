@@ -88,6 +88,31 @@
 
     <!-- Top Right Actions -->
     <div class="topbar-actions" style="display:flex;align-items:center;gap:6px;">
+      <!-- Closer Daily Message Quota Pill -->
+      <div class="header-quota-pill" id="headerQuotaPill" style="display:none; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; font-size:11px; font-weight:700; background:rgba(139, 92, 246, 0.15); border:1px solid rgba(139, 92, 246, 0.3); color:#c4b5fd;" title="Daily Message Limit">
+        <span>⚡</span>
+        <span id="headerQuotaCount">0</span>/<span id="headerQuotaLimit">150</span> msgs
+      </div>
+
+      <!-- Team Lead Portal & Commission Button -->
+      <button class="btn-header-tl" id="openTlModalBtn" style="display:none; align-items:center; gap:6px; padding:6px 12px; border-radius:10px; font-size:12px; font-weight:700; background:linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2)); border:1px solid rgba(16, 185, 129, 0.4); color:#34d399; cursor:pointer;" title="Team Leader Commission & Provisioning">
+        <span>👑</span>
+        <span>Team Lead (Rs. <span id="headerTlCommission">0</span>)</span>
+        <span style="padding:2px 6px; border-radius:4px; background:#10b981; color:#fff; font-size:10px;">➕ Recruit TM</span>
+      </button>
+
+      <!-- Company Admin Link -->
+      <a href="admin.php" class="btn-header-admin" id="headerAdminLink" style="display:none; text-decoration:none;" title="Company Admin Portal">
+        <span>🏢</span>
+        <span>Company Admin</span>
+      </a>
+
+      <!-- Super Admin Link -->
+      <a href="sadmin.php" class="btn-header-admin" id="headerSadminLink" style="display:none; text-decoration:none; background:rgba(139, 92, 246, 0.2); border-color:rgba(139, 92, 246, 0.5); color:#c4b5fd;" title="Super Admin Command">
+        <span>⚡</span>
+        <span>Super Admin</span>
+      </a>
+
       <button class="btn-header-perf" id="openScoreBtn" style="display:none;" title="View Performance Stats">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
         <span>Stats</span>
@@ -1965,6 +1990,91 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         <button type="button" class="btn btn-ghost" id="suspendedLogoutBtn" style="width:100%;padding:11px;font-weight:700;border-radius:10px;border:1px solid var(--border-subtle);">
           Sign Out / Switch Account
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       TEAM LEADER (TL) PROVISIONING & COMMISSION MODAL
+  ════════════════════════════════════════════════════════ -->
+  <div class="emp-modal-overlay" id="tlProvisionModal" style="display:none;" aria-hidden="true">
+    <div class="emp-modal-card" style="max-width: 580px; background:var(--bg-card); border:1px solid var(--border-glow); border-radius:20px; box-shadow:0 25px 60px rgba(0,0,0,0.7);">
+      <div class="emp-modal-header" style="display:flex; align-items:center; justify-content:space-between; padding:18px 24px; border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:36px; height:36px; border-radius:10px; background:rgba(16,185,129,0.2); color:#34d399; display:flex; align-items:center; justify-content:center; font-size:18px;">👑</div>
+          <div>
+            <h3 style="font-size:16px; font-weight:800; color:var(--text-main);">Team Leader Command</h3>
+            <p style="font-size:12px; color:var(--text-muted);">Provision Team Members & Earn Rs. 500 Commission</p>
+          </div>
+        </div>
+        <button class="emp-modal-close" id="closeTlModalBtn" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
+      </div>
+
+      <div style="padding:20px 24px;">
+        <!-- TL Stats Banner -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-radius:14px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.25); margin-bottom:20px;">
+          <div>
+            <div style="font-size:11px; text-transform:uppercase; font-weight:700; color:#34d399; letter-spacing:0.04em;">Accrued Commission Balance</div>
+            <div style="font-size:24px; font-weight:900; color:#10b981; margin-top:2px;">PKR <span id="modalTlBalance">0</span></div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:var(--text-muted);">Direct TMs Recruited</div>
+            <div style="font-size:18px; font-weight:800; color:var(--text-main); margin-top:2px;"><span id="modalTlTmCount">0</span> TMs</div>
+          </div>
+        </div>
+
+        <!-- Provision TM Form -->
+        <form id="tlProvisionForm">
+          <div style="font-size:13px; font-weight:700; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <span>➕</span> Recruit New Team Member (TM)
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div>
+              <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">TM Full Name *</label>
+              <input type="text" id="tlTmName" class="form-input" placeholder="e.g. Usman Ali" required style="width:100%; padding:9px 12px; font-size:13px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border-card); color:var(--text-main);">
+            </div>
+            <div>
+              <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Username *</label>
+              <input type="text" id="tlTmUsername" class="form-input" placeholder="e.g. usman" required style="width:100%; padding:9px 12px; font-size:13px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border-card); color:var(--text-main);">
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div>
+              <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Initial Password *</label>
+              <input type="text" id="tlTmPassword" class="form-input" placeholder="Min 6 chars" required style="width:100%; padding:9px 12px; font-size:13px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border-card); color:var(--text-main);">
+            </div>
+            <div>
+              <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">Gender (Closer Voice Notes)</label>
+              <select id="tlTmGender" class="form-input" style="width:100%; padding:9px 12px; font-size:13px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border-card); color:var(--text-main);">
+                <option value="female">Female (Voice Recording Allowed)</option>
+                <option value="male">Male (Text Only Policy)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:4px;">WhatsApp Number (Optional)</label>
+            <input type="text" id="tlTmPhone" class="form-input" placeholder="+923001234567" style="width:100%; padding:9px 12px; font-size:13px; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border-card); color:var(--text-main);">
+          </div>
+
+          <div style="padding:10px 14px; border-radius:10px; background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.25); font-size:12px; color:#fbbf24; margin-bottom:16px; line-height:1.4;">
+            ⚠️ <strong>Plan Purchase Requirement:</strong> Once registered, this TM must activate Nunno's 1,700 PKR Plan before accessing leads. You will receive <strong>500 PKR commission</strong> credited to your balance immediately!
+          </div>
+
+          <button type="submit" id="tlSubmitBtnForm" class="btn btn-primary" style="width:100%; background:linear-gradient(135deg, #10b981, #059669); font-size:13px; padding:11px; justify-content:center; font-weight:700; border-radius:10px; border:none; color:#fff; cursor:pointer;">
+            Register TM & Claim Rs. 500 Commission 🚀
+          </button>
+        </form>
+
+        <!-- Recruited TMs List -->
+        <div style="margin-top:24px; border-top:1px solid rgba(255,255,255,0.06); padding-top:16px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:10px;">📋 Your Recruited Team Members</div>
+          <div id="tlTmListContainer" style="max-height:160px; overflow-y:auto; font-size:12px;">
+            <div style="padding:10px; text-align:center; color:var(--text-muted);">Loading your team roster...</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
