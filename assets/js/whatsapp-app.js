@@ -5261,18 +5261,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fetchTeamRoster() {
-    fetch('api/auth.php?action=list_employees')
+    const compId = state.currentCompanyId || state.currentUser?.company_id || 'COMP-001';
+    fetch(`api/auth.php?action=list_employees&company_id=${encodeURIComponent(compId)}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.success && Array.isArray(data.employees)) {
-          state.employees = data.employees;
-          renderRosterList(data.employees);
+          // Team roster strictly contains Closers (TM) and Team Leaders (TL) belonging to THIS company
+          const companyTeam = data.employees.filter(emp => {
+            const role = (emp.role || '').toLowerCase();
+            const empComp = emp.company_id || 'COMP-001';
+            if (empComp !== compId) return false;
+            if (role === 'admin' || role === 'superadmin') return false;
+            return true;
+          });
+          state.employees = companyTeam;
+          renderRosterList(companyTeam);
           populateAdminEmailUsers();
-          if (els.headerEmpCount) els.headerEmpCount.textContent = data.employees.length;
+          if (els.headerEmpCount) els.headerEmpCount.textContent = companyTeam.length;
         }
       })
       .catch(() => {
-        const localEmps = getLocalEmployees();
+        const localEmps = getLocalEmployees().filter(emp => emp.role !== 'admin' && emp.role !== 'superadmin');
         state.employees = localEmps;
         renderRosterList(localEmps);
         populateAdminEmailUsers();

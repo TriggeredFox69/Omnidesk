@@ -370,7 +370,14 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'list_employees') {
-            json(200, { success: true, employees: allUsers });
+            const compId = url.searchParams.get('company_id') || currentLocalUser?.company_id || 'COMP-001';
+            const closers = allUsers.filter(u => {
+              if (u.role === 'superadmin' || u.company_id === 'GLOBAL') return false;
+              if (u.role === 'admin') return false; // Admins are not closer employees
+              const uComp = u.company_id || 'COMP-001';
+              return uComp === compId;
+            });
+            json(200, { success: true, employees: closers });
             return;
           }
           if (action === 'create_employee') {
@@ -461,8 +468,13 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'list_company_employees') {
-            const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
-            const filtered = allUsers.filter(u => u.role !== 'superadmin').map(u => {
+            const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
+            const filtered = allUsers.filter(u => {
+              if (u.role === 'superadmin' || u.company_id === 'GLOBAL') return false;
+              if (u.role === 'admin') return false; // Admins are not closer employees
+              const uComp = u.company_id || 'COMP-001';
+              return uComp === compId;
+            }).map(u => {
               const lim = u.message_limit !== undefined ? Number(u.message_limit) : 100;
               const sent = Number(u.messages_sent_today) || 0;
               return {
@@ -484,8 +496,13 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         if (url.pathname === '/api/tenant_manager.php') {
           const allUsers = loadLocalUsers();
           if (action === 'list_company_employees') {
-            const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
-            const filtered = allUsers.filter(u => u.role !== 'superadmin').map(u => {
+            const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
+            const filtered = allUsers.filter(u => {
+              if (u.role === 'superadmin' || u.company_id === 'GLOBAL') return false;
+              if (u.role === 'admin') return false; // Admins are not closer employees
+              const uComp = u.company_id || 'COMP-001';
+              return uComp === compId;
+            }).map(u => {
               const lim = u.message_limit !== undefined ? Number(u.message_limit) : 100;
               const sent = Number(u.messages_sent_today) || 0;
               return {

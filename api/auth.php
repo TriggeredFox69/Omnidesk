@@ -788,12 +788,14 @@ switch ($action) {
         }
 
         $users = getUsers($usersFile);
-        $userComp = $currentUser['company_id'] ?? 'COMP-001';
-        $isSuper = ($currentUser['role'] === 'superadmin' || $userComp === 'GLOBAL');
+        $userComp = $_GET['company_id'] ?? ($currentUser['company_id'] ?? 'COMP-001');
 
-        if (!$isSuper) {
+        if (!empty($_GET['company_id']) || ($currentUser['role'] !== 'superadmin')) {
             $users = array_values(array_filter($users, fn($u) => ($u['company_id'] ?? 'COMP-001') === $userComp));
         }
+
+        // Always exclude superadmin and company admin accounts from the closer employee roster
+        $users = array_values(array_filter($users, fn($u) => !in_array($u['role'] ?? '', ['admin', 'superadmin'], true)));
 
         $cleanList = array_map('sanitizeUser', $users);
 
@@ -1108,6 +1110,7 @@ switch ($action) {
 
         foreach ($users as &$u) {
             if (($u['role'] ?? '') === 'superadmin') continue;
+            if (($u['role'] ?? '') === 'admin') continue; // Admins are not closer employees
             if ($currentUser['role'] !== 'superadmin' && ($u['company_id'] ?? '') !== $companyId) continue;
 
             // Daily quota auto-reset
