@@ -222,7 +222,7 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         }
         reply(200, { success: true, ...(receipt || { status: 'accepted' }) }); return;
       }
-      if (req.method === 'GET' && url.pathname === '/campaign/status') {
+      if (url.pathname === '/campaign/status') {
         reply(200, campaignManager.getStatus());
         return;
       }

@@ -979,10 +979,27 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             get_media: '/media?id=' + encodeURIComponent(body.message_id || ''),
             sync_chat: '/sync-chat',
             get_presence: '/presence?phone=' + encodeURIComponent(body.phone || ''),
-            get_send_status: '/receipt?id=' + encodeURIComponent(body.message_id || '')
+            send_presence: '/presence',
+            get_send_status: '/receipt?id=' + encodeURIComponent(body.message_id || ''),
+            start_campaign: '/campaign/start',
+            pause_campaign: '/campaign/pause',
+            resume_campaign: '/campaign/resume',
+            stop_campaign: '/campaign/stop',
+            get_campaign_status: '/campaign/status'
           };
           if (routes[action]) {
-            const post = ['connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'sync_chat'].includes(action);
+            const post = [
+              'connect_whatsapp',
+              'reconnect_whatsapp',
+              'reset_whatsapp',
+              'send_direct',
+              'sync_chat',
+              'send_presence',
+              'start_campaign',
+              'pause_campaign',
+              'resume_campaign',
+              'stop_campaign'
+            ].includes(action);
             if (post && req.method !== 'POST') { json(405, { success: false }); return; }
             if (action === 'send_direct') {
               body.phone = String(body.phone || '').replace(/\D/g, '');
