@@ -157,14 +157,10 @@ function logAudit($auditFile, $companyId, $actorId, $actorName, $action, $detail
 
 // Current session
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
-if (!$action) {
-    $rawInput = file_get_contents('php://input');
-    if ($rawInput) {
-        $json = json_decode($rawInput, true);
-        if (is_array($json)) $action = $json['action'] ?? '';
-    }
-}
+$rawInput = file_get_contents('php://input');
+$jsonInput = $rawInput ? json_decode($rawInput, true) : [];
+if (!is_array($jsonInput)) $jsonInput = [];
+$action = $_GET['action'] ?? $_POST['action'] ?? ($jsonInput['action'] ?? '');
 
 // Security Helper
 function requireSuperAdmin($user) {
@@ -880,27 +876,38 @@ switch ($action) {
     // 15. Impersonate Company Admin (Super Admin)
     case 'impersonate':
         requireSuperAdmin($currentUser);
-        $companyId = trim($_GET['company_id'] ?? ($_POST['company_id'] ?? 'COMP-001'));
+        $companyId = trim($_GET['company_id'] ?? ($_POST['company_id'] ?? ($jsonInput['company_id'] ?? '')));
+        if (!$companyId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Company ID is required for impersonation.']);
+            exit;
+        }
         
         $companies = getCompanies($companiesFile);
         $targetCompany = null;
         foreach ($companies as $c) {
-            if ($c['id'] === $companyId) {
+            if ($c['id'] === $companyId || ($c['slug'] ?? '') === $companyId) {
                 $targetCompany = $c;
                 break;
             }
         }
         if (!$targetCompany) {
             http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Company not found.']);
+            echo json_encode(['success' => false, 'error' => "Company '$companyId' not found."]);
             exit;
+        }
+
+        // Save original superadmin identity so they can return anytime
+        if (empty($_SESSION['omnidesk_superadmin_original']) && ($currentUser['role'] ?? '') === 'superadmin') {
+            $_SESSION['omnidesk_superadmin_original'] = $currentUser;
         }
 
         // Find company admin user or create on-the-fly proxy admin session
         $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+        if (!is_array($users)) $users = [];
         $targetUser = null;
         foreach ($users as $u) {
-            if (($u['company_id'] ?? '') === $companyId && ($u['role'] ?? '') === 'admin') {
+            if (($u['company_id'] ?? '') === $targetCompany['id'] && in_array(($u['role'] ?? ''), ['admin'], true)) {
                 $targetUser = $u;
                 break;
             }
@@ -908,13 +915,13 @@ switch ($action) {
 
         if (!$targetUser) {
             $targetUser = [
-                'id'          => 'USR-PROXY-' . $companyId,
+                'id'          => 'USR-PROXY-' . $targetCompany['id'],
                 'name'        => $targetCompany['name'] . ' Administrator',
                 'username'    => $targetCompany['slug'] . '_admin',
                 'email'       => $targetCompany['owner_email'],
                 'role'        => 'admin',
                 'designation' => 'Company Admin',
-                'company_id'  => $companyId,
+                'company_id'  => $targetCompany['id'],
                 'status'      => 'active'
             ];
         }
@@ -926,15 +933,16 @@ switch ($action) {
             'email'          => $targetUser['email'],
             'role'           => 'admin',
             'designation'    => 'Company Admin (Impersonated by Super Admin)',
-            'company_id'     => $companyId,
+            'company_id'     => $targetCompany['id'],
+            'company_name'   => $targetCompany['name'],
             'is_impersonated'=> true,
             'status'         => 'active'
         ];
 
         echo json_encode([
-            'success' => true,
-            'message' => "Successfully assumed Admin identity for '{$targetCompany['name']}'!",
-            'redirect' => "admin.php?company_id=" . urlencode($companyId)
+            'success'  => true,
+            'message'  => "Successfully assumed Admin identity for '{$targetCompany['name']}'!",
+            'redirect' => "/cc?portal=1&company_id=" . urlencode($targetCompany['id'])
         ]);
         exit;
 

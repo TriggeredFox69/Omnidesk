@@ -25,9 +25,9 @@ if (session_status() === PHP_SESSION_NONE) {
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
 $isLoggedInAdmin = ($currentUser && in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true));
 
-// Only show the administrative portal if the user is authenticated AND explicitly viewing portal (?portal=1 or ?dashboard=1)
+// Only show the administrative portal if the user is authenticated AND (explicitly viewing portal ?portal=1 OR has an active impersonated session from Super Admin)
 // Direct visits to /cc or cc.php or admin.php without ?portal=1 will ALWAYS present the Company Admin Login form
-$isPortalView = (isset($_GET['portal']) || isset($_GET['dashboard']));
+$isPortalView = (isset($_GET['portal']) || isset($_GET['dashboard']) || !empty($currentUser['is_impersonated']));
 $isAdmin = ($isLoggedInAdmin && $isPortalView && !isset($_GET['login']) && !isset($_GET['switch']));
 
 // Logout action
@@ -483,6 +483,15 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 
 <?php else: ?>
   <!-- EXECUTIVE COMPANY ADMIN DASHBOARD -->
+  <?php if (!empty($currentUser['is_impersonated'])): ?>
+    <div style="background: linear-gradient(90deg, #eab308, #ca8a04); color: #000; padding: 10px 18px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; border-radius: 12px; margin-bottom: 18px; box-shadow: 0 4px 15px rgba(234, 179, 8, 0.25);">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:16px;">👑</span>
+        <span>Super Admin Impersonation: You are managing <strong><?php echo htmlspecialchars($activeCompany['name']); ?></strong> (<?php echo htmlspecialchars($activeCompany['id']); ?>) with full administrative privileges.</span>
+      </div>
+      <a href="/ss?portal=1" style="background: #000; color: #facc15; padding: 5px 14px; border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">&larr; Exit to Super Admin HQ</a>
+    </div>
+  <?php endif; ?>
   <header class="top-bar">
     <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
       <a href="/" title="Chatly Homepage" style="display:flex; align-items:center; text-decoration:none;">

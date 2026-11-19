@@ -831,17 +831,22 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'impersonate' && req.method === 'POST') {
-            const compId = body.company_id || 'COMP-001';
-            const compAdmin = allUsers.find(u => u.role === 'admin' && (u.company_id || 'COMP-001') === compId) || {
-              id: 'USR-ADMIN-' + compId,
-              name: 'Company Administrator',
-              username: 'admin',
+            const compId = body.company_id || url.searchParams.get('company_id') || 'COMP-001';
+            const comps = loadComps();
+            const targetComp = comps.find(c => c.id === compId || c.slug === compId) || comps[0] || { id: compId, name: 'Company' };
+            const compAdmin = allUsers.find(u => u.role === 'admin' && (u.company_id || 'COMP-001') === targetComp.id) || {
+              id: 'USR-ADMIN-' + targetComp.id,
+              name: targetComp.name + ' Administrator',
+              username: targetComp.slug + '_admin',
               role: 'admin',
-              company_id: compId,
+              company_id: targetComp.id,
               status: 'active'
             };
+            compAdmin.is_impersonated = true;
+            compAdmin.company_id = targetComp.id;
+            compAdmin.company_name = targetComp.name;
             currentLocalUser = compAdmin;
-            json(200, { success: true, message: `Impersonating Admin for ${compId}`, redirect: `admin.php?company_id=${compId}` });
+            json(200, { success: true, message: `Impersonating Admin for ${targetComp.name}`, redirect: `/cc?portal=1&company_id=${targetComp.id}` });
             return;
           }
           if (action === 'get_company_leads') {
