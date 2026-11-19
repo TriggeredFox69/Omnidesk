@@ -81,6 +81,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <base href="/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Chatly Company Admin — <?php echo htmlspecialchars($activeCompany['name']); ?></title>

@@ -1162,6 +1162,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       const pathname = decodeURIComponent(url.pathname);
       let relative = pathname;
       if (relative.startsWith('/')) relative = relative.slice(1);
+      if (relative.endsWith('/')) relative = relative.slice(0, -1);
 
       // Handle GET logout or switch account parameter
       if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('logout') === '1') {
@@ -1184,8 +1185,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       }
 
       if (relative === 'login' || relative === 'login.html') relative = 'login.php';
-      if (relative === 'admin' || relative === 'admin.html' || relative === 'cc' || relative === 'cc.html' || relative === 'cc.php') relative = 'admin.php';
-      if (relative === 'sadmin' || relative === 'sadmin.html' || relative === 'ss' || relative === 'ss.html' || relative === 'ss.php') relative = 'sadmin.php';
+      if (relative === 'admin' || relative === 'admin.html' || relative === 'cc' || relative === 'cc.html' || relative === 'cc.php' || relative === 'cc/index.php') relative = 'admin.php';
+      if (relative === 'sadmin' || relative === 'sadmin.html' || relative === 'ss' || relative === 'ss.html' || relative === 'ss.php' || relative === 'ss/index.php') relative = 'sadmin.php';
 
       const file = path.resolve(root, relative);
       const allowedPages = ['index.html', 'email_hub.php', 'sadmin.php', 'admin.php', 'login.php', 'cc.php', 'ss.php'];

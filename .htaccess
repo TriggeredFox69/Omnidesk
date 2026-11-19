@@ -2,8 +2,8 @@
 # Nunno WhatsApp Omni-Desk — cPanel / Apache Security
 # ====================================================
 
-# 1. Prevent Directory Browsing
-Options -Indexes
+# 1. Prevent Directory Browsing & Enable SymLinks for LiteSpeed / Apache
+Options -Indexes +FollowSymLinks
 
 # 2. Block Direct Web Access to Sensitive Files & Folders
 <FilesMatch "^(config\.php|\.env|\.git.*|\.cpanel\.yml)$">
@@ -11,20 +11,22 @@ Options -Indexes
     Deny from all
 </FilesMatch>
 
-# 3. Block HTTP Access to /data/ directory (protects confidential phone numbers)
+# 3. Clean URL Routes for Multi-Tenant Enterprise Portals
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteBase /
+
     RewriteRule ^data/.*$ - [F,L]
     RewriteRule ^bridge/.*$ - [F,L]
 
-    # Clean URL Routes for Multi-Tenant Enterprise Portals
-    RewriteRule ^cc/?$ cc.php [L,QSA]
-    RewriteRule ^ss/?$ ss.php [L,QSA]
-    RewriteRule ^sadmin/?$ ss.php [L,QSA]
-    RewriteRule ^admin/?$ cc.php [L,QSA]
-    RewriteRule ^login/?$ login.php [L,QSA]
-    RewriteRule ^desk/?$ index.php [L,QSA]
-    RewriteRule ^app/?$ index.php [L,QSA]
+    # Dedicated Company & Superadmin Routes
+    RewriteRule ^cc/?$ /cc/index.php [L,QSA]
+    RewriteRule ^ss/?$ /ss/index.php [L,QSA]
+    RewriteRule ^sadmin/?$ /ss/index.php [L,QSA]
+    RewriteRule ^admin/?$ /cc/index.php [L,QSA]
+    RewriteRule ^login/?$ /login.php [L,QSA]
+    RewriteRule ^desk/?$ /index.php [L,QSA]
+    RewriteRule ^app/?$ /index.php [L,QSA]
 </IfModule>
 
 # 4. Enable Gzip Compression for Fast Assets Delivery
