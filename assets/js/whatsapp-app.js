@@ -623,18 +623,26 @@ document.addEventListener('DOMContentLoaded', () => {
       logo: 'assets/images/paktrade-logo.svg',
       badge: 'Mentorship & Trade Bootcamp',
       brand_color: '#10b981'
+    },
+    'COMP-004': {
+      name: 'Metalink',
+      short_name: 'Metalink',
+      logo: 'assets/images/metalink-logo.webp',
+      badge: 'Digital Trading & Closer Desk',
+      brand_color: '#06b6d4'
     }
   };
 
   function applyCompanyBranding(companyId) {
-    const compId = companyId || state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    const urlComp = new URLSearchParams(window.location.search).get('company_id');
+    const compId = companyId || urlComp || state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
     state.currentCompanyId = compId;
     let brand = COMPANY_BRAND_CATALOG[compId] || {
-      name: state.currentUser?.company_name || 'Nunno Official',
-      short_name: (state.currentUser?.company_name || 'Nunno').split(' ')[0],
-      logo: 'assets/images/nunno-logo.png',
-      badge: 'Scalper Alpha & SaaS',
-      brand_color: '#00a884'
+      name: state.currentUser?.company_name || 'Metalink',
+      short_name: (state.currentUser?.company_name || 'Metalink').split(' ')[0],
+      logo: 'assets/images/metalink-logo.webp',
+      badge: 'Enterprise Brand',
+      brand_color: '#06b6d4'
     };
 
     const logoImg = document.getElementById('mainBrandLogoImg') || document.querySelector('.brand-logo-img');
@@ -666,6 +674,16 @@ document.addEventListener('DOMContentLoaded', () => {
     animLogos.forEach(img => { img.src = 'assets/images/chatly-icon.png'; });
     const chatTransLogos = document.querySelectorAll('.chat-transition-logo');
     chatTransLogos.forEach(img => { img.src = 'assets/images/chatly-icon.png'; });
+
+    // Update top header links with active company context
+    const headerAdmin = document.getElementById('headerAdminLink');
+    if (headerAdmin) {
+      headerAdmin.href = 'admin.php?company_id=' + encodeURIComponent(compId);
+    }
+    const topLogo = document.getElementById('chatlyTopLogoLink');
+    if (topLogo) {
+      topLogo.href = 'index.php?company_id=' + encodeURIComponent(compId);
+    }
 
     document.title = `${brand.name} — Chatly Sales Closing Platform`;
 

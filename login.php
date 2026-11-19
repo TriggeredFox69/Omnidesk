@@ -1691,7 +1691,8 @@ async function handleAdminLogin(e) {
     });
     const data = await res.json();
     if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
-      triggerLoginAnimation(data.user.name, 'Company Administrator Control Center', 'admin.php');
+      const targetCompany = data.user.company_id ? `admin.php?company_id=${encodeURIComponent(data.user.company_id)}` : 'admin.php';
+      triggerLoginAnimation(data.user.name, 'Company Administrator Control Center — ' + (data.user.company_name || data.user.name), targetCompany);
     } else {
       errBox.textContent = data.error || 'Access Denied: Company Admin privileges required.';
       errBox.style.display = 'block';

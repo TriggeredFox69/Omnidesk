@@ -478,24 +478,26 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   <!-- EXECUTIVE COMPANY ADMIN DASHBOARD -->
   <header class="top-bar">
     <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
-      <a href="admin.php" title="Chatly Enterprise" style="display:flex; align-items:center; text-decoration:none;">
+      <a href="index.php?company_id=<?php echo urlencode($activeCompany['id']); ?>" title="Chatly Sales Desk" style="display:flex; align-items:center; text-decoration:none;">
         <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
-      <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/nunno-logo.png'); ?>" alt="Company Logo" class="company-logo">
-      <div class="company-info">
-        <div class="company-name-row">
-          <span class="company-name"><?php echo htmlspecialchars($activeCompany['name']); ?></span>
-          <span class="badge-tier"><?php echo htmlspecialchars($activeCompany['plan'] ?? 'Enterprise Pro'); ?></span>
-          <span style="font-size: 11px; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
-            <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-            Decentralized TM Hub &bull; Active
-          </span>
+      <a href="admin.php?company_id=<?php echo urlencode($activeCompany['id']); ?>" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;" title="Refresh Company Admin Portal">
+        <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/metalink-logo.webp'); ?>" alt="Company Logo" class="company-logo">
+        <div class="company-info">
+          <div class="company-name-row">
+            <span class="company-name"><?php echo htmlspecialchars($activeCompany['name']); ?></span>
+            <span class="badge-tier"><?php echo htmlspecialchars($activeCompany['plan'] ?? 'Enterprise Pro'); ?></span>
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+              <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
+              Decentralized TM Hub &bull; Active
+            </span>
+          </div>
+          <div class="company-sub">
+            ID: <?php echo htmlspecialchars($activeCompany['id']); ?> &bull; Tenant DB: Isolated &bull; Admin: <?php echo htmlspecialchars($currentUser['name'] ?? 'Admin'); ?>
+          </div>
         </div>
-        <div class="company-sub">
-          ID: <?php echo htmlspecialchars($activeCompany['id']); ?> &bull; Tenant DB: Isolated &bull; Admin: <?php echo htmlspecialchars($currentUser['name'] ?? 'Admin'); ?>
-        </div>
-      </div>
+      </a>
     </div>
 
     <div class="header-actions">
