@@ -23,12 +23,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
-$isAdmin = ($currentUser && in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true));
+$isLoggedInAdmin = ($currentUser && in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true));
 
-// Allow explicit forced login form via ?login=1 or ?switch=1
-if (isset($_GET['login']) || isset($_GET['switch'])) {
-    $isAdmin = false;
-}
+// Only show the administrative portal if the user is authenticated AND explicitly viewing portal (?portal=1 or ?dashboard=1)
+// Direct visits to /cc or cc.php or admin.php without ?portal=1 will ALWAYS present the Company Admin Login form
+$isPortalView = (isset($_GET['portal']) || isset($_GET['dashboard']));
+$isAdmin = ($isLoggedInAdmin && $isPortalView && !isset($_GET['login']) && !isset($_GET['switch']));
 
 // Logout action
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
@@ -37,8 +37,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         $params = session_get_cookie_params();
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
-    session_destroy();
-    header('Location: ?');
+    @session_destroy();
+    header('Location: /cc');
     exit;
 }
 
@@ -454,27 +454,40 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 
 <?php if (!$isAdmin): ?>
   <!-- COMPANY ADMIN LOGIN GATE -->
-  <div style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
-    <div style="width: 100%; max-width: 420px; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 20px; padding: 36px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); text-align: center;">
+  <div style="min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div style="width: 100%; max-width: 440px; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 20px; padding: 36px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); text-align: center;">
       <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #10b981, #059669); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 26px;">🏢</div>
       <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">Company Admin Portal</h2>
-      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">Provision employees, configure message limits & lead takeover.</p>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">Enter company credentials to manage workforce, limits & closing operations.</p>
+
+      <?php if ($isLoggedInAdmin): ?>
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 22px; text-align: left; font-size: 12.5px;">
+          <div style="color: #34d399; font-weight: 700; margin-bottom: 4px;">⚡ Active Session Detected</div>
+          <div style="color: var(--text-secondary); margin-bottom: 12px;">
+            Currently signed in as <strong><?php echo htmlspecialchars($currentUser['name'] ?? $currentUser['username']); ?></strong> (<?php echo htmlspecialchars($activeCompany['name'] ?? 'Company'); ?>).
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <a href="?portal=1&company_id=<?php echo urlencode($currentUser['company_id'] ?? 'COMP-001'); ?>" class="btn btn-emerald" style="padding: 7px 14px; font-size: 12px; text-decoration: none; border-radius: 8px; flex: 1; justify-content: center;">Continue to Dashboard &rarr;</a>
+            <a href="?action=logout" class="btn btn-secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-radius: 8px; color: #ef4444;">Sign Out</a>
+          </div>
+        </div>
+      <?php endif; ?>
 
       <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
         <div class="form-group" style="text-align: left;">
           <label class="form-label">Username / Email</label>
-          <input type="text" id="aUsername" class="form-control" placeholder="admin" required autofocus>
+          <input type="text" id="aUsername" class="form-control" placeholder="Company admin username" required autofocus>
         </div>
         <div class="form-group" style="text-align: left; margin-bottom: 22px;">
           <label class="form-label">Password</label>
-          <input type="password" id="aPassword" class="form-control" placeholder="admin123" required>
+          <input type="password" id="aPassword" class="form-control" placeholder="••••••••" required>
         </div>
         <div id="loginError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; font-size: 12.5px; margin-bottom: 14px;"></div>
-        <button type="submit" id="adminLoginBtn" class="btn btn-emerald" style="width: 100%; justify-content: center; padding: 12px;">
+        <button type="submit" id="adminLoginBtn" class="btn btn-emerald" style="width: 100%; justify-content: center; padding: 12px; font-weight: 700;">
           Access Company Control 🏢
         </button>
       </form>
-      <div style="margin-top: 20px; font-size: 12px; color: var(--text-secondary);">
+      <div style="margin-top: 22px; font-size: 12px; color: var(--text-secondary);">
         <a href="/" style="color: var(--accent-emerald); text-decoration: none; font-weight: 600;">&larr; Return to Chatly Homepage</a>
       </div>
     </div>
@@ -484,11 +497,11 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   <!-- EXECUTIVE COMPANY ADMIN DASHBOARD -->
   <header class="top-bar">
     <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
-      <a href="index.php?company_id=<?php echo urlencode($activeCompany['id']); ?>" title="Chatly Sales Desk" style="display:flex; align-items:center; text-decoration:none;">
+      <a href="/" title="Chatly Homepage" style="display:flex; align-items:center; text-decoration:none;">
         <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
-      <a href="?company_id=<?php echo urlencode($activeCompany['id']); ?>" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;" title="Refresh Company Admin Portal">
+      <a href="?portal=1&company_id=<?php echo urlencode($activeCompany['id']); ?>" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;" title="Refresh Company Admin Portal">
         <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/metalink-logo.webp'); ?>" alt="Company Logo" class="company-logo">
         <div class="company-info">
           <div class="company-name-row">
@@ -516,7 +529,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       <button class="btn btn-secondary" onclick="toggleTheme()">
         <span>🌓</span>
       </button>
-      <a href="?switch=1" class="btn btn-secondary" style="font-size:12px;" title="Switch Company Account">
+      <a href="/cc" class="btn btn-secondary" style="font-size:12px;" title="Switch Company Account">
         <span>🔄</span> Switch
       </a>
       <a href="?action=logout" class="btn btn-danger">
@@ -1641,7 +1654,7 @@ async function handleAdminLogin(e) {
     const data = await res.json();
     if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
       const compId = data.user.company_id || 'COMP-001';
-      window.location.href = '?company_id=' + encodeURIComponent(compId);
+      window.location.href = '?portal=1&company_id=' + encodeURIComponent(compId);
     } else {
       if (errBox) {
         errBox.textContent = data.error || 'Access Denied: Company Administrator privileges required.';

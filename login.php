@@ -31,11 +31,11 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
 } elseif (!empty($_SESSION['omnidesk_user'])) {
     $role = $_SESSION['omnidesk_user']['role'] ?? '';
     if ($role === 'superadmin' && isset($_GET['to_sadmin'])) {
-        header('Location: sadmin.php');
+        header('Location: /ss?portal=1');
         exit;
     }
     if ($role === 'admin' && isset($_GET['to_admin'])) {
-        header('Location: admin.php');
+        header('Location: /cc?portal=1');
         exit;
     }
     // Landing page remains viewable without forced redirect
@@ -955,7 +955,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <nav class="lp-nav">
       <?php if (!empty($_SESSION['omnidesk_user'])): 
         $sessUser = $_SESSION['omnidesk_user'];
-        $destUrl = in_array($sessUser['role'] ?? '', ['admin', 'superadmin'], true) ? 'admin.php' : 'index.php';
+        $destUrl = in_array($sessUser['role'] ?? '', ['admin', 'superadmin'], true) ? '/cc?portal=1' : 'index.php';
       ?>
         <a href="<?php echo htmlspecialchars($destUrl); ?>" class="lp-nav-cta" style="background:rgba(31,224,138,0.22); border:1px solid var(--wa-accent); color:var(--wa-accent); font-weight:800;">⚡ Open Workspace (<?php echo htmlspecialchars($sessUser['name'] ?? 'Closer'); ?>) &rarr;</a>
         <a href="login.php?action=logout" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>
@@ -1622,7 +1622,7 @@ async function handleAdminLogin(e) {
     });
     const data = await res.json();
     if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
-      const targetCompany = data.user.company_id ? `admin.php?company_id=${encodeURIComponent(data.user.company_id)}` : 'admin.php';
+      const targetCompany = data.user.company_id ? `/cc?portal=1&company_id=${encodeURIComponent(data.user.company_id)}` : '/cc?portal=1';
       triggerLoginAnimation(data.user.name, 'Company Administrator Control Center — ' + (data.user.company_name || data.user.name), targetCompany);
     } else {
       errBox.textContent = data.error || 'Access Denied: Company Admin privileges required.';
@@ -1658,7 +1658,7 @@ async function handleSadminLogin(e) {
     });
     const data = await res.json();
     if (data.success && data.user.role === 'superadmin') {
-      triggerLoginAnimation('Platform Super Admin', 'Master Command Center • Multi-Tenant Telemetry', 'sadmin.php');
+      triggerLoginAnimation('Platform Super Admin', 'Master Command Center • Multi-Tenant Telemetry', '/ss?portal=1');
     } else {
       errBox.textContent = data.error || 'Access Denied: Super Administrator privileges required.';
       errBox.style.display = 'block';

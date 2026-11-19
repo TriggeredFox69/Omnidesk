@@ -24,12 +24,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
-$isSuperAdmin = ($currentUser && ($currentUser['role'] ?? '') === 'superadmin');
+$isLoggedInSuperAdmin = ($currentUser && ($currentUser['role'] ?? '') === 'superadmin');
 
-// Allow explicit forced login form via ?login=1 or ?switch=1
-if (isset($_GET['login']) || isset($_GET['switch'])) {
-    $isSuperAdmin = false;
-}
+// Only show the super admin command center if authenticated AND viewing portal (?portal=1 or ?dashboard=1)
+// Direct visits to /ss or ss.php or sadmin.php without ?portal=1 will ALWAYS present the Super Admin login gate
+$isPortalView = (isset($_GET['portal']) || isset($_GET['dashboard']));
+$isSuperAdmin = ($isLoggedInSuperAdmin && $isPortalView && !isset($_GET['login']) && !isset($_GET['switch']));
 
 // Quick logout action
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
@@ -38,8 +38,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         $params = session_get_cookie_params();
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
-    session_destroy();
-    header('Location: ?');
+    @session_destroy();
+    header('Location: /ss');
     exit;
 }
 ?>
@@ -310,6 +310,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
       <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">Super Admin Command</h2>
       <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">Platform Owner Master Command Access</p>
 
+      <?php if ($isLoggedInSuperAdmin): ?>
+        <div style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 22px; text-align: left; font-size: 12.5px;">
+          <div style="color: #facc15; font-weight: 700; margin-bottom: 4px;">⚡ Active Superadmin Session</div>
+          <div style="color: var(--text-secondary); margin-bottom: 12px;">
+            Currently authenticated as <strong><?php echo htmlspecialchars($currentUser['name'] ?? $currentUser['username']); ?></strong>.
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <a href="?portal=1" class="btn btn-gold" style="padding: 7px 14px; font-size: 12px; text-decoration: none; border-radius: 8px; flex: 1; justify-content: center;">Enter Command Center &rarr;</a>
+            <a href="?action=logout" class="btn btn-secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-radius: 8px; color: #ef4444;">Sign Out</a>
+          </div>
+        </div>
+      <?php endif; ?>
+
       <form id="sadminLoginForm" onsubmit="handleSadminLogin(event)">
         <div class="form-group" style="text-align: left;">
           <label class="form-label">Super Key / Username</label>
@@ -334,7 +347,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   <!-- SUPER ADMIN MASTER COMMAND CENTER -->
   <header class="top-bar">
     <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
-      <a href="?" title="Chatly Global" style="display:flex; align-items:center; text-decoration:none;">
+      <a href="/" title="Chatly Homepage" style="display:flex; align-items:center; text-decoration:none;">
         <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
@@ -358,7 +371,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
       <button class="btn btn-secondary" onclick="toggleTheme()">
         <span>🌓</span>
       </button>
-      <a href="?switch=1" class="btn btn-secondary" style="font-size:12px;" title="Switch Account">
+      <a href="/ss" class="btn btn-secondary" style="font-size:12px;" title="Switch Account">
         <span>🔄</span> Switch
       </a>
       <a href="?action=logout" class="btn btn-danger">
@@ -1533,7 +1546,7 @@ async function handleSadminLogin(e) {
     });
     const data = await res.json();
     if (data.success && data.user.role === 'superadmin') {
-      window.location.reload();
+      window.location.href = '?portal=1';
     } else {
       errBox.textContent = data.error || 'Access Denied: Super Administrator privileges required.';
       errBox.style.display = 'block';

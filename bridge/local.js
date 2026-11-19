@@ -14,8 +14,8 @@ function templateLoginPhp(content) {
   return rendered;
 }
 
-function templateAdminPhp(content, currentUser, targetCompId = null) {
-  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
+function templateAdminPhp(content, currentUser, targetCompId = null, isPortal = false) {
+  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin') && isPortal;
   let rendered = content;
   if (!isAdmin) {
     rendered = rendered.replace(/<\?php if \(!\$isAdmin\): \?>([\s\S]*?)<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$1');
@@ -47,8 +47,8 @@ function templateAdminPhp(content, currentUser, targetCompId = null) {
   return rendered;
 }
 
-function templateSadminPhp(content, currentUser) {
-  const isSuperAdmin = currentUser && currentUser.role === 'superadmin';
+function templateSadminPhp(content, currentUser, isPortal = false) {
+  const isSuperAdmin = currentUser && currentUser.role === 'superadmin' && isPortal;
   let rendered = content;
   if (!isSuperAdmin) {
     rendered = rendered.replace(/<\?php if \(!\$isSuperAdmin\): \?>([\s\S]*?)<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$1');
@@ -1209,12 +1209,12 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('login') === '1') {
             currentLocalUser = null;
           }
-          content = templateAdminPhp(content, currentLocalUser, url.searchParams.get('company_id'));
+          content = templateAdminPhp(content, currentLocalUser, url.searchParams.get('company_id'), url.searchParams.has('portal') || url.searchParams.has('dashboard'));
         } else if (relative === 'sadmin.php' || relative === 'ss.php') {
           if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('login') === '1') {
             currentLocalUser = null;
           }
-          content = templateSadminPhp(content, currentLocalUser);
+          content = templateSadminPhp(content, currentLocalUser, url.searchParams.has('portal') || url.searchParams.has('dashboard'));
         } else if (relative === 'index.html') {
           content = content.replace('</head>', '<script>window.NUNNO_LOCAL_LIVE=true;</script></head>');
         }
