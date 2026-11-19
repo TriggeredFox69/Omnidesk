@@ -3861,9 +3861,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.tabEmployee) els.tabEmployee.addEventListener('click', () => switchTab('employee'));
   document.getElementById('employeeOpenInboxBtn')?.addEventListener('click', () => {
     if (isNunnoPlanLocked()) {
-      showToast('🔒 Nunno Special Plan (Rs. 1,000) required to access Team Inbox.');
+      showToast('🔒 Nunno Special Plan (Rs. 1,000) required. Opening checkout...');
       const lockCard = document.getElementById('nunnoPlanLockCard');
       if (lockCard) lockCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.open('https://nunno.cloud/partner/chatly-c7x4k2', '_blank');
       return;
     }
     switchTab('inbox');
