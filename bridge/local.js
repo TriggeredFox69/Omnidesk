@@ -628,6 +628,67 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             json(200, { success: true, employees: filtered });
             return;
           }
+          if (action === 'get_campaign_senders') {
+            const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
+            let matched = allUsers.filter(u => {
+              const uComp = u.company_id || 'COMP-001';
+              const status = (u.status || 'active').toLowerCase();
+              const phone = String(u.phone || '').replace(/\D/g, '');
+              return uComp === compId && status === 'active' && phone.length >= 10;
+            });
+
+            // Sort: TM first, then TL, then Admin
+            matched.sort((a, b) => {
+              const order = { member: 1, lead: 2, admin: 3 };
+              return (order[a.role] || 99) - (order[b.role] || 99);
+            });
+
+            // Deduplicate by clean phone
+            const seenPhones = new Set();
+            const uniqueMatched = [];
+            for (const u of matched) {
+              const p = String(u.phone || '').replace(/\D/g, '');
+              if (!seenPhones.has(p)) {
+                seenPhones.add(p);
+                uniqueMatched.push(u);
+              }
+            }
+
+            let senders = uniqueMatched.map((u, idx) => {
+              const cleanPhone = String(u.phone || '').replace(/\D/g, '');
+              let roleLabel = 'TM Closer';
+              if (u.role === 'lead') roleLabel = 'Team Leader (TL)';
+              else if (u.role === 'admin') roleLabel = 'Admin';
+              return {
+                index: idx + 1,
+                id: u.id,
+                name: u.name,
+                username: u.username || '',
+                role: roleLabel,
+                roleType: u.role || 'member',
+                phone: cleanPhone,
+                display: String(u.phone).startsWith('+') ? u.phone : ('+' + cleanPhone),
+                messages_sent: Number(u.messages_sent_today) || 0,
+                status: 'ready'
+              };
+            });
+            if (!senders.length) {
+              senders = [{
+                index: 1,
+                id: 'SENDER-FALLBACK-01',
+                name: 'Primary WhatsApp Device',
+                username: 'primary',
+                role: 'TM Closer',
+                roleType: 'member',
+                phone: '923318036576',
+                display: '+92 331 8036576',
+                messages_sent: 0,
+                status: 'ready'
+              }];
+            }
+            json(200, { success: true, company_id: compId, count: senders.length, senders });
+            return;
+          }
         }
 
         // 2. Tenant Manager API (Company Admin Controls)
@@ -654,6 +715,67 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               };
             });
             json(200, { success: true, employees: filtered });
+            return;
+          }
+          if (action === 'get_campaign_senders') {
+            const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
+            let matched = allUsers.filter(u => {
+              const uComp = u.company_id || 'COMP-001';
+              const status = (u.status || 'active').toLowerCase();
+              const phone = String(u.phone || '').replace(/\D/g, '');
+              return uComp === compId && status === 'active' && phone.length >= 10;
+            });
+
+            // Sort: TM first, then TL, then Admin
+            matched.sort((a, b) => {
+              const order = { member: 1, lead: 2, admin: 3 };
+              return (order[a.role] || 99) - (order[b.role] || 99);
+            });
+
+            // Deduplicate by clean phone
+            const seenPhones = new Set();
+            const uniqueMatched = [];
+            for (const u of matched) {
+              const p = String(u.phone || '').replace(/\D/g, '');
+              if (!seenPhones.has(p)) {
+                seenPhones.add(p);
+                uniqueMatched.push(u);
+              }
+            }
+
+            let senders = uniqueMatched.map((u, idx) => {
+              const cleanPhone = String(u.phone || '').replace(/\D/g, '');
+              let roleLabel = 'TM Closer';
+              if (u.role === 'lead') roleLabel = 'Team Leader (TL)';
+              else if (u.role === 'admin') roleLabel = 'Admin';
+              return {
+                index: idx + 1,
+                id: u.id,
+                name: u.name,
+                username: u.username || '',
+                role: roleLabel,
+                roleType: u.role || 'member',
+                phone: cleanPhone,
+                display: String(u.phone).startsWith('+') ? u.phone : ('+' + cleanPhone),
+                messages_sent: Number(u.messages_sent_today) || 0,
+                status: 'ready'
+              };
+            });
+            if (!senders.length) {
+              senders = [{
+                index: 1,
+                id: 'SENDER-FALLBACK-01',
+                name: 'Primary WhatsApp Device',
+                username: 'primary',
+                role: 'TM Closer',
+                roleType: 'member',
+                phone: '923318036576',
+                display: '+92 331 8036576',
+                messages_sent: 0,
+                status: 'ready'
+              }];
+            }
+            json(200, { success: true, company_id: compId, count: senders.length, senders });
             return;
           }
           if (action === 'update_message_limit') {
@@ -1482,6 +1604,11 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             if (action === 'get_send_status' && String(body.message_id || '').startsWith('sim_')) {
               json(200, { success: true, simulated: true, status: 'accepted' });
               return;
+            }
+            if (action === 'start_campaign') {
+              body.company_id = body.company_id || url.searchParams.get('company_id') || currentLocalUser?.company_id || 'COMP-001';
+              body.simulate = true;
+              body.allow_simulation = true;
             }
             const upstream = await fetch(bridgeUrl + routes[action], { method: post ? 'POST' : 'GET',
               headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

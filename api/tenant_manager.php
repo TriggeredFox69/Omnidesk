@@ -413,3 +413,109 @@ function findCompanyIdForPhone(string $phone): string {
     }
     return 'COMP-001';
 }
+
+// HTTP API Handler for Tenant Operations
+if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'tenant_manager.php') {
+    if (session_status() === PHP_SESSION_NONE) {
+        @session_start();
+    }
+    header('Content-Type: application/json; charset=UTF-8');
+    $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
+    $action = $_GET['action'] ?? $input['action'] ?? '';
+    $companyId = resolveActiveCompanyId();
+
+    if ($action === 'list_company_employees' || $action === 'get_employees' || $action === 'list_employees') {
+        $usersFile = __DIR__ . '/../data/users.json';
+        $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+        if (!is_array($allUsers)) $allUsers = [];
+
+        $filtered = array_values(array_filter($allUsers, function($u) use ($companyId) {
+            if (($u['role'] ?? '') === 'superadmin' || ($u['company_id'] ?? '') === 'GLOBAL') return false;
+            if (($u['role'] ?? '') === 'admin') return false;
+            return ($u['company_id'] ?? 'COMP-001') === $companyId;
+        }));
+
+        echo json_encode(['success' => true, 'employees' => $filtered]);
+        exit;
+    }
+
+    if ($action === 'get_campaign_senders') {
+        $usersFile = __DIR__ . '/../data/users.json';
+        $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+        if (!is_array($allUsers)) $allUsers = [];
+
+        $matched = array_values(array_filter($allUsers, function($u) use ($companyId) {
+            $uComp = $u['company_id'] ?? 'COMP-001';
+            $status = strtolower($u['status'] ?? 'active');
+            $phone = preg_replace('/\D+/', '', $u['phone'] ?? '');
+            return $uComp === $companyId && $status === 'active' && strlen($phone) >= 10;
+        }));
+
+        // Sort: member (TM) first, lead (TL) next, admin last
+        usort($matched, function($a, $b) {
+            $order = ['member' => 1, 'lead' => 2, 'admin' => 3];
+            return ($order[$a['role'] ?? ''] ?? 99) <=> ($order[$b['role'] ?? ''] ?? 99);
+        });
+
+        // Deduplicate by clean phone
+        $seenPhones = [];
+        $uniqueMatched = [];
+        foreach ($matched as $u) {
+            $p = preg_replace('/\D+/', '', $u['phone'] ?? '');
+            if (!isset($seenPhones[$p])) {
+                $seenPhones[$p] = true;
+                $uniqueMatched[] = $u;
+            }
+        }
+
+        $senders = [];
+        $idx = 1;
+        foreach ($uniqueMatched as $u) {
+            $cleanPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
+            $roleLabel = 'TM Closer';
+            if (($u['role'] ?? '') === 'lead') $roleLabel = 'Team Leader (TL)';
+            elseif (($u['role'] ?? '') === 'admin') $roleLabel = 'Admin';
+
+            $senders[] = [
+                'index'         => $idx++,
+                'id'            => $u['id'],
+                'name'          => $u['name'],
+                'username'      => $u['username'] ?? '',
+                'role'          => $roleLabel,
+                'roleType'      => $u['role'] ?? 'member',
+                'phone'         => $cleanPhone,
+                'display'       => str_starts_with($u['phone'] ?? '', '+') ? $u['phone'] : ('+' . $cleanPhone),
+                'messages_sent' => (int)($u['messages_sent_today'] ?? 0),
+                'status'        => 'ready'
+            ];
+        }
+
+        if (empty($senders)) {
+            $senders[] = [
+                'index'         => 1,
+                'id'            => 'SENDER-FALLBACK-01',
+                'name'          => 'Primary WhatsApp Device',
+                'username'      => 'primary',
+                'role'          => 'TM Closer',
+                'roleType'      => 'member',
+                'phone'         => '923318036576',
+                'display'       => '+92 331 8036576',
+                'messages_sent' => 0,
+                'status'        => 'ready'
+            ];
+        }
+
+        echo json_encode([
+            'success'    => true,
+            'company_id' => $companyId,
+            'count'      => count($senders),
+            'senders'    => $senders
+        ]);
+        exit;
+    }
+
+    if ($action === 'get_company_config') {
+        echo json_encode(['success' => true, 'config' => getTenantConfig($companyId)]);
+        exit;
+    }
+}

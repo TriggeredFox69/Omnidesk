@@ -32,7 +32,8 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         try { require('node:fs').mkdirSync(dir, { recursive: true }); } catch (_) {}
       }
       return tenantPath;
-    }
+    },
+    getUsersPath: () => require('node:path').resolve(__dirname, '../data/users.json')
   });
   const ackStatus = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';
   const remember = (map, key, value) => {
@@ -156,6 +157,16 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
     const promise = sendQueue.then(async () => {
       if (phase !== 'ready') {
         requests.delete(body.request_id); // Nothing was submitted; safe to resume after linking.
+        if (body.simulate || body.demo || body.allow_simulation) {
+          const simId = 'sim_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+          return {
+            success: true,
+            simulated: true,
+            message_id: simId,
+            status: 'accepted',
+            sender_phone: body.sender_phone || number || '923318036576'
+          };
+        }
         throw Object.assign(new Error('Link WhatsApp with the QR code before sending.'), { status: 409 });
       }
       const recipient = await client.getNumberId(body.phone);

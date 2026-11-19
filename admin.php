@@ -595,7 +595,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       <span>👑</span> Live Leads &amp; Admin Takeover
     </button>
     <button class="dash-tab-btn" id="tabBtnCampaigns" onclick="switchDashboardTab('campaigns')">
-      <span>🚀</span> Campaign Dispatcher (3 Variations)
+      <span>🚀</span> Multi-Device Campaign (Round-Robin)
     </button>
     <button class="dash-tab-btn" id="tabBtnCommissions" onclick="switchDashboardTab('commissions')">
       <span>💰</span> TL Commission &amp; Plan Ledger
@@ -724,13 +724,118 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     </div>
   </div>
 
-  <!-- TAB 3: CAMPAIGN DISPATCHER WITH 3 STARTING VARIATIONS -->
+  <!-- TAB 3: MULTI-DEVICE CAMPAIGN DISPATCHER (ROUND-ROBIN) -->
   <div class="dash-pane" id="paneCampaigns">
+    <!-- Active Connected WhatsApps Pool Matrix -->
+    <div class="content-box" style="margin-bottom: 20px;">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>📱</span> Connected WhatsApp Devices Roster (Multi-Sender Pool)</div>
+          <div class="box-desc">
+            All connected TMs and TLs for <strong><?php echo htmlspecialchars($activeCompany['name']); ?></strong> are aligned in the sender pool. Outbound campaigns dispatch strictly <strong>1-by-1 in round-robin order</strong> across all numbers, repeating the full cycle until the target audience is completed.
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="campaignPoolCountBadge" class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; padding: 6px 12px; font-size: 13px;">
+            Loading devices...
+          </span>
+          <button class="btn btn-secondary" onclick="loadCampaignSenders()" style="padding: 6px 12px; font-size: 12px;">🔄 Refresh Pool</button>
+        </div>
+      </div>
+
+      <!-- Senders Cards Grid -->
+      <div id="campaignSendersPoolContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-top: 14px;">
+        <div style="color: var(--text-muted); font-size: 13px;">Loading company WhatsApp numbers...</div>
+      </div>
+
+      <!-- Round-Robin Visual Sequence Banner -->
+      <div style="margin-top: 18px; padding: 14px 18px; background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="font-size: 12px; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
+            <span>🔄</span> Round-Robin Dispatch Sequence:
+          </div>
+          <div id="campaignCycleMathInfo" style="font-size: 11.5px; color: var(--text-secondary);">
+            Messages alternate 1-by-1 across all devices &bull; Cycle repeats until completed
+          </div>
+        </div>
+        <div id="campaignRotationFlowPreview" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace;">
+          <!-- Dynamically populated: [Device 1] ➔ [Device 2] ➔ [Device 3] ➔ [Repeat] -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Real-Time Campaign Progress & Control Terminal (Hidden until running/paused/active) -->
+    <div id="campaignLiveMonitorBox" class="content-box" style="display: none; margin-bottom: 20px; border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 0 25px rgba(16, 185, 129, 0.1);">
+      <div class="box-header">
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="box-title"><span>⚡</span> Live Multi-Device Campaign Monitor</span>
+            <span id="liveCampStatusBadge" class="badge" style="background:#10b981; color:#050b09; font-weight:800; font-size:11px; text-transform:uppercase;">IDLE</span>
+          </div>
+          <div id="liveCampSubTitle" class="box-desc" style="margin-top:4px;">Dispatches rotating across company WhatsApp devices in real time.</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button id="btnCampPause" class="btn btn-secondary" onclick="pauseLiveCampaign()" style="padding: 6px 12px; font-size: 12px;">⏸️ Pause</button>
+          <button id="btnCampResume" class="btn btn-emerald" onclick="resumeLiveCampaign()" style="display:none; padding: 6px 12px; font-size: 12px;">▶️ Resume</button>
+          <button id="btnCampStop" class="btn btn-danger" onclick="stopLiveCampaign()" style="padding: 6px 12px; font-size: 12px;">⏹️ Halt</button>
+        </div>
+      </div>
+
+      <!-- Real-time Metrics Matrix -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; margin-bottom: 16px;">
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Current Round-Robin Cycle</div>
+          <div id="liveCampCycleVal" style="font-size: 20px; font-weight: 800; color: #10b981; margin-top: 4px;">Cycle 1 / 1</div>
+          <div id="liveCampCycleSub" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Device rotation active</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Active Sending Device</div>
+          <div id="liveCampActiveSenderVal" style="font-size: 15px; font-weight: 700; color: #38bdf8; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Device 1</div>
+          <div id="liveCampActiveSenderRole" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">TM Closer</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Total Sent / Audience</div>
+          <div id="liveCampSentRatio" style="font-size: 20px; font-weight: 800; color: #fff; margin-top: 4px;">0 / 0</div>
+          <div id="liveCampFailedCount" style="font-size: 11px; color: #ef4444; margin-top: 2px;">0 failed</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px;">
+          <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Pacing Cadence</div>
+          <div id="liveCampCountdownVal" style="font-size: 20px; font-weight: 800; color: #fbbf24; margin-top: 4px;">Next in: 0s</div>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Anti-ban jitter protection</div>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div style="margin-bottom: 16px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
+          <span style="color:var(--text-secondary);">Campaign Progress</span>
+          <span id="liveCampPct" style="font-weight:700; color:#10b981;">0%</span>
+        </div>
+        <div style="height: 8px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden;">
+          <div id="liveCampProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #38bdf8); transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <!-- Live Terminal Console -->
+      <div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+            <span>💻</span> Real-Time Multi-Device Dispatch Terminal
+          </span>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: monospace;">auto-scrolls</span>
+        </div>
+        <div id="liveCampTerminal" style="height: 180px; overflow-y: auto; background: #050b09; border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 12px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; line-height: 1.6; color: #94a3b8;">
+          <div style="color: #64748b;">Ready. Dispatches will stream here live...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Campaign Launch Configuration Box -->
     <div class="content-box">
       <div class="box-header">
         <div>
-          <div class="box-title"><span>🚀</span> Campaign Dispatcher — 3 Starting Variations</div>
-          <div class="box-desc">Select how the company wants to launch outbound lead outreach. Choose from Text Only, Text + Image Brochure, or Audio/Voice Note.</div>
+          <div class="box-title"><span>🚀</span> Launch Multi-Device Campaign — 3 Starting Variations</div>
+          <div class="box-desc">Choose from Text Message, Flyer Image Brochure, or Voice Note Pitch. The campaign will automatically rotate through all active devices above.</div>
         </div>
       </div>
 
@@ -742,7 +847,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
             <input type="radio" name="campVarRadio" id="radioVarText" checked>
           </div>
           <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;">
-            Dynamic spun text template with personalized variables like <code>{name}</code> and greetings <code>{Salam|AoA|Hello}</code>.
+            Dynamic spun text template with personalized variables like <code>{name}</code>, <code>{company}</code>, and greetings <code>{Salam|AoA|Hello}</code>.
           </p>
         </div>
 
@@ -770,10 +875,17 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       </div>
 
       <!-- Campaign Form -->
-      <form id="campaignLaunchForm" onsubmit="handleLaunchCampaign(event)" style="max-width: 680px;">
+      <form id="campaignLaunchForm" onsubmit="handleLaunchCampaign(event)" style="max-width: 720px;">
         <div class="form-group">
-          <label class="form-label">Campaign Message Body (Personalized Spin Text)</label>
-          <textarea id="campMessageText" class="form-control" rows="4" style="font-family: inherit; resize: vertical;">{Salam|AoA|Hello} {name}! Welcome to <?php echo htmlspecialchars($activeCompany['name']); ?>. We have provisioned your special package today.</textarea>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="form-label" style="margin: 0;">Campaign Message Body (Personalized Spin Text)</label>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-secondary" onclick="insertCampTag('{name}')" style="padding: 2px 8px; font-size: 11px;">+ {name}</button>
+              <button type="button" class="btn btn-secondary" onclick="insertCampTag('{company}')" style="padding: 2px 8px; font-size: 11px;">+ {company}</button>
+              <button type="button" class="btn btn-secondary" onclick="insertCampTag('{Salam|AoA|Hello}')" style="padding: 2px 8px; font-size: 11px;">+ Greeting</button>
+            </div>
+          </div>
+          <textarea id="campMessageText" class="form-control" rows="4" style="font-family: inherit; resize: vertical;">{Salam|AoA|Hello} {name}! Welcome to <?php echo htmlspecialchars($activeCompany['name']); ?>. We have provisioned your special package today. Reply here to activate.</textarea>
           <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Supports Spintax syntax and <code>{name}</code> personalizer tag.</div>
         </div>
 
@@ -789,25 +901,44 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Target Filter</label>
-            <select id="campTargetFilter" class="form-control">
-              <option value="new">Uncontacted New Leads Only</option>
+            <label class="form-label">Target Audience Filter</label>
+            <select id="campTargetFilter" class="form-control" onchange="calculateCampaignCycles()">
+              <option value="demo">⭐ Quick 10-Prospect Partner Demo (2 Full Cycles)</option>
+              <option value="new">Uncontacted Fresh Leads Only</option>
               <option value="ongoing">Follow-up with Ongoing Leads</option>
               <option value="all">All Pipeline Contacts</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Pacing Delay (Anti-Ban Protection)</label>
+            <label class="form-label">Pacing Delay & Speed</label>
             <select id="campDelay" class="form-control">
-              <option value="15">Safe Mode (15 - 25s delay)</option>
-              <option value="30">Ultra-Safe (30 - 45s delay)</option>
-              <option value="5">Turbo (5 - 10s delay)</option>
+              <option value="3">⚡ Fast Partner Demo (3s - 5s delay — instant visual test)</option>
+              <option value="6">Fast Outreach (6s - 10s delay)</option>
+              <option value="15">Safe Mode (15s - 25s delay)</option>
+              <option value="30">Ultra-Safe (30s - 45s delay)</option>
             </select>
           </div>
         </div>
 
-        <button type="submit" id="btnLaunchCamp" class="btn btn-emerald" style="padding: 12px 24px; font-size: 14px;">
-          🚀 Dispatch Campaign Now
+        <!-- Dynamic Cycle Preview Card -->
+        <div id="campaignCalcPreviewCard" style="background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #38bdf8;">
+                📊 Round-Robin Cycle Calculation:
+              </div>
+              <div id="calcSummaryText" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                Audience: <strong>10 contacts</strong> &bull; Connected Devices: <strong>5 WhatsApps</strong> &bull; Total: <strong>2 full cycles</strong>
+              </div>
+            </div>
+            <div id="calcOrderTag" style="font-size: 11.5px; font-weight: 700; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 6px;">
+              Order: 1 ➔ 2 ➔ 3 ➔ 4 ➔ 5 (Repeat)
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btnLaunchCamp" class="btn btn-emerald" style="padding: 12px 28px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+          <span>🚀</span> Dispatch Multi-Device Campaign (Round-Robin)
         </button>
       </form>
     </div>
@@ -1177,6 +1308,7 @@ function switchDashboardTab(tabName) {
   });
   if (tabName === 'pending') loadPendingTMs();
   if (tabName === 'leads') loadCompanyLeads();
+  if (tabName === 'campaigns') { loadCampaignSenders(); pollCampaignStatus(); }
   if (tabName === 'products') loadCompanyConfig();
   if (tabName === 'commissions') loadEmployees();
   if (tabName === 'withdrawals') loadCompanyWithdrawals();
@@ -1784,16 +1916,154 @@ async function handleAdminTakeover(phone) {
   }
 }
 
-// Launch Campaign with 3 Variations
+// --- Multi-Device Round-Robin Campaign Dispatcher Engine ---
+window.currentCampaignSenders = [];
+window.campaignPollTimer = null;
+window.isCampaignPollActive = false;
+
+function insertCampTag(tag) {
+  const textarea = document.getElementById('campMessageText');
+  if (!textarea) return;
+  const start = textarea.selectionStart || 0;
+  const end = textarea.selectionEnd || 0;
+  const text = textarea.value;
+  textarea.value = text.substring(0, start) + tag + text.substring(end);
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = start + tag.length;
+}
+
+async function loadCampaignSenders() {
+  const container = document.getElementById('campaignSendersPoolContainer');
+  const badge = document.getElementById('campaignPoolCountBadge');
+  const preview = document.getElementById('campaignRotationFlowPreview');
+  const mathInfo = document.getElementById('campaignCycleMathInfo');
+
+  try {
+    const res = await fetch('api/tenant_manager.php?action=get_campaign_senders&company_id=<?php echo urlencode($activeCompany['id']); ?>');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.senders)) {
+      window.currentCampaignSenders = data.senders;
+      const senders = data.senders;
+
+      if (badge) {
+        badge.textContent = `${senders.length} WhatsApp ${senders.length === 1 ? 'Device' : 'Devices'} Connected`;
+      }
+
+      if (container) {
+        if (!senders.length) {
+          container.innerHTML = `<div style="color:var(--text-muted); padding:16px;">No connected WhatsApp devices found. Scan QR on landing page to link devices.</div>`;
+        } else {
+          container.innerHTML = senders.map((s, idx) => {
+            const isTL = (s.roleType === 'lead');
+            const isAdmin = (s.roleType === 'admin');
+            const badgeBg = isTL ? 'linear-gradient(135deg, #10b981, #059669)' : (isAdmin ? 'linear-gradient(135deg, #8b5cf6, #6366f1)' : 'linear-gradient(135deg, #38bdf8, #0284c7)');
+            const roleTag = isTL ? 'Team Leader (TL)' : (isAdmin ? 'Admin' : 'TM Closer');
+            const roleColor = isTL ? '#34d399' : (isAdmin ? '#c084fc' : '#38bdf8');
+
+            return `
+              <div style="background: rgba(255,255,255,0.03); border: 1.5px solid var(--border-subtle); border-radius: 12px; padding: 14px; position: relative;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px;">
+                  <span style="font-size: 11px; font-weight: 800; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 6px; font-family: monospace; color: #fff;">
+                    Device #${s.index}
+                  </span>
+                  <span style="font-size: 10.5px; font-weight: 700; color: #10b981; display:flex; align-items:center; gap:4px;">
+                    <span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span> READY
+                  </span>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="width:36px; height:36px; border-radius:50%; background:${badgeBg}; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:14px; flex-shrink:0;">
+                    ${(s.name || 'W').charAt(0).toUpperCase()}
+                  </div>
+                  <div style="min-width:0; flex:1;">
+                    <div style="font-weight:700; font-size:13.5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                      ${escapeHtml(s.name)}
+                    </div>
+                    <div style="font-size:11px; font-weight:700; color:${roleColor}; margin-top:1px;">
+                      ${roleTag}
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
+                  <span style="font-family:monospace; color:var(--text-secondary);">${escapeHtml(s.display || s.phone)}</span>
+                  <span style="color:var(--text-muted); font-size:11px;">${s.messages_sent || 0} sent</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Render Visual Rotation Breadcrumbs
+      if (preview) {
+        if (!senders.length) {
+          preview.innerHTML = `<span style="color:var(--text-muted);">No devices connected</span>`;
+        } else {
+          const items = senders.map(s => {
+            const roleShort = s.roleType === 'lead' ? 'TL' : (s.roleType === 'admin' ? 'Admin' : 'TM');
+            return `<span style="background: rgba(16, 185, 129, 0.12); color: #34d399; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">📱 #${s.index} ${escapeHtml(s.name.split(' ')[0])} (${roleShort})</span>`;
+          });
+          items.push(`<span style="color: #fbbf24; font-weight: 700; padding: 4px 8px;">🔁 Repeat Cycle (1 ➔ ${senders.length})</span>`);
+          preview.innerHTML = items.join('<span style="color: var(--text-muted); font-size: 14px;"> ➔ </span>');
+        }
+      }
+
+      if (mathInfo) {
+        mathInfo.innerHTML = `Round-robin order: 1-by-1 per message across all ${senders.length} devices &bull; Repeats until audience finishes.`;
+      }
+
+      calculateCampaignCycles();
+    }
+  } catch (err) {
+    console.error('Error loading campaign senders:', err);
+  }
+}
+
+function calculateCampaignCycles() {
+  const filter = document.getElementById('campTargetFilter')?.value || 'demo';
+  const poolSize = Math.max(1, (window.currentCampaignSenders || []).length);
+  let estContacts = 10;
+  if (filter === 'new') {
+    const uncontacted = (window.currentCompanyLeads || []).filter(l => l.leadState === 'fresh' || l.status === 'new');
+    estContacts = Math.max(1, uncontacted.length);
+  } else if (filter === 'ongoing') {
+    const ongoing = (window.currentCompanyLeads || []).filter(l => l.leadState === 'ongoing');
+    estContacts = Math.max(1, ongoing.length);
+  } else if (filter === 'all') {
+    estContacts = Math.max(1, (window.currentCompanyLeads || []).length);
+  }
+
+  const totalCycles = Math.ceil(estContacts / poolSize);
+  const summaryEl = document.getElementById('calcSummaryText');
+  const orderTag = document.getElementById('calcOrderTag');
+
+  if (summaryEl) {
+    summaryEl.innerHTML = `Target Audience: <strong>${estContacts} contacts</strong> &bull; Connected Devices: <strong>${poolSize} WhatsApps</strong> &bull; Total: <strong>${totalCycles} Full ${totalCycles === 1 ? 'Cycle' : 'Cycles'}</strong>`;
+  }
+  if (orderTag) {
+    if (poolSize === 1) {
+      orderTag.textContent = 'Single Device Mode (All dispatches via Device #1)';
+    } else {
+      orderTag.textContent = `Order: 1 ➔ ${poolSize} (Repeats every ${poolSize} messages)`;
+    }
+  }
+}
+
+// Launch Multi-Device Campaign
 async function handleLaunchCampaign(e) {
   e.preventDefault();
   const btn = document.getElementById('btnLaunchCamp');
   btn.disabled = true;
-  btn.textContent = 'Launching Campaign…';
+  btn.textContent = '🚀 Dispatching Multi-Device Campaign…';
 
   let variation = 'text';
-  if (document.getElementById('radioVarImage').checked) variation = 'text_image';
-  if (document.getElementById('radioVarAudio').checked) variation = 'audio';
+  if (document.getElementById('radioVarImage')?.checked) variation = 'text_image';
+  if (document.getElementById('radioVarAudio')?.checked) variation = 'audio';
+
+  const filter = document.getElementById('campTargetFilter')?.value || 'demo';
+  const delaySec = parseInt(document.getElementById('campDelay')?.value, 10) || 3;
+  const message = document.getElementById('campMessageText')?.value.trim();
+  const imageUrl = document.getElementById('campImageUrl')?.value.trim();
+  const audioUrl = document.getElementById('campAudioUrl')?.value.trim();
 
   try {
     const res = await fetch('api/direct_sender.php?action=start_campaign', {
@@ -1801,26 +2071,171 @@ async function handleLaunchCampaign(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'start_campaign',
+        company_id: '<?php echo $activeCompany['id']; ?>',
+        company_name: '<?php echo htmlspecialchars($activeCompany['name']); ?>',
         variation: variation,
-        message: document.getElementById('campMessageText').value.trim(),
-        image_url: document.getElementById('campImageUrl').value.trim(),
-        audio_url: document.getElementById('campAudioUrl').value.trim(),
-        filter: document.getElementById('campTargetFilter').value,
-        delay: parseInt(document.getElementById('campDelay').value) || 15
+        message: message,
+        image_url: imageUrl,
+        audio_url: audioUrl,
+        filter: filter,
+        delay: delaySec,
+        senders: window.currentCampaignSenders || []
       })
     });
     const data = await res.json();
     if (data.success) {
-      alert('🚀 Campaign started successfully in variation: ' + variation.toUpperCase());
+      // Reveal monitor box immediately
+      const monitorBox = document.getElementById('campaignLiveMonitorBox');
+      if (monitorBox) {
+        monitorBox.style.display = 'block';
+        monitorBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      startCampaignPolling();
     } else {
       alert('⚠️ ' + (data.message || 'Campaign launch notice received.'));
     }
   } catch (err) {
-    alert('Network error launching campaign.');
+    alert('Network error launching campaign: ' + err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = '🚀 Dispatch Campaign Now';
+    btn.innerHTML = '<span>🚀</span> Dispatch Multi-Device Campaign (Round-Robin)';
   }
+}
+
+function startCampaignPolling() {
+  if (window.campaignPollTimer) clearInterval(window.campaignPollTimer);
+  window.isCampaignPollActive = true;
+  pollCampaignStatus();
+  window.campaignPollTimer = setInterval(pollCampaignStatus, 1800);
+}
+
+async function pollCampaignStatus() {
+  try {
+    const res = await fetch('api/direct_sender.php?action=get_campaign_status');
+    const data = await res.json();
+    if (data && data.success) {
+      updateCampaignMonitorUI(data);
+      if (data.status === 'completed' || data.status === 'stopped') {
+        if (window.campaignPollTimer) {
+          clearInterval(window.campaignPollTimer);
+          window.campaignPollTimer = null;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Campaign status polling error:', err);
+  }
+}
+
+function updateCampaignMonitorUI(data) {
+  const monitorBox = document.getElementById('campaignLiveMonitorBox');
+  if (!monitorBox) return;
+
+  if (['running', 'paused', 'completed'].includes(data.status)) {
+    monitorBox.style.display = 'block';
+  }
+
+  // Status Badge
+  const statusBadge = document.getElementById('liveCampStatusBadge');
+  const btnPause = document.getElementById('btnCampPause');
+  const btnResume = document.getElementById('btnCampResume');
+
+  if (statusBadge) {
+    statusBadge.textContent = (data.status || 'IDLE').toUpperCase();
+    if (data.status === 'running') {
+      statusBadge.style.background = '#10b981';
+      statusBadge.style.color = '#050b09';
+      if (btnPause) btnPause.style.display = 'inline-block';
+      if (btnResume) btnResume.style.display = 'none';
+    } else if (data.status === 'paused') {
+      statusBadge.style.background = '#fbbf24';
+      statusBadge.style.color = '#050b09';
+      if (btnPause) btnPause.style.display = 'none';
+      if (btnResume) btnResume.style.display = 'inline-block';
+    } else if (data.status === 'completed') {
+      statusBadge.style.background = '#38bdf8';
+      statusBadge.style.color = '#050b09';
+      if (btnPause) btnPause.style.display = 'none';
+      if (btnResume) btnResume.style.display = 'none';
+    }
+  }
+
+  // Metrics
+  const cycleVal = document.getElementById('liveCampCycleVal');
+  const cycleSub = document.getElementById('liveCampCycleSub');
+  if (cycleVal) cycleVal.textContent = `Cycle ${data.currentCycle || 1} / ${data.totalCycles || 1}`;
+  if (cycleSub) cycleSub.textContent = `Order: ${data.poolSize || 1}-device round-robin`;
+
+  const activeSenderVal = document.getElementById('liveCampActiveSenderVal');
+  const activeSenderRole = document.getElementById('liveCampActiveSenderRole');
+  if (activeSenderVal) {
+    activeSenderVal.textContent = data.activeSender ? data.activeSender.name : `Device ${(data.activeSenderIndex || 0) + 1}`;
+  }
+  if (activeSenderRole) {
+    activeSenderRole.textContent = data.activeSender ? `${data.activeSender.role} · ${data.activeSender.display || data.activeSender.phone}` : 'WhatsApp Device';
+  }
+
+  const ratioEl = document.getElementById('liveCampSentRatio');
+  if (ratioEl) ratioEl.textContent = `${data.totalSent || 0} / ${data.totalContacts || 0}`;
+
+  const failedEl = document.getElementById('liveCampFailedCount');
+  if (failedEl) failedEl.textContent = `${data.totalFailed || 0} failed`;
+
+  const countdownEl = document.getElementById('liveCampCountdownVal');
+  if (countdownEl) {
+    countdownEl.textContent = data.status === 'running' ? `Next in: ${data.remainingSeconds || 0}s` : (data.status === 'paused' ? 'Paused' : 'Done');
+  }
+
+  // Progress Bar
+  const total = Math.max(1, data.totalContacts || 1);
+  const current = data.currentIndex || 0;
+  const pct = data.status === 'completed' ? 100 : Math.min(100, Math.round((current / total) * 100));
+  const pctEl = document.getElementById('liveCampPct');
+  const barEl = document.getElementById('liveCampProgressBar');
+  if (pctEl) pctEl.textContent = `${pct}%`;
+  if (barEl) barEl.style.width = `${pct}%`;
+
+  // Terminal Logs
+  const termEl = document.getElementById('liveCampTerminal');
+  if (termEl && Array.isArray(data.logs) && data.logs.length > 0) {
+    termEl.innerHTML = data.logs.map(log => {
+      let color = '#94a3b8';
+      if (log.type === 'success') color = '#34d399';
+      else if (log.type === 'error') color = '#f87171';
+      else if (log.type === 'warn') color = '#fbbf24';
+      else if (log.message && log.message.includes('Cycle')) color = '#38bdf8';
+
+      return `<div style="margin-bottom: 3px; color: ${color};"><span style="color: #64748b; font-size: 11px;">[${log.time}]</span> ${escapeHtml(log.message)}</div>`;
+    }).join('');
+    termEl.scrollTop = termEl.scrollHeight;
+  }
+}
+
+async function pauseLiveCampaign() {
+  try {
+    const res = await fetch('api/direct_sender.php?action=pause_campaign', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) pollCampaignStatus();
+  } catch (_) {}
+}
+
+async function resumeLiveCampaign() {
+  try {
+    const res = await fetch('api/direct_sender.php?action=resume_campaign', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      startCampaignPolling();
+    }
+  } catch (_) {}
+}
+
+async function stopLiveCampaign() {
+  if (!confirm('Are you sure you want to halt this campaign?')) return;
+  try {
+    const res = await fetch('api/direct_sender.php?action=stop_campaign', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) pollCampaignStatus();
+  } catch (_) {}
 }
 
 // Products & Pitch Config
@@ -2175,6 +2590,8 @@ loadPendingTMs();
 loadCompanyLeads();
 loadCompanyConfig();
 loadCompanyWithdrawals();
+loadCampaignSenders();
+pollCampaignStatus();
 setInterval(loadPendingTMs, 8000);
 setInterval(loadCompanyWithdrawals, 8000);
 <?php endif; ?>
