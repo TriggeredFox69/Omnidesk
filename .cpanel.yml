@@ -3,66 +3,37 @@
 # Chatly production deployment to chatly.pk and omnidesk.lalagpt.pk
 deployment:
   tasks:
-    # 1. Primary deployment to Chatly.pk domain root
-    - export TARGET1=/home/dailygol/chatly.pk/
-    - /bin/mkdir -p $TARGET1/api $TARGET1/assets $TARGET1/bridge $TARGET1/data $TARGET1/cc $TARGET1/ss
-    - /bin/cp -rf api/* $TARGET1/api/ 2>/dev/null || true
-    - /bin/cp -rf assets/* $TARGET1/assets/ 2>/dev/null || true
-    - /bin/cp -rf cc/* $TARGET1/cc/ 2>/dev/null || true
-    - /bin/cp -rf ss/* $TARGET1/ss/ 2>/dev/null || true
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET1 2>/dev/null || true
-    - /bin/cp -R bridge/dist $TARGET1/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET1/bridge/ 2>/dev/null || true
-    - /bin/chmod +x $TARGET1/bridge/*.sh 2>/dev/null || true
-    - /bin/cp -f .htaccess $TARGET1 2>/dev/null || true
-    - /bin/cp -f data/.htaccess data/companies.json data/email_config.json $TARGET1/data/ 2>/dev/null || true
-    - /bin/chmod 755 $TARGET1 $TARGET1/cc $TARGET1/ss 2>/dev/null || true
-    - /bin/chmod 775 $TARGET1/data 2>/dev/null || true
+    # 1. Primary shell deployment runner
+    - /bin/bash ./deploy.sh 2>/dev/null || true
 
-    # 2. Mirror deployment to public_html/chatly.pk (cPanel add-on document root variant)
-    - export TARGET2=/home/dailygol/public_html/chatly.pk/
-    - /bin/mkdir -p $TARGET2/api $TARGET2/assets $TARGET2/bridge $TARGET2/data $TARGET2/cc $TARGET2/ss
-    - /bin/cp -rf api/* $TARGET2/api/ 2>/dev/null || true
-    - /bin/cp -rf assets/* $TARGET2/assets/ 2>/dev/null || true
-    - /bin/cp -rf cc/* $TARGET2/cc/ 2>/dev/null || true
-    - /bin/cp -rf ss/* $TARGET2/ss/ 2>/dev/null || true
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET2 2>/dev/null || true
-    - /bin/cp -R bridge/dist $TARGET2/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET2/bridge/ 2>/dev/null || true
-    - /bin/chmod +x $TARGET2/bridge/*.sh 2>/dev/null || true
-    - /bin/cp -f .htaccess $TARGET2 2>/dev/null || true
-    - /bin/cp -f data/.htaccess data/companies.json data/email_config.json $TARGET2/data/ 2>/dev/null || true
-    - /bin/chmod 755 $TARGET2 $TARGET2/cc $TARGET2/ss 2>/dev/null || true
-    - /bin/chmod 775 $TARGET2/data 2>/dev/null || true
+    # 2. Direct absolute copy for chatly.pk (Zero dependency on env vars)
+    - /bin/mkdir -p /home/dailygol/chatly.pk/api /home/dailygol/chatly.pk/assets /home/dailygol/chatly.pk/bridge /home/dailygol/chatly.pk/data /home/dailygol/chatly.pk/cc /home/dailygol/chatly.pk/ss
+    - /bin/cp -rf api/* /home/dailygol/chatly.pk/api/ 2>/dev/null || true
+    - /bin/cp -rf assets/* /home/dailygol/chatly.pk/assets/ 2>/dev/null || true
+    - /bin/cp -rf cc/* /home/dailygol/chatly.pk/cc/ 2>/dev/null || true
+    - /bin/cp -rf ss/* /home/dailygol/chatly.pk/ss/ 2>/dev/null || true
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md /home/dailygol/chatly.pk/ 2>/dev/null || true
+    - /bin/cp -R bridge/dist /home/dailygol/chatly.pk/bridge/ 2>/dev/null || true
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json /home/dailygol/chatly.pk/bridge/ 2>/dev/null || true
+    - /bin/chmod +x /home/dailygol/chatly.pk/bridge/*.sh 2>/dev/null || true
+    - /bin/cp -f .htaccess /home/dailygol/chatly.pk/ 2>/dev/null || true
+    - /bin/cp -f data/.htaccess /home/dailygol/chatly.pk/data/ 2>/dev/null || true
+    - /bin/cp -f data/companies.json data/email_config.json /home/dailygol/chatly.pk/data/ 2>/dev/null || true
+    - /bin/chmod 755 /home/dailygol/chatly.pk /home/dailygol/chatly.pk/cc /home/dailygol/chatly.pk/ss 2>/dev/null || true
+    - /bin/chmod 775 /home/dailygol/chatly.pk/data 2>/dev/null || true
 
-    # 3. Legacy subdomain root omnidesk.lalagpt.pk (seamless transition)
-    - export TARGET3=/home/dailygol/omnidesk.lalagpt.pk/
-    - /bin/mkdir -p $TARGET3/api $TARGET3/assets $TARGET3/bridge $TARGET3/data $TARGET3/cc $TARGET3/ss
-    - /bin/cp -rf api/* $TARGET3/api/ 2>/dev/null || true
-    - /bin/cp -rf assets/* $TARGET3/assets/ 2>/dev/null || true
-    - /bin/cp -rf cc/* $TARGET3/cc/ 2>/dev/null || true
-    - /bin/cp -rf ss/* $TARGET3/ss/ 2>/dev/null || true
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET3 2>/dev/null || true
-    - /bin/cp -R bridge/dist $TARGET3/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET3/bridge/ 2>/dev/null || true
-    - /bin/chmod +x $TARGET3/bridge/*.sh 2>/dev/null || true
-    - /bin/cp -f .htaccess $TARGET3 2>/dev/null || true
-    - /bin/cp -f data/.htaccess $TARGET3/data/.htaccess 2>/dev/null || true
-    - /bin/chmod 755 $TARGET3 $TARGET3/cc $TARGET3/ss 2>/dev/null || true
-    - /bin/chmod 775 $TARGET3/data 2>/dev/null || true
-
-    # 4. Mirror deployment to public_html/omnidesk
-    - export TARGET4=/home/dailygol/public_html/omnidesk/
-    - /bin/mkdir -p $TARGET4/api $TARGET4/assets $TARGET4/bridge $TARGET4/data $TARGET4/cc $TARGET4/ss
-    - /bin/cp -rf api/* $TARGET4/api/ 2>/dev/null || true
-    - /bin/cp -rf assets/* $TARGET4/assets/ 2>/dev/null || true
-    - /bin/cp -rf cc/* $TARGET4/cc/ 2>/dev/null || true
-    - /bin/cp -rf ss/* $TARGET4/ss/ 2>/dev/null || true
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET4 2>/dev/null || true
-    - /bin/cp -R bridge/dist $TARGET4/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET4/bridge/ 2>/dev/null || true
-    - /bin/chmod +x $TARGET4/bridge/*.sh 2>/dev/null || true
-    - /bin/cp -f .htaccess $TARGET4 2>/dev/null || true
-    - /bin/cp -f data/.htaccess $TARGET4/data/.htaccess 2>/dev/null || true
-    - /bin/chmod 755 $TARGET4 $TARGET4/cc $TARGET4/ss 2>/dev/null || true
-    - /bin/chmod 775 $TARGET4/data 2>/dev/null || true
+    # 3. Direct absolute copy for public_html/chatly.pk (Add-on domain root)
+    - /bin/mkdir -p /home/dailygol/public_html/chatly.pk/api /home/dailygol/public_html/chatly.pk/assets /home/dailygol/public_html/chatly.pk/bridge /home/dailygol/public_html/chatly.pk/data /home/dailygol/public_html/chatly.pk/cc /home/dailygol/public_html/chatly.pk/ss
+    - /bin/cp -rf api/* /home/dailygol/public_html/chatly.pk/api/ 2>/dev/null || true
+    - /bin/cp -rf assets/* /home/dailygol/public_html/chatly.pk/assets/ 2>/dev/null || true
+    - /bin/cp -rf cc/* /home/dailygol/public_html/chatly.pk/cc/ 2>/dev/null || true
+    - /bin/cp -rf ss/* /home/dailygol/public_html/chatly.pk/ss/ 2>/dev/null || true
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md /home/dailygol/public_html/chatly.pk/ 2>/dev/null || true
+    - /bin/cp -R bridge/dist /home/dailygol/public_html/chatly.pk/bridge/ 2>/dev/null || true
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json /home/dailygol/public_html/chatly.pk/bridge/ 2>/dev/null || true
+    - /bin/chmod +x /home/dailygol/public_html/chatly.pk/bridge/*.sh 2>/dev/null || true
+    - /bin/cp -f .htaccess /home/dailygol/public_html/chatly.pk/ 2>/dev/null || true
+    - /bin/cp -f data/.htaccess /home/dailygol/public_html/chatly.pk/data/ 2>/dev/null || true
+    - /bin/cp -f data/companies.json data/email_config.json /home/dailygol/public_html/chatly.pk/data/ 2>/dev/null || true
+    - /bin/chmod 755 /home/dailygol/public_html/chatly.pk /home/dailygol/public_html/chatly.pk/cc /home/dailygol/public_html/chatly.pk/ss 2>/dev/null || true
+    - /bin/chmod 775 /home/dailygol/public_html/chatly.pk/data 2>/dev/null || true
