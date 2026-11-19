@@ -63,8 +63,6 @@ class BaileysClient extends EventEmitter {
     this._msgRetryCache = new NodeCache({ stdTTL: 3600, useClones: false });
     this._loadRawStore();
     this._loadLidMap();
-    // Seed known mappings
-    this._recordLidPhone('208023050051744', '923046588806');
   }
 
   _resolvePhoneFromJid(jid) {

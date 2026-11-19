@@ -953,7 +953,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         <span>📱</span> 1. Closer (TM) QR Login
       </button>
       <button class="role-tab-btn tab-tl" id="tabBtnTL" onclick="switchRole('tl')">
-        <span>👑</span> 2. Continue as TL (Rs. 500/TM)
+        <span>👑</span> 2. Team Lead (TL) Login
       </button>
       <button class="role-tab-btn tab-admin" id="tabBtnAdmin" onclick="switchRole('admin')">
         <span>🏢</span> 3. Company Admin (/admin)
@@ -1052,7 +1052,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
             <div id="connectedPhoneActionsBox" style="display:none; width:100%; max-width:270px; margin-top:14px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.3); border-radius:14px; padding:14px; text-align:center;">
               <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.6px; color:var(--wa-accent); font-weight:800; margin-bottom:4px;">Connected WhatsApp Closer</div>
               <div id="connectedCloserName" style="font-size:15px; font-weight:800; color:var(--wa-text-primary);">Closer Account</div>
-              <div id="connectedCloserPhone" style="font-size:12px; color:var(--wa-text-secondary); margin-bottom:12px;">+923046588806</div>
+              <div id="connectedCloserPhone" style="font-size:12px; color:var(--wa-text-secondary); margin-bottom:12px;"></div>
               <div style="display:flex; gap:8px; justify-content:center;">
                 <button type="button" id="btnEnterConnectedCloser" class="btn-action-primary" style="margin:0; padding:9px 12px; font-size:12px; flex:1.3; white-space:nowrap;">
                   Enter Desk →
@@ -1069,7 +1069,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
                 📱 Link WhatsApp Number:
               </div>
               <div style="display: flex; gap: 6px;">
-                <input type="text" id="simPhoneInput" placeholder="+923046588806" value="+923046588806" class="input-field" style="padding: 8px 10px; font-size: 13px; font-family: monospace;">
+                <input type="text" id="simPhoneInput" placeholder="+923001234567" value="" class="input-field" style="padding: 8px 10px; font-size: 13px; font-family: monospace;">
                 <button type="button" class="btn-action-primary" style="margin: 0; padding: 8px 12px; width: auto; font-size: 12px; background: var(--wa-accent); white-space: nowrap;" onclick="handlePhonePairSubmit()">
                   ⚡ Link
                 </button>
@@ -1118,15 +1118,10 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         <div class="form-header">
           <div class="form-badge-icon" style="background:rgba(31, 224, 138, 0.2); color:#8ff5c8;">👑</div>
           <h2 class="form-title">Team Leader (TL) Commission Portal</h2>
-          <p class="form-subtitle">Earn <strong>Rs. 500 PKR</strong> per joined TM. Recruit closers & manage quotas.</p>
+          <p class="form-subtitle">Recruit closers, manage team quotas, and monitor commission earnings.</p>
         </div>
 
-        <div style="display:flex; gap:8px; margin-bottom:18px;">
-          <button type="button" class="role-tab-btn tab-tl active" id="btnTLModeLogin" onclick="toggleTLMode('login')" style="flex:1; border-radius:8px;">TL Sign In</button>
-          <button type="button" class="role-tab-btn tab-tl" id="btnTLModeReg" onclick="toggleTLMode('register')" style="flex:1; border-radius:8px;">Register New TL</button>
-        </div>
-
-        <!-- TL Login Form -->
+        <!-- TL Login Form (TLs only sign in) -->
         <form id="formTLLogin" onsubmit="handleTLLogin(event)">
           <div class="input-group">
             <label class="input-label">TL Username (e.g. ali or asima)</label>
@@ -1139,30 +1134,6 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           <div class="error-box" id="tlLoginError"></div>
           <button type="submit" id="tlLoginBtn" class="btn-action-primary btn-tl">
             Access TL Commission Desk 👑
-          </button>
-        </form>
-
-        <!-- TL Register Form -->
-        <form id="formTLRegister" onsubmit="handleTLRegister(event)" style="display:none;">
-          <div class="input-group">
-            <label class="input-label">Full Name *</label>
-            <input type="text" id="regTLName" class="input-field" placeholder="e.g. Bilal Ahmed" required>
-          </div>
-          <div class="input-group">
-            <label class="input-label">Desired Username *</label>
-            <input type="text" id="regTLUsername" class="input-field" placeholder="e.g. bilal_tl" required>
-          </div>
-          <div class="input-group">
-            <label class="input-label">WhatsApp Phone *</label>
-            <input type="text" id="regTLPhone" class="input-field" placeholder="+923001234567" required>
-          </div>
-          <div class="input-group">
-            <label class="input-label">Password *</label>
-            <input type="password" id="regTLPassword" class="input-field" placeholder="Min 6 characters" required>
-          </div>
-          <div class="error-box" id="tlRegError"></div>
-          <button type="submit" id="tlRegBtn" class="btn-action-primary btn-tl">
-            Register & Activate Commission Desk (Rs. 500/TM) 🚀
           </button>
         </form>
 
@@ -1357,23 +1328,10 @@ function switchRole(role) {
   });
 }
 
-// TL Mode Switcher (Login vs Register)
+// TL Mode Switcher (TL is login only)
 function toggleTLMode(mode) {
   const formLogin = document.getElementById('formTLLogin');
-  const formReg = document.getElementById('formTLRegister');
-  const btnLogin = document.getElementById('btnTLModeLogin');
-  const btnReg = document.getElementById('btnTLModeReg');
-  if (mode === 'register') {
-    formLogin.style.display = 'none';
-    formReg.style.display = 'block';
-    btnReg.classList.add('active');
-    btnLogin.classList.remove('active');
-  } else {
-    formLogin.style.display = 'block';
-    formReg.style.display = 'none';
-    btnLogin.classList.add('active');
-    btnReg.classList.remove('active');
-  }
+  if (formLogin) formLogin.style.display = 'block';
 }
 
 // 360 Spin Animation Trigger

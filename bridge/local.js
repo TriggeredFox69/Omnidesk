@@ -358,9 +358,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               });
             }
             if (!closerUser && body.demo) {
-              closerUser = allUsers.find(u => u.username === 'askari') || allUsers.find(u => u.role === 'member' && u.status === 'active') || {
-                id: 'EMP-TM-MWMK43N9', name: 'Askari Raza', username: 'askari', role: 'member', designation: 'Closer Specialist', status: 'active', company_id: 'COMP-001'
-              };
+              closerUser = allUsers.find(u => u.role === 'member' && u.status === 'active') || allUsers.find(u => u.role === 'member');
             }
             if (!closerUser) {
               json(404, { success: false, error: 'No account linked to this WhatsApp number. Please complete registration.' });
