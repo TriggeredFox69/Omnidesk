@@ -1714,7 +1714,6 @@ async function toggleNunnoPlan(empId, activate) {
   }
 }
 window.toggleNunnoPlan = toggleNunnoPlan;
-}
 
 async function directLoginAsEmployee(username) {
   if (!username) return;
@@ -2489,7 +2488,7 @@ async function handleAdminLogin(e) {
     });
     const data = await res.json();
     if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
-      const compId = data.user.company_id || 'COMP-001';
+      const compId = (data.user.role === 'superadmin' && (data.user.company_id === 'GLOBAL' || !data.user.company_id)) ? 'COMP-001' : (data.user.company_id || 'COMP-001');
       try { localStorage.setItem('omnidesk_user', JSON.stringify(data.user)); } catch(_) {}
       const targetUrl = (window.location.pathname.includes('admin.php') ? 'admin.php' : '/cc') + '?portal=1&company_id=' + encodeURIComponent(compId);
       window.location.href = targetUrl;

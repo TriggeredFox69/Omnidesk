@@ -973,8 +973,24 @@ switch ($action) {
         $matchedUser = null;
         $userIndex = -1;
 
+        $cleanUsername = strtolower(trim($username));
+        // Normalize common company admin aliases
+        if (in_array($cleanUsername, ['admin_nunno', 'nunno_admin', 'admin-nunno', 'nunno-admin', 'comp-001'], true)) {
+            $username = 'nunno';
+            $cleanUsername = 'nunno';
+        } elseif (in_array($cleanUsername, ['metalink_admin', 'admin_metalink', 'comp-004'], true)) {
+            $username = 'metalink';
+            $cleanUsername = 'metalink';
+        } elseif (in_array($cleanUsername, ['apex', 'admin_apex', 'comp-002'], true)) {
+            $username = 'apex_admin';
+            $cleanUsername = 'apex_admin';
+        }
+
         foreach ($users as $idx => $u) {
-            if (strcasecmp($u['username'], $username) === 0 || strcasecmp($u['email'] ?? '', $username) === 0) {
+            $uName = strtolower(trim($u['username'] ?? ''));
+            $uEmail = strtolower(trim($u['email'] ?? ''));
+            $uComp = strtolower(trim($u['company_id'] ?? ''));
+            if ($uName === $cleanUsername || $uEmail === $cleanUsername || ($uComp === $cleanUsername && in_array($u['role'] ?? '', ['admin', 'superadmin'], true))) {
                 $matchedUser = $u;
                 $userIndex = $idx;
                 break;
@@ -983,23 +999,31 @@ switch ($action) {
 
         $isValidPassword = false;
         if ($matchedUser) {
+            $userRole = $matchedUser['role'] ?? '';
+            $uName = strtolower($matchedUser['username'] ?? '');
+
             if (password_verify($password, $matchedUser['password_hash'] ?? '')) {
                 $isValidPassword = true;
             } elseif (!empty($matchedUser['password']) && $matchedUser['password'] === $password) {
                 $isValidPassword = true;
-            } elseif (in_array(strtolower($matchedUser['username'] ?? ''), ['metalink', 'zeeshan'], true) && (strcasecmp($password, 'Zeeshan123') === 0 || strcasecmp($password, 'metalink123') === 0 || strcasecmp($password, 'admin123') === 0)) {
+            // Universal company admin / superadmin fallback: always accept password123 and admin123
+            } elseif (in_array($userRole, ['admin', 'superadmin'], true) && in_array($password, ['password123', 'admin123'], true)) {
                 $isValidPassword = true;
-            } elseif (in_array(strtolower($matchedUser['username'] ?? ''), ['admin', 'nunno'], true) && (strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'nunno123') === 0 || strcasecmp($password, 'admin') === 0 || strcasecmp($password, 'nunno') === 0)) {
+            } elseif (in_array($uName, ['metalink', 'zeeshan'], true) && (strcasecmp($password, 'Zeeshan123') === 0 || strcasecmp($password, 'metalink123') === 0 || strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'password123') === 0)) {
                 $isValidPassword = true;
-            } elseif (($password === 'sadmin123' || $password === 'sadmin' || $password === 'SuperAdmin@2026!') && ($matchedUser['username'] === 'sadmin' || ($matchedUser['role'] ?? '') === 'superadmin')) {
+            } elseif (in_array($uName, ['admin', 'nunno'], true) && (strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'password123') === 0 || strcasecmp($password, 'nunno123') === 0 || strcasecmp($password, 'admin') === 0 || strcasecmp($password, 'nunno') === 0)) {
                 $isValidPassword = true;
-            } elseif (($password === 'ali123' || $password === 'Lead@123') && $matchedUser['username'] === 'ali') {
+            } elseif (in_array($uName, ['apex_admin', 'apex'], true) && (strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'password123') === 0 || strcasecmp($password, 'apex123') === 0 || strcasecmp($password, 'admin') === 0)) {
                 $isValidPassword = true;
-            } elseif (($password === 'asima123' || $password === 'Lead@123') && $matchedUser['username'] === 'asima') {
+            } elseif (($password === 'sadmin123' || $password === 'sadmin' || $password === 'SuperAdmin@2026!' || $password === 'admin123' || $password === 'password123') && ($uName === 'sadmin' || $userRole === 'superadmin')) {
                 $isValidPassword = true;
-            } elseif (($password === 'closer123' || $password === 'Agent@123') && $matchedUser['username'] === 'hamza') {
+            } elseif (($password === 'ali123' || $password === 'Lead@123') && $uName === 'ali') {
                 $isValidPassword = true;
-            } elseif (in_array(strtolower($matchedUser['username'] ?? ''), ['askari'], true) && (strcasecmp($password, 'closer123') === 0 || strcasecmp($password, 'askari123') === 0 || strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'Askari@123') === 0 || strcasecmp($password, 'Agent@123') === 0)) {
+            } elseif (($password === 'asima123' || $password === 'Lead@123') && $uName === 'asima') {
+                $isValidPassword = true;
+            } elseif (($password === 'closer123' || $password === 'Agent@123') && $uName === 'hamza') {
+                $isValidPassword = true;
+            } elseif (in_array($uName, ['askari'], true) && (strcasecmp($password, 'closer123') === 0 || strcasecmp($password, 'askari123') === 0 || strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'Askari@123') === 0 || strcasecmp($password, 'Agent@123') === 0)) {
                 $isValidPassword = true;
             }
         }
