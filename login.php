@@ -792,13 +792,17 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     .lp-foot img { height: 26px; margin: 0 auto 10px; display: block; opacity: 0.9; }
     html.theme-light .lp-foot img.dark-logo { display: none; }
 
-    /* Access card section */
-    .lp-access-head { text-align: center; padding-top: 64px; margin-bottom: 26px; }
+    /* Access card section (Top Primary Workspace) */
+    #access { position: relative; z-index: 1; padding-top: 104px; padding-bottom: 48px; }
+    .lp-access-head { text-align: center; padding-top: 0; margin-bottom: 24px; }
     #access .landing-wrapper { margin-top: 0; margin-bottom: 0; }
+    #overview.lp-hero { padding-top: 64px; padding-bottom: 44px; border-top: 1px solid var(--wa-card-border); }
     @media (prefers-reduced-motion: reduce) { .cm-b, .cm-deal { animation: none !important; opacity: 1 !important; transform: none !important; } .lp-visual::before, .lp-chip { animation: none; } }
 
     /* ═════════ MOBILE: ACCESS CARD ═════════ */
     @media (max-width: 640px) {
+      #access { padding-top: 92px; padding-bottom: 28px; }
+      #overview.lp-hero { padding-top: 48px; }
       .landing-wrapper { padding: 0 10px; }
       .wa-main-card { border-radius: 20px; }
       .role-nav-bar { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; }
@@ -836,7 +840,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
       .form-title { font-size: 18px; }
       .wa-card-footer { padding: 16px 14px; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
       .wa-card-footer > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; }
-      .lp-access-head { padding-top: 44px; margin-bottom: 18px; }
+      .lp-access-head { padding-top: 0; margin-bottom: 16px; }
     }  </style>
 </head>
 <body>
@@ -848,7 +852,13 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
   </a>
 
   <div style="display:flex; align-items:center; gap:18px;">
-    <nav class="lp-nav"><a href="#offer">What we offer</a><a href="#how">How it works</a><a href="#brands">For brands</a><a href="#access" class="lp-nav-cta">Log in</a></nav>
+    <nav class="lp-nav">
+      <a href="#access" class="lp-nav-cta" onclick="window.scrollTo({top:0,behavior:'smooth'}); return false;">⚡ Workspace Login</a>
+      <a href="#overview">Overview</a>
+      <a href="#offer">What we offer</a>
+      <a href="#how">How it works</a>
+      <a href="#brands">For brands</a>
+    </nav>
     <button onclick="toggleTheme()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600;">
       🌓 Theme
     </button>
@@ -870,83 +880,12 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     </div>
   </div>
 </div>
-<!-- ═══════════ LANDING: HERO ═══════════ -->
-<section class="lp-section lp-hero" id="top">
-  <div>
-    <span class="lp-eyebrow"><i></i> WhatsApp sales closing platform</span>
-    <h1>Turn WhatsApp chats into <span class="lp-grad">paying customers.</span></h1>
-    <p class="lp-lead">Chatly puts your product in front of a trained team of closers who sell for you on WhatsApp. You pay for promotion &mdash; we bring real conversations, real orders and real revenue.</p>
-    <div class="lp-cta-row">
-      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
-      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Become a closer</a>
-    </div>
-    <div class="lp-trust"><span>Pay for promotion</span><span>Trained closers</span><span>Live deal tracking</span></div>
-  </div>
-
-  <div class="lp-visual" aria-hidden="true">
-    <div class="lp-chat">
-      <div class="lp-chat-head">
-        <img src="assets/images/chatly-icon.png" alt="">
-        <div><b>Chatly Closer Desk</b><small>&#9679; online &middot; replying now</small></div>
-      </div>
-      <div class="lp-chat-body">
-        <div class="cm-b cm-in">Is this still available?</div>
-        <div class="cm-b cm-out">Yes! Delivering today. Want me to reserve one for you?</div>
-        <div class="cm-b cm-in">Great, I'll take it!</div>
-        <div class="cm-b cm-out">Order confirmed. Thank you!</div>
-        <div class="cm-deal">&#10003; DEAL CLOSED</div>
-      </div>
-    </div>
-    <div class="lp-chip a">&#9889; Avg reply <b>&lt; 2 min</b></div>
-    <div class="lp-chip b">&#128176; New order <b>+ Rs. 4,500</b></div>
-  </div>
-</section>
-
-<!-- ═══════════ LANDING: STATS ═══════════
-     PLACEHOLDER FIGURES — replace data-count values with real numbers before launch. -->
-<section class="lp-section" id="stats">
-  <div class="lp-stats">
-    <div class="lp-stat"><b><span data-count="48500" data-suffix="+">0</span></b><span>Conversations handled</span></div>
-    <div class="lp-stat"><b><span data-count="3200" data-suffix="+">0</span></b><span>Deals closed</span></div>
-    <div class="lp-stat"><b><span data-count="24.8" data-decimals="1" data-prefix="Rs. " data-suffix="M+">0</span></b><span>Revenue generated for brands</span></div>
-    <div class="lp-stat"><b><span data-count="420" data-suffix="+">0</span></b><span>Active closers</span></div>
-    <div class="lp-stat"><b><span data-count="85" data-suffix="+">0</span></b><span>Brands promoted</span></div>
-  </div>
-</section>
-
-<!-- ═══════════ LANDING: WHAT WE OFFER ═══════════ -->
-<section class="lp-section lp-block lp-center" id="offer">
-  <span class="lp-eyebrow">What we offer</span>
-  <h2 class="lp-h2">Everything you need to <span class="lp-grad">sell on WhatsApp</span></h2>
-  <p class="lp-lead">One platform for the whole journey &mdash; from the first message to the paid order.</p>
-  <div class="lp-grid3" style="text-align:left;">
-    <div class="lp-card"><div class="lp-ico">&#129309;</div><h3>Dedicated closers</h3><p>A trained team of closers chats with your buyers and turns interest into confirmed orders.</p></div>
-    <div class="lp-card"><div class="lp-ico">&#128172;</div><h3>Shared team inbox</h3><p>Every conversation in one live inbox, with anti-theft lead locking so customers never get double-messaged.</p></div>
-    <div class="lp-card"><div class="lp-ico">&#128640;</div><h3>Smart campaigns</h3><p>Reach your audience with campaign message variations, live previews and automatic sending from a linked account.</p></div>
-    <div class="lp-card"><div class="lp-ico">&#128202;</div><h3>Live deal pipeline</h3><p>Watch every lead move from fresh to ongoing to paid, with conversion and performance stats in real time.</p></div>
-    <div class="lp-card"><div class="lp-ico">&#128176;</div><h3>Commissions &amp; payouts</h3><p>Closers earn on every deal and team leaders earn Rs. 500 per recruited closer, with a built-in earnings portal.</p></div>
-    <div class="lp-card"><div class="lp-ico">&#127970;</div><h3>Your own workspace</h3><p>Each brand gets an isolated company workspace and admin portal to manage people, limits and approvals.</p></div>
-  </div>
-</section>
-
-<!-- ═══════════ LANDING: HOW IT WORKS ═══════════ -->
-<section class="lp-section lp-block lp-center" id="how">
-  <span class="lp-eyebrow">How it works</span>
-  <h2 class="lp-h2">From product to <span class="lp-grad">paid order</span> in three steps</h2>
-  <p class="lp-lead">No ad guesswork. You pay for promotion, closers do the selling.</p>
-  <div class="lp-steps" style="text-align:left;">
-    <div class="lp-step"><h3>List your product</h3><p>Set up your company workspace and tell us what you sell. Approve the closers who will represent your brand.</p></div>
-    <div class="lp-step"><h3>Closers start chatting</h3><p>Closers link WhatsApp in seconds, promote your product and handle every conversation in the shared inbox.</p></div>
-    <div class="lp-step"><h3>You get customers</h3><p>Track deals in real time. You pay for promotion and keep the customers and revenue that come in.</p></div>
-  </div>
-</section>
-
-<!-- ═══════════ LANDING: ACCESS (existing login card lives here) ═══════════ -->
+<!-- ═══════════ LANDING: ACCESS (Primary Workspace Login Desk) ═══════════ -->
 <section id="access">
   <div class="lp-access-head lp-section">
-    <span class="lp-eyebrow">Get started</span>
-    <h2 class="lp-h2">Access your <span class="lp-grad">Chatly workspace</span></h2>
-    <p class="lp-lead" style="margin:0 auto;">Closers scan a QR to link WhatsApp. Team leaders, brands and platform admins sign in below.</p>
+    <span class="lp-eyebrow"><i></i> Live WhatsApp Closing Desk</span>
+    <h1 class="lp-h2">Log In &amp; <span class="lp-grad">Start Closing Deals</span></h1>
+    <p class="lp-lead" style="margin:0 auto;">Scan WhatsApp to link your closer terminal immediately, or sign in to your team leader, company admin, or master console.</p>
   </div>
 
 <!-- Main Floating Container -->
@@ -988,7 +927,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           
           <!-- Left: Step-by-Step Instructions -->
           <div>
-            <h1 class="wa-journey-title">To use Chatly on your computer:</h1>
+            <h2 class="wa-journey-title">To start closing on your computer:</h2>
 
             <ol class="wa-steps-list">
               <li class="wa-step-item">
@@ -1226,6 +1165,79 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
   </div>
 </div>
 
+</section>
+
+
+
+<!-- ═══════════ LANDING: PLATFORM SHOWCASE ═══════════ -->
+<section class="lp-section lp-hero" id="overview">
+  <div>
+    <span class="lp-eyebrow"><i></i> WhatsApp sales closing platform</span>
+    <h2>Turn WhatsApp chats into <span class="lp-grad">paying customers.</span></h2>
+    <p class="lp-lead">Chatly puts your product in front of a trained team of closers who sell for you on WhatsApp. You pay for promotion &mdash; we bring real conversations, real orders and real revenue.</p>
+    <div class="lp-cta-row">
+      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
+      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Start closing as TM</a>
+    </div>
+    <div class="lp-trust"><span>Pay for promotion</span><span>Trained closers</span><span>Live deal tracking</span></div>
+  </div>
+
+  <div class="lp-visual" aria-hidden="true">
+    <div class="lp-chat">
+      <div class="lp-chat-head">
+        <img src="assets/images/chatly-icon.png" alt="">
+        <div><b>Chatly Closer Desk</b><small>&#9679; online &middot; replying now</small></div>
+      </div>
+      <div class="lp-chat-body">
+        <div class="cm-b cm-in">Is this still available?</div>
+        <div class="cm-b cm-out">Yes! Delivering today. Want me to reserve one for you?</div>
+        <div class="cm-b cm-in">Great, I'll take it!</div>
+        <div class="cm-b cm-out">Order confirmed. Thank you!</div>
+        <div class="cm-deal">&#10003; DEAL CLOSED</div>
+      </div>
+    </div>
+    <div class="lp-chip a">&#9889; Avg reply <b>&lt; 2 min</b></div>
+    <div class="lp-chip b">&#128176; New order <b>+ Rs. 4,500</b></div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: STATS ═══════════
+     PLACEHOLDER FIGURES — replace data-count values with real numbers before launch. -->
+<section class="lp-section" id="stats">
+  <div class="lp-stats">
+    <div class="lp-stat"><b><span data-count="48500" data-suffix="+">0</span></b><span>Conversations handled</span></div>
+    <div class="lp-stat"><b><span data-count="3200" data-suffix="+">0</span></b><span>Deals closed</span></div>
+    <div class="lp-stat"><b><span data-count="24.8" data-decimals="1" data-prefix="Rs. " data-suffix="M+">0</span></b><span>Revenue generated for brands</span></div>
+    <div class="lp-stat"><b><span data-count="420" data-suffix="+">0</span></b><span>Active closers</span></div>
+    <div class="lp-stat"><b><span data-count="85" data-suffix="+">0</span></b><span>Brands promoted</span></div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: WHAT WE OFFER ═══════════ -->
+<section class="lp-section lp-block lp-center" id="offer">
+  <span class="lp-eyebrow">What we offer</span>
+  <h2 class="lp-h2">Everything you need to <span class="lp-grad">sell on WhatsApp</span></h2>
+  <p class="lp-lead">One platform for the whole journey &mdash; from the first message to the paid order.</p>
+  <div class="lp-grid3" style="text-align:left;">
+    <div class="lp-card"><div class="lp-ico">&#129309;</div><h3>Dedicated closers</h3><p>A trained team of closers chats with your buyers and turns interest into confirmed orders.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128172;</div><h3>Shared team inbox</h3><p>Every conversation in one live inbox, with anti-theft lead locking so customers never get double-messaged.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128640;</div><h3>Smart campaigns</h3><p>Reach your audience with campaign message variations, live previews and automatic sending from a linked account.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128202;</div><h3>Live deal pipeline</h3><p>Watch every lead move from fresh to ongoing to paid, with conversion and performance stats in real time.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128176;</div><h3>Commissions &amp; payouts</h3><p>Closers earn on every deal and team leaders earn Rs. 500 per recruited closer, with a built-in earnings portal.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#127970;</div><h3>Your own workspace</h3><p>Each brand gets an isolated company workspace and admin portal to manage people, limits and approvals.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: HOW IT WORKS ═══════════ -->
+<section class="lp-section lp-block lp-center" id="how">
+  <span class="lp-eyebrow">How it works</span>
+  <h2 class="lp-h2">From product to <span class="lp-grad">paid order</span> in three steps</h2>
+  <p class="lp-lead">No ad guesswork. You pay for promotion, closers do the selling.</p>
+  <div class="lp-steps" style="text-align:left;">
+    <div class="lp-step"><h3>List your product</h3><p>Set up your company workspace and tell us what you sell. Approve the closers who will represent your brand.</p></div>
+    <div class="lp-step"><h3>Closers start chatting</h3><p>Closers link WhatsApp in seconds, promote your product and handle every conversation in the shared inbox.</p></div>
+    <div class="lp-step"><h3>You get customers</h3><p>Track deals in real time. You pay for promotion and keep the customers and revenue that come in.</p></div>
+  </div>
 </section>
 
 <!-- ═══════════ LANDING: FOR BRANDS / FOR CLOSERS ═══════════ -->
