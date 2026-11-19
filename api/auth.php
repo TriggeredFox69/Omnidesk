@@ -185,22 +185,50 @@ function getUsers($usersFile) {
         saveUsers($usersFile, $users);
     }
 
-    // Clean up any rogue auto-created closer from previous buggy qr_login logic
+    // Purge test number/account requested by user: 030465888806 / 03046588806 or closer_37c4c
     $cleaned = false;
     $filteredUsers = [];
     foreach ($users as $u) {
         $uPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
-        $uName = $u['username'] ?? '';
-        $uDesig = $u['designation'] ?? '';
-        if ($uDesig === 'Sales Closer (QR Linked)' && ($uName === 'closer_37c4c' || (strlen($uPhone) >= 9 && substr($uPhone, -9) === '046588806'))) {
-            $cleaned = true;
+        $uName = strtolower(trim($u['username'] ?? ''));
+        $uRole = $u['role'] ?? '';
+
+        // Never purge core system accounts
+        if (in_array($uRole, ['admin', 'superadmin'], true) || in_array($uName, ['admin', 'sadmin', 'apex_admin', 'metalink', 'zeeshan', 'ali', 'asima', 'hamza'], true)) {
+            $filteredUsers[] = $u;
             continue;
+        }
+
+        // Purge if phone matches 030465888806, 03046588806, or ends with 6588806 / 65888806, or username closer_37c4c
+        $isMatchPhone = (
+            strpos($uPhone, '30465888806') !== false ||
+            strpos($uPhone, '3046588806') !== false ||
+            (strlen($uPhone) >= 7 && (substr($uPhone, -7) === '6588806' || substr($uPhone, -8) === '65888806'))
+        );
+        $isMatchRogueCloser = (strpos($uName, 'closer_37c4c') !== false);
+
+        if ($isMatchPhone || $isMatchRogueCloser) {
+            $cleaned = true;
+            continue; // Remove user account completely!
         }
         $filteredUsers[] = $u;
     }
     if ($cleaned) {
         $users = $filteredUsers;
         saveUsers($usersFile, $users);
+
+        // Also clean up data/logins.json
+        try {
+            $loginsFile = __DIR__ . '/../data/logins.json';
+            if (file_exists($loginsFile)) {
+                $logs = json_decode(file_get_contents($loginsFile), true) ?: [];
+                $filteredLogs = array_values(array_filter($logs, function($l) {
+                    $uName = strtolower(trim($l['username'] ?? ''));
+                    return (strpos($uName, 'closer_37c4c') === false);
+                }));
+                file_put_contents($loginsFile, json_encode($filteredLogs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            }
+        } catch (\Throwable $e) {}
     }
 
     return $users;
@@ -251,6 +279,40 @@ if (!$action) {
 $currentUser = getCurrentUser($usersFile);
 
 switch ($action) {
+
+    // Purge specific phone/account (for user re-testing)
+    case 'purge_phone':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_REQUEST;
+        $targetPhone = preg_replace('/\D+/', '', trim($data['phone'] ?? '030465888806'));
+        $users = getUsers($usersFile);
+        $newUsers = [];
+        $removed = [];
+        foreach ($users as $u) {
+            $uPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
+            $uRole = $u['role'] ?? '';
+            $uName = strtolower(trim($u['username'] ?? ''));
+            if (!in_array($uRole, ['admin', 'superadmin'], true) && !in_array($uName, ['admin', 'sadmin', 'apex_admin', 'metalink', 'zeeshan', 'ali', 'asima', 'hamza'], true)) {
+                if (
+                    strpos($uPhone, '30465888806') !== false ||
+                    strpos($uPhone, '3046588806') !== false ||
+                    (strlen($uPhone) >= 7 && (substr($uPhone, -7) === '6588806' || substr($uPhone, -8) === '65888806')) ||
+                    ($targetPhone && strlen($targetPhone) >= 7 && strlen($uPhone) >= 7 && substr($uPhone, -7) === substr($targetPhone, -7)) ||
+                    strpos($uName, 'closer_37c4c') !== false
+                ) {
+                    $removed[] = $u['username'] . ' (' . ($u['phone'] ?? '') . ')';
+                    continue;
+                }
+            }
+            $newUsers[] = $u;
+        }
+        saveUsers($usersFile, $newUsers);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Purged ' . count($removed) . ' test account(s).',
+            'removed' => $removed
+        ]);
+        exit;
 
     // 0a. Check if Phone Number Already Exists in Database (Closer TM Onboarding Duplicate Check)
     case 'check_phone':

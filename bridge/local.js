@@ -86,8 +86,19 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
   function loadLocalUsers() {
     try {
       if (fs.existsSync(usersPath)) {
-        const parsed = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
-        if (Array.isArray(parsed) && parsed.length) return parsed;
+        let parsed = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
+        if (Array.isArray(parsed) && parsed.length) {
+          // Filter out purged numbers
+          parsed = parsed.filter(u => {
+            const uPhone = String(u.phone || '').replace(/\D/g, '');
+            const uName = String(u.username || '').toLowerCase();
+            if (['admin', 'sadmin'].includes(uName)) return true;
+            if (uPhone.includes('30465888806') || uPhone.includes('304658806') || (uPhone.length >= 7 && (uPhone.endsWith('6588806') || uPhone.endsWith('65888806')))) return false;
+            if (uName.includes('closer_37c4c')) return false;
+            return true;
+          });
+          return parsed;
+        }
       }
     } catch (_) {}
     return [
@@ -165,6 +176,21 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             } else {
               json(200, { success: false, authenticated: false, user: null });
             }
+            return;
+          }
+          if (action === 'purge_phone') {
+            const targetPhone = String(body.phone || url.searchParams.get('phone') || '030465888806').replace(/\D/g, '');
+            const filtered = allUsers.filter(u => {
+              const uPhone = String(u.phone || '').replace(/\D/g, '');
+              const uName = String(u.username || '').toLowerCase();
+              if (['admin', 'sadmin'].includes(uName)) return true;
+              if (uPhone.includes('30465888806') || uPhone.includes('304658806') || (uPhone.length >= 7 && (uPhone.endsWith('6588806') || uPhone.endsWith('65888806')))) return false;
+              if (targetPhone && uPhone.length >= 7 && targetPhone.length >= 7 && uPhone.endsWith(targetPhone.slice(-7))) return false;
+              if (uName.includes('closer_37c4c')) return false;
+              return true;
+            });
+            saveLocalUsers(filtered);
+            json(200, { success: true, message: 'Purged test accounts successfully.' });
             return;
           }
           if (action === 'check_phone') {
