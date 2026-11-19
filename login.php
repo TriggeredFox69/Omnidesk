@@ -38,8 +38,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         header('Location: admin.php');
         exit;
     }
-    header('Location: /');
-    exit;
+    // Landing page remains viewable without forced redirect
 }
 ?>
 <!DOCTYPE html>
@@ -844,9 +843,8 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
 
 <!-- Green Header Banner -->
 <div class="wa-top-header">
-  <a href="login.php" class="wa-brand-title" style="display:flex; align-items:center; gap:12px;">
+  <a href="/" onclick="window.scrollTo({top:0,behavior:'smooth'}); return false;" class="wa-brand-title" style="display:flex; align-items:center; gap:12px; text-decoration:none;" title="Chatly Homepage">
     <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-header-logo">
-    <span class="wa-brand-tag" style="background:rgba(255,255,255,0.22); color:#fff; font-weight:700;">Sales Closing Platform</span>
   </a>
 
   <div style="display:flex; align-items:center; gap:18px;">
