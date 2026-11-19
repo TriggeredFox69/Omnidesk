@@ -174,6 +174,12 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               return uPhone && (uPhone === phone || (uPhone.length >= 9 && phone.length >= 9 && uPhone.slice(-9) === phone.slice(-9)));
             });
             if (matched) {
+              let compName = 'Nunno Official';
+              try {
+                const comps = JSON.parse(fs.readFileSync(path.join(root, 'data/companies.json'), 'utf8') || '[]');
+                const foundC = comps.find(c => c.id === matched.company_id);
+                if (foundC) compName = foundC.name;
+              } catch (_) {}
               json(200, {
                 success: true,
                 exists: true,
@@ -183,7 +189,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
                   username: matched.username,
                   phone: matched.phone,
                   status: matched.status || 'active',
-                  company_id: matched.company_id || 'COMP-001'
+                  company_id: matched.company_id || 'COMP-001',
+                  company_name: compName
                 }
               });
             } else {
@@ -362,11 +369,21 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               closerUser = allUsers.find(u => u.role === 'member' && u.status === 'active') || allUsers.find(u => u.role === 'member');
             }
             if (!closerUser) {
-              json(404, { success: false, error: 'No account linked to this WhatsApp number. Please complete registration.' });
+              json(404, { success: false, requires_registration: true, error: 'No account linked to this WhatsApp number. Please complete closer registration.' });
               return;
             }
             if (closerUser.status === 'pending') {
-              json(403, { success: false, error: 'Your account is pending company approval.', status: 'pending', user: closerUser });
+              let compName = 'Company';
+              try {
+                const comps = JSON.parse(fs.readFileSync(path.join(root, 'data/companies.json'), 'utf8') || '[]');
+                const foundC = comps.find(c => c.id === closerUser.company_id);
+                if (foundC) compName = foundC.name;
+              } catch (_) {}
+              json(403, { success: false, error: `⏳ Your application to join ${compName} is pending manual approval by company administration in /cc.`, status: 'pending', user: closerUser });
+              return;
+            }
+            if (closerUser.status !== 'active') {
+              json(403, { success: false, error: `Your account is ${closerUser.status}. Please contact company administration.`, status: closerUser.status });
               return;
             }
             currentLocalUser = closerUser;

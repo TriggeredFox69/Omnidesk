@@ -1047,15 +1047,22 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
       </div>
 
       <!-- Connected WhatsApp Closer Card -->
-      <div id="connectedPhoneActionsBox" style="display:none; width:100%; margin-top:10px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.3); border-radius:12px; padding:12px; text-align:center;">
-        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--wa-accent); font-weight:800; margin-bottom:2px;">Connected WhatsApp Closer</div>
-        <div id="connectedCloserName" style="font-size:14px; font-weight:800; color:var(--wa-text-primary);">Closer Account</div>
-        <div id="connectedCloserPhone" style="font-size:11.5px; color:var(--wa-text-secondary); margin-bottom:10px;"></div>
-        <div style="display:flex; gap:8px; justify-content:center;">
-          <button type="button" id="btnEnterConnectedCloser" class="btn-action-primary" style="margin:0; padding:8px 12px; font-size:12px; flex:1.3; white-space:nowrap;">
+      <div id="connectedPhoneActionsBox" style="display:none; width:100%; margin-top:12px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.3); border-radius:14px; padding:14px; text-align:center; transition:all 0.25s ease;">
+        <div id="connectedCardBadge" style="font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--wa-accent); font-weight:800; margin-bottom:3px;">
+          📱 Connected WhatsApp Closer
+        </div>
+        <div id="connectedCloserName" style="font-size:15px; font-weight:800; color:var(--wa-text-primary); margin-bottom:2px;">
+          Closer Account
+        </div>
+        <div id="connectedCloserCompany" style="display:none; font-size:11px; font-weight:700; margin-bottom:4px;"></div>
+        <div id="connectedCloserPhone" style="font-size:11.5px; color:var(--wa-text-secondary); margin-bottom:8px;"></div>
+        <div id="connectedCloserNote" style="font-size:11.5px; line-height:1.45; color:var(--wa-text-secondary); margin-bottom:12px;"></div>
+        
+        <div id="connectedActionsRow" style="display:flex; gap:8px; justify-content:center;">
+          <button type="button" id="btnEnterConnectedCloser" class="btn-action-primary" style="margin:0; padding:9px 14px; font-size:12px; flex:1.4; white-space:nowrap;">
             Enter Desk →
           </button>
-          <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:8px 10px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" title="Disconnect WhatsApp session and show fresh QR code">
+          <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:9px 12px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" onclick="disconnectWhatsAppBridge()" title="Disconnect WhatsApp session and show fresh QR code">
             🔄 Disconnect
           </button>
         </div>
@@ -1398,6 +1405,8 @@ async function refreshQRCode(force = false) {
   }
 }
 
+let autoModalTriggeredForPhone = null;
+
 async function showConnectedCloserBox(phone) {
   const statusTxt = document.getElementById('qrStatusText');
   const scanLine = document.querySelector('.qr-scan-line');
@@ -1405,39 +1414,135 @@ async function showConnectedCloserBox(phone) {
   if (statusTxt) statusTxt.innerHTML = '🟢 WhatsApp Paired: <strong>+' + phone + '</strong>';
 
   const box = document.getElementById('connectedPhoneActionsBox');
+  const badgeEl = document.getElementById('connectedCardBadge');
   const nameEl = document.getElementById('connectedCloserName');
+  const compEl = document.getElementById('connectedCloserCompany');
   const phoneEl = document.getElementById('connectedCloserPhone');
+  const noteEl = document.getElementById('connectedCloserNote');
   const enterBtn = document.getElementById('btnEnterConnectedCloser');
   const discBtn = document.getElementById('btnDisconnectWhatsApp');
 
-  if (box) {
-    box.style.display = 'block';
-    if (phoneEl) phoneEl.textContent = '+' + phone;
+  if (!box) return;
+  box.style.display = 'block';
+  if (phoneEl) phoneEl.textContent = '+' + phone;
 
-    try {
-      const res = await fetch('api/auth.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'check_phone', phone: phone })
-      });
-      const data = await res.json();
-      if (data.exists && data.user) {
-        if (nameEl) nameEl.textContent = (data.user.name || 'Closer') + ' (@' + (data.user.username || 'closer') + ')';
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check_phone', phone: phone })
+    });
+    const data = await res.json();
+
+    if (data.exists && data.user) {
+      const u = data.user;
+      const compName = u.company_name || u.company_id || 'Company';
+
+      if (u.status === 'pending') {
+        // CASE 1: Applicant is pending manual approval by company admin
+        if (badgeEl) {
+          badgeEl.textContent = '⏳ APPLICATION PENDING APPROVAL';
+          badgeEl.style.color = '#fbbf24';
+        }
+        if (nameEl) nameEl.textContent = (u.name || 'Closer Applicant') + ' (@' + (u.username || 'closer') + ')';
+        if (compEl) {
+          compEl.style.display = 'block';
+          compEl.style.color = '#fbbf24';
+          compEl.textContent = '🏢 Applied to: ' + compName;
+        }
+        if (noteEl) {
+          noteEl.innerHTML = 'Your application to join <strong>' + compName + '</strong> is awaiting manual review by company administration in <strong>/cc</strong>.<br>You will be able to enter once approved.';
+        }
+        if (enterBtn) {
+          enterBtn.style.display = 'inline-block';
+          enterBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+          enterBtn.textContent = '🔄 Check Status';
+          enterBtn.onclick = function() {
+            showConnectedCloserBox(phone);
+          };
+        }
+      } else if (u.status === 'active') {
+        // CASE 2: Approved active closer
+        if (badgeEl) {
+          badgeEl.textContent = '🟢 VERIFIED SALES CLOSER';
+          badgeEl.style.color = 'var(--wa-accent)';
+        }
+        if (nameEl) nameEl.textContent = (u.name || 'Closer') + ' (@' + (u.username || 'closer') + ')';
+        if (compEl) {
+          compEl.style.display = 'block';
+          compEl.style.color = 'var(--wa-accent)';
+          compEl.textContent = '🏢 ' + compName + ' • Ready';
+        }
+        if (noteEl) {
+          noteEl.innerHTML = 'Active sales session linked to <strong>' + compName + '</strong>. Click below to enter your closing desk.';
+        }
+        if (enterBtn) {
+          enterBtn.style.display = 'inline-block';
+          enterBtn.style.background = 'linear-gradient(135deg, #2de89a, #0fa968)';
+          enterBtn.textContent = 'Enter Sales Desk →';
+          enterBtn.onclick = function() {
+            loginAsConnectedCloser(phone);
+          };
+        }
       } else {
-        if (nameEl) nameEl.textContent = 'Unregistered WhatsApp Closer';
+        // CASE 3: Suspended / Inactive
+        if (badgeEl) {
+          badgeEl.textContent = '🚫 ACCOUNT INACTIVE';
+          badgeEl.style.color = '#ef4444';
+        }
+        if (nameEl) nameEl.textContent = (u.name || 'Account') + ' (@' + (u.username || '') + ')';
+        if (compEl) {
+          compEl.style.display = 'block';
+          compEl.style.color = '#ef4444';
+          compEl.textContent = '🏢 ' + compName;
+        }
+        if (noteEl) {
+          noteEl.textContent = 'Your closer account is ' + u.status + '. Please contact your company administrator.';
+        }
+        if (enterBtn) {
+          enterBtn.style.display = 'none';
+        }
       }
-    } catch (_) {}
+    } else {
+      // CASE 4: Brand new WhatsApp number (NOT registered in Chatly!)
+      if (badgeEl) {
+        badgeEl.textContent = '✨ NEW CLOSER APPLICANT (NOT REGISTERED)';
+        badgeEl.style.color = '#38bdf8';
+      }
+      if (nameEl) nameEl.textContent = 'Unregistered Closer Applicant';
+      if (compEl) {
+        compEl.style.display = 'block';
+        compEl.style.color = 'var(--wa-text-muted)';
+        compEl.textContent = '🏢 Please select your company';
+      }
+      if (noteEl) {
+        noteEl.innerHTML = 'WhatsApp number verified! Complete your closer application below to choose your company and submit for admin approval.';
+      }
+      if (enterBtn) {
+        enterBtn.style.display = 'inline-block';
+        enterBtn.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
+        enterBtn.textContent = '🚀 Complete Closer Application →';
+        enterBtn.onclick = function() {
+          openTMRegisterModal(phone);
+        };
+      }
 
-    if (enterBtn) {
-      enterBtn.onclick = function() {
-        loginAsConnectedCloser(phone);
-      };
+      // Automatically open the registration modal once so the TM gets the onboarding wizard immediately
+      if (autoModalTriggeredForPhone !== phone) {
+        autoModalTriggeredForPhone = phone;
+        setTimeout(() => {
+          openTMRegisterModal(phone);
+        }, 350);
+      }
     }
-    if (discBtn) {
-      discBtn.onclick = function() {
-        disconnectWhatsAppBridge();
-      };
-    }
+  } catch (err) {
+    if (nameEl) nameEl.textContent = 'Connected Closer (+' + phone + ')';
+  }
+
+  if (discBtn) {
+    discBtn.onclick = function() {
+      disconnectWhatsAppBridge();
+    };
   }
 }
 
@@ -1453,6 +1558,9 @@ async function loginAsConnectedCloser(phone) {
     if (data.success && data.user) {
       triggerLoginAnimation(data.user.name, 'Sales Closer Desk Activated • Starting Pipeline', 'index.php');
     } else {
+      if (data.status === 'pending' || data.requires_registration) {
+        showConnectedCloserBox(phone);
+      }
       alert(data.error || 'Failed to activate session with connected number.');
     }
   } catch (err) {
@@ -1468,48 +1576,13 @@ async function disconnectWhatsAppBridge() {
   const scanLine = document.querySelector('.qr-scan-line');
   if (scanLine) scanLine.style.display = 'block';
   lastKnownState = '';
+  autoModalTriggeredForPhone = null;
   await refreshQRCode(true);
 }
 
 // Connected Phone Verification & Routing (TM Joining Cycle)
 async function handleConnectedPhone(phone) {
-  try {
-    const res = await fetch('api/auth.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'check_phone', phone: phone })
-    });
-    const data = await res.json();
-    if (data.exists && data.user) {
-      if (data.user.status === 'pending') {
-        const compName = data.user.company_name || data.user.company_id || 'Company';
-        document.getElementById('successCompName').textContent = compName;
-        document.getElementById('modalTMSuccess').style.display = 'flex';
-      } else if (data.user.status === 'active') {
-        const loginRes = await fetch('api/auth.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'qr_login', phone: phone })
-        });
-        const loginData = await loginRes.json();
-        if (loginData.success) {
-          triggerLoginAnimation(loginData.user.name, 'Sales Closer Desk Activated • Starting Pipeline', 'index.php');
-        } else {
-          pendingMatchedUser = data.user;
-          document.getElementById('phoneExistsUser').textContent = '@' + data.user.username;
-          document.getElementById('phoneExistsBtnUser').textContent = data.user.username;
-          document.getElementById('modalPhoneExists').style.display = 'flex';
-        }
-      } else {
-        alert('Your closer account is ' + data.user.status + '. Please contact your company administrator.');
-      }
-    } else {
-      // Brand new TM closer: open registration modal with locked phone
-      openTMRegisterModal(phone);
-    }
-  } catch (err) {
-    openTMRegisterModal(phone);
-  }
+  await showConnectedCloserBox(phone);
 }
 
 // Polling interval
@@ -1875,7 +1948,8 @@ function closePhoneExistsModal() {
 }
 
 function openTMRegisterModal(phone) {
-  document.getElementById('regDisplayPhone').textContent = phone;
+  const cleanPhone = phone ? (phone.startsWith('+') ? phone : ('+' + phone.replace(/\D/g, ''))) : '+92 300 1234567';
+  document.getElementById('regDisplayPhone').textContent = cleanPhone;
   document.getElementById('modalTMRegister').style.display = 'flex';
   document.getElementById('regTMUsername').focus();
   loadCompaniesForRegister();
@@ -1977,6 +2051,12 @@ async function handleTMRegisterSubmit(e) {
       }
       document.getElementById('modalTMSuccess').style.display = 'flex';
       document.getElementById('tmDirectUsername').value = username;
+
+      // Update card on page to Pending state immediately!
+      const cleanP = phone.replace(/\D/g, '');
+      if (cleanP) {
+        showConnectedCloserBox(cleanP);
+      }
     } else {
       errBox.textContent = data.error || 'Registration failed.';
       errBox.style.display = 'block';

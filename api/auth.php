@@ -185,6 +185,24 @@ function getUsers($usersFile) {
         saveUsers($usersFile, $users);
     }
 
+    // Clean up any rogue auto-created closer from previous buggy qr_login logic
+    $cleaned = false;
+    $filteredUsers = [];
+    foreach ($users as $u) {
+        $uPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
+        $uName = $u['username'] ?? '';
+        $uDesig = $u['designation'] ?? '';
+        if ($uDesig === 'Sales Closer (QR Linked)' && ($uName === 'closer_37c4c' || (strlen($uPhone) >= 9 && substr($uPhone, -9) === '046588806'))) {
+            $cleaned = true;
+            continue;
+        }
+        $filteredUsers[] = $u;
+    }
+    if ($cleaned) {
+        $users = $filteredUsers;
+        saveUsers($usersFile, $users);
+    }
+
     return $users;
 }
 
@@ -256,16 +274,31 @@ switch ($action) {
         }
 
         if ($matched) {
+            $compName = 'Nunno Official';
+            $compsFile = __DIR__ . '/../data/companies.json';
+            if (file_exists($compsFile)) {
+                $comps = json_decode(file_get_contents($compsFile), true);
+                if (is_array($comps)) {
+                    foreach ($comps as $c) {
+                        if (($c['id'] ?? '') === ($matched['company_id'] ?? '')) {
+                            $compName = $c['name'] ?? $compName;
+                            break;
+                        }
+                    }
+                }
+            }
+
             echo json_encode([
                 'success' => true,
                 'exists'  => true,
                 'user'    => [
-                    'id'         => $matched['id'],
-                    'name'       => $matched['name'],
-                    'username'   => $matched['username'],
-                    'phone'      => $matched['phone'],
-                    'status'     => $matched['status'] ?? 'active',
-                    'company_id' => $matched['company_id'] ?? 'COMP-001'
+                    'id'           => $matched['id'],
+                    'name'         => $matched['name'],
+                    'username'     => $matched['username'],
+                    'phone'        => $matched['phone'],
+                    'status'       => $matched['status'] ?? 'active',
+                    'company_id'   => $matched['company_id'] ?? 'COMP-001',
+                    'company_name' => $compName
                 ]
             ]);
         } else {
@@ -472,13 +505,12 @@ switch ($action) {
         echo json_encode(['success' => true, 'logins' => $logins]);
         exit;
 
-    // 0. QR Code Authentication & Auto-Provisioning (Closer TM Login Journey)
+    // 0. QR Code Authentication & Linking (Closer TM Login Journey)
     case 'qr_login':
         $raw = file_get_contents('php://input');
         $data = json_decode($raw, true) ?: $_POST;
         $phone = preg_replace('/\D+/', '', trim($data['phone'] ?? ''));
         $demo = !empty($data['demo']);
-        $companyId = trim($data['company_id'] ?? 'COMP-001');
 
         $users = getUsers($usersFile);
         $matchedUser = null;
@@ -495,42 +527,102 @@ switch ($action) {
             }
         }
 
-        if (!$matchedUser && ($demo || $phone)) {
-            // Provision instant TM closer account
-            $tmNumber = $phone ? ('+' . $phone) : '+923001234567';
-            $tmUsername = 'closer_' . substr(md5(microtime()), 0, 5);
-            $newTM = [
-                'id'                  => 'EMP-TM-' . time(),
-                'name'                => $phone ? ('Closer ' . substr($phone, -4)) : 'Sales Closer (Demo TM)',
-                'username'            => $tmUsername,
-                'email'               => $tmUsername . '@closer.cloud',
-                'password_hash'       => '',
-                'role'                => 'member',
-                'designation'         => 'Sales Closer (QR Linked)',
-                'gender'              => 'male',
-                'phone'               => $tmNumber,
-                'status'              => 'active',
-                'company_id'          => $companyId,
-                'message_limit'       => 150,
-                'messages_sent_today' => 0,
-                'quota_reset_date'    => date('Y-m-d'),
-                'created_at'          => date('Y-m-d H:i:s'),
-                'last_login'          => date('Y-m-d H:i:s')
-            ];
-            $users[] = $newTM;
-            saveUsers($usersFile, $users);
-            $matchedUser = $newTM;
+        if (!$matchedUser && $demo) {
+            foreach ($users as $idx => $u) {
+                if (($u['role'] ?? '') === 'member' && ($u['status'] ?? '') === 'active') {
+                    $matchedUser = $u;
+                    $userIndex = $idx;
+                    break;
+                }
+            }
         }
 
+        // NO AUTO-PROVISIONING TO COMP-001! If phone is not registered, instruct user to register.
         if (!$matchedUser) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'No active WhatsApp session or phone provided for pairing.']);
+            http_response_code(404);
+            echo json_encode([
+                'success'               => false,
+                'requires_registration' => true,
+                'error'                 => 'This WhatsApp number is not yet registered. Please complete closer registration.'
+            ]);
+            exit;
+        }
+
+        // Check if user account is pending approval
+        if (($matchedUser['status'] ?? '') === 'pending') {
+            http_response_code(403);
+            $compName = 'Company';
+            $compsFile = __DIR__ . '/../data/companies.json';
+            if (file_exists($compsFile)) {
+                $comps = json_decode(file_get_contents($compsFile), true);
+                if (is_array($comps)) {
+                    foreach ($comps as $c) {
+                        if (($c['id'] ?? '') === ($matchedUser['company_id'] ?? '')) {
+                            $compName = $c['name'];
+                            break;
+                        }
+                    }
+                }
+            }
+            echo json_encode([
+                'success' => false,
+                'status'  => 'pending',
+                'error'   => "⏳ Your application to join {$compName} is currently pending company administrator review in /cc. You will be able to enter once approved.",
+                'user'    => sanitizeUser($matchedUser)
+            ]);
+            exit;
+        }
+
+        // Check if user account is suspended or inactive
+        if (($matchedUser['status'] ?? '') !== 'active') {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'status'  => $matchedUser['status'] ?? 'inactive',
+                'error'   => 'Your closer account is ' . ($matchedUser['status'] ?? 'inactive') . '. Please contact your company administrator.'
+            ]);
             exit;
         }
 
         $safeUser = sanitizeUser($matchedUser);
         session_regenerate_id(true);
         $_SESSION['omnidesk_user'] = $safeUser;
+
+        // Record in data/logins.json
+        try {
+            $loginsFile = __DIR__ . '/../data/logins.json';
+            $logins = file_exists($loginsFile) ? json_decode(file_get_contents($loginsFile), true) : [];
+            if (!is_array($logins)) $logins = [];
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+            $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown Browser';
+            $compName = 'Nunno Official';
+            $compsFile = __DIR__ . '/../data/companies.json';
+            if (file_exists($compsFile)) {
+                $comps = json_decode(file_get_contents($compsFile), true);
+                if (is_array($comps)) {
+                    foreach ($comps as $c) {
+                        if (($c['id'] ?? '') === ($safeUser['company_id'] ?? '')) {
+                            $compName = $c['name'];
+                            break;
+                        }
+                    }
+                }
+            }
+            array_unshift($logins, [
+                'id'           => 'LOG-' . strtoupper(substr(md5(microtime()), 0, 8)),
+                'timestamp'    => date('Y-m-d H:i:s'),
+                'username'     => $safeUser['username'],
+                'name'         => $safeUser['name'],
+                'role'         => $safeUser['role'],
+                'company_id'   => $safeUser['company_id'] ?? 'COMP-001',
+                'company_name' => $compName,
+                'ip'           => $ip,
+                'city'         => $safeUser['city'] ?? 'Pakistan',
+                'device'       => substr($ua, 0, 40),
+                'status'       => 'active'
+            ]);
+            file_put_contents($loginsFile, json_encode(array_slice($logins, 0, 100), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        } catch (\Throwable $e) {}
 
         echo json_encode([
             'success' => true,
