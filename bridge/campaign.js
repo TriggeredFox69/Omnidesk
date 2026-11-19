@@ -230,6 +230,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
 
       const ownerId = activeSender ? activeSender.id : null;
       const ownerName = activeSender ? activeSender.name : null;
+      const ownerUsername = activeSender ? (activeSender.username || '') : '';
 
       if (existingLead) {
         existingLead.messages = existingLead.messages || [];
@@ -238,9 +239,10 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         }
         existingLead.lastActive = 'Just now';
         existingLead.status = 'sent';
-        if (!existingLead.ownerId && ownerId) {
+        if (ownerId) {
           existingLead.ownerId = ownerId;
           existingLead.ownerName = ownerName;
+          existingLead.ownerUsername = ownerUsername;
         }
         existingLead.lastSenderPhone = activeSender ? activeSender.phone : null;
         existingLead.lastSenderName = activeSender ? activeSender.name : null;
@@ -255,6 +257,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
           network: contact.network || 'WhatsApp',
           ownerId: ownerId,
           ownerName: ownerName,
+          ownerUsername: ownerUsername,
           sender_id: ownerId,
           sender_name: ownerName,
           sender_phone: activeSender ? activeSender.phone : null,
@@ -272,6 +275,15 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
       const tmp = leadsFile + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8');
       fs.renameSync(tmp, leadsFile);
+
+      if (state.companyId === 'COMP-001') {
+        try {
+          const globalLeads = path.resolve(__dirname, '../data/leads.json');
+          if (fs.existsSync(globalLeads) && path.resolve(leadsFile) !== globalLeads) {
+            fs.writeFileSync(globalLeads, JSON.stringify(leads, null, 2), 'utf8');
+          }
+        } catch (_) {}
+      }
     } catch (err) {
       console.warn('[Campaign CRM Sync Error]:', err.message);
     }
@@ -384,7 +396,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
 
       updateCrmLead(contact, crmMessage, state.assignMode, activeSender);
 
-      log(`🔄 [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] ${activeSender.name} (${activeSender.role} · ${activeSender.display}) ➔ Dispatched to ${contact.display || contact.phone} (${contact.name || 'Lead'})`, 'success');
+      log(`🔄 [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] ${activeSender.name} (${activeSender.role} · ${activeSender.display}) ➔ Dispatched to ${contact.display || contact.phone} (${contact.name || 'Lead'}) [Lead assigned to ${activeSender.name}]`, 'success');
 
       // Check if a full round-robin cycle just completed
       if (poolSize > 1 && (senderIndex + 1 === poolSize) && currentNum < total) {
@@ -471,6 +483,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         index: idx + 1,
         id: s.id || `sender_${idx + 1}`,
         name: s.name || `Device ${idx + 1}`,
+        username: s.username || '',
         role: s.role || 'TM Closer',
         roleType: s.roleType || 'member',
         phone: String(s.phone || '').replace(/\D/g, ''),

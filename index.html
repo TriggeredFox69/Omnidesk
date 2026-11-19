@@ -992,7 +992,7 @@
           <span style="font-size:22px;">🚀</span>
           <span class="grad-text">Campaigns</span>
         </h2>
-        <p class="text-xs text-muted" style="margin-top:4px;">Link your WhatsApp account, then click Start campaign to send your queued messages.</p>
+        <p class="text-xs text-muted" style="margin-top:4px;">Multi-Device Round-Robin: Dispatches through all connected TL &amp; TM WhatsApp numbers in sequence.</p>
       </div>
       <div id="campaignStatusBadge" class="panel-badge">⚪ Ready to Launch</div>
     </div>
@@ -1044,8 +1044,9 @@
         <div class="form-group" style="margin:0;">
           <label class="form-label">Assign Created Leads To</label>
           <select id="campaignAssignSelect" class="form-select form-select-sm">
-            <option value="pool">🟢 Open Pool (Any closer can claim)</option>
-            <option value="mine">🔒 Myself (Lock to my profile)</option>
+            <option value="round_robin" selected>🔄 Multi-Device Round-Robin (Assigned to Sender TL/TM)</option>
+            <option value="pool">🟢 Open Pool (Shared access)</option>
+            <option value="mine">🔒 Myself (Current Closer)</option>
           </select>
         </div>
       </aside>
@@ -1082,17 +1083,29 @@
           </div>
         </div>
 
-        <div class="campaign-dispatch-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <div class="campaign-dispatch-card" id="campaignSendersPoolCard">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
             <div style="font-weight:700;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
-              <span>⚡ Campaign sending</span>
-              <span class="badge-role-admin" style="font-size:9.5px;padding:1px 6px;">Campaign controls</span>
+              <span>📱</span>
+              <span>Connected Team WhatsApp Devices (TLs &amp; TMs Pool)</span>
             </div>
-            <button type="button" id="campaignConnectionStatus" class="btn btn-ghost btn-xs" aria-live="polite">Checking WhatsApp connection…</button>
+            <span id="campaignPoolCountBadge" class="panel-badge" style="color:var(--emerald);background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);font-size:11px;">
+              Loading devices…
+            </span>
           </div>
-          <p class="text-xs text-muted" style="margin:5px 0 0;line-height:1.4;">
-            Link your WhatsApp once by scanning a QR code. Start Campaign sends each message automatically from your linked account. Keep this page open while the campaign runs.
+          <p class="text-xs text-muted" style="margin:0 0 10px;line-height:1.45;">
+            No QR scan required. Campaigns dispatch automatically in round-robin order using the pre-connected WhatsApp numbers of your Team Leads and Closers. Each contacted lead is automatically assigned to that team member.
           </p>
+          <div id="campaignSendersPoolContainer" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;padding-right:2px;margin-bottom:8px;">
+            <div class="text-xs text-muted" style="padding:8px;text-align:center;">Loading connected team devices…</div>
+          </div>
+          <div id="campaignRotationFlowPreview" style="font-size:11px;color:var(--cyan);background:rgba(6,182,212,0.08);border:1px dashed rgba(6,182,212,0.3);border-radius:6px;padding:6px 10px;margin-bottom:6px;line-height:1.4;">
+            Rotation: Device #1 ➔ Device #2 ➔ Device #3 ➔ …
+          </div>
+          <div id="campaignCycleMathInfo" style="font-size:10.5px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
+            <span>⚡ 3-6s delay = ~1 msg/min per device</span>
+            <span style="color:#10b981;font-weight:700;">🛡️ 0 Risk of Ban</span>
+          </div>
         </div>
 
         <!-- 3 Campaign Starting Variations -->

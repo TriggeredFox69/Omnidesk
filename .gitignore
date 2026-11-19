@@ -27,6 +27,7 @@ data/whatsapp-bridge/
 data/whatsapp-bridge/
 bridge/data/
 bridge/node_modules/
+campaign_state.json
 scratch/
 
 cookies.txt
