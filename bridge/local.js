@@ -1173,15 +1173,6 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       
       // Default / -> login.php (The authentic WhatsApp Web landing page)
       if (!relative) {
-        if (currentLocalUser) {
-          if (currentLocalUser.role === 'superadmin') {
-            res.writeHead(302, { 'Location': '/sadmin.php' }); res.end(); return;
-          } else if (currentLocalUser.role === 'admin') {
-            res.writeHead(302, { 'Location': '/admin.php' }); res.end(); return;
-          } else {
-            res.writeHead(302, { 'Location': '/index.html' }); res.end(); return;
-          }
-        }
         relative = 'login.php';
       }
 

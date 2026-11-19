@@ -953,7 +953,15 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
 
   <div style="display:flex; align-items:center; gap:18px;">
     <nav class="lp-nav">
-      <a href="#top" class="lp-nav-cta" onclick="focusHeroQR(); return false;">⚡ Workspace Login</a>
+      <?php if (!empty($_SESSION['omnidesk_user'])): 
+        $sessUser = $_SESSION['omnidesk_user'];
+        $destUrl = in_array($sessUser['role'] ?? '', ['admin', 'superadmin'], true) ? 'admin.php' : 'index.php';
+      ?>
+        <a href="<?php echo htmlspecialchars($destUrl); ?>" class="lp-nav-cta" style="background:rgba(31,224,138,0.22); border:1px solid var(--wa-accent); color:var(--wa-accent); font-weight:800;">⚡ Open Workspace (<?php echo htmlspecialchars($sessUser['name'] ?? 'Closer'); ?>) &rarr;</a>
+        <a href="login.php?action=logout" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>
+      <?php else: ?>
+        <a href="#top" class="lp-nav-cta" onclick="focusHeroQR(); return false;">⚡ Workspace Login</a>
+      <?php endif; ?>
       <a href="#offer">What we offer</a>
       <a href="#how">How it works</a>
       <a href="#brands">For brands</a>
@@ -1387,20 +1395,8 @@ async function refreshQRCode(force = false) {
         if (statusTxt) statusTxt.textContent = 'Pure WebSocket Bridge • Scan with WhatsApp';
         lastKnownState = 'qr';
       } else if (data.is_connected && data.connected_number) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const isExplicitLogout = urlParams.get('action') === 'logout' || urlParams.get('switch') === '1' || urlParams.get('logout') === '1' || sessionStorage.getItem('chatly_logged_out') === '1';
-
-        // Auto-login only if user was actively looking at the QR code and just scanned it with their phone camera
-        if (lastKnownState === 'qr' && !isExplicitLogout) {
-          lastKnownState = 'connected';
-          if (statusTxt) statusTxt.textContent = `Connected: +${data.connected_number}! Verifying Account...`;
-          clearInterval(qrPollTimer);
-          handleConnectedPhone(data.connected_number);
-        } else {
-          // Already connected from a previous background session or user just logged out
-          lastKnownState = 'already_connected';
-          showConnectedCloserBox(data.connected_number);
-        }
+        lastKnownState = 'connected';
+        showConnectedCloserBox(data.connected_number);
       } else if (data.state === 'idle' || data.state === 'disconnected' || (!data.qr && !data.is_connected)) {
         if (box) box.style.display = 'none';
         if (scanLine) scanLine.style.display = 'block';

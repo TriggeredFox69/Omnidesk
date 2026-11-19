@@ -21,6 +21,8 @@ Options -Indexes
     RewriteRule ^sadmin/?$ sadmin.php [L,QSA]
     RewriteRule ^admin/?$ admin.php [L,QSA]
     RewriteRule ^login/?$ login.php [L,QSA]
+    RewriteRule ^desk/?$ index.php [L,QSA]
+    RewriteRule ^app/?$ index.php [L,QSA]
 </IfModule>
 
 # 4. Enable Gzip Compression for Fast Assets Delivery
@@ -47,5 +49,5 @@ Options -Indexes
     Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
-# 7. Default Index
-DirectoryIndex index.php index.html
+# 7. Default Index: Always serve the marketing landing page on root domain
+DirectoryIndex login.php index.php index.html
