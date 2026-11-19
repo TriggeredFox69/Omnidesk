@@ -155,17 +155,12 @@ function handleWhatsAppBridge(string $action, array $input): void {
     }
     $user = $_SESSION['omnidesk_user'];
     $admin = in_array(strtolower($user['role'] ?? ''), ['admin', 'master admin'], true);
-    if ($action === 'connect_whatsapp' && (!$admin || $_SERVER['REQUEST_METHOD'] !== 'POST')) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'An administrator must link the WhatsApp account.']);
-        exit;
-    }
-    // Avoid blocking status polling behind a long-running send.
+    // Allow landing page visitors and all closer TMs to connect and pair their WhatsApp
     session_write_close();
     if ($action === 'get_sender_info' || $action === 'connect_whatsapp' || $action === 'reconnect_whatsapp' || $action === 'reset_whatsapp') {
         $path = $action === 'reset_whatsapp' ? '/reset' : ($action === 'reconnect_whatsapp' ? '/reconnect' : ($action === 'connect_whatsapp' ? '/connect' : '/status'));
         $result = whatsappBridgeRequest($path, in_array($action, ['connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp'], true) ? [] : null);
-        if (!$admin) unset($result['qr']);
+        // Preserve QR code for landing page and all closer TMs to link their personal WhatsApp numbers
         // If the bridge is offline on cPanel, accurately report offline state so the user is informed
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
             $result = [

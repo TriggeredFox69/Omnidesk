@@ -2901,7 +2901,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function syncServerCampaignStatus() {
     if (window.NUNNO_OFFLINE_PREVIEW) return;
     try {
-      const response = await fetch('api/direct_sender.php', {
+      const response = await fetch('api/direct_sender.php?action=get_campaign_status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'get_campaign_status' })
@@ -3118,7 +3118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('🚀 Campaign running 24/7 on server! You can safely close your browser.');
 
     try {
-      const response = await fetch('api/direct_sender.php', {
+      const response = await fetch('api/direct_sender.php?action=start_campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3160,7 +3160,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const action = campaignState.isPaused ? 'resume_campaign' : 'pause_campaign';
-      const response = await fetch('api/direct_sender.php', {
+      const response = await fetch('api/direct_sender.php?action=' + encodeURIComponent(action), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })
@@ -3182,7 +3182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const response = await fetch('api/direct_sender.php', {
+      const response = await fetch('api/direct_sender.php?action=stop_campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'stop_campaign' })

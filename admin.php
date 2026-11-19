@@ -1501,7 +1501,7 @@ async function handleLaunchCampaign(e) {
   if (document.getElementById('radioVarAudio').checked) variation = 'audio';
 
   try {
-    const res = await fetch('api/direct_sender.php', {
+    const res = await fetch('api/direct_sender.php?action=start_campaign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
