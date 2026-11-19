@@ -391,7 +391,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             const matched = allUsers.find(u => u.username.toLowerCase() === username || (u.email && u.email.toLowerCase() === username));
             let isValid = false;
             if (matched) {
-              if (matched.username === 'admin' && (password === 'admin123' || password === 'admin' || password === 'Admin@Omnidesk2026!')) isValid = true;
+              if (['admin', 'nunno'].includes(matched.username.toLowerCase()) && (password.toLowerCase() === 'admin123' || password.toLowerCase() === 'nunno123' || password === 'admin' || password === 'nunno' || password === 'Admin@Omnidesk2026!')) isValid = true;
               else if ((matched.username === 'sadmin' || matched.role === 'superadmin') && (password === 'sadmin123' || password === 'sadmin' || password === 'SuperAdmin@2026!')) isValid = true;
               else if (matched.username === 'apex_admin' && (password === 'admin123' || password === 'admin' || password === 'apex123')) isValid = true;
               else if (matched.username === 'ali' && (password === 'ali123' || password === 'Lead@123')) isValid = true;

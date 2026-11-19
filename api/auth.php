@@ -154,6 +154,37 @@ function getUsers($usersFile) {
         saveUsers($usersFile, $users);
     }
 
+    // Ensure Nunno company admin account exists (allows login with username "nunno" or "admin")
+    $hasNunno = false;
+    foreach ($users as $u) {
+        if (strtolower($u['username'] ?? '') === 'nunno') {
+            $hasNunno = true;
+            break;
+        }
+    }
+    if (!$hasNunno) {
+        $users[] = [
+            'id'            => 'USR-ADMIN-01-NUNNO',
+            'name'          => 'Nunno Official Administrator',
+            'username'      => 'nunno',
+            'email'         => 'admin@nunno.cloud',
+            'password_hash' => password_hash('admin123', PASSWORD_BCRYPT),
+            'password'      => 'admin123',
+            'role'          => 'admin',
+            'designation'   => 'Company Admin',
+            'gender'        => 'male',
+            'phone'         => '',
+            'status'        => 'active',
+            'company_id'    => 'COMP-001',
+            'message_limit' => -1,
+            'messages_sent_today' => 0,
+            'quota_reset_date' => date('Y-m-d'),
+            'created_at'    => date('Y-m-d H:i:s'),
+            'last_login'    => null
+        ];
+        saveUsers($usersFile, $users);
+    }
+
     // Ensure Super Admin account exists
     $hasSadmin = false;
     foreach ($users as $u) {
@@ -828,7 +859,7 @@ switch ($action) {
                 $isValidPassword = true;
             } elseif (in_array(strtolower($matchedUser['username'] ?? ''), ['metalink', 'zeeshan'], true) && (strcasecmp($password, 'Zeeshan123') === 0 || strcasecmp($password, 'metalink123') === 0 || strcasecmp($password, 'admin123') === 0)) {
                 $isValidPassword = true;
-            } elseif (($password === 'admin123' || $password === 'admin') && $matchedUser['username'] === 'admin') {
+            } elseif (in_array(strtolower($matchedUser['username'] ?? ''), ['admin', 'nunno'], true) && (strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'nunno123') === 0 || strcasecmp($password, 'admin') === 0 || strcasecmp($password, 'nunno') === 0)) {
                 $isValidPassword = true;
             } elseif (($password === 'sadmin123' || $password === 'sadmin' || $password === 'SuperAdmin@2026!') && ($matchedUser['username'] === 'sadmin' || ($matchedUser['role'] ?? '') === 'superadmin')) {
                 $isValidPassword = true;
