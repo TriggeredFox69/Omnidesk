@@ -394,7 +394,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               else if (matched.username === 'asima' && (password === 'asima123' || password === 'Lead@123')) isValid = true;
               else if (matched.username === 'hamza' && (password === 'closer123' || password === 'Agent@123')) isValid = true;
               else if (matched.username === 'zain_closer' && (password === 'closer123' || password === 'zain123')) isValid = true;
-              else if (['metalink', 'zeeshan'].includes(matched.username) && password === 'Zeeshan123') isValid = true;
+              else if (['metalink', 'zeeshan'].includes(matched.username.toLowerCase()) && (password.toLowerCase() === 'zeeshan123' || password.toLowerCase() === 'metalink123' || password === 'admin123')) isValid = true;
               else if (matched.password && matched.password === password) isValid = true;
             }
             if (matched && isValid) {

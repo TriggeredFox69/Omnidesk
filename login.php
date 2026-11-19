@@ -1714,6 +1714,7 @@ async function handleAdminLogin(e) {
     });
     const data = await res.json();
     if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
+      try { localStorage.setItem('omnidesk_user', JSON.stringify(data.user)); } catch(_) {}
       const targetCompany = data.user.company_id ? `/cc?portal=1&company_id=${encodeURIComponent(data.user.company_id)}` : '/cc?portal=1';
       triggerLoginAnimation(data.user.name, 'Company Administrator Control Center — ' + (data.user.company_name || data.user.name), targetCompany);
     } else {

@@ -25,10 +25,9 @@ if (session_status() === PHP_SESSION_NONE) {
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
 $isLoggedInAdmin = ($currentUser && in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true));
 
-// Only show the administrative portal if the user is authenticated AND (explicitly viewing portal ?portal=1 OR has an active impersonated session from Super Admin)
-// Direct visits to /cc or cc.php or admin.php without ?portal=1 will ALWAYS present the Company Admin Login form
-$isPortalView = (isset($_GET['portal']) || isset($_GET['dashboard']) || !empty($currentUser['is_impersonated']));
-$isAdmin = ($isLoggedInAdmin && $isPortalView && !isset($_GET['login']) && !isset($_GET['switch']));
+// Direct visits to /cc or admin.php by an authenticated admin will directly display their company dashboard.
+// If ?login=1 or ?switch=1 is passed, the login gate will be displayed.
+$isAdmin = ($isLoggedInAdmin && !isset($_GET['login']) && !isset($_GET['switch']));
 
 // Logout action
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
@@ -1546,11 +1545,6 @@ async function loadPendingTMs() {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pending applications.</td></tr>';
   }
 }
-    }
-  } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pending applications.</td></tr>';
-  }
-}
 
 function selectCampaignVar(v) {
   document.getElementById('radioVarText').checked = (v === 'text');
@@ -2439,7 +2433,9 @@ async function handleAdminLogin(e) {
     const data = await res.json();
     if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
       const compId = data.user.company_id || 'COMP-001';
-      window.location.href = '/cc?portal=1&company_id=' + encodeURIComponent(compId);
+      try { localStorage.setItem('omnidesk_user', JSON.stringify(data.user)); } catch(_) {}
+      const targetUrl = (window.location.pathname.includes('admin.php') ? 'admin.php' : '/cc') + '?portal=1&company_id=' + encodeURIComponent(compId);
+      window.location.href = targetUrl;
     } else {
       if (errBox) {
         errBox.textContent = data.error || 'Access Denied: Company Administrator privileges required.';
