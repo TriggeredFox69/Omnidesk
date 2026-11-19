@@ -1025,10 +1025,8 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         </div>
       </div>
 
-      <div class="qr-status-badge" id="qrStatusBadge">
-        <span class="pulse-dot"></span>
-        <span id="qrStatusText">Pure WebSocket Bridge • Scan with WhatsApp</span>
-      </div>
+      <span id="qrStatusText" style="display:none;"></span>
+      <input type="hidden" id="simPhoneInput" value="">
 
       <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:0 4px;">
         <label class="qr-checkbox-row" style="margin:0;">
@@ -1049,19 +1047,6 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           </button>
           <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:8px 10px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" title="Disconnect WhatsApp session and show fresh QR code">
             🔄 Disconnect
-          </button>
-        </div>
-      </div>
-
-      <!-- Direct Phone Input -->
-      <div style="margin-top:10px; width:100%;">
-        <div style="font-size:11px; color:var(--wa-text-muted); margin-bottom:4px; text-align:left;">
-          📱 Or link phone number directly:
-        </div>
-        <div style="display:flex; gap:6px;">
-          <input type="text" id="simPhoneInput" placeholder="+923001234567" value="" class="input-field" style="padding:7px 10px; font-size:12px; font-family:monospace;">
-          <button type="button" class="btn-action-primary" style="margin:0; padding:7px 12px; width:auto; font-size:12px; background:var(--wa-accent); white-space:nowrap;" onclick="handlePhonePairSubmit()">
-            ⚡ Link
           </button>
         </div>
       </div>
