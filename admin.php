@@ -69,12 +69,13 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     ];
 } elseif (!$activeCompany) {
     $activeCompany = [
-        'id'                    => 'COMP-001',
-        'name'                  => 'Nunno Official',
-        'slug'                  => 'nunno',
+        'id'                    => $companyId ?: 'COMP-001',
+        'name'                  => $currentUser['company_name'] ?? ($currentUser['name'] ?? 'Company Admin'),
+        'slug'                  => strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $currentUser['username'] ?? 'company')),
         'plan'                  => 'Enterprise Pro',
         'default_message_limit' => 250,
-        'fallback_phone'        => '+923318036576'
+        'fallback_phone'        => '+923318036576',
+        'logo'                  => 'assets/images/chatly-icon.png'
     ];
 }
 ?>
@@ -84,7 +85,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   <base href="/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Chatly Company Admin — <?php echo htmlspecialchars($activeCompany['name']); ?></title>
+  <title><?php echo $isAdmin ? ('Chatly Company Admin — ' . htmlspecialchars($activeCompany['name'])) : 'Chatly — Company Administrator Portal'; ?></title>
   <link rel="icon" type="image/png" href="assets/images/chatly-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -458,25 +459,12 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     <div style="width: 100%; max-width: 440px; background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 20px; padding: 36px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); text-align: center;">
       <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #10b981, #059669); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 26px;">🏢</div>
       <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">Company Admin Portal</h2>
-      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">Enter company credentials to manage workforce, limits & closing operations.</p>
-
-      <?php if ($isLoggedInAdmin): ?>
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 22px; text-align: left; font-size: 12.5px;">
-          <div style="color: #34d399; font-weight: 700; margin-bottom: 4px;">⚡ Active Session Detected</div>
-          <div style="color: var(--text-secondary); margin-bottom: 12px;">
-            Currently signed in as <strong><?php echo htmlspecialchars($currentUser['name'] ?? $currentUser['username']); ?></strong> (<?php echo htmlspecialchars($activeCompany['name'] ?? 'Company'); ?>).
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <a href="?portal=1&company_id=<?php echo urlencode($currentUser['company_id'] ?? 'COMP-001'); ?>" class="btn btn-emerald" style="padding: 7px 14px; font-size: 12px; text-decoration: none; border-radius: 8px; flex: 1; justify-content: center;">Continue to Dashboard &rarr;</a>
-            <a href="?action=logout" class="btn btn-secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-radius: 8px; color: #ef4444;">Sign Out</a>
-          </div>
-        </div>
-      <?php endif; ?>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">Enter company administrator credentials to manage your workforce and sales desk.</p>
 
       <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
         <div class="form-group" style="text-align: left;">
           <label class="form-label">Username / Email</label>
-          <input type="text" id="aUsername" class="form-control" placeholder="Company admin username" required autofocus>
+          <input type="text" id="aUsername" class="form-control" placeholder="Company admin username or email" required autofocus>
         </div>
         <div class="form-group" style="text-align: left; margin-bottom: 22px;">
           <label class="form-label">Password</label>
@@ -501,8 +489,8 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
         <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
-      <a href="?portal=1&company_id=<?php echo urlencode($activeCompany['id']); ?>" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;" title="Refresh Company Admin Portal">
-        <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/metalink-logo.webp'); ?>" alt="Company Logo" class="company-logo">
+      <a href="/cc?portal=1&company_id=<?php echo urlencode($activeCompany['id']); ?>" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;" title="Refresh Company Admin Portal">
+        <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/chatly-icon.png'); ?>" alt="Company Logo" class="company-logo">
         <div class="company-info">
           <div class="company-name-row">
             <span class="company-name"><?php echo htmlspecialchars($activeCompany['name']); ?></span>
@@ -529,10 +517,10 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       <button class="btn btn-secondary" onclick="toggleTheme()">
         <span>🌓</span>
       </button>
-      <a href="/cc" class="btn btn-secondary" style="font-size:12px;" title="Switch Company Account">
+      <a href="/cc?login=1" class="btn btn-secondary" style="font-size:12px;" title="Switch Company Account">
         <span>🔄</span> Switch
       </a>
-      <a href="?action=logout" class="btn btn-danger">
+      <a href="/cc?action=logout" class="btn btn-danger">
         <span>🚪</span> Logout
       </a>
     </div>
@@ -1654,7 +1642,7 @@ async function handleAdminLogin(e) {
     const data = await res.json();
     if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
       const compId = data.user.company_id || 'COMP-001';
-      window.location.href = '?portal=1&company_id=' + encodeURIComponent(compId);
+      window.location.href = '/cc?portal=1&company_id=' + encodeURIComponent(compId);
     } else {
       if (errBox) {
         errBox.textContent = data.error || 'Access Denied: Company Administrator privileges required.';

@@ -154,6 +154,37 @@ function getUsers($usersFile) {
         saveUsers($usersFile, $users);
     }
 
+    // Ensure Super Admin account exists
+    $hasSadmin = false;
+    foreach ($users as $u) {
+        if (($u['username'] ?? '') === 'sadmin' || ($u['role'] ?? '') === 'superadmin') {
+            $hasSadmin = true;
+            break;
+        }
+    }
+    if (!$hasSadmin) {
+        $users[] = [
+            'id'            => 'USR-SADMIN-01',
+            'name'          => 'Super Administrator',
+            'username'      => 'sadmin',
+            'email'         => 'sadmin@chatly.pk',
+            'password_hash' => password_hash('sadmin123', PASSWORD_BCRYPT),
+            'password'      => 'sadmin123',
+            'role'          => 'superadmin',
+            'designation'   => 'Master Platform Owner',
+            'gender'        => 'male',
+            'phone'         => '+923000000000',
+            'status'        => 'active',
+            'company_id'    => 'GLOBAL',
+            'message_limit' => -1,
+            'messages_sent_today' => 0,
+            'quota_reset_date' => date('Y-m-d'),
+            'created_at'    => date('Y-m-d H:i:s'),
+            'last_login'    => null
+        ];
+        saveUsers($usersFile, $users);
+    }
+
     return $users;
 }
 

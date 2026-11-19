@@ -382,6 +382,9 @@ switch ($action) {
         $plan          = trim($data['plan'] ?? 'Enterprise Growth');
         $maxEmployees  = max(1, (int)($data['max_employees'] ?? 50));
         $defaultMsgLim = max(10, (int)($data['default_message_limit'] ?? 200));
+        $logo          = trim($data['logo'] ?? '');
+        $fallbackPhone = trim($data['fallback_phone'] ?? '');
+        $brandColor    = trim($data['brand_color'] ?? '#10b981');
         
         $adminUsername = strtolower(trim($data['admin_username'] ?? ($slug . '_admin')));
         $adminPassword = trim($data['admin_password'] ?? '');
@@ -415,10 +418,14 @@ switch ($action) {
         $newCompany = [
             'id'                    => $companyId,
             'name'                  => $name,
+            'short_name'            => $data['short_name'] ?? $name,
             'slug'                  => $slug,
             'owner_name'            => $ownerName ?: $name . ' Admin',
             'owner_email'           => $ownerEmail,
             'plan'                  => $plan,
+            'logo'                  => $logo ?: 'assets/images/chatly-icon.png',
+            'brand_color'           => $brandColor,
+            'fallback_phone'        => $fallbackPhone ?: '+923318036576',
             'max_employees'         => $maxEmployees,
             'default_message_limit' => $defaultMsgLim,
             'status'                => 'active',
@@ -513,6 +520,42 @@ switch ($action) {
 
         saveCompanies($companiesFile, $companies);
         echo json_encode(['success' => true, 'message' => 'Company status updated.']);
+        exit;
+
+    // 4b. Update Company Logo (Super Admin)
+    case 'update_logo':
+        requireSuperAdmin($currentUser);
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $companyId = trim($data['company_id'] ?? '');
+        $logo = trim($data['logo'] ?? '');
+
+        if (!$companyId || !$logo) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Company ID and Logo are required.']);
+            exit;
+        }
+
+        $companies = getCompanies($companiesFile);
+        $found = false;
+        foreach ($companies as &$comp) {
+            if ($comp['id'] === $companyId || ($comp['slug'] ?? '') === $companyId) {
+                $comp['logo'] = $logo;
+                $found = true;
+                logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_logo_updated', "Updated logo for company {$comp['name']}");
+                break;
+            }
+        }
+        unset($comp);
+
+        if (!$found) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Company not found.']);
+            exit;
+        }
+
+        saveCompanies($companiesFile, $companies);
+        echo json_encode(['success' => true, 'message' => 'Company logo updated successfully!', 'logo' => $logo]);
         exit;
 
     // 5. Audit Activity Logs (Super Admin)

@@ -696,6 +696,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group" style="flex: 2;">
+            <label class="form-label">Company Logo (Image URL or Path) 🖼️</label>
+            <input type="text" id="compLogo" class="form-control" placeholder="assets/images/company-logo.png or https://... or choose file ->" oninput="previewCompanyLogo(this.value)">
+          </div>
+          <div class="form-group" style="flex: 1.2;">
+            <label class="form-label">Or Upload Logo</label>
+            <input type="file" id="compLogoFile" class="form-control" accept="image/*" onchange="handleLogoFileUpload(event)" style="padding: 7px 10px; font-size: 12px;">
+          </div>
+          <div class="form-group" style="flex: 0 0 70px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <label class="form-label" style="margin-bottom: 4px;">Preview</label>
+            <div id="compLogoPreviewBox" style="width: 44px; height: 44px; border-radius: 10px; border: 1px dashed var(--border-accent); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.04); overflow: hidden;">
+              <span id="compLogoPreviewText" style="font-size: 18px;">🏢</span>
+              <img id="compLogoPreviewImg" src="" style="width: 100%; height: 100%; object-fit: contain; display: none;">
+            </div>
+          </div>
+        </div>
+
         <div id="provisionError" style="display:none; padding:10px; border-radius:8px; background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); color:#fb7185; font-size:12.5px; margin-bottom:14px;"></div>
 
         <button type="submit" id="btnProvisionSubmit" class="btn btn-gold" style="padding:12px 24px; font-size:14px;">
@@ -1380,6 +1398,34 @@ async function deleteCompany(companyId) {
   }
 }
 
+function previewCompanyLogo(url) {
+  const img = document.getElementById('compLogoPreviewImg');
+  const txt = document.getElementById('compLogoPreviewText');
+  if (!img || !txt) return;
+  if (url && url.trim()) {
+    img.src = url.trim();
+    img.style.display = 'block';
+    txt.style.display = 'none';
+    img.onerror = () => { img.style.display = 'none'; txt.style.display = 'block'; };
+  } else {
+    img.style.display = 'none';
+    txt.style.display = 'block';
+  }
+}
+
+function handleLogoFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const dataUrl = evt.target.result;
+    const input = document.getElementById('compLogo');
+    if (input) input.value = dataUrl;
+    previewCompanyLogo(dataUrl);
+  };
+  reader.readAsDataURL(file);
+}
+
 // Provision Company Form
 async function handleProvisionCompany(e) {
   e.preventDefault();
@@ -1402,6 +1448,8 @@ async function handleProvisionCompany(e) {
         admin_username: document.getElementById('compAdminUser').value.trim(),
         admin_password: document.getElementById('compAdminPass').value.trim(),
         plan: document.getElementById('compPlan').value,
+        logo: document.getElementById('compLogo')?.value.trim() || '',
+        fallback_phone: document.getElementById('compFallbackPhone')?.value.trim() || '',
         default_message_limit: parseInt(document.getElementById('compDefaultLimit').value) || 200,
         max_employees: parseInt(document.getElementById('compMaxEmployees').value) || 50
       })
@@ -1410,6 +1458,7 @@ async function handleProvisionCompany(e) {
     if (data.success) {
       alert('🎉 ' + data.message);
       document.getElementById('inlineProvisionForm').reset();
+      previewCompanyLogo('');
       switchSadminTab('companies');
       loadDashboardData();
     } else {

@@ -955,10 +955,20 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <nav class="lp-nav">
       <?php if (!empty($_SESSION['omnidesk_user'])): 
         $sessUser = $_SESSION['omnidesk_user'];
-        $destUrl = in_array($sessUser['role'] ?? '', ['admin', 'superadmin'], true) ? '/cc?portal=1' : 'index.php';
+        $role = $sessUser['role'] ?? '';
+        if ($role === 'superadmin') {
+            $destUrl = '/ss?portal=1';
+            $btnText = '⚡ Master Command Center';
+        } elseif ($role === 'admin') {
+            $destUrl = '/cc?portal=1&company_id=' . urlencode($sessUser['company_id'] ?? '');
+            $btnText = '🏢 Company Admin Portal';
+        } else {
+            $destUrl = 'index.php';
+            $btnText = '⚡ Open Workspace (' . htmlspecialchars($sessUser['name'] ?? 'Closer') . ')';
+        }
       ?>
-        <a href="<?php echo htmlspecialchars($destUrl); ?>" class="lp-nav-cta" style="background:rgba(31,224,138,0.22); border:1px solid var(--wa-accent); color:var(--wa-accent); font-weight:800;">⚡ Open Workspace (<?php echo htmlspecialchars($sessUser['name'] ?? 'Closer'); ?>) &rarr;</a>
-        <a href="login.php?action=logout" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>
+        <a href="<?php echo htmlspecialchars($destUrl); ?>" class="lp-nav-cta" style="background:rgba(31,224,138,0.22); border:1px solid var(--wa-accent); color:var(--wa-accent); font-weight:800;"><?php echo $btnText; ?> &rarr;</a>
+        <a href="/login.php?action=logout" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>
       <?php else: ?>
         <a href="#top" class="lp-nav-cta" onclick="focusHeroQR(); return false;">⚡ Workspace Login</a>
       <?php endif; ?>

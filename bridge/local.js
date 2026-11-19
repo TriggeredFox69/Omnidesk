@@ -35,6 +35,7 @@ function templateAdminPhp(content, currentUser, targetCompId = null, isPortal = 
       compLogo = match.logo || compLogo;
     }
   } catch (_) {}
+  rendered = rendered.replace(/<\?php echo \$isAdmin \? \('Chatly Company Admin — ' \. htmlspecialchars\(\$activeCompany\['name'\]\)\) : 'Chatly — Company Administrator Portal'; \?>/g, isAdmin ? ('Chatly Company Admin — ' + compName) : 'Chatly — Company Administrator Portal');
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['name'\]\); \?>/g, compName);
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['plan'\] \?\? 'Enterprise Pro'\); \?>/g, compPlan);
   rendered = rendered.replace(/<\?php echo htmlspecialchars\(\$activeCompany\['logo'\] \?\? '[^']*'\); \?>/g, compLogo);
@@ -776,6 +777,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               owner_name: body.owner_name || 'Admin',
               owner_email: body.owner_email || 'admin@' + slug + '.com',
               plan: body.plan || 'Enterprise Billion',
+              logo: body.logo || 'assets/images/chatly-icon.png',
+              fallback_phone: body.fallback_phone || '+923318036576',
               max_employees: Number(body.max_employees) || 50,
               default_message_limit: Number(body.default_message_limit) || 200,
               status: 'active',
