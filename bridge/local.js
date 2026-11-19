@@ -1184,11 +1184,11 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       }
 
       if (relative === 'login' || relative === 'login.html') relative = 'login.php';
-      if (relative === 'admin' || relative === 'admin.html') relative = 'admin.php';
-      if (relative === 'sadmin' || relative === 'sadmin.html') relative = 'sadmin.php';
+      if (relative === 'admin' || relative === 'admin.html' || relative === 'cc' || relative === 'cc.html' || relative === 'cc.php') relative = 'admin.php';
+      if (relative === 'sadmin' || relative === 'sadmin.html' || relative === 'ss' || relative === 'ss.html' || relative === 'ss.php') relative = 'sadmin.php';
 
       const file = path.resolve(root, relative);
-      const allowedPages = ['index.html', 'email_hub.php', 'sadmin.php', 'admin.php', 'login.php'];
+      const allowedPages = ['index.html', 'email_hub.php', 'sadmin.php', 'admin.php', 'login.php', 'cc.php', 'ss.php'];
       if ((!allowedPages.includes(relative) && !file.startsWith(path.join(root, 'assets') + path.sep)) || !file.startsWith(root + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
         res.writeHead(404); res.end(); return;
       }
@@ -1204,9 +1204,15 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             currentLocalUser = null;
           }
           content = templateLoginPhp(content);
-        } else if (relative === 'admin.php') {
+        } else if (relative === 'admin.php' || relative === 'cc.php') {
+          if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('login') === '1') {
+            currentLocalUser = null;
+          }
           content = templateAdminPhp(content, currentLocalUser, url.searchParams.get('company_id'));
-        } else if (relative === 'sadmin.php') {
+        } else if (relative === 'sadmin.php' || relative === 'ss.php') {
+          if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('login') === '1') {
+            currentLocalUser = null;
+          }
           content = templateSadminPhp(content, currentLocalUser);
         } else if (relative === 'index.html') {
           content = content.replace('</head>', '<script>window.NUNNO_LOCAL_LIVE=true;</script></head>');

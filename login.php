@@ -995,7 +995,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <h1>Turn WhatsApp chats into <span class="lp-grad">paying customers.</span></h1>
     <p class="lp-lead">Chatly puts your product in front of a trained team of closers who sell for you on WhatsApp. You pay for promotion &mdash; we bring real conversations, real orders and real revenue.</p>
     <div class="lp-cta-row">
-      <a href="admin.php" class="lp-btn lp-btn-primary">Promote my product &rarr;</a>
+      <a href="cc.php" class="lp-btn lp-btn-primary">Promote my product &rarr;</a>
       <a href="javascript:void(0)" class="lp-btn lp-btn-ghost" onclick="focusHeroQR(); return false;">Start closing as TM</a>
     </div>
     <div class="lp-trust">
@@ -1072,12 +1072,6 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           <span>🔑 Continue with Username &amp; Password &rarr;</span>
         </button>
       </div>
-
-      <div style="margin-top:10px; display:flex; justify-content:center; gap:12px; font-size:11.5px; color:var(--wa-text-secondary);">
-        <a href="admin.php" class="footer-link">Company Admin (/admin)</a>
-        <span>•</span>
-        <a href="sadmin.php" class="footer-link">Super Admin (/sadmin)</a>
-      </div>
     </div>
 
     <!-- State 2: Username & Password Login with TM / TL Switch -->
@@ -1133,12 +1127,6 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
             Access TL Commission Desk 👑
           </button>
         </form>
-      </div>
-
-      <div style="margin-top:14px; text-align:center; font-size:11.5px; color:var(--wa-text-secondary); display:flex; justify-content:center; gap:10px;">
-        <a href="admin.php" class="footer-link">Company Admin (/admin)</a>
-        <span>•</span>
-        <a href="sadmin.php" class="footer-link">Super Admin (/sadmin)</a>
       </div>
     </div>
 
@@ -1280,7 +1268,7 @@ function focusHeroQR() {
 
 function scrollToAccess(role) {
   if (role === 'admin') {
-    window.location.href = 'admin.php';
+    window.location.href = 'cc.php';
     return;
   }
   if (role === 'tl') {
@@ -1660,7 +1648,7 @@ async function handleAdminLogin(e) {
     errBox.style.display = 'block';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Sign In to Company Admin (/admin) 🏢';
+    btn.textContent = 'Sign In to Company Portal 🏢';
   }
 }
 

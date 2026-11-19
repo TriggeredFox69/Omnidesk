@@ -18,8 +18,10 @@ Options -Indexes
     RewriteRule ^bridge/.*$ - [F,L]
 
     # Clean URL Routes for Multi-Tenant Enterprise Portals
-    RewriteRule ^sadmin/?$ sadmin.php [L,QSA]
-    RewriteRule ^admin/?$ admin.php [L,QSA]
+    RewriteRule ^cc/?$ cc.php [L,QSA]
+    RewriteRule ^ss/?$ ss.php [L,QSA]
+    RewriteRule ^sadmin/?$ ss.php [L,QSA]
+    RewriteRule ^admin/?$ cc.php [L,QSA]
     RewriteRule ^login/?$ login.php [L,QSA]
     RewriteRule ^desk/?$ index.php [L,QSA]
     RewriteRule ^app/?$ index.php [L,QSA]

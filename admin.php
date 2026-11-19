@@ -25,6 +25,11 @@ if (session_status() === PHP_SESSION_NONE) {
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
 $isAdmin = ($currentUser && in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true));
 
+// Allow explicit forced login form via ?login=1 or ?switch=1
+if (isset($_GET['login']) || isset($_GET['switch'])) {
+    $isAdmin = false;
+}
+
 // Logout action
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = [];
@@ -33,7 +38,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
     session_destroy();
-    header('Location: /');
+    header('Location: ?');
     exit;
 }
 
@@ -469,7 +474,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
         </button>
       </form>
       <div style="margin-top: 20px; font-size: 12px; color: var(--text-secondary);">
-        <a href="login.php" style="color: var(--accent-emerald); text-decoration: none; font-weight: 600;">&larr; Return to Closer / TL Login</a>
+        <a href="/" style="color: var(--accent-emerald); text-decoration: none; font-weight: 600;">&larr; Return to Chatly Homepage</a>
       </div>
     </div>
   </div>
@@ -482,7 +487,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
         <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
-      <a href="admin.php?company_id=<?php echo urlencode($activeCompany['id']); ?>" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;" title="Refresh Company Admin Portal">
+      <a href="?company_id=<?php echo urlencode($activeCompany['id']); ?>" style="display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit;" title="Refresh Company Admin Portal">
         <img id="adminCompLogo" src="<?php echo htmlspecialchars($activeCompany['logo'] ?? 'assets/images/metalink-logo.webp'); ?>" alt="Company Logo" class="company-logo">
         <div class="company-info">
           <div class="company-name-row">
@@ -510,7 +515,10 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       <button class="btn btn-secondary" onclick="toggleTheme()">
         <span>🌓</span>
       </button>
-      <a href="admin.php?action=logout" class="btn btn-danger">
+      <a href="?switch=1" class="btn btn-secondary" style="font-size:12px;" title="Switch Company Account">
+        <span>🔄</span> Switch
+      </a>
+      <a href="?action=logout" class="btn btn-danger">
         <span>🚪</span> Logout
       </a>
     </div>
@@ -1611,11 +1619,56 @@ async function saveProductConfig() {
   }
 }
 
-// Initial boot
+async function handleAdminLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('adminLoginBtn');
+  const errBox = document.getElementById('loginError');
+  btn.disabled = true;
+  btn.textContent = 'Authenticating…';
+  if (errBox) errBox.style.display = 'none';
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'login',
+        username: document.getElementById('aUsername').value.trim(),
+        password: document.getElementById('aPassword').value.trim()
+      })
+    });
+    const data = await res.json();
+    if (data.success && (data.user.role === 'admin' || data.user.role === 'superadmin')) {
+      const compId = data.user.company_id || 'COMP-001';
+      window.location.href = '?company_id=' + encodeURIComponent(compId);
+    } else {
+      if (errBox) {
+        errBox.textContent = data.error || 'Access Denied: Company Administrator privileges required.';
+        errBox.style.display = 'block';
+      } else {
+        alert(data.error || 'Access Denied: Company Administrator privileges required.');
+      }
+    }
+  } catch (err) {
+    if (errBox) {
+      errBox.textContent = 'Server communication error.';
+      errBox.style.display = 'block';
+    } else {
+      alert('Server communication error.');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Access Company Control 🏢';
+  }
+}
+
+// Initial boot for authenticated company admin
+<?php if ($isAdmin): ?>
 loadEmployees();
 loadPendingTMs();
 loadCompanyLeads();
 setInterval(loadPendingTMs, 8000);
+<?php endif; ?>
 
 function toggleTheme() {
   const isLight = document.documentElement.classList.toggle('theme-light');

@@ -26,6 +26,11 @@ if (session_status() === PHP_SESSION_NONE) {
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
 $isSuperAdmin = ($currentUser && ($currentUser['role'] ?? '') === 'superadmin');
 
+// Allow explicit forced login form via ?login=1 or ?switch=1
+if (isset($_GET['login']) || isset($_GET['switch'])) {
+    $isSuperAdmin = false;
+}
+
 // Quick logout action
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = [];
@@ -34,7 +39,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
     session_destroy();
-    header('Location: /');
+    header('Location: ?');
     exit;
 }
 ?>
@@ -319,7 +324,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         </button>
       </form>
       <div style="margin-top: 20px; font-size: 12px; color: var(--text-secondary);">
-        <a href="login.php" style="color: var(--accent-gold); text-decoration: none; font-weight: 600;">&larr; Return to Closer / TL Login</a>
+        <a href="/" style="color: var(--accent-gold); text-decoration: none; font-weight: 600;">&larr; Return to Chatly Homepage</a>
       </div>
     </div>
   </div>
@@ -328,7 +333,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   <!-- SUPER ADMIN MASTER COMMAND CENTER -->
   <header class="top-bar">
     <div class="brand-section" style="display:flex; align-items:center; gap:12px;">
-      <a href="sadmin.php" title="Chatly Global" style="display:flex; align-items:center; text-decoration:none;">
+      <a href="?" title="Chatly Global" style="display:flex; align-items:center; text-decoration:none;">
         <img src="assets/images/chatly-logo.png" alt="Chatly" class="chatly-logo chatly-logo--dark"><img src="assets/images/chatly-logo-light.png" alt="Chatly" class="chatly-logo chatly-logo--light">
       </a>
       <div style="height:28px; width:1px; background:rgba(255,255,255,0.15); margin:0 2px;"></div>
@@ -352,7 +357,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
       <button class="btn btn-secondary" onclick="toggleTheme()">
         <span>🌓</span>
       </button>
-      <a href="sadmin.php?action=logout" class="btn btn-danger">
+      <a href="?switch=1" class="btn btn-secondary" style="font-size:12px;" title="Switch Account">
+        <span>🔄</span> Switch
+      </a>
+      <a href="?action=logout" class="btn btn-danger">
         <span>🚪</span> Logout
       </a>
     </div>
@@ -1546,10 +1554,12 @@ function filterCompaniesTable() {
 }
 
 // Initial Boot
+<?php if ($isSuperAdmin): ?>
 loadDashboardData();
 loadMasterPendingTMs();
 setInterval(loadDashboardData, 8000);
 setInterval(loadMasterPendingTMs, 8000);
+<?php endif; ?>
 
 function toggleTheme() {
   const isLight = document.documentElement.classList.toggle('theme-light');
