@@ -1549,9 +1549,11 @@ async function loadPendingTMs() {
           </tr>
         `;
       }).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:24px; color:#fb7185;">⚠️ ' + (data.error || 'Failed to load applications.') + '</td></tr>';
     }
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pending applications.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pending applications: ' + err.message + '</td></tr>';
   }
 }
 

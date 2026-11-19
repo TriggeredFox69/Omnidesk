@@ -101,14 +101,6 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         let parsed = JSON.parse(fs.readFileSync(usersPath, 'utf8'));
         if (Array.isArray(parsed) && parsed.length) {
           // Filter out purged numbers
-          parsed = parsed.filter(u => {
-            const uPhone = String(u.phone || '').replace(/\D/g, '');
-            const uName = String(u.username || '').toLowerCase();
-            if (['admin', 'sadmin'].includes(uName)) return true;
-            if (uPhone.includes('30465888806') || uPhone.includes('304658806') || (uPhone.length >= 7 && (uPhone.endsWith('6588806') || uPhone.endsWith('65888806')))) return false;
-            if (uName.includes('closer_37c4c')) return false;
-            return true;
-          });
           return parsed;
         }
       }

@@ -39,15 +39,6 @@ function getStoredLeads($dataFile) {
         $content = file_get_contents($dataFile);
         $decoded = json_decode($content, true);
         if (is_array($decoded)) {
-            // Auto-scrub unlinked test lead 03046588806 if still present in legacy state
-            $cleaned = array_values(array_filter($decoded, function($lead) {
-                $rawPhone = preg_replace('/[^\d]/', '', $lead['phone'] ?? '');
-                return !str_ends_with($rawPhone, '3046588806');
-            }));
-            if (count($cleaned) !== count($decoded)) {
-                saveStoredLeads($dataFile, $cleaned);
-                return $cleaned;
-            }
             return $decoded;
         }
     }

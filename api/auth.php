@@ -185,52 +185,6 @@ function getUsers($usersFile) {
         saveUsers($usersFile, $users);
     }
 
-    // Purge test number/account requested by user: 030465888806 / 03046588806 or closer_37c4c
-    $cleaned = false;
-    $filteredUsers = [];
-    foreach ($users as $u) {
-        $uPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
-        $uName = strtolower(trim($u['username'] ?? ''));
-        $uRole = $u['role'] ?? '';
-
-        // Never purge core system accounts
-        if (in_array($uRole, ['admin', 'superadmin'], true) || in_array($uName, ['admin', 'sadmin', 'apex_admin', 'metalink', 'zeeshan', 'ali', 'asima', 'hamza'], true)) {
-            $filteredUsers[] = $u;
-            continue;
-        }
-
-        // Purge if phone matches 030465888806, 03046588806, or ends with 6588806 / 65888806, or username closer_37c4c
-        $isMatchPhone = (
-            strpos($uPhone, '30465888806') !== false ||
-            strpos($uPhone, '3046588806') !== false ||
-            (strlen($uPhone) >= 7 && (substr($uPhone, -7) === '6588806' || substr($uPhone, -8) === '65888806'))
-        );
-        $isMatchRogueCloser = (strpos($uName, 'closer_37c4c') !== false);
-
-        if ($isMatchPhone || $isMatchRogueCloser) {
-            $cleaned = true;
-            continue; // Remove user account completely!
-        }
-        $filteredUsers[] = $u;
-    }
-    if ($cleaned) {
-        $users = $filteredUsers;
-        saveUsers($usersFile, $users);
-
-        // Also clean up data/logins.json
-        try {
-            $loginsFile = __DIR__ . '/../data/logins.json';
-            if (file_exists($loginsFile)) {
-                $logs = json_decode(file_get_contents($loginsFile), true) ?: [];
-                $filteredLogs = array_values(array_filter($logs, function($l) {
-                    $uName = strtolower(trim($l['username'] ?? ''));
-                    return (strpos($uName, 'closer_37c4c') === false);
-                }));
-                file_put_contents($loginsFile, json_encode($filteredLogs, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-            }
-        } catch (\Throwable $e) {}
-    }
-
     return $users;
 }
 
@@ -252,13 +206,18 @@ function sanitizeUser($user) {
 function getCurrentUser($usersFile) {
     $users = getUsers($usersFile);
     if (isset($_SESSION['omnidesk_user']) && is_array($_SESSION['omnidesk_user'])) {
-        $userId = $_SESSION['omnidesk_user']['id'] ?? '';
+        $sessUser = $_SESSION['omnidesk_user'];
+        $userId = $sessUser['id'] ?? '';
+        $username = strtolower(trim($sessUser['username'] ?? ''));
         foreach ($users as $u) {
-            if ($u['id'] === $userId) {
+            if (($userId && ($u['id'] ?? '') === $userId) || ($username && strtolower(trim($u['username'] ?? '')) === $username)) {
                 $sanitized = sanitizeUser($u);
                 $_SESSION['omnidesk_user'] = $sanitized;
                 return $sanitized;
             }
+        }
+        if (!empty($sessUser['role'])) {
+            return $sessUser;
         }
     }
     return null;
@@ -459,22 +418,28 @@ switch ($action) {
 
     // 0c. List Pending TMs (Company Admin or Super Admin)
     case 'list_pending_tms':
-        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Access Denied.']);
-            exit;
+        $authAdmin = $_SESSION['omnidesk_user'] ?? $currentUser;
+        if (!$authAdmin || !in_array(($authAdmin['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            // Also allow if company_id parameter is supplied by admin portal view
+            $reqComp = trim($_GET['company_id'] ?? '');
+            if (empty($reqComp) && empty($_SESSION['omnidesk_user'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Access Denied.']);
+                exit;
+            }
         }
 
         $users = getUsers($usersFile);
         $pending = [];
-        $isSuper = ($currentUser['role'] === 'superadmin');
-        $targetComp = $isSuper ? ($_GET['company_id'] ?? null) : ($currentUser['company_id'] ?? 'COMP-001');
+        $isSuper = ($authAdmin && ($authAdmin['role'] ?? '') === 'superadmin');
+        $targetComp = !empty($_GET['company_id']) ? $_GET['company_id'] : ($authAdmin['company_id'] ?? null);
 
         foreach ($users as $u) {
-            if (($u['status'] ?? '') === 'pending') {
+            $uStatus = strtolower(trim($u['status'] ?? ''));
+            if ($uStatus === 'pending' || $uStatus === 'pending_approval') {
                 if ($isSuper && !$targetComp) {
                     $pending[] = sanitizeUser($u);
-                } elseif (($u['company_id'] ?? 'COMP-001') === $targetComp) {
+                } elseif (!$targetComp || ($u['company_id'] ?? 'COMP-001') === $targetComp) {
                     $pending[] = sanitizeUser($u);
                 }
             }
@@ -485,7 +450,8 @@ switch ($action) {
 
     // 0d. Approve Pending TM or TL (Set Status to Active, Limit & Credit Sponsoring TL)
     case 'approve_tm':
-        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
+        $authAdmin = $_SESSION['omnidesk_user'] ?? $currentUser;
+        if (!$authAdmin || !in_array(($authAdmin['role'] ?? ''), ['admin', 'superadmin'], true)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Access Denied.']);
             exit;
