@@ -987,6 +987,66 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
         }
 
+        // 4b. Withdrawals & Payouts API
+        if (url.pathname === '/api/withdrawals.php') {
+          const wdFile = path.join(root, 'data/withdrawals.json');
+          const loadWd = () => {
+            try { return JSON.parse(fs.readFileSync(wdFile, 'utf8') || '[]'); } catch (_) { return []; }
+          };
+          const saveWd = (arr) => {
+            try { fs.writeFileSync(wdFile, JSON.stringify(arr, null, 2), 'utf8'); } catch (_) {}
+          };
+          if (action === 'get_withdrawals' || !action) {
+            json(200, { success: true, withdrawals: loadWd() });
+            return;
+          }
+          if (action === 'request_withdrawal' && req.method === 'POST') {
+            const amount = Number(body.amount) || 0;
+            if (amount <= 0) { json(400, { success: false, error: 'Please enter a valid withdrawal amount.' }); return; }
+            const method = String(body.method || 'EasyPaisa').trim();
+            const institution = String(body.institution || method).trim();
+            const accountTitle = String(body.accountTitle || '').trim();
+            const accountNumber = String(body.accountNumber || '').trim();
+            if (!accountTitle || !accountNumber) {
+              json(400, { success: false, error: 'Account title and account number are required.' });
+              return;
+            }
+            const list = loadWd();
+            const newWd = {
+              id: 'WD-' + Date.now().toString(36).toUpperCase(),
+              userId: body.userId || currentLocalUser?.id || 'EMP-TM-01',
+              userName: body.userName || currentLocalUser?.name || 'Closer Specialist',
+              userRole: body.userRole || currentLocalUser?.role || 'member',
+              amount: amount,
+              method: method,
+              institution: institution,
+              accountTitle: accountTitle,
+              accountNumber: accountNumber,
+              note: body.note || '',
+              status: 'pending',
+              created_at: new Date().toISOString()
+            };
+            list.unshift(newWd);
+            saveWd(list);
+            json(200, { success: true, withdrawal: newWd, withdrawals: list });
+            return;
+          }
+          if (action === 'update_status' && req.method === 'POST') {
+            const list = loadWd();
+            const target = list.find(w => w.id === body.id);
+            if (target) {
+              target.status = body.status || 'approved';
+              if (body.txRef) target.txRef = body.txRef;
+              target.updated_at = new Date().toISOString();
+              saveWd(list);
+              json(200, { success: true, withdrawals: list, message: `Withdrawal ${target.id} updated to ${target.status}` });
+            } else {
+              json(404, { success: false, error: 'Withdrawal request not found.' });
+            }
+            return;
+          }
+        }
+
         // 5. Direct Sender API (Baileys WhatsApp Web Bridge)
         if (url.pathname === '/api/direct_sender.php') {
           const routes = {
