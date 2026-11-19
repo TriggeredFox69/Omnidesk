@@ -765,8 +765,6 @@
         </div>
 
         <div class="chat-header-actions">
-          <button class="btn btn-claim btn-xs" id="chatClaimBtn" style="display:none;">✋ Take Lead</button>
-
           <button class="btn btn-paid btn-xs" id="markPaidHeaderBtn" title="Mark client as Paid">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
             <span>Mark Paid</span>
@@ -828,51 +826,6 @@
 
       <!-- Messages Thread -->
       <div class="chat-messages-area" id="chatMessagesArea"></div>
-
-      <!-- Anti-Theft Shield (Permanently Disabled) -->
-      <div id="leadLockedShield" class="lead-locked-shield" style="display:none !important;">
-        <div class="lock-shield-card">
-          <div class="lock-shield-icon">
-            <div class="lock-icon-glow"></div>
-            <div class="lock-icon-circle">
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="3" ry="3"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-            </div>
-          </div>
-
-          <div class="lock-shield-badge">
-            <span class="lock-pulse-dot"></span>
-            <span>Anti-Theft Lead Protection</span>
-          </div>
-
-          <h3 class="lock-shield-title">Lead In Progress &amp; Protected</h3>
-
-          <div class="lock-shield-handler-box">
-            <div class="lock-handler-avatar" id="lockedCloserAvatar">AR</div>
-            <div class="lock-handler-info">
-              <span class="lock-handler-label">Exclusively Claimed By</span>
-              <strong class="lock-handler-name" id="lockedCloserName">Ali Raza (Team Lead)</strong>
-            </div>
-            <span class="lock-handler-status">Ongoing</span>
-          </div>
-
-          <p class="lock-shield-desc">
-            To prevent customer conflict and double-messaging, only the assigned closer or the Administrator can view message history or reply.
-          </p>
-
-          <div class="lock-shield-actions">
-            <button type="button" class="btn btn-wa btn-sm" id="lockedBackToMineBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              <span>View My Leads</span>
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" id="lockedBrowsePoolBtn" style="border:1px solid var(--glass-border);border-radius:10px;">
-              <span>Browse Fresh Leads</span>
-            </button>
-          </div>
-        </div>
-      </div>
 
       <!-- Hidden file inputs for attachments -->
       <input type="file" id="composerFileInput" accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" style="display:none;">
@@ -977,13 +930,6 @@
             <div class="closer-name" id="dossierOwner">Closer Specialist</div>
             <div class="closer-role" id="dossierOwnerRole">Team Member • EMP-101</div>
           </div>
-        </div>
-        <div style="display:flex;gap:6px;margin-top:8px;">
-          <button type="button" class="btn btn-claim btn-sm" id="dossierClaimBtn" style="flex:1;display:none;">✋ Take Lead</button>
-          <button type="button" class="btn btn-warning btn-xs" id="dossierReleaseBtn" style="flex:1;display:none;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
-            <span>Won't Handle</span>
-          </button>
         </div>
       </div>
 

@@ -461,11 +461,19 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               else if (matched.username === 'asima' && (password === 'asima123' || password === 'Lead@123')) isValid = true;
               else if (matched.username === 'hamza' && (password === 'closer123' || password === 'Agent@123')) isValid = true;
               else if (matched.username === 'zain_closer' && (password === 'closer123' || password === 'zain123')) isValid = true;
+              else if (matched.username.toLowerCase() === 'askari' && (password.toLowerCase() === 'closer123' || password.toLowerCase() === 'askari123' || password.toLowerCase() === 'admin123' || password === 'Askari@123')) isValid = true;
               else if (['metalink', 'zeeshan'].includes(matched.username.toLowerCase()) && (password.toLowerCase() === 'zeeshan123' || password.toLowerCase() === 'metalink123' || password === 'admin123')) isValid = true;
               else if (matched.password && matched.password === password) isValid = true;
             }
             if (matched && isValid) {
-              const isNunnoTM = (matched.company_id === 'COMP-001' && matched.role === 'member');
+              const isAskari = (matched.username.toLowerCase() === 'askari');
+              if (isAskari) {
+                matched.has_nunno_plan = true;
+                matched.nunno_plan_status = 'active';
+                matched.status = 'active';
+                saveLocalUsers(allUsers);
+              }
+              const isNunnoTM = (matched.company_id === 'COMP-001' && matched.role === 'member' && !isAskari);
               if (matched.status === 'pending') {
                 if (isNunnoTM) {
                   matched.status = 'active';

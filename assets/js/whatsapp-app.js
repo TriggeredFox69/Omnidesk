@@ -52,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Helper: Single Source of Truth for Traffic-Light Status
   // RED = Fresh (Unclaimed)
   // YELLOW = Ongoing (Claimed by an agent)
+  // RED = Fresh (Uncontacted or awaiting closer negotiation)
+  // YELLOW = Ongoing (Active back-and-forth negotiation)
   // GREY = Pending Verification (Submitted as paid, awaiting Admin audit)
   // GREEN = Closed (Client has paid & Admin verified!)
   // BLUE = Useless (Dealt with, won't pay / dead lead)
@@ -60,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (lead.leadState === 'pending_verification' || lead.status === 'pending_verification' || lead.leadState === 'pending' || lead.status === 'pending') return 'pending_verification';
     if (lead.leadState === 'paid' || lead.status === 'paid') return 'paid';
     if (lead.leadState === 'useless' || lead.status === 'useless') return 'useless';
-    if (lead.ownerId !== null) return 'ongoing';
+    if (lead.leadState === 'ongoing' || lead.status === 'ongoing') return 'ongoing';
     return 'fresh';
   }
 
@@ -975,42 +977,34 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => {});
   }
 
-  // Claim Lead -> Transitions to YELLOW (Ongoing)
+  // Assign Lead -> Associates lead with active closer without locking barriers
   function claimLead(leadId) {
     const lead = getLead(leadId);
     if (!lead) return;
 
     const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
     const myName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
-    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
-
-    if (lead.ownerId && lead.ownerId !== myId && !isAdmin) {
-      const owner = getAgent(lead.ownerId);
-      showToast(`⚠️ This lead is already locked by ${owner ? owner.name : (lead.ownerName || lead.ownerId)}!`);
-      return;
-    }
 
     lead.ownerId = myId;
     lead.ownerName = myName;
-    lead.leadState = 'ongoing'; // YELLOW: Ongoing
 
-    showToast(`🟡 Lead Claimed! You are now chatting with ${lead.name} (Ongoing).`);
+    showToast(`💬 Connected with ${lead.name || lead.phone}.`);
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
     syncLeadToServer(lead, { ownerName: myName });
   }
 
-  // Release Lead -> Transitions back to RED (Fresh / Unclaimed)
+  // Release Lead -> Returns to unassigned fresh pool
   function releaseLead(leadId) {
     const lead = getLead(leadId);
     if (!lead) return;
 
     lead.ownerId = null;
     lead.ownerName = null;
-    lead.leadState = 'fresh'; // RED: Fresh
+    lead.leadState = 'fresh';
 
-    showToast(`🔴 Lead released back to Open Pool (Fresh).`);
+    showToast(`Lead released to fresh pool.`);
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
@@ -1567,7 +1561,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.inboxFilter === 'takeover') return l.isTakeover === true;
       if (state.inboxFilter === 'mine') {
         const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-        return l.ownerId === myId || l.originalOwnerId === myId || l.paidDetails?.closedById === myId;
+        const myUser = state.currentUser ? (state.currentUser.username || '').toLowerCase() : '';
+        return l.ownerId === myId || (myUser && (l.ownerUsername || '').toLowerCase() === myUser) || l.originalOwnerId === myId || l.paidDetails?.closedById === myId;
       }
       return true;
     });
@@ -1585,7 +1580,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const countPaid = state.leads.filter(l => getLeadState(l) === 'paid').length;
     const countUseless = state.leads.filter(l => getLeadState(l) === 'useless').length;
     const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-    const countMine = state.leads.filter(l => l.ownerId === currentUserId || l.paidDetails?.closedById === currentUserId).length;
+    const currentUsername = state.currentUser ? (state.currentUser.username || '').toLowerCase() : '';
+    const countMine = state.leads.filter(l => l.ownerId === currentUserId || (currentUsername && (l.ownerUsername || '').toLowerCase() === currentUsername) || l.paidDetails?.closedById === currentUserId).length;
 
     if (els.kpiCountAll) els.kpiCountAll.textContent = countAll;
     if (els.kpiCountFresh) els.kpiCountFresh.textContent = countFresh;
@@ -1600,7 +1596,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const countMyOngoing = state.leads.filter(l => {
       const lState = getLeadState(l);
-      const isOwner = l.ownerId === currentUserId || (state.currentUser?.role === 'admin' && (l.ownerId === 'USR-ADMIN-01' || l.ownerId === 'local-admin' || l.ownerId === currentUserId));
+      const isOwner = l.ownerId === currentUserId || (currentUsername && (l.ownerUsername || '').toLowerCase() === currentUsername) || (state.currentUser?.role === 'admin' && (l.ownerId === 'USR-ADMIN-01' || l.ownerId === 'local-admin' || l.ownerId === currentUserId));
       return isOwner && lState === 'ongoing';
     }).length;
 
@@ -2301,12 +2297,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
     }
 
-    // If unclaimed, automatically claim when agent responds
+    // Associate lead with closer
     if (!lead.ownerId) {
       lead.ownerId = myId;
       lead.ownerName = myName;
-      lead.leadState = 'ongoing';
-      showToast(`🎯 You responded first! Lead automatically locked to you.`);
     }
 
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3801,7 +3795,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function isNunnoPlanLocked(user = state.currentUser || window.NUNNO_ACTIVE_USER) {
     if (!user) return false;
-    // Strictly applies ONLY to Nunno Official (COMP-001) TMs (role: 'member')
+    const uname = String(user.username || '').toLowerCase();
+    // Askari is permanently exempt
+    if (uname === 'askari' || user.id === 'EMP-TM-MWMK43N9' || user.id === 'EMP-TM-ASKARI') return false;
+    if (user.role === 'admin' || user.role === 'superadmin' || user.role === 'lead') return false;
+    // Strictly applies ONLY to other Nunno Official (COMP-001) TMs (role: 'member')
     const isNunno = (user.company_id === 'COMP-001');
     const isTM = (user.role === 'member');
     const hasPlan = Boolean(user.has_nunno_plan);
@@ -4016,9 +4014,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = state.currentUser || state.currentAgent;
     const isAdmin = user ? user.role === 'admin' : false;
     const activeId = user ? user.id : '';
+    const activeUsername = (user?.username || '').toLowerCase();
     const mine = isAdmin 
       ? state.leads 
-      : state.leads.filter(lead => lead.ownerId === activeId || lead.paidDetails?.closedById === activeId);
+      : state.leads.filter(lead => lead.ownerId === activeId || (activeUsername && (lead.ownerUsername || '').toLowerCase() === activeUsername) || lead.paidDetails?.closedById === activeId);
     let filteredMine = mine;
     if (currentPipelineFilter !== 'all') {
       filteredMine = mine.filter(lead => getLeadState(lead) === currentPipelineFilter);
@@ -4147,9 +4146,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Compute the Core Requested Metrics
     const activeId = user.id;
+    const activeUsername = (user?.username || '').toLowerCase();
     const mine = isAdmin 
       ? state.leads 
-      : state.leads.filter(lead => lead.ownerId === activeId || lead.paidDetails?.closedById === activeId);
+      : state.leads.filter(lead => lead.ownerId === activeId || (activeUsername && (lead.ownerUsername || '').toLowerCase() === activeUsername) || lead.paidDetails?.closedById === activeId);
 
     const ongoing = mine.filter(lead => getLeadState(lead) === 'ongoing');
     const inReview = mine.filter(lead => getLeadState(lead) === 'pending_verification');
@@ -7060,13 +7060,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // CRITICAL: Closer commission protection ensures deals closed after Admin Takeover still count!
     const paidLeads = state.leads.filter(l => 
       (l.leadState === 'paid' || l.status === 'paid') && 
-      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId)
+      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId || ((closerId === 'EMP-TM-MWMK43N9' || closerId === 'askari') && l.ownerUsername === 'askari'))
     );
 
     // Pending deals undergoing Admin verification
     const pendingLeads = state.leads.filter(l => 
       (l.leadState === 'pending_verification' || l.status === 'pending_verification') && 
-      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId)
+      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId || ((closerId === 'EMP-TM-MWMK43N9' || closerId === 'askari') && l.ownerUsername === 'askari'))
     );
 
     const TARGET = 10000;
@@ -7822,11 +7822,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
-    if (lead.ownerId && lead.ownerId !== myId && !isAdmin) {
-      showToast('⚠️ You cannot send voice notes to a lead owned by another agent!');
-      return;
-    }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       fallbackSimulatedOrUploadAudio();
@@ -7986,8 +7981,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!lead.ownerId) {
       lead.ownerId = myId;
       lead.ownerName = myName;
-      lead.leadState = 'ongoing';
-      showToast(`🎯 You responded with audio! Lead locked to you.`);
     }
 
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
