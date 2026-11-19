@@ -1086,11 +1086,44 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               if (/^0092/.test(body.phone)) body.phone = body.phone.slice(2);
               else if (/^03\d{9}$/.test(body.phone)) body.phone = '92' + body.phone.slice(1);
               else if (/^3\d{9}$/.test(body.phone)) body.phone = '92' + body.phone;
+
+              // Quota / Limiter check for non-admin users
+              const allUsers = loadLocalUsers();
+              const activeUser = body.userId ? allUsers.find(u => u.id === body.userId) : currentLocalUser;
+              if (activeUser && !['admin', 'superadmin'].includes(activeUser.role)) {
+                const limit = activeUser.message_limit !== undefined ? Number(activeUser.message_limit) : 100;
+                const sent = Number(activeUser.messages_sent_today || 0);
+                if (limit > 0 && sent >= limit) {
+                  json(429, {
+                    success: false,
+                    quota_exceeded: true,
+                    message: `Daily message quota reached (${sent}/${limit} sent today). Please contact your Company Administrator to increase your message allowance.`
+                  });
+                  return;
+                }
+              }
             }
             const upstream = await fetch(bridgeUrl + routes[action], { method: post ? 'POST' : 'GET',
               headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
               ...(post ? { body: JSON.stringify(body) } : {}) });
-            json(upstream.status, await upstream.json()); return;
+            const result = await upstream.json();
+            if (action === 'send_direct' && result && result.success) {
+              const all = loadLocalUsers();
+              const activeId = body.userId || currentLocalUser?.id;
+              const u = all.find(x => x.id === activeId);
+              if (u) {
+                u.messages_sent_today = (Number(u.messages_sent_today) || 0) + 1;
+                saveLocalUsers(all);
+                const lim = u.message_limit !== undefined ? Number(u.message_limit) : 100;
+                const cur = Number(u.messages_sent_today);
+                result.quota_metrics = {
+                  limit: lim,
+                  sent: cur,
+                  remaining: lim < 0 ? 'Unlimited' : Math.max(0, lim - cur)
+                };
+              }
+            }
+            json(upstream.status, result); return;
           }
         }
 
