@@ -368,6 +368,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
       color: #fff;
     }
     html.theme-light .tl-cta-title { color: #065f3c; }
+    html.theme-light .tl-cta-badge { color: #065f3c; background: rgba(15, 169, 104, 0.16); }
     .tl-cta-sub {
       font-size: 12px;
       color: var(--wa-text-secondary);
@@ -788,7 +789,48 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     .lp-access-head { text-align: center; padding-top: 64px; margin-bottom: 26px; }
     #access .landing-wrapper { margin-top: 0; margin-bottom: 0; }
     @media (prefers-reduced-motion: reduce) { .cm-b, .cm-deal { animation: none !important; opacity: 1 !important; transform: none !important; } .lp-visual::before, .lp-chip { animation: none; } }
-  </style>
+
+    /* ═════════ MOBILE: ACCESS CARD ═════════ */
+    @media (max-width: 640px) {
+      .landing-wrapper { padding: 0 10px; }
+      .wa-main-card { border-radius: 20px; }
+      .role-nav-bar { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; }
+      .role-nav-bar .role-tab-btn { min-width: 0; padding: 12px 6px 11px; font-size: 11.5px; line-height: 1.25; flex-direction: column; gap: 4px; text-align: center; border-bottom: 2px solid transparent; }
+      .role-nav-bar .role-tab-btn > span:first-child { font-size: 18px; line-height: 1; }
+      .role-nav-bar .role-tab-btn:nth-child(odd) { border-right: 1px solid var(--wa-card-border); }
+      .role-nav-bar .role-tab-btn:nth-child(-n+2) { border-bottom: 1px solid var(--wa-card-border); }
+      .role-nav-bar .role-tab-btn.active { border-bottom: 2px solid currentColor !important; }
+      .tab-pane { padding: 20px 14px 22px; }
+
+      .tm-subtoggle { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; margin-bottom: 20px !important; }
+      .tm-subtoggle .role-tab-btn { min-width: 0; padding: 10px 6px; font-size: 12px; line-height: 1.25; flex-direction: column; gap: 3px; text-align: center; border-radius: 12px !important; border: 1px solid var(--wa-card-border); background: rgba(31, 224, 138, 0.04); }
+      .tm-subtoggle .role-tab-btn.active { border-color: var(--wa-accent); background: rgba(31, 224, 138, 0.12); box-shadow: 0 0 18px -6px var(--wa-accent); }
+
+      .wa-journey-layout { gap: 24px; }
+      .qr-column { order: -1; width: 100%; }
+      .wa-qr-frame { width: min(256px, 100%); height: auto; aspect-ratio: 1 / 1; padding: 12px; border-radius: 20px; }
+      .wa-qr-img { width: 100%; height: 100%; }
+      .qr-column > div:not(.wa-qr-frame) { max-width: 340px !important; width: 100%; }
+      .qr-status-badge { margin-top: 12px; text-align: center; justify-content: center; }
+      .qr-checkbox-row { margin-top: 10px; }
+
+      .wa-journey-title { font-size: 19px; font-weight: 800; margin-bottom: 14px; text-align: center; }
+      .wa-steps-list { gap: 10px; margin-bottom: 20px; padding: 14px; border-radius: 16px; background: rgba(31, 224, 138, 0.05); border: 1px solid var(--wa-card-border); }
+      .wa-step-item { font-size: 13.5px; gap: 12px; align-items: center; line-height: 1.4; }
+      .wa-step-num { flex: none; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; background: rgba(31, 224, 138, 0.16); color: var(--wa-accent); border: 1px solid rgba(31, 224, 138, 0.35); }
+
+      .tl-cta-banner { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; margin-top: 4px; }
+      .tl-cta-btn { width: 100%; padding: 12px; font-size: 13px; }
+      .qr-links { flex-wrap: wrap; justify-content: center; gap: 8px !important; margin-top: 16px !important; }
+      .qr-links > span { display: none; }
+      .qr-links a { padding: 8px 13px; border-radius: 999px; background: rgba(31, 224, 138, 0.1); border: 1px solid rgba(31, 224, 138, 0.28); font-size: 12.5px; text-decoration: none; }
+
+      .form-container { max-width: 100%; }
+      .form-title { font-size: 18px; }
+      .wa-card-footer { padding: 16px 14px; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+      .wa-card-footer > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; }
+      .lp-access-head { padding-top: 44px; margin-bottom: 18px; }
+    }  </style>
 </head>
 <body>
 
@@ -925,7 +967,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <div class="tab-pane active" id="paneTM">
       
       <!-- Sub-Toggle: QR Pair vs Direct Password Login -->
-      <div style="display:flex; gap:10px; margin-bottom:22px; max-width:540px; margin-left:auto; margin-right:auto;">
+      <div class="tm-subtoggle" style="display:flex; gap:10px; margin-bottom:22px; max-width:540px; margin-left:auto; margin-right:auto;">
         <button type="button" class="role-tab-btn active" id="btnTMSubQR" onclick="toggleTMSubMode('qr')" style="flex:1; border-radius:10px; font-weight:700;">
           <span>📱</span> Scan WhatsApp QR Code
         </button>
@@ -977,7 +1019,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
               <button class="tl-cta-btn">Access TL Portal &rarr;</button>
             </div>
 
-            <div style="margin-top: 24px; font-size: 13px; color: var(--wa-text-secondary); display: flex; align-items: center; gap: 16px;">
+            <div class="qr-links" style="margin-top: 24px; font-size: 13px; color: var(--wa-text-secondary); display: flex; align-items: center; gap: 16px;">
               <a href="javascript:void(0)" onclick="refreshQRCode(true)" class="footer-link">🔄 Refresh QR code</a>
               <span>•</span>
               <a href="admin.php" class="footer-link">Company Admin Portal</a>

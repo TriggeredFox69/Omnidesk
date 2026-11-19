@@ -488,7 +488,16 @@ switch ($action) {
             $repo = dirname($gitDir);
             $gitCmd = "cd " . escapeshellarg($repo) . " && " . escapeshellarg($gitPath) . " fetch origin main 2>&1 && " . escapeshellarg($gitPath) . " reset --hard origin/main 2>&1";
             $gitOut = @shell_exec($gitCmd);
-            $deployCmd = "cd " . escapeshellarg($repo) . " && /bin/cp -R api assets index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html /home/dailygol/omnidesk.lalagpt.pk/ 2>&1 && /bin/cp -R bridge/dist /home/dailygol/omnidesk.lalagpt.pk/bridge/ 2>&1 && /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json /home/dailygol/omnidesk.lalagpt.pk/bridge/ 2>&1 && chmod +x /home/dailygol/omnidesk.lalagpt.pk/bridge/*.sh 2>/dev/null || true";
+            $deployCmd = "cd " . escapeshellarg($repo) . " && "
+                . "/bin/mkdir -p /home/dailygol/chatly.pk /home/dailygol/public_html/chatly.pk /home/dailygol/omnidesk.lalagpt.pk && "
+                . "for d in /home/dailygol/chatly.pk /home/dailygol/public_html/chatly.pk /home/dailygol/omnidesk.lalagpt.pk; do "
+                . "/bin/cp -R api assets index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html .htaccess \"\$d/\" 2>&1; "
+                . "/bin/mkdir -p \"\$d/bridge\" \"\$d/data\"; "
+                . "/bin/cp -R bridge/dist \"\$d/bridge/\" 2>/dev/null || true; "
+                . "/bin/cp -f bridge/*.js bridge/*.sh bridge/package.json \"\$d/bridge/\" 2>&1; "
+                . "chmod +x \"\$d/bridge/\"*.sh 2>/dev/null || true; "
+                . "chmod 775 \"\$d/data\" 2>/dev/null || true; "
+                . "done";
             $deployOut = @shell_exec($deployCmd);
             $results[] = [
                 'repo' => $repo,

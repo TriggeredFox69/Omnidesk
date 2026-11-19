@@ -51,7 +51,7 @@ service.server.listen(port, host, () => {
 
   if (publicUrl) {
     const bridgeToken = process.env.WHATSAPP_BRIDGE_TOKEN || fs.readFileSync(tokenPath, 'utf8').trim();
-    const omnideskTarget = process.env.OMNIDESK_API_URL || 'https://omnidesk.lalagpt.pk/api/direct_sender.php';
+    const omnideskTarget = process.env.CHATLY_API_URL || process.env.OMNIDESK_API_URL || 'https://chatly.pk/api/direct_sender.php';
     console.log(`Auto-registering bridge (${publicUrl}) with Omnidesk: ${omnideskTarget}...`);
     (async () => {
       for (let attempt = 1; attempt <= 3; attempt++) {

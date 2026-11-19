@@ -8,13 +8,22 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 
 if (isset($_GET['deploy'])) {
     $repoDir = '/home/dailygol/repositories/Omnidesk';
-    $targetDir = '/home/dailygol/omnidesk.lalagpt.pk';
+    $targets = [
+        '/home/dailygol/chatly.pk',
+        '/home/dailygol/public_html/chatly.pk',
+        '/home/dailygol/omnidesk.lalagpt.pk'
+    ];
     $pullOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && git fetch origin main 2>&1 && git reset --hard origin/main 2>&1");
-    $deployOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && /bin/cp -R api assets " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -R bridge/dist " . escapeshellarg($targetDir) . "/bridge/ 2>/dev/null || true && /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json " . escapeshellarg($targetDir) . "/bridge/ 2>&1 && chmod +x " . escapeshellarg($targetDir) . "/bridge/*.sh 2>/dev/null || true");
+    $deployLogs = [];
+    foreach ($targets as $targetDir) {
+        @mkdir($targetDir, 0755, true);
+        $deployOut = @shell_exec("cd " . escapeshellarg($repoDir) . " && /bin/cp -R api assets " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md .htaccess " . escapeshellarg($targetDir) . "/ 2>&1 && /bin/cp -R bridge/dist " . escapeshellarg($targetDir) . "/bridge/ 2>/dev/null || true && /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json " . escapeshellarg($targetDir) . "/bridge/ 2>&1 && chmod +x " . escapeshellarg($targetDir) . "/bridge/*.sh 2>/dev/null || true");
+        $deployLogs[$targetDir] = trim((string)$deployOut);
+    }
     echo json_encode([
         'success'  => true,
         'git_pull' => trim((string)$pullOut),
-        'deploy'   => trim((string)$deployOut)
+        'deploy'   => $deployLogs
     ], JSON_PRETTY_PRINT);
     exit;
 }

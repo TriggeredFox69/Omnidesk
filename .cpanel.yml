@@ -1,32 +1,59 @@
 ---
 # cPanel Git™ Version Control Automated Deployment Recipe
-# Omnidesk production deployment to omnidesk.lalagpt.pk
+# Chatly production deployment to chatly.pk and omnidesk.lalagpt.pk
 deployment:
   tasks:
-    # 1. Primary deployment to subdomain root
-    - export DEPLOYPATH=/home/dailygol/omnidesk.lalagpt.pk/
-    - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -R api assets $DEPLOYPATH
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH
-    - /bin/mkdir -p $DEPLOYPATH/bridge
-    - /bin/cp -R bridge/dist $DEPLOYPATH/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $DEPLOYPATH/bridge/
-    - /bin/chmod +x $DEPLOYPATH/bridge/*.sh 2>/dev/null || true
-    - /bin/cp -f .htaccess $DEPLOYPATH 2>/dev/null || true
-    - /bin/mkdir -p $DEPLOYPATH/data
-    - /bin/cp -f data/.htaccess $DEPLOYPATH/data/.htaccess 2>/dev/null || true
-    - /bin/chmod 755 $DEPLOYPATH 2>/dev/null || true
-    - /bin/chmod 775 $DEPLOYPATH/data 2>/dev/null || true
-    # 2. Mirror deployment to public_html/omnidesk
-    - export DEPLOYPATH2=/home/dailygol/public_html/omnidesk/
-    - /bin/mkdir -p $DEPLOYPATH2
-    - /bin/cp -R api assets $DEPLOYPATH2
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $DEPLOYPATH2
-    - /bin/mkdir -p $DEPLOYPATH2/bridge
-    - /bin/cp -R bridge/dist $DEPLOYPATH2/bridge/ 2>/dev/null || true
-    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $DEPLOYPATH2/bridge/
-    - /bin/chmod +x $DEPLOYPATH2/bridge/*.sh 2>/dev/null || true
-    - /bin/cp -f .htaccess $DEPLOYPATH2 2>/dev/null || true
-    - /bin/mkdir -p $DEPLOYPATH2/data
-    - /bin/cp -f data/.htaccess $DEPLOYPATH2/data/.htaccess 2>/dev/null || true
-    - /bin/chmod 775 $DEPLOYPATH2/data 2>/dev/null || true
+    # 1. Primary deployment to Chatly.pk domain root
+    - export TARGET1=/home/dailygol/chatly.pk/
+    - /bin/mkdir -p $TARGET1
+    - /bin/cp -R api assets $TARGET1
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET1
+    - /bin/mkdir -p $TARGET1/bridge $TARGET1/data
+    - /bin/cp -R bridge/dist $TARGET1/bridge/ 2>/dev/null || true
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET1/bridge/
+    - /bin/chmod +x $TARGET1/bridge/*.sh 2>/dev/null || true
+    - /bin/cp -f .htaccess $TARGET1 2>/dev/null || true
+    - /bin/cp -f data/.htaccess data/companies.json data/email_config.json $TARGET1/data/ 2>/dev/null || true
+    - /bin/chmod 755 $TARGET1 2>/dev/null || true
+    - /bin/chmod 775 $TARGET1/data 2>/dev/null || true
+
+    # 2. Mirror deployment to public_html/chatly.pk (cPanel add-on document root variant)
+    - export TARGET2=/home/dailygol/public_html/chatly.pk/
+    - /bin/mkdir -p $TARGET2
+    - /bin/cp -R api assets $TARGET2
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET2
+    - /bin/mkdir -p $TARGET2/bridge $TARGET2/data
+    - /bin/cp -R bridge/dist $TARGET2/bridge/ 2>/dev/null || true
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET2/bridge/
+    - /bin/chmod +x $TARGET2/bridge/*.sh 2>/dev/null || true
+    - /bin/cp -f .htaccess $TARGET2 2>/dev/null || true
+    - /bin/cp -f data/.htaccess data/companies.json data/email_config.json $TARGET2/data/ 2>/dev/null || true
+    - /bin/chmod 755 $TARGET2 2>/dev/null || true
+    - /bin/chmod 775 $TARGET2/data 2>/dev/null || true
+
+    # 3. Legacy subdomain root omnidesk.lalagpt.pk (seamless transition)
+    - export TARGET3=/home/dailygol/omnidesk.lalagpt.pk/
+    - /bin/mkdir -p $TARGET3
+    - /bin/cp -R api assets $TARGET3
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET3
+    - /bin/mkdir -p $TARGET3/bridge $TARGET3/data
+    - /bin/cp -R bridge/dist $TARGET3/bridge/ 2>/dev/null || true
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET3/bridge/
+    - /bin/chmod +x $TARGET3/bridge/*.sh 2>/dev/null || true
+    - /bin/cp -f .htaccess $TARGET3 2>/dev/null || true
+    - /bin/cp -f data/.htaccess $TARGET3/data/.htaccess 2>/dev/null || true
+    - /bin/chmod 755 $TARGET3 2>/dev/null || true
+    - /bin/chmod 775 $TARGET3/data 2>/dev/null || true
+
+    # 4. Mirror deployment to public_html/omnidesk
+    - export TARGET4=/home/dailygol/public_html/omnidesk/
+    - /bin/mkdir -p $TARGET4
+    - /bin/cp -R api assets $TARGET4
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md $TARGET4
+    - /bin/mkdir -p $TARGET4/bridge $TARGET4/data
+    - /bin/cp -R bridge/dist $TARGET4/bridge/ 2>/dev/null || true
+    - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json $TARGET4/bridge/
+    - /bin/chmod +x $TARGET4/bridge/*.sh 2>/dev/null || true
+    - /bin/cp -f .htaccess $TARGET4 2>/dev/null || true
+    - /bin/cp -f data/.htaccess $TARGET4/data/.htaccess 2>/dev/null || true
+    - /bin/chmod 775 $TARGET4/data 2>/dev/null || true

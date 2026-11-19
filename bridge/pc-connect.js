@@ -42,6 +42,7 @@ async function main() {
       console.log('Syncing live bridge with hosted Omnidesk (https://omnidesk.lalagpt.pk)...');
       
       const endpoints = [
+        'https://chatly.pk/api/direct_sender.php',
         'https://omnidesk.lalagpt.pk/api/direct_sender.php',
         'https://lalagpt.pk/omnidesk/api/direct_sender.php'
       ];

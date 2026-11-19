@@ -53,7 +53,7 @@ function getEmailConfig($file) {
         'smtp_secure'  => 'ssl', // 'ssl' | 'tls' | 'none'
         'smtp_user'    => 'numeniousnexus@gmail.com',
         'smtp_pass'    => '',
-        'portal_url'   => 'https://omnidesk.lalagpt.pk'
+        'portal_url'   => 'https://chatly.pk'
     ];
     if (file_exists($file)) {
         $content = @file_get_contents($file);
@@ -265,10 +265,10 @@ if ($action === 'get_templates') {
             'id'          => 'welcome',
             'name'        => '🌟 New Employee Welcome & Login Credentials',
             'category'    => 'Onboarding',
-            'subject'     => 'Welcome to OmniDesk — Your Closer Account is Ready [{username}]',
+            'subject'     => 'Welcome to Chatly — Your Closer Account is Ready [{username}]',
             'badge'       => 'Account Ready',
             'description' => 'Dispatches initial login username, generated password, and portal link to newly provisioned sales closers.',
-            'default_body' => "Welcome to the Team, {name}! 👋\n\nYour authorized OmniDesk sales closer workspace has been provisioned by the Administrator. You now have full access to our high-converting WhatsApp lead pipeline.\n\nYour OmniDesk Login Credentials:\n• Workspace URL: {portal_url}\n• Username: {username}\n• Initial Password: {password}\n• Assigned Role: {role}\n\nSecurity Note: Please change your password upon your first login. Do not share your login credentials with anyone outside the authorized closing team."
+            'default_body' => "Welcome to the Team, {name}! 👋\n\nYour authorized Chatly sales closer workspace has been provisioned by the Administrator. You now have full access to our high-converting WhatsApp lead pipeline.\n\nYour Chatly Login Credentials:\n• Workspace URL: {portal_url}\n• Username: {username}\n• Initial Password: {password}\n• Assigned Role: {role}\n\nSecurity Note: Please change your password upon your first login. Do not share your login credentials with anyone outside the authorized closing team."
         ],
         [
             'id'          => 'withdrawal_lodged',
