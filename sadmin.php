@@ -34,7 +34,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
     session_destroy();
-    header('Location: login.php?action=logout&switch=1');
+    header('Location: /');
     exit;
 }
 ?>

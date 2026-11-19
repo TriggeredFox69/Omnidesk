@@ -17,7 +17,7 @@ $config = require __DIR__ . '/api/config.php';
 
 // If no authenticated user session exists, route to the Landing Page (WhatsApp Web QR journey)
 if (empty($_SESSION['omnidesk_user'])) {
-    header('Location: login.php');
+    require __DIR__ . '/login.php';
     exit;
 }
 $user = $_SESSION['omnidesk_user'];

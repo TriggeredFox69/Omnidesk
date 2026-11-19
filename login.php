@@ -18,7 +18,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// If action=logout or switch=1 or logout=1 is passed, completely wipe session
+// If action=logout or switch=1 or logout=1 is passed, completely wipe session and redirect to clean root URL
 if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['logout']) || isset($_GET['switch'])) {
     $_SESSION = [];
     if (ini_get("session.use_cookies")) {
@@ -26,6 +26,8 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
     }
     @session_destroy();
+    header('Location: /');
+    exit;
 } elseif (!empty($_SESSION['omnidesk_user'])) {
     $role = $_SESSION['omnidesk_user']['role'] ?? '';
     if ($role === 'superadmin' && isset($_GET['to_sadmin'])) {
@@ -36,7 +38,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         header('Location: admin.php');
         exit;
     }
-    header('Location: index.php');
+    header('Location: /');
     exit;
 }
 ?>
@@ -62,6 +64,12 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           localStorage.removeItem('omnidesk_active_chat_phone');
           sessionStorage.clear();
           sessionStorage.setItem('chatly_logged_out', '1');
+        }
+        // Always display clean URL in browser address bar
+        if (window.history && window.history.replaceState) {
+          if (window.location.pathname.endsWith('login.php') || q) {
+            window.history.replaceState({}, document.title, '/');
+          }
         }
         if (localStorage.getItem('nunno_theme') === 'light') {
           document.documentElement.classList.add('theme-light');

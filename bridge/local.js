@@ -1166,13 +1166,9 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
       // Handle GET logout or switch account parameter
       if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('logout') === '1') {
         currentLocalUser = null;
-        if (relative === 'login.php' || relative === 'login' || relative === 'login.html') {
-          relative = 'login.php';
-        } else {
-          res.writeHead(302, { 'Location': '/login.php?action=logout&switch=1' });
-          res.end();
-          return;
-        }
+        res.writeHead(302, { 'Location': '/' });
+        res.end();
+        return;
       }
       
       // Default / -> login.php (The authentic WhatsApp Web landing page)
@@ -1191,7 +1187,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
 
       if (relative === 'index.html' || relative === 'index.php') {
         if (!currentLocalUser) {
-          res.writeHead(302, { 'Location': '/login.php' }); res.end(); return;
+          res.writeHead(302, { 'Location': '/' }); res.end(); return;
         }
         relative = 'index.html';
       }

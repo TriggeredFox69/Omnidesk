@@ -4832,10 +4832,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data && data.authenticated && data.user) {
           applyUserSession(data.user);
         } else {
-          // Unauthenticated: clear any stale cached session and redirect to login gateway
+          // Unauthenticated: clear any stale cached session and redirect to clean root landing
           localStorage.removeItem('nunno_active_session');
           if (location.protocol !== 'file:') {
-            window.location.href = 'login.php';
+            window.location.href = '/';
             return;
           }
           showAuthOverlay();
@@ -4854,7 +4854,7 @@ document.addEventListener('DOMContentLoaded', () => {
           } catch (e) {}
         }
         if (location.protocol !== 'file:') {
-          window.location.href = 'login.php';
+          window.location.href = '/';
         } else {
           showAuthOverlay();
         }
@@ -5295,7 +5295,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleDossierDrawer(false);
 
     if (location.protocol !== 'file:') {
-      window.location.href = 'login.php?action=logout&switch=1';
+      window.location.href = '/';
       return;
     }
 
