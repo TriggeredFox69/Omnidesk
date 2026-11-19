@@ -25,6 +25,7 @@ Options -Indexes +FollowSymLinks
     RewriteRule ^sadmin/?$ /ss/index.php [L,QSA]
     RewriteRule ^admin/?$ /cc/index.php [L,QSA]
     RewriteRule ^login/?$ /login.php [L,QSA]
+    RewriteRule ^promote/?$ /login.php#promote [NE,L,R=302]
     RewriteRule ^desk/?$ /index.php [L,QSA]
     RewriteRule ^app/?$ /index.php [L,QSA]
 </IfModule>

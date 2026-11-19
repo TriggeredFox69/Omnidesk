@@ -362,6 +362,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     </div>
 
     <div class="header-actions">
+      <!-- Real-Time Brand Product Promotion Inquiries Notification Pill -->
+      <button class="btn btn-secondary" id="btnHeaderBrandInquiries" onclick="switchSadminTab('brandInquiries')" style="position:relative; border-color:rgba(31,224,138,0.4); background:rgba(31,224,138,0.08); color:var(--text-primary);">
+        <span style="font-size:15px;">📢</span>
+        <span>Brand Leads</span>
+        <span id="headerBrandBadge" style="display:none; background:#10b981; color:#03130c; font-size:10.5px; padding:2px 7px; border-radius:10px; font-weight:800; margin-left:4px;">0</span>
+      </button>
       <button class="btn btn-gold" onclick="openProvisionModal()">
         <span>➕</span> Provision New Company
       </button>
@@ -454,6 +460,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
       <div class="metric-val" style="font-size: 20px; color: #34d399;" id="metricBridgeHealth">Baileys Pure WS 🟢</div>
       <div class="metric-sub">Zero Chromium &bull; Port 3210 Active</div>
     </div>
+
+    <div class="metric-card" onclick="switchSadminTab('brandInquiries')" style="cursor:pointer; border-color:rgba(31,224,138,0.3); transition:transform 0.15s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+      <div class="metric-header">
+        <span class="metric-label">Brand Inquiries</span>
+        <div class="metric-icon" style="background: rgba(31, 224, 138, 0.15); color: #34d399;">📢</div>
+      </div>
+      <div class="metric-val" id="metricBrandInquiries" style="color: #34d399;">0</div>
+      <div class="metric-sub"><span id="metricNewBrandInquiries" style="color:#4cecab; font-weight:700;">0 new</span> &bull; Click to review</div>
+    </div>
   </div>
 
   <!-- SADMIN Navigation Tabs -->
@@ -481,6 +496,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     </button>
     <button class="sadmin-tab-btn" id="tabBtnFinancials" onclick="switchSadminTab('financials')">
       <span>💳</span> 8. Billing &amp; Nunno 1700 Ledger
+    </button>
+    <button class="sadmin-tab-btn" id="tabBtnBrandInquiries" onclick="switchSadminTab('brandInquiries')">
+      <span>📢</span> 9. Brand Product Inquiries <span id="sadminBrandBadge" style="display:none; background:#10b981; color:#03130c; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:800; margin-left:4px;">0</span>
     </button>
   </div>
 
@@ -815,7 +833,143 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     </div>
   </div>
 
+  <!-- TAB 9: BRAND PRODUCT INQUIRIES & PROMOTION PIPELINE -->
+  <div class="sadmin-pane" id="paneBrandInquiries">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>📢</span> Inbound Brand Product Inquiries &amp; Promotion Leads</div>
+          <div class="box-desc">
+            Prospects who submitted the "Promote my product" form on the Chatly homepage. Review their product details, chat with them on WhatsApp, and convert them to an onboarded company in 1 click.
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input type="text" id="inqSearchInput" oninput="filterBrandInquiriesTable()" placeholder="Search brand, product, phone..." class="form-control" style="width:240px; padding:8px 12px; font-size:12.5px;">
+          <select id="inqStatusFilter" onchange="filterBrandInquiriesTable()" class="form-control" style="width:160px; padding:8px 12px; font-size:12.5px; cursor:pointer;">
+            <option value="all">All Statuses</option>
+            <option value="new" selected>🟢 New Leads</option>
+            <option value="contacted">🟡 Contacted</option>
+            <option value="converted">🏢 Converted</option>
+            <option value="archived">⚪ Archived</option>
+          </select>
+          <button class="btn btn-secondary" onclick="loadBrandInquiries(true)" style="padding:8px 14px; font-size:12.5px;">
+            <span>🔄</span> Refresh
+          </button>
+          <button class="btn btn-secondary" onclick="markAllBrandInquiriesRead()" style="padding:8px 14px; font-size:12.5px;">
+            <span>✓</span> Mark All Read
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Metrics for Inquiries -->
+      <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+        <div class="metric-card" style="padding:14px;">
+          <div class="metric-label">Total Submissions</div>
+          <div class="metric-val" id="inqMetricTotal" style="font-size:22px; color:var(--text-primary);">-</div>
+          <div class="metric-sub">Lifetime product inquiries</div>
+        </div>
+        <div class="metric-card" style="padding:14px; border-color:rgba(16, 185, 129, 0.3);">
+          <div class="metric-label" style="color:#34d399;">New (Uncontacted)</div>
+          <div class="metric-val" id="inqMetricNew" style="font-size:22px; color:#34d399;">-</div>
+          <div class="metric-sub">Awaiting initial WhatsApp outreach</div>
+        </div>
+        <div class="metric-card" style="padding:14px;">
+          <div class="metric-label" style="color:#fbbf24;">Contacted / In Discussion</div>
+          <div class="metric-val" id="inqMetricContacted" style="font-size:22px; color:#fbbf24;">-</div>
+          <div class="metric-sub">Negotiating closer terms</div>
+        </div>
+        <div class="metric-card" style="padding:14px; border-color:rgba(234, 179, 8, 0.3);">
+          <div class="metric-label" style="color:#fde047;">Converted to Company</div>
+          <div class="metric-val" id="inqMetricConverted" style="font-size:22px; color:#fde047;">-</div>
+          <div class="metric-sub">Live tenant on Chatly</div>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Brand &amp; Product</th>
+              <th>Pitch &amp; Details</th>
+              <th>Business Contact</th>
+              <th>Submitted</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="brandInquiriesTableBody">
+            <tr><td colspan="6" style="text-align: center; padding: 28px; color: var(--text-muted);">Loading brand inquiries...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 <?php endif; ?>
+
+<!-- BRAND INQUIRY PITCH MODAL -->
+<div class="modal-overlay" id="inquiryDetailModal" style="display:none;">
+  <div class="modal-card" style="max-width: 580px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <div>
+        <h3 class="modal-title" id="inqModalBrandTitle">Brand Product Details</h3>
+        <div style="font-size: 12px; color: var(--text-secondary);" id="inqModalSub">Full Pitch &amp; Specifications</div>
+      </div>
+      <button onclick="closeInquiryDetailModal()" style="background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer;">&times;</button>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:12px; padding:16px; margin-bottom:16px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div>
+          <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Product Name</div>
+          <strong id="inqModalProductName" style="font-size:14px; color:#fff;">-</strong>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Price &amp; Category</div>
+          <span id="inqModalPriceCat" style="font-size:13px; color:#34d399; font-weight:700;">-</span>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Product Description &amp; Pitch</div>
+        <div id="inqModalPitchText" style="font-size:13px; color:var(--text-primary); line-height:1.6; background:rgba(0,0,0,0.3); padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05); white-space:pre-wrap;">-</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div>
+          <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Target Daily Orders</div>
+          <span id="inqModalVolume" style="font-size:12.5px; color:#f8fafc;">-</span>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Website / Social Link</div>
+          <div id="inqModalWebsiteLink" style="font-size:12.5px;">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div id="inqModalContactSnippet" style="font-size:12px; color:var(--text-muted);">
+        Contact: <strong id="inqModalContactName" style="color:#fff;">-</strong>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <a id="inqModalWAButton" href="#" target="_blank" class="btn btn-emerald" style="padding:6px 14px; font-size:12px; text-decoration:none;">
+          <span>💬</span> Chat on WhatsApp
+        </a>
+        <button type="button" class="btn btn-secondary" onclick="closeInquiryDetailModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REAL-TIME NOTIFICATION TOAST FOR NEW INQUIRIES -->
+<div id="sadminNotificationToast" style="display:none; position:fixed; top:20px; right:24px; z-index:9999999; background:linear-gradient(135deg, #071e14, #0b2d1f); border:1px solid rgba(31,224,138,0.5); box-shadow:0 12px 40px rgba(0,0,0,0.8); border-radius:14px; padding:14px 20px; max-width:400px; cursor:pointer; transition:all 0.3s cubic-bezier(0.16, 1, 0.3, 1);" onclick="switchSadminTab('brandInquiries')">
+  <div style="display:flex; align-items:flex-start; gap:12px;">
+    <div style="font-size:22px; line-height:1;">🔔</div>
+    <div>
+      <div style="font-size:13px; font-weight:800; color:#4cecab; margin-bottom:2px;" id="toastTitle">New Brand Promotion Lead!</div>
+      <div style="font-size:11.5px; color:#e2e8f0; line-height:1.4;" id="toastMsg">A brand submitted a new product inquiry. Click to review.</div>
+    </div>
+    <button type="button" onclick="event.stopPropagation(); closeSadminToast();" style="background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; margin-left:auto; line-height:1;">&times;</button>
+  </div>
+</div>
 
 </div>
 
@@ -927,7 +1081,7 @@ setInterval(() => {
 }, 10);
 
 function switchSadminTab(tabName) {
-  const tabs = ['companies', 'chatter', 'logins', 'masterPending', 'numbers', 'provision', 'audit', 'financials'];
+  const tabs = ['companies', 'chatter', 'logins', 'masterPending', 'numbers', 'provision', 'audit', 'financials', 'brandInquiries'];
   tabs.forEach((t) => {
     const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
     const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -939,6 +1093,7 @@ function switchSadminTab(tabName) {
   if (tabName === 'masterPending') loadMasterPendingTMs();
   if (tabName === 'numbers') loadNumberPool();
   if (tabName === 'audit') loadAuditLogs();
+  if (tabName === 'brandInquiries') loadBrandInquiries();
 }
 
 function openProvisionModal() { switchSadminTab('provision'); }
@@ -1616,12 +1771,339 @@ function filterCompaniesTable() {
   renderCompanyTable(filtered);
 }
 
+// ══════════════════════════════════════════════════════
+// 9. BRAND PRODUCT PROMOTION INQUIRIES & NOTIFICATIONS
+// ══════════════════════════════════════════════════════
+let currentBrandInquiries = [];
+let lastKnownInquiryCount = null;
+
+async function loadBrandInquiries(manual = false) {
+  try {
+    const res = await fetch('api/brand_inquiries.php?action=list');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.inquiries)) {
+      currentBrandInquiries = data.inquiries;
+
+      // Update counters & metrics
+      const total = data.total || 0;
+      const newCount = data.new_count || 0;
+      const contactedCount = data.contacted_count || 0;
+      const convertedCount = data.converted_count || 0;
+
+      const metricTotal = document.getElementById('inqMetricTotal');
+      const metricNew = document.getElementById('inqMetricNew');
+      const metricContacted = document.getElementById('inqMetricContacted');
+      const metricConverted = document.getElementById('inqMetricConverted');
+      if (metricTotal) metricTotal.textContent = total;
+      if (metricNew) metricNew.textContent = newCount;
+      if (metricContacted) metricContacted.textContent = contactedCount;
+      if (metricConverted) metricConverted.textContent = convertedCount;
+
+      const metricHUD = document.getElementById('metricBrandInquiries');
+      const metricHUDNew = document.getElementById('metricNewBrandInquiries');
+      if (metricHUD) metricHUD.textContent = total;
+      if (metricHUDNew) metricHUDNew.textContent = newCount > 0 ? (newCount + ' new') : '0 new';
+
+      // Badges
+      const hBadge = document.getElementById('headerBrandBadge');
+      const tBadge = document.getElementById('sadminBrandBadge');
+      if (hBadge) {
+        hBadge.textContent = newCount;
+        hBadge.style.display = newCount > 0 ? 'inline-block' : 'none';
+        if (newCount > 0) hBadge.style.animation = 'pulseDot 0.8s infinite alternate';
+        else hBadge.style.animation = 'none';
+      }
+      if (tBadge) {
+        tBadge.textContent = newCount;
+        tBadge.style.display = newCount > 0 ? 'inline-block' : 'none';
+      }
+
+      // Notification System: If new inquiries arrived while active on session!
+      if (lastKnownInquiryCount !== null && total > lastKnownInquiryCount) {
+        const diff = total - lastKnownInquiryCount;
+        const newest = data.inquiries[0];
+        triggerNewInquiryNotification(diff, newest);
+      }
+      lastKnownInquiryCount = total;
+
+      filterBrandInquiriesTable();
+    }
+  } catch (err) {
+    console.error('Error loading brand inquiries:', err);
+  }
+}
+
+function filterBrandInquiriesTable() {
+  const search = (document.getElementById('inqSearchInput')?.value || '').toLowerCase().trim();
+  const filter = document.getElementById('inqStatusFilter')?.value || 'all';
+
+  let list = currentBrandInquiries;
+  if (filter !== 'all') {
+    list = list.filter(i => (i.status || 'new') === filter);
+  }
+  if (search) {
+    list = list.filter(i => 
+      (i.brand_name || '').toLowerCase().includes(search) ||
+      (i.product_name || '').toLowerCase().includes(search) ||
+      (i.contact_name || '').toLowerCase().includes(search) ||
+      (i.phone || '').includes(search)
+    );
+  }
+  renderBrandInquiries(list);
+}
+
+function renderBrandInquiries(inquiries) {
+  const tbody = document.getElementById('brandInquiriesTableBody');
+  if (!tbody) return;
+
+  if (!inquiries.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">✨ No brand promotion inquiries found matching your filter.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = inquiries.map(inq => {
+    const cleanPhone = String(inq.phone || '').replace(/\D/g, '');
+    const waGreeting = encodeURIComponent(`Hello ${inq.contact_name || ''}! This is Chatly Platform Administration regarding your inquiry to promote "${inq.product_name || inq.brand_name}". We reviewed your product details and would love to launch your dedicated WhatsApp closer team!`);
+    const waLink = `https://wa.me/${cleanPhone}?text=${waGreeting}`;
+    
+    let statusBadge = '<span class="badge-status status-active" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);">🟢 New Lead</span>';
+    if (inq.status === 'contacted') {
+      statusBadge = '<span class="badge-status" style="background:rgba(234,179,8,0.15); color:#fde047; border:1px solid rgba(234,179,8,0.3);">🟡 Contacted</span>';
+    } else if (inq.status === 'converted') {
+      statusBadge = '<span class="badge-status" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">🏢 Converted</span>';
+    } else if (inq.status === 'archived') {
+      statusBadge = '<span class="badge-status" style="background:rgba(148,163,184,0.15); color:#94a3b8; border:1px solid rgba(148,163,184,0.3);">⚪ Archived</span>';
+    }
+
+    const priceText = inq.price ? (inq.currency === 'USD' ? '$' + inq.price : 'Rs. ' + inq.price) : 'Custom';
+    const pitchSnippet = (inq.description || 'No pitch provided').slice(0, 85) + (inq.description?.length > 85 ? '…' : '');
+
+    return `
+      <tr style="${!inq.is_read ? 'background:rgba(31,224,138,0.04);' : ''}">
+        <td>
+          <div style="font-weight:800; font-size:14px; color:var(--text-primary);">${inq.brand_name}</div>
+          <div style="font-size:12.5px; color:#34d399; font-weight:700;">📦 ${inq.product_name}</div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+            <span style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.06); color:var(--text-secondary);">${inq.category || 'E-Commerce'}</span>
+            <span style="font-size:11px; font-weight:800; color:#fbbf24;">${priceText}</span>
+          </div>
+        </td>
+        <td style="max-width:260px;">
+          <div style="font-size:12px; color:var(--text-secondary); line-height:1.4; margin-bottom:4px;">
+            ${pitchSnippet}
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-secondary" style="padding:2px 8px; font-size:10.5px; border-radius:6px;" onclick="openInquiryDetailModal('${inq.id}')">
+              🔍 View Full Pitch
+            </button>
+            ${inq.website ? `<a href="${inq.website.startsWith('http') ? inq.website : 'https://' + inq.website}" target="_blank" style="font-size:11px; color:#60a5fa; text-decoration:underline;">🔗 Store/Link</a>` : ''}
+          </div>
+          <div style="font-size:10.5px; color:var(--text-muted); margin-top:4px;">Target: <strong>${inq.target_volume || 'Standard'}</strong></div>
+        </td>
+        <td>
+          <div style="font-weight:700; font-size:13px; color:var(--text-primary);">${inq.contact_name}</div>
+          <a href="${waLink}" target="_blank" style="display:inline-flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#34d399; text-decoration:none; font-weight:700; margin-top:2px;" title="Chat with lead on WhatsApp">
+            <span>💬</span> ${inq.phone || ''}
+          </a>
+          <div style="font-size:11px; color:var(--text-muted);">${inq.email || inq.city || ''}</div>
+        </td>
+        <td>
+          <div style="font-size:11.5px; color:var(--text-secondary); font-family:'JetBrains Mono',monospace;">
+            ${inq.created_at || 'Recently'}
+          </div>
+        </td>
+        <td>
+          <div>${statusBadge}</div>
+          <select onchange="updateInquiryStatus('${inq.id}', this.value)" style="margin-top:5px; background:var(--bg-card); color:var(--text-secondary); border:1px solid var(--border-subtle); border-radius:6px; font-size:10.5px; padding:2px 4px; cursor:pointer;">
+            <option value="new" ${inq.status === 'new' ? 'selected' : ''}>Set New</option>
+            <option value="contacted" ${inq.status === 'contacted' ? 'selected' : ''}>Set Contacted</option>
+            <option value="converted" ${inq.status === 'converted' ? 'selected' : ''}>Set Converted</option>
+            <option value="archived" ${inq.status === 'archived' ? 'selected' : ''}>Set Archived</option>
+          </select>
+        </td>
+        <td>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <a href="${waLink}" target="_blank" class="btn btn-emerald" style="padding:5px 10px; font-size:11.5px; text-decoration:none; text-align:center;">
+              <span>💬</span> Chat WhatsApp
+            </a>
+            <button class="btn btn-gold" style="padding:5px 10px; font-size:11.5px;" onclick="convertInquiryToCompany('${inq.id}')">
+              <span>🏢</span> Convert to Company
+            </button>
+            <button class="btn btn-secondary" style="padding:3px 8px; font-size:10.5px; color:#fb7185;" onclick="deleteInquiry('${inq.id}')">
+              🗑️ Delete
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openInquiryDetailModal(id) {
+  const inq = currentBrandInquiries.find(i => i.id === id);
+  if (!inq) return;
+
+  document.getElementById('inqModalBrandTitle').textContent = inq.brand_name;
+  document.getElementById('inqModalSub').textContent = `Inquiry ID: ${inq.id} • Category: ${inq.category || 'General'}`;
+  document.getElementById('inqModalProductName').textContent = inq.product_name;
+  document.getElementById('inqModalPriceCat').textContent = `${inq.currency || 'PKR'} ${inq.price || 'Custom'} (${inq.category || 'Business'})`;
+  document.getElementById('inqModalPitchText').textContent = inq.description || 'No pitch provided.';
+  document.getElementById('inqModalVolume').textContent = inq.target_volume || 'Standard';
+  
+  const webEl = document.getElementById('inqModalWebsiteLink');
+  if (inq.website) {
+    const url = inq.website.startsWith('http') ? inq.website : 'https://' + inq.website;
+    webEl.innerHTML = `<a href="${url}" target="_blank" style="color:#60a5fa; text-decoration:underline;">${inq.website}</a>`;
+  } else {
+    webEl.textContent = 'None provided';
+  }
+
+  const cleanPhone = String(inq.phone || '').replace(/\D/g, '');
+  document.getElementById('inqModalContactName').textContent = `${inq.contact_name} (${inq.phone}) • ${inq.email || ''}`;
+  
+  const waBtn = document.getElementById('inqModalWAButton');
+  const waGreeting = encodeURIComponent(`Hello ${inq.contact_name}! This is Chatly Platform Administration regarding your inquiry for "${inq.product_name}".`);
+  waBtn.href = `https://wa.me/${cleanPhone}?text=${waGreeting}`;
+
+  document.getElementById('inquiryDetailModal').style.display = 'flex';
+}
+
+function closeInquiryDetailModal() {
+  document.getElementById('inquiryDetailModal').style.display = 'none';
+}
+
+function convertInquiryToCompany(id) {
+  const inq = currentBrandInquiries.find(i => i.id === id);
+  if (!inq) return;
+
+  switchSadminTab('provision');
+  const nameInp = document.getElementById('provName');
+  const slugInp = document.getElementById('provSlug');
+  const ownerNameInp = document.getElementById('provOwnerName');
+  const emailInp = document.getElementById('provOwnerEmail');
+  const phoneInp = document.getElementById('provFallbackPhone');
+
+  if (nameInp) nameInp.value = inq.brand_name;
+  if (slugInp) {
+    slugInp.value = inq.brand_name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (typeof checkSlugAvailability === 'function') checkSlugAvailability();
+  }
+  if (ownerNameInp) ownerNameInp.value = inq.contact_name;
+  if (emailInp && inq.email) emailInp.value = inq.email;
+  if (phoneInp && inq.phone) phoneInp.value = inq.phone;
+
+  // Update status of inquiry to 'converted'
+  updateInquiryStatus(id, 'converted');
+
+  const provPane = document.getElementById('paneProvision');
+  if (provPane) {
+    window.scrollTo({ top: provPane.offsetTop - 50, behavior: 'smooth' });
+  }
+}
+
+async function updateInquiryStatus(id, newStatus) {
+  try {
+    const res = await fetch('api/brand_inquiries.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update_status',
+        id: id,
+        status: newStatus
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadBrandInquiries();
+    } else {
+      alert('⚠️ ' + (data.error || 'Failed to update status.'));
+    }
+  } catch (err) {
+    console.error('Error updating inquiry status:', err);
+  }
+}
+
+async function markAllBrandInquiriesRead() {
+  try {
+    const res = await fetch('api/brand_inquiries.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'mark_all_read' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadBrandInquiries();
+    }
+  } catch (err) {}
+}
+
+async function deleteInquiry(id) {
+  if (!confirm('Are you sure you want to delete this brand promotion inquiry?')) return;
+  try {
+    const res = await fetch('api/brand_inquiries.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: id })
+    });
+    const data = await res.json();
+    if (data.success) {
+      loadBrandInquiries();
+    } else {
+      alert('⚠️ ' + (data.error || 'Failed to delete inquiry.'));
+    }
+  } catch (err) {
+    alert('Error deleting inquiry.');
+  }
+}
+
+// Notification System: Audio chime + Floating toast
+function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.45);
+  } catch (_) {}
+}
+
+function triggerNewInquiryNotification(diff, newestInq) {
+  playNotificationChime();
+  const toast = document.getElementById('sadminNotificationToast');
+  const title = document.getElementById('toastTitle');
+  const msg = document.getElementById('toastMsg');
+  if (toast && newestInq) {
+    if (title) title.textContent = `🔔 New Brand Promotion Request!`;
+    if (msg) msg.textContent = `"${newestInq.brand_name}" submitted product "${newestInq.product_name}". Click to review!`;
+    toast.style.display = 'block';
+    setTimeout(() => {
+      closeSadminToast();
+    }, 7000);
+  }
+}
+
+function closeSadminToast() {
+  const toast = document.getElementById('sadminNotificationToast');
+  if (toast) toast.style.display = 'none';
+}
+
 // Initial Boot
 <?php if ($isSuperAdmin): ?>
 loadDashboardData();
 loadMasterPendingTMs();
+loadBrandInquiries();
 setInterval(loadDashboardData, 8000);
 setInterval(loadMasterPendingTMs, 8000);
+setInterval(loadBrandInquiries, 6000);
 <?php endif; ?>
 
 function toggleTheme() {

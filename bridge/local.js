@@ -1060,6 +1060,114 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
         }
 
+        // 3b. Brand Product Promotion Inquiries API
+        if (url.pathname === '/api/brand_inquiries.php') {
+          const inqFile = path.join(root, 'data/brand_inquiries.json');
+          const loadInqs = () => {
+            try { return JSON.parse(fs.readFileSync(inqFile, 'utf8') || '[]'); } catch (_) { return []; }
+          };
+          const saveInqs = (arr) => {
+            try { fs.writeFileSync(inqFile, JSON.stringify(arr, null, 2), 'utf8'); } catch (_) {}
+          };
+
+          if (action === 'submit' && req.method === 'POST') {
+            const inqs = loadInqs();
+            const brandName = String(body.brand_name || '').trim();
+            const productName = String(body.product_name || '').trim();
+            const contactName = String(body.contact_name || '').trim();
+            const phone = String(body.phone || body.whatsapp || '').trim();
+
+            if (!brandName || !productName || !contactName || !phone) {
+              json(400, { success: false, error: 'Brand Name, Product Name, Contact Name, and WhatsApp Phone are required.' });
+              return;
+            }
+
+            const cleanPhone = phone.replace(/[^\d+]/g, '');
+            const newInq = {
+              id: 'INQ-' + Date.now().toString(36).toUpperCase() + '-' + Math.floor(Math.random() * 900 + 100),
+              brand_name: brandName,
+              product_name: productName,
+              category: String(body.category || 'E-Commerce & Retail').trim(),
+              price: String(body.price || '5000').trim(),
+              currency: String(body.currency || 'PKR').trim(),
+              description: String(body.description || body.pitch || '').trim(),
+              contact_name: contactName,
+              phone: cleanPhone,
+              email: String(body.email || '').trim(),
+              website: String(body.website || '').trim(),
+              target_volume: String(body.target_volume || '5-20 orders / day').trim(),
+              city: String(body.city || 'Pakistan').trim(),
+              status: 'new',
+              is_read: false,
+              notes: '',
+              created_at: new Date().toISOString()
+            };
+
+            inqs.unshift(newInq);
+            saveInqs(inqs);
+            json(200, {
+              success: true,
+              message: 'Thank you! Your product promotion inquiry has been received. Our company will be in touch with you soon via WhatsApp.',
+              inquiry: newInq
+            });
+            return;
+          }
+
+          if (action === 'list') {
+            const inqs = loadInqs();
+            const total = inqs.length;
+            const newCount = inqs.filter(i => i.status === 'new' || !i.is_read).length;
+            const contactedCount = inqs.filter(i => i.status === 'contacted').length;
+            const convertedCount = inqs.filter(i => i.status === 'converted').length;
+            json(200, {
+              success: true,
+              inquiries: inqs,
+              total,
+              new_count: newCount,
+              contacted_count: contactedCount,
+              converted_count: convertedCount
+            });
+            return;
+          }
+
+          if (action === 'update_status' && req.method === 'POST') {
+            const inqs = loadInqs();
+            const target = inqs.find(i => i.id === body.id);
+            if (target) {
+              target.status = body.status || target.status;
+              target.is_read = true;
+              if (body.notes !== undefined) target.notes = body.notes;
+              target.updated_at = new Date().toISOString();
+              saveInqs(inqs);
+              json(200, { success: true, message: 'Inquiry status updated successfully.' });
+            } else {
+              json(404, { success: false, error: 'Inquiry record not found.' });
+            }
+            return;
+          }
+
+          if (action === 'mark_all_read' && req.method === 'POST') {
+            const inqs = loadInqs();
+            inqs.forEach(i => i.is_read = true);
+            saveInqs(inqs);
+            json(200, { success: true, message: 'All inquiries marked as read.' });
+            return;
+          }
+
+          if (action === 'delete' && req.method === 'POST') {
+            let inqs = loadInqs();
+            const before = inqs.length;
+            inqs = inqs.filter(i => i.id !== body.id);
+            if (inqs.length < before) {
+              saveInqs(inqs);
+              json(200, { success: true, message: 'Inquiry deleted successfully.' });
+            } else {
+              json(404, { success: false, error: 'Inquiry record not found.' });
+            }
+            return;
+          }
+        }
+
         // 4. Leads Sync API
         if (url.pathname === '/api/leads_sync.php') {
           if (action === 'get_leads') { json(200, { success: true, leads: [...leads.values()] }); return; }

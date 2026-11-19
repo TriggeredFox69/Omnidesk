@@ -974,7 +974,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
       <?php endif; ?>
       <a href="#offer">What we offer</a>
       <a href="#how">How it works</a>
-      <a href="#brands">For brands</a>
+      <a href="#promote" onclick="openPromoteProductModal(); return false;">For brands</a>
     </nav>
     <button onclick="toggleTheme()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600;">
       🌓 Theme
@@ -1005,7 +1005,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <h1>Turn WhatsApp chats into <span class="lp-grad">paying customers.</span></h1>
     <p class="lp-lead">Chatly puts your product in front of a trained team of closers who sell for you on WhatsApp. You pay for promotion &mdash; we bring real conversations, real orders and real revenue.</p>
     <div class="lp-cta-row">
-      <a href="cc.php" class="lp-btn lp-btn-primary">Promote my product &rarr;</a>
+      <a href="#promote" class="lp-btn lp-btn-primary" onclick="openPromoteProductModal(); return false;">Promote my product &rarr;</a>
       <a href="javascript:void(0)" class="lp-btn lp-btn-ghost" onclick="focusHeroQR(); return false;">Start closing as TM</a>
     </div>
     <div class="lp-trust">
@@ -1187,7 +1187,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         <li>Live pipeline, conversions and closer performance</li>
         <li>Approve, pause or remove closers any time</li>
       </ul>
-      <a href="#top" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
+      <a href="#promote" class="lp-btn lp-btn-primary" onclick="openPromoteProductModal(); return false;">Promote my product &rarr;</a>
     </div>
     <div class="lp-panel">
       <span class="lp-eyebrow">For closers</span>
@@ -1208,7 +1208,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
       <div class="lp-brand-tile"><img src="assets/images/nunno-logo.svg" alt="">Nunno</div>
       <div class="lp-brand-tile"><img src="assets/images/apex-logo.svg" alt="">Apex</div>
       <div class="lp-brand-tile"><img src="assets/images/paktrade-logo.svg" alt="">PakTrade</div>
-      <div class="lp-brand-tile more">+ your brand</div>
+      <div class="lp-brand-tile more" style="cursor:pointer;" onclick="openPromoteProductModal();" title="Promote your product on Chatly">+ your brand</div>
     </div>
   </div>
 </section>
@@ -1219,7 +1219,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <h2>Ready to sell more on WhatsApp?</h2>
     <p>Put your product in front of real buyers &mdash; and let our closers do the selling.</p>
     <div class="lp-cta-row">
-      <a href="#top" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Start promoting today &rarr;</a>
+      <a href="#promote" class="lp-btn lp-btn-primary" onclick="openPromoteProductModal(); return false;">Start promoting today &rarr;</a>
       <a href="#top" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Join as a closer</a>
     </div>
   </div>
@@ -1925,8 +1925,142 @@ async function handleSadminLogin(e) {
     </button>
   </div>
 </div>
-    <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); margin:0;" onclick="closeTMSuccessModal()">
-      Understood, Continue to Login &rarr;
+
+<!-- MODAL: Promote My Product Form (Brand Inquiry) -->
+<div id="modalPromoteProduct" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(10px); overflow-y:auto; padding:24px 0;">
+  <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138, 0.4); border-radius:22px; padding:32px; max-width:560px; width:92%; box-shadow:0 25px 70px rgba(0,0,0,0.7); position:relative; margin:auto;">
+    
+    <!-- Modal Close Button -->
+    <button type="button" onclick="closePromoteProductModal()" style="position:absolute; top:20px; right:20px; background:none; border:none; color:var(--wa-text-muted); font-size:26px; cursor:pointer; line-height:1; transition:color 0.15s ease;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--wa-text-muted)'">&times;</button>
+
+    <!-- Header -->
+    <div style="margin-bottom:20px; padding-right:30px;">
+      <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; color:var(--wa-accent); letter-spacing:0.05em; background:rgba(31,224,138,0.12); border:1px solid rgba(31,224,138,0.3); padding:3px 8px; border-radius:6px; margin-bottom:8px;">
+        <span>🚀</span> Sell with Chatly Closers
+      </div>
+      <h3 style="font-size:22px; font-weight:800; color:var(--wa-text-primary); margin:0 0 6px 0; letter-spacing:-0.02em;">
+        Promote Your Product on Chatly
+      </h3>
+      <p style="font-size:12.5px; color:var(--wa-text-secondary); margin:0; line-height:1.5;">
+        Tell us about your product or service. Our network of trained WhatsApp sales closers will pitch, qualify leads, and close deals for your brand.
+      </p>
+    </div>
+
+    <!-- Form -->
+    <form id="formPromoteProductSubmit" onsubmit="handlePromoteProductSubmit(event)">
+      
+      <!-- Section 1: Product & Business -->
+      <div style="font-size:11.5px; font-weight:800; text-transform:uppercase; color:var(--wa-accent); letter-spacing:0.04em; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:4px;">
+        1. Product &amp; Brand Details
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Brand / Business Name *</label>
+          <input type="text" id="inqBrandName" class="input-field" placeholder="e.g. Aura Threads / Alpha Signals" required style="font-size:13px;">
+        </div>
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Product or Service Name *</label>
+          <input type="text" id="inqProductName" class="input-field" placeholder="e.g. Premium Leather Bags" required style="font-size:13px;">
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Industry / Category *</label>
+          <select id="inqCategory" class="input-field" style="cursor:pointer; font-size:12.5px;">
+            <option value="E-Commerce & Retail">E-Commerce &amp; Retail</option>
+            <option value="Trading, Crypto & Forex">Trading, Crypto &amp; Forex</option>
+            <option value="Online Courses & Coaching">Online Courses &amp; Coaching</option>
+            <option value="Real Estate & Property">Real Estate &amp; Property</option>
+            <option value="Health, Beauty & Fashion">Health, Beauty &amp; Fashion</option>
+            <option value="SaaS & Digital Services">SaaS &amp; Digital Services</option>
+            <option value="Other Business">Other Business</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Product Selling Price (PKR / USD) *</label>
+          <input type="text" id="inqPrice" class="input-field" placeholder="e.g. Rs. 4,500 or $50" required style="font-size:13px;">
+        </div>
+      </div>
+
+      <div class="input-group" style="margin-bottom:12px;">
+        <label class="input-label">What does your product do? / Main Pitch *</label>
+        <textarea id="inqDescription" class="input-field" rows="3" placeholder="Briefly describe what your product is, its key benefits, and why customers buy it..." required style="resize:vertical; font-family:inherit; font-size:12.5px; line-height:1.5;"></textarea>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Website, Store, or Instagram URL</label>
+          <input type="text" id="inqWebsite" class="input-field" placeholder="https://... (Optional)" style="font-size:12.5px;">
+        </div>
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Target Daily Orders / Closers</label>
+          <select id="inqTargetVolume" class="input-field" style="cursor:pointer; font-size:12.5px;">
+            <option value="1-5 orders / day (1 Closer)">1-5 orders / day (1 Closer)</option>
+            <option value="5-20 orders / day (2-3 Closers)" selected>5-20 orders / day (2-3 Closers)</option>
+            <option value="20-50+ orders / day (Dedicated Team)">20-50+ orders / day (Dedicated Team)</option>
+            <option value="Enterprise Scale (100+ orders / day)">Enterprise Scale (100+ orders / day)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Section 2: Contact Info -->
+      <div style="font-size:11.5px; font-weight:800; text-transform:uppercase; color:var(--wa-accent); letter-spacing:0.04em; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:4px;">
+        2. Business Contact &amp; WhatsApp
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Contact Person Name *</label>
+          <input type="text" id="inqContactName" class="input-field" placeholder="e.g. Askar Ali" required style="font-size:13px;">
+        </div>
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">WhatsApp Number *</label>
+          <input type="text" id="inqPhone" class="input-field" placeholder="+92 300 1234567" required style="font-size:13px;">
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">Email Address (Optional)</label>
+          <input type="email" id="inqEmail" class="input-field" placeholder="owner@brand.com" style="font-size:12.5px;">
+        </div>
+        <div class="input-group" style="margin:0;">
+          <label class="input-label">City / Country</label>
+          <input type="text" id="inqCity" class="input-field" placeholder="e.g. Lahore, Pakistan" value="Pakistan" style="font-size:12.5px;">
+        </div>
+      </div>
+
+      <div class="error-box" id="promoteFormError" style="display:none; margin-bottom:12px;"></div>
+
+      <button type="submit" id="btnSubmitPromoteProduct" class="btn-action-primary" style="background:linear-gradient(135deg, #4cecab, #1fe08a 50%, #0fa968); color:#03130c; font-weight:800; font-size:15px; margin-top:4px; box-shadow:0 10px 30px -6px rgba(31, 224, 138, 0.5);">
+        🚀 Submit Product for Review &amp; Promotion
+      </button>
+
+      <div style="font-size:11px; color:var(--wa-text-muted); text-align:center; margin-top:10px;">
+        🔒 Your details are secure. Our administration will contact you to review your product and assign dedicated WhatsApp closers.
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Product Promotion Submitted Confirmation -->
+<div id="modalPromoteSuccess" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
+  <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138, 0.4); border-radius:24px; padding:36px; max-width:480px; width:90%; box-shadow:0 25px 70px rgba(0,0,0,0.7); text-align:center;">
+    <div style="width:68px; height:68px; border-radius:50%; background:rgba(31, 224, 138, 0.15); border:2px solid var(--wa-accent); display:flex; align-items:center; justify-content:center; font-size:32px; margin:0 auto 16px;">
+      🎉
+    </div>
+    <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--wa-accent); letter-spacing:0.06em; margin-bottom:6px;">Application Received</div>
+    <h3 style="font-size:22px; font-weight:800; color:var(--wa-text-primary); margin-bottom:10px;">
+      Our Company Will Be In Touch Soon!
+    </h3>
+    <p style="font-size:13.5px; color:var(--wa-text-secondary); line-height:1.6; margin-bottom:24px;">
+      Thank you for submitting your product! Our team has received your details for <strong id="successInquiryBrand" style="color:var(--wa-accent);">your brand</strong>.<br><br>
+      Our company administration will review your product and be in touch with you shortly on WhatsApp at <strong id="successInquiryPhone" style="color:#fff;">+92 300 1234567</strong> to discuss closer onboarding and launching your campaigns.
+    </p>
+    <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); color:#03130c; font-weight:800; margin:0;" onclick="closePromoteSuccessModal()">
+      Awesome, Return to Homepage &rarr;
     </button>
   </div>
 </div>
@@ -2201,9 +2335,109 @@ async function handleTMRegisterSubmit(e) {
     btn.textContent = isTL ? 'Submit Team Leader (TL) Application for Approval ⏳' : 'Submit Closer Application for Company Approval ⏳';
   }
 }
-    btn.textContent = 'Submit Closer Application for Company Approval ⏳';
+
+// Brand Product Promotion Modal Handlers
+function openPromoteProductModal() {
+  const m = document.getElementById('modalPromoteProduct');
+  if (m) {
+    m.style.display = 'flex';
+    const firstInput = document.getElementById('inqBrandName');
+    if (firstInput) setTimeout(() => firstInput.focus(), 100);
   }
 }
+
+function closePromoteProductModal() {
+  const m = document.getElementById('modalPromoteProduct');
+  if (m) m.style.display = 'none';
+}
+
+function closePromoteSuccessModal() {
+  const m = document.getElementById('modalPromoteSuccess');
+  if (m) m.style.display = 'none';
+  if (window.location.hash === '#promote') {
+    history.replaceState(null, document.title, window.location.pathname);
+  }
+}
+
+async function handlePromoteProductSubmit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btnSubmitPromoteProduct');
+  const errBox = document.getElementById('promoteFormError');
+  btn.disabled = true;
+  btn.textContent = 'Submitting Product Details…';
+  if (errBox) errBox.style.display = 'none';
+
+  const brand_name = document.getElementById('inqBrandName').value.trim();
+  const product_name = document.getElementById('inqProductName').value.trim();
+  const category = document.getElementById('inqCategory').value;
+  const price = document.getElementById('inqPrice').value.trim();
+  const description = document.getElementById('inqDescription').value.trim();
+  const website = document.getElementById('inqWebsite').value.trim();
+  const target_volume = document.getElementById('inqTargetVolume').value;
+  const contact_name = document.getElementById('inqContactName').value.trim();
+  const phone = document.getElementById('inqPhone').value.trim();
+  const email = document.getElementById('inqEmail').value.trim();
+  const city = document.getElementById('inqCity').value.trim();
+
+  try {
+    const res = await fetch('api/brand_inquiries.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'submit',
+        brand_name,
+        product_name,
+        category,
+        price,
+        description,
+        website,
+        target_volume,
+        contact_name,
+        phone,
+        email,
+        city
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      closePromoteProductModal();
+      document.getElementById('formPromoteProductSubmit').reset();
+      
+      const bEl = document.getElementById('successInquiryBrand');
+      const pEl = document.getElementById('successInquiryPhone');
+      if (bEl) bEl.textContent = brand_name;
+      if (pEl) pEl.textContent = phone;
+
+      const sModal = document.getElementById('modalPromoteSuccess');
+      if (sModal) sModal.style.display = 'flex';
+    } else {
+      if (errBox) {
+        errBox.textContent = data.error || 'Failed to submit inquiry.';
+        errBox.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    if (errBox) {
+      errBox.textContent = 'Network communication error. Please try again.';
+      errBox.style.display = 'block';
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🚀 Submit Product for Review & Promotion';
+  }
+}
+
+// Auto open if #promote hash is present
+window.addEventListener('DOMContentLoaded', () => {
+  if (window.location.hash === '#promote') {
+    openPromoteProductModal();
+  }
+});
+window.addEventListener('hashchange', () => {
+  if (window.location.hash === '#promote') {
+    openPromoteProductModal();
+  }
+});
 
 // Handle TM Direct Password Login
 async function handleTMPasswordLogin(e) {
