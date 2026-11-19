@@ -333,7 +333,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         sender_role: activeSender.role,
         cycle: currentCycle,
         sender_index: senderIndex + 1,
-        simulate: true,
+        simulate: false,
         allow_simulation: true
       };
       if (state.media) {

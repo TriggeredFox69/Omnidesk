@@ -1830,8 +1830,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const isOwner = lead.ownerId === currentUserId;
-    const isLockedOngoing = leadState === 'ongoing' && lead.ownerId && !isOwner;
-    const closerDisplayName = owner ? owner.name : (lead.ownerName || lead.ownerId);
+    const isLockedOngoing = false; // Anti-Theft Lead Locking permanently disabled: each TM/TL operates their own connected WhatsApp
+    const closerDisplayName = owner ? owner.name : (lead.ownerName || lead.ownerId || 'Assigned Closer');
 
     if (els.chatLeadCloser) {
       if (leadState === 'fresh') {
@@ -1840,7 +1840,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (leadState === 'ongoing') {
         els.chatLeadCloser.style.display = 'inline';
         els.chatLeadCloser.style.color = '#fbbf24';
-        els.chatLeadCloser.textContent = isOwner ? `🔒 You (${closerDisplayName})` : `🔒 ${closerDisplayName}`;
+        els.chatLeadCloser.textContent = isOwner ? `👤 You (${closerDisplayName})` : `👤 ${closerDisplayName}`;
       } else if (leadState === 'pending_verification') {
         els.chatLeadCloser.style.display = 'inline';
         els.chatLeadCloser.style.color = '#cbd5e1';
@@ -1858,14 +1858,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Header Claim Button
+    // Header Claim Button: Permanently hidden (no take-lead barrier)
     if (els.chatClaimBtn) {
-      if (leadState === 'fresh') {
-        els.chatClaimBtn.style.display = 'inline-flex';
-        els.chatClaimBtn.onclick = () => claimLead(lead.id);
-      } else {
-        els.chatClaimBtn.style.display = 'none';
-      }
+      els.chatClaimBtn.style.display = 'none';
     }
 
     // Header Can't Handle Button (Only visible to the assigned closer or admin when ongoing)
@@ -1959,10 +1954,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.verifyPaidHeaderBtn) els.verifyPaidHeaderBtn.style.display = 'none';
       if (els.rejectPaidHeaderBtn) els.rejectPaidHeaderBtn.style.display = 'none';
       if (els.markPaidHeaderBtn) {
-        if (!isOwner && !isAdmin) {
-          // Strict Ownership Gate: Agent must take and claim the lead first before they can mark it as paid!
-          els.markPaidHeaderBtn.style.display = 'none';
-        } else if (leadState === 'paid') {
+        if (leadState === 'paid') {
           els.markPaidHeaderBtn.style.display = 'inline-flex';
           els.markPaidHeaderBtn.className = 'btn btn-ghost btn-xs';
           els.markPaidHeaderBtn.style.color = '#10b981';
@@ -1984,47 +1976,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const quickBar = document.querySelector('.quick-reply-bar');
     const compBar = document.querySelector('.chat-composer-bar');
 
-    // ANTI-THEFT LEAD LOCKING ENFORCEMENT
-    if (isLockedOngoing && !isAdmin) {
-      // UNAUTHORIZED CLOSER: Show Anti-Theft Security Shield
-      if (els.leadLockedShield) {
-        els.leadLockedShield.style.display = 'flex';
-        if (lead.isTakeover && lead.originalOwnerId === myId) {
-          if (els.lockedCloserName) els.lockedCloserName.innerHTML = `${lead.takenOverBy || 'Admin'} (Executive Takeover)<br><span style="color:#10b981;font-size:12px;font-weight:600;">🛡️ Your sales commission target credit is 100% protected!</span>`;
-        } else {
-          if (els.lockedCloserName) els.lockedCloserName.textContent = closerDisplayName;
-        }
-        const initials = (closerDisplayName || 'CL').split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('').toUpperCase();
-        const avEl = document.getElementById('lockedCloserAvatar');
-        if (avEl) avEl.textContent = initials;
-      }
-      if (els.chatMessagesArea) els.chatMessagesArea.style.display = 'none';
-      if (quickBar) quickBar.style.display = 'none';
-      if (compBar) compBar.style.display = 'none';
-      if (els.otherCloserNotice) els.otherCloserNotice.style.display = 'none';
-    } else {
-      // AUTHORIZED: Closer, Admin, or Fresh/Paid/Useless Lead
-      if (els.leadLockedShield) els.leadLockedShield.style.display = 'none';
-      if (els.chatMessagesArea) els.chatMessagesArea.style.display = 'flex';
-      if (quickBar) quickBar.style.display = 'flex';
-      if (compBar) compBar.style.display = 'block';
+    // ANTI-THEFT LEAD LOCKING PERMANENTLY DISABLED
+    if (els.leadLockedShield) els.leadLockedShield.style.display = 'none';
+    if (els.chatMessagesArea) els.chatMessagesArea.style.display = 'flex';
+    if (quickBar) quickBar.style.display = 'flex';
+    if (compBar) compBar.style.display = 'block';
+    if (els.otherCloserNotice) els.otherCloserNotice.style.display = 'none';
 
-      // Admin Monitoring Notice (Hidden if Takeover Banner is already shown)
-      if (els.otherCloserNotice) {
-        if (isLockedOngoing && isAdmin && !lead.isTakeover) {
-          els.otherCloserNotice.style.display = 'block';
-          if (els.otherCloserName) els.otherCloserName.textContent = closerDisplayName;
-        } else {
-          els.otherCloserNotice.style.display = 'none';
-        }
-      }
-
-      if (els.chatInput) {
-        els.chatInput.disabled = false;
-        els.chatInput.placeholder = 'Write a message…';
-      }
-      if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
+    if (els.chatInput) {
+      els.chatInput.disabled = false;
+      els.chatInput.placeholder = 'Write a message…';
     }
+    if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
 
     // Render Messages Thread
     if (els.chatMessagesArea && (!isLockedOngoing || isAdmin)) {
@@ -2199,23 +2162,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.dossierLockBadge) {
       if (!lead.ownerId) {
         els.dossierLockBadge.className = 'agent-lock-badge open';
-        els.dossierLockBadge.textContent = '🟢 Open Pool';
-      } else if (lead.ownerId === state.currentAgent.id) {
-        els.dossierLockBadge.className = 'agent-lock-badge mine';
-        els.dossierLockBadge.textContent = '🔒 Locked to You';
+        els.dossierLockBadge.textContent = '🟢 Open / Active';
       } else {
-        els.dossierLockBadge.className = 'agent-lock-badge locked';
-        els.dossierLockBadge.textContent = `🔒 Locked (${owner ? owner.name.split(' ')[0] : lead.ownerId})`;
+        els.dossierLockBadge.className = 'agent-lock-badge mine';
+        els.dossierLockBadge.textContent = `👤 ${closerDisplayName}`;
       }
     }
 
     if (els.dossierClaimBtn) {
-      if (leadState === 'fresh') {
-        els.dossierClaimBtn.style.display = 'block';
-        els.dossierClaimBtn.onclick = () => claimLead(lead.id);
-      } else {
-        els.dossierClaimBtn.style.display = 'none';
-      }
+      els.dossierClaimBtn.style.display = 'none';
     }
 
     if (els.dossierReleaseBtn) {
@@ -6613,11 +6568,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const isAdmin = state.currentUser && state.currentUser.role === 'admin';
     const isOwner = lead.ownerId === currentUserId;
 
-    if (!isOwner && !isAdmin) {
-      showToast('⚠️ Please claim and take this lead first before recording a sale or submitting for review!');
-      return;
-    }
-
     state.activeLeadId = lead.id;
 
     if (els.paidCustomerName) els.paidCustomerName.value = lead.name || '';
@@ -6711,11 +6661,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
     const isAdmin = state.currentUser && state.currentUser.role === 'admin';
     const isOwner = lead.ownerId === currentUserId;
-
-    if (!isOwner && !isAdmin) {
-      showToast('⚠️ Action blocked: You must take and claim this lead first before recording a sale.');
-      return;
-    }
 
     const name = (els.paidCustomerName?.value || '').trim() || lead.name;
     const plan = (els.paidPlanSelect?.value || 'Pro');

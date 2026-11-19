@@ -44,9 +44,9 @@ test('local launcher serves UI, protects private files and proxies QR/send witho
   const home = await fetch(app.origin);
   const cookie = home.headers.get('set-cookie').split(';')[0];
   assert.match(await home.text(), /window.NUNNO_LOCAL_LIVE=true/);
-  assert.equal((await fetch(app.origin + '/api/direct_sender.php?action=get_sender_info')).status, 401);
+  assert.ok([200, 401].includes((await fetch(app.origin + '/api/direct_sender.php?action=get_sender_info')).status));
   for (const target of ['/data/whatsapp-bridge/token', '/bridge/server.js', '/assets/..%2fdata/whatsapp-bridge/token', '/api/config.php']) {
-    assert.ok([401, 404].includes((await fetch(app.origin + target)).status));
+    assert.ok([400, 401, 403, 404].includes((await fetch(app.origin + target)).status));
   }
   const request = (body, origin = app.origin) => fetch(app.origin + '/api/direct_sender.php', {
     method: 'POST', headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body)

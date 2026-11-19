@@ -274,6 +274,9 @@ class BaileysClient extends EventEmitter {
         if (!id) return undefined;
         const remote = key?.remoteJid || '';
         const comboKey = remote ? `${remote}_${id}` : '';
+        const cleanRemote = remote.split('@')[0].split(':')[0].replace(/\D/g, '');
+        const cleanCombo = cleanRemote ? `${cleanRemote}_${id}` : '';
+
         if (this._rawMessageStore.has(id)) {
           const raw = this._rawMessageStore.get(id);
           try {
@@ -284,6 +287,14 @@ class BaileysClient extends EventEmitter {
         }
         if (comboKey && this._rawMessageStore.has(comboKey)) {
           const raw = this._rawMessageStore.get(comboKey);
+          try {
+            return proto.Message.fromObject(raw);
+          } catch (_) {
+            return raw;
+          }
+        }
+        if (cleanCombo && this._rawMessageStore.has(cleanCombo)) {
+          const raw = this._rawMessageStore.get(cleanCombo);
           try {
             return proto.Message.fromObject(raw);
           } catch (_) {
@@ -605,9 +616,11 @@ class BaileysClient extends EventEmitter {
 
             console.log(`[Baileys Auto-Heal] Socket retry receipt received for ${ids.length} msgs [${ids.join(', ')}] from ${participant} (count ${count})`);
 
-            // ALWAYS reset the contact's session when ANY retry is received.
-            // A retry receipt means the recipient phone's Signal ratchet cannot decrypt our message.
-            this.resetContactSession(participant);
+            // Only purge session when count >= 2 so the standard prekey negotiation is not wiped prematurely
+            if (count >= 2) {
+              console.log(`[Baileys Auto-Heal] Retry count >= 2 for ${participant}. Purging desynchronized session to force fresh prekey exchange...`);
+              this.resetContactSession(participant);
+            }
 
             try {
               if (typeof this.sock.assertSessions === 'function') {
@@ -649,19 +662,28 @@ class BaileysClient extends EventEmitter {
 
   _normalizeJid(jidOrPhone) {
     let raw = String(jidOrPhone || '').trim();
-    if (raw.endsWith('@s.whatsapp.net') || raw.endsWith('@c.us') || raw.endsWith('@lid')) {
+    if (raw.endsWith('@g.us') || raw.endsWith('@broadcast') || raw.endsWith('@newsletter')) {
+      return raw;
+    }
+    // If a LID is passed, map it to its registered phone number if known
+    if (raw.endsWith('@lid') || (raw.startsWith('2080') && raw.length >= 14)) {
+      const lidClean = raw.split('@')[0].split(':')[0].replace(/\D/g, '');
+      if (this._lidToPhone.has(lidClean)) {
+        return `${this._lidToPhone.get(lidClean)}@s.whatsapp.net`;
+      }
+      return `${lidClean}@s.whatsapp.net`;
+    }
+    if (raw.endsWith('@s.whatsapp.net') || raw.endsWith('@c.us')) {
       raw = raw.split('@')[0];
     }
     raw = raw.replace(/\D/g, '');
     if (raw.startsWith('0092')) raw = raw.slice(2);
     else if (raw.startsWith('03') && raw.length === 11) raw = '92' + raw.slice(1);
     else if (raw.startsWith('3') && raw.length === 10) raw = '92' + raw;
-    if (this._phoneToLid.has(raw)) {
-      return `${this._phoneToLid.get(raw)}@lid`;
-    }
-    if (raw.startsWith('2080') && raw.length >= 14) {
-      return `${raw}@lid`;
-    }
+
+    // CRITICAL: All 1-on-1 outgoing messages MUST be sent to @s.whatsapp.net!
+    // Never send 1-on-1 messages to @lid, as it causes "Waiting for this message"
+    // on the recipient's phone and prevents the message from syncing to the sender's own phone.
     return `${raw}@s.whatsapp.net`;
   }
 
@@ -711,7 +733,8 @@ class BaileysClient extends EventEmitter {
         if (result.lid) {
           this._recordLidPhone(result.lid, result.jid || norm);
         }
-        return { _serialized: result.jid };
+        const targetJid = (result.jid && !result.jid.endsWith('@lid')) ? result.jid : `${norm}@s.whatsapp.net`;
+        return { _serialized: targetJid };
       }
       if (result && result.exists === false) return null;
     } catch (_) {}
@@ -866,6 +889,16 @@ class BaileysClient extends EventEmitter {
 
     console.log(`[Baileys] Sending to ${jid}: ${typeof content === 'string' ? content.slice(0, 40) : (isVoice ? 'Voice Note' : (content?.mimetype || 'media'))}`);
 
+    // Assert and verify active Signal ratchet session exists before encryption
+    try {
+      if (typeof this.sock.assertSessions === 'function') {
+        const assertTargets = [jid];
+        const myJid = this.sock.user?.id ? (this.sock.user.id.split(':')[0].split('@')[0] + '@s.whatsapp.net') : '';
+        if (myJid && myJid !== jid) assertTargets.push(myJid);
+        await this.sock.assertSessions(assertTargets, false).catch(() => {});
+      }
+    } catch (_) {}
+
     if (typeof content === 'string') {
       sent = await this.sock.sendMessage(jid, { text: content });
     } else if (content && content.data && content.mimetype) {
@@ -914,8 +947,13 @@ class BaileysClient extends EventEmitter {
 
     // CRITICAL: Cache raw message proto so retry requests can decrypt and prevent "Waiting for this message"
     if (sent?.key?.id && sent?.message) {
-      this._rawMessageStore.set(sent.key.id, sent.message);
-      if (jid) this._rawMessageStore.set(`${jid}_${sent.key.id}`, sent.message);
+      const rawId = sent.key.id;
+      this._rawMessageStore.set(rawId, sent.message);
+      if (jid) {
+        this._rawMessageStore.set(`${jid}_${rawId}`, sent.message);
+        const cleanPhone = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+        if (cleanPhone) this._rawMessageStore.set(`${cleanPhone}_${rawId}`, sent.message);
+      }
       this._saveRawStore();
     }
 

@@ -52,8 +52,8 @@ test('createCampaignManager starts, executes, pauses, and stops', async () => {
   assert.equal(status.status, 'running');
   assert.equal(status.totalContacts, 2);
 
-  // Wait a moment for first step to fire
-  await new Promise(r => setTimeout(r, 50));
+  // Wait a moment for first step to fire (step triggers after 100ms)
+  await new Promise(r => setTimeout(r, 250));
   assert.equal(sent.length >= 1, true);
 
   const paused = mgr.pause();

@@ -1760,7 +1760,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             currentLocalUser = null;
           }
           content = templateSadminPhp(content, currentLocalUser, url.searchParams.has('portal') || url.searchParams.has('dashboard'));
-        } else if (relative === 'index.html') {
+        }
+        if (!content.includes('window.NUNNO_LOCAL_LIVE=true') && content.includes('</head>')) {
           content = content.replace('</head>', '<script>window.NUNNO_LOCAL_LIVE=true;</script></head>');
         }
         res.end(content);
