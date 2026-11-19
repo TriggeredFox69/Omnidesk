@@ -21,11 +21,19 @@ if (session_status() === PHP_SESSION_NONE) {
 // If action=logout or switch=1 or logout=1 is passed, completely wipe session and redirect to clean root URL
 if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['logout']) || isset($_GET['switch'])) {
     $_SESSION = [];
+    if (session_id()) {
+        @session_unset();
+        @session_destroy();
+    }
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+        setcookie(session_name(), '', time() - 86400, '/');
+        if (!empty($params['domain'])) {
+            setcookie(session_name(), '', time() - 86400, '/', $params['domain']);
+        }
     }
-    @session_destroy();
+    setcookie('nunno_local', '', time() - 86400, '/');
+    @session_write_close();
     header('Location: /');
     exit;
 } elseif (!empty($_SESSION['omnidesk_user'])) {
@@ -55,14 +63,14 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     (function(){
       try {
         var q = window.location.search || '';
-        if (q.indexOf('action=logout') !== -1 || q.indexOf('logout=1') !== -1 || q.indexOf('switch=1') !== -1) {
+        if (q.indexOf('action=logout') !== -1 || q.indexOf('logout=1') !== -1 || q.indexOf('switch=1') !== -1 || sessionStorage.getItem('chatly_logged_out') === '1') {
           localStorage.removeItem('nunno_active_session');
+          localStorage.removeItem('omnidesk_user');
           localStorage.removeItem('omnidesk_impersonated_from_admin');
           localStorage.removeItem('omnidesk_impersonated_user');
           localStorage.removeItem('omnidesk_impersonated_name');
           localStorage.removeItem('omnidesk_active_chat_phone');
           sessionStorage.clear();
-          sessionStorage.setItem('chatly_logged_out', '1');
         }
         // Always display clean URL in browser address bar
         if (window.history && window.history.replaceState) {
@@ -75,6 +83,21 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         }
       } catch(_) {}
     })();
+
+    function handleGeneralLogout(e) {
+      if (e) e.preventDefault();
+      try {
+        localStorage.removeItem('nunno_active_session');
+        localStorage.removeItem('omnidesk_user');
+        localStorage.removeItem('omnidesk_impersonated_from_admin');
+        localStorage.removeItem('omnidesk_impersonated_user');
+        localStorage.removeItem('omnidesk_impersonated_name');
+        localStorage.removeItem('omnidesk_active_chat_phone');
+        sessionStorage.clear();
+        sessionStorage.setItem('chatly_logged_out', '1');
+      } catch (_) {}
+      window.location.href = '/login.php?action=logout';
+    }
   </script>
   <style>
     :root {
@@ -968,7 +991,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         }
       ?>
         <a href="<?php echo htmlspecialchars($destUrl); ?>" class="lp-nav-cta" style="background:rgba(31,224,138,0.22); border:1px solid var(--wa-accent); color:var(--wa-accent); font-weight:800;"><?php echo $btnText; ?> &rarr;</a>
-        <a href="/login.php?action=logout" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>
+        <a href="/login.php?action=logout" onclick="handleGeneralLogout(event)" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>
       <?php else: ?>
         <a href="#top" class="lp-nav-cta" onclick="focusHeroQR(); return false;">⚡ Workspace Login</a>
       <?php endif; ?>

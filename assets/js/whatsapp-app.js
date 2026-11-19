@@ -5472,6 +5472,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleLogout() {
     try {
       localStorage.removeItem('nunno_active_session');
+      localStorage.removeItem('omnidesk_user');
       localStorage.removeItem('omnidesk_impersonated_from_admin');
       localStorage.removeItem('omnidesk_impersonated_user');
       localStorage.removeItem('omnidesk_impersonated_name');

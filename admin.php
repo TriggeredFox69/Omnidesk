@@ -25,19 +25,28 @@ if (session_status() === PHP_SESSION_NONE) {
 $currentUser = $_SESSION['omnidesk_user'] ?? null;
 $isLoggedInAdmin = ($currentUser && in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true));
 
-// Direct visits to /cc or admin.php by an authenticated admin will directly display their company dashboard.
-// If ?login=1 or ?switch=1 is passed, the login gate will be displayed.
-$isAdmin = ($isLoggedInAdmin && !isset($_GET['login']) && !isset($_GET['switch']));
+// Only show executive company dashboard if admin is authenticated AND explicitly accessing portal (?portal=1 or ?dashboard=1)
+// Direct visits to /cc or admin.php without ?portal=1 will ALWAYS display the clean company admin login gate
+$isPortalView = (isset($_GET['portal']) && $_GET['portal'] === '1') || isset($_GET['dashboard']);
+$isAdmin = ($isLoggedInAdmin && $isPortalView && !isset($_GET['login']) && !isset($_GET['switch']));
 
-// Logout action
+// Complete logout action: thoroughly purge session, wipe cookies, and redirect to homepage (/)
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = [];
+    if (session_id()) {
+        @session_unset();
+        @session_destroy();
+    }
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+        setcookie(session_name(), '', time() - 86400, '/');
+        if (!empty($params['domain'])) {
+            setcookie(session_name(), '', time() - 86400, '/', $params['domain']);
+        }
     }
-    @session_destroy();
-    header('Location: /cc');
+    setcookie('nunno_local', '', time() - 86400, '/');
+    @session_write_close();
+    header('Location: /');
     exit;
 }
 
@@ -528,7 +537,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       <a href="/cc?login=1" class="btn btn-secondary" style="font-size:12px;" title="Switch Company Account">
         <span>🔄</span> Switch
       </a>
-      <a href="/cc?action=logout" class="btn btn-danger">
+      <a href="/cc?action=logout" onclick="handleAdminLogout(event)" class="btn btn-danger">
         <span>🚪</span> Logout
       </a>
     </div>
@@ -2455,6 +2464,21 @@ async function handleAdminLogin(e) {
     btn.disabled = false;
     btn.textContent = 'Access Company Control 🏢';
   }
+}
+
+function handleAdminLogout(e) {
+  if (e) e.preventDefault();
+  try {
+    localStorage.removeItem('omnidesk_user');
+    localStorage.removeItem('nunno_active_session');
+    localStorage.removeItem('omnidesk_impersonated_from_admin');
+    localStorage.removeItem('omnidesk_impersonated_user');
+    localStorage.removeItem('omnidesk_impersonated_name');
+    localStorage.removeItem('omnidesk_active_chat_phone');
+    sessionStorage.clear();
+    sessionStorage.setItem('chatly_logged_out', '1');
+  } catch (_) {}
+  window.location.href = '/cc?action=logout';
 }
 
 // ==========================================

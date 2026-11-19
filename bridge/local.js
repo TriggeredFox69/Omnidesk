@@ -8,8 +8,20 @@ const { spawn } = require('node:child_process');
 const { createService } = require('./service');
 const root = path.resolve(__dirname, '..');
 
-function templateLoginPhp(content) {
-  let rendered = content.replace(/<\?php[\s\S]*?\?>/, '');
+function templateLoginPhp(content, currentUser = null) {
+  let rendered = content;
+  if (!currentUser) {
+    rendered = rendered.replace(/<\?php if \(!empty\(\$_SESSION\['omnidesk_user'\]\)\):[\s\S]*?<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, '$1');
+  } else {
+    rendered = rendered.replace(/<\?php if \(!empty\(\$_SESSION\['omnidesk_user'\]\)\):[\s\S]*?<\?php else: \?>([\s\S]*?)<\?php endif; \?>/, () => {
+      const isSuper = currentUser.role === 'superadmin';
+      const isAdmin = currentUser.role === 'admin';
+      const compId = currentUser.company_id || 'COMP-001';
+      const url = isSuper ? '/ss?portal=1' : (isAdmin ? `/cc?portal=1&company_id=${encodeURIComponent(compId)}` : 'index.php');
+      const text = isSuper ? '⚡ Master Command Center' : (isAdmin ? '🏢 Company Admin Portal' : `⚡ Open Workspace (${currentUser.name || 'Closer'})`);
+      return `<a href="${url}" class="lp-nav-cta" style="background:rgba(31,224,138,0.22); border:1px solid var(--wa-accent); color:var(--wa-accent); font-weight:800;">${text} &rarr;</a>\n<a href="/login.php?action=logout" onclick="handleGeneralLogout(event)" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>`;
+    });
+  }
   rendered = rendered.replace(/<\?php[\s\S]*?\?>/g, '');
   return rendered;
 }
@@ -1745,7 +1757,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('logout') === '1') {
             currentLocalUser = null;
           }
-          content = templateLoginPhp(content);
+          content = templateLoginPhp(content, currentLocalUser);
         } else if (relative === 'admin.php' || relative === 'cc.php') {
           if (url.searchParams.get('action') === 'logout' || url.searchParams.get('switch') === '1' || url.searchParams.get('login') === '1') {
             currentLocalUser = null;

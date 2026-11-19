@@ -31,15 +31,23 @@ $isLoggedInSuperAdmin = ($currentUser && ($currentUser['role'] ?? '') === 'super
 $isPortalView = (isset($_GET['portal']) || isset($_GET['dashboard']));
 $isSuperAdmin = ($isLoggedInSuperAdmin && $isPortalView && !isset($_GET['login']) && !isset($_GET['switch']));
 
-// Quick logout action
+// Complete logout action: thoroughly purge session, wipe cookies, and redirect to homepage (/)
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = [];
+    if (session_id()) {
+        @session_unset();
+        @session_destroy();
+    }
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+        setcookie(session_name(), '', time() - 86400, '/');
+        if (!empty($params['domain'])) {
+            setcookie(session_name(), '', time() - 86400, '/', $params['domain']);
+        }
     }
-    @session_destroy();
-    header('Location: /ss');
+    setcookie('nunno_local', '', time() - 86400, '/');
+    @session_write_close();
+    header('Location: /');
     exit;
 }
 ?>
@@ -318,7 +326,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
           </div>
           <div style="display: flex; gap: 8px;">
             <a href="?portal=1" class="btn btn-gold" style="padding: 7px 14px; font-size: 12px; text-decoration: none; border-radius: 8px; flex: 1; justify-content: center;">Enter Command Center &rarr;</a>
-            <a href="?action=logout" class="btn btn-secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-radius: 8px; color: #ef4444;">Sign Out</a>
+            <a href="?action=logout" onclick="handleSadminLogout(event)" class="btn btn-secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-radius: 8px; color: #ef4444;">Sign Out</a>
           </div>
         </div>
       <?php endif; ?>
@@ -380,7 +388,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
       <a href="/ss" class="btn btn-secondary" style="font-size:12px;" title="Switch Account">
         <span>🔄</span> Switch
       </a>
-      <a href="?action=logout" class="btn btn-danger">
+      <a href="?action=logout" onclick="handleSadminLogout(event)" class="btn btn-danger">
         <span>🚪</span> Logout
       </a>
     </div>
@@ -1885,6 +1893,21 @@ async function handleSadminLogin(e) {
     btn.disabled = false;
     btn.textContent = 'Unlock Platform Command ⚡';
   }
+}
+
+function handleSadminLogout(e) {
+  if (e) e.preventDefault();
+  try {
+    localStorage.removeItem('omnidesk_user');
+    localStorage.removeItem('nunno_active_session');
+    localStorage.removeItem('omnidesk_impersonated_from_admin');
+    localStorage.removeItem('omnidesk_impersonated_user');
+    localStorage.removeItem('omnidesk_impersonated_name');
+    localStorage.removeItem('omnidesk_active_chat_phone');
+    sessionStorage.clear();
+    sessionStorage.setItem('chatly_logged_out', '1');
+  } catch (_) {}
+  window.location.href = '/ss?action=logout';
 }
 
 // Filter Companies Table

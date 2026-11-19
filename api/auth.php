@@ -967,14 +967,19 @@ switch ($action) {
     // 3. Logout
     case 'logout':
         $_SESSION = [];
+        if (session_id()) {
+            @session_unset();
+            @session_destroy();
+        }
         if (ini_get("session.use_cookies")) {
             $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000,
-                $params["path"], $params["domain"],
-                $params["secure"], $params["httponly"]
-            );
+            setcookie(session_name(), '', time() - 86400, '/');
+            if (!empty($params['domain'])) {
+                setcookie(session_name(), '', time() - 86400, '/', $params['domain']);
+            }
         }
-        session_destroy();
+        setcookie('nunno_local', '', time() - 86400, '/');
+        @session_write_close();
         echo json_encode([
             'success' => true,
             'message' => 'Logged out successfully.'
