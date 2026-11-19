@@ -665,6 +665,129 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     .btn-action-primary { color: #03130c; font-weight: 800; }
     .btn-admin { color: #1a1000; }
     .role-tab-btn.active { box-shadow: inset 0 -2px 18px -10px currentColor; }
+
+    /* ═════════ CHATLY LANDING SECTIONS ═════════ */
+    html { scroll-behavior: smooth; }
+    .wa-top-header { height: 76px !important; padding: 16px 40px !important; align-items: center !important; z-index: 20 !important; position: fixed !important; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); background: linear-gradient(180deg, rgba(8, 36, 26, 0.88), rgba(5, 11, 9, 0.72)) !important; border-bottom: 1px solid rgba(31, 224, 138, 0.16); }
+    html.theme-light .wa-top-header { background: linear-gradient(180deg, rgba(11, 61, 42, 0.95), rgba(10, 90, 58, 0.92)) !important; }
+    .lp-nav { display: flex; align-items: center; gap: 22px; }
+    .lp-nav a { color: rgba(255, 255, 255, 0.78); text-decoration: none; font-size: 13px; font-weight: 600; transition: color 0.15s; }
+    .lp-nav a:hover { color: #1fe08a; }
+    .lp-nav .lp-nav-cta { padding: 7px 16px; border-radius: 999px; background: linear-gradient(135deg, #4cecab, #1fe08a 50%, #0fa968); color: #03130c; font-weight: 800; box-shadow: 0 4px 16px rgba(31, 224, 138, 0.35); }
+    .lp-nav .lp-nav-cta:hover { color: #03130c; filter: brightness(1.07); }
+    @media (max-width: 860px) { .lp-nav a:not(.lp-nav-cta) { display: none; } .wa-top-header { padding: 14px 16px !important; } .wa-brand-tag { display: none; } }
+
+    .lp-section { position: relative; z-index: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+    .lp-eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 13px; border-radius: 999px; background: rgba(31, 224, 138, 0.12); border: 1px solid rgba(31, 224, 138, 0.35); color: var(--wa-accent); font-size: 11.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .lp-eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--wa-accent); box-shadow: 0 0 10px var(--wa-accent); animation: pulseAnim 1.6s infinite; }
+    .lp-h2 { font-size: clamp(26px, 3.6vw, 40px); font-weight: 900; letter-spacing: -0.03em; line-height: 1.12; margin: 14px 0 10px; color: var(--wa-text-primary); }
+    .lp-lead { font-size: 16px; line-height: 1.6; color: var(--wa-text-secondary); max-width: 640px; }
+    .lp-center { text-align: center; } .lp-center .lp-lead { margin: 0 auto; }
+    .lp-grad { background: linear-gradient(135deg, #4cecab, #1fe08a 50%, #0fa968); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    html.theme-light .lp-grad { background: linear-gradient(135deg, #0fa968, #0b8a57); -webkit-background-clip: text; background-clip: text; }
+    .lp-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 24px; border-radius: 14px; font-size: 15px; font-weight: 800; border: 0; cursor: pointer; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s, filter 0.15s; }
+    .lp-btn:hover { transform: translateY(-2px); }
+    .lp-btn-primary { background: linear-gradient(135deg, #4cecab, #1fe08a 50%, #0fa968); color: #03130c; box-shadow: 0 10px 30px -6px rgba(31, 224, 138, 0.5); }
+    .lp-btn-ghost { background: rgba(31, 224, 138, 0.08); color: var(--wa-text-primary); border: 1px solid rgba(31, 224, 138, 0.3); }
+    .lp-btn-ghost:hover { background: rgba(31, 224, 138, 0.16); }
+
+    /* Hero */
+    .lp-hero { padding-top: 138px; padding-bottom: 36px; display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 48px; align-items: center; }
+    .lp-hero h1 { font-size: clamp(34px, 5.4vw, 64px); font-weight: 900; letter-spacing: -0.04em; line-height: 1.04; margin: 18px 0 18px; color: var(--wa-text-primary); }
+    .lp-hero .lp-lead { font-size: 17.5px; max-width: 560px; }
+    .lp-cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+    .lp-trust { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 26px; font-size: 13px; color: var(--wa-text-secondary); font-weight: 600; }
+    .lp-trust span::before { content: '\2713'; color: var(--wa-accent); font-weight: 900; margin-right: 6px; }
+    @media (max-width: 920px) { .lp-hero { grid-template-columns: 1fr; padding-top: 112px; gap: 36px; } }
+
+    /* Hero visual: animated chat */
+    .lp-visual { position: relative; display: flex; justify-content: center; padding: 18px 0; }
+    .lp-visual::before { content: ''; position: absolute; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(circle, rgba(31, 224, 138, 0.35), rgba(31, 224, 138, 0) 68%); filter: blur(30px); top: 50%; left: 50%; transform: translate(-50%, -50%); animation: chatlyFloat 6s ease-in-out infinite; }
+    .lp-chat { position: relative; width: min(100%, 390px); border-radius: 26px; background: rgba(11, 23, 19, 0.86); border: 1px solid rgba(31, 224, 138, 0.28); box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(31, 224, 138, 0.06), 0 0 60px -18px rgba(31, 224, 138, 0.45); backdrop-filter: blur(16px); overflow: hidden; }
+    html.theme-light .lp-chat { background: rgba(255, 255, 255, 0.92); }
+    .lp-chat-head { display: flex; align-items: center; gap: 11px; padding: 14px 16px; border-bottom: 1px solid var(--wa-card-border); }
+    .lp-chat-head img { width: 38px; height: 38px; border-radius: 11px; }
+    .lp-chat-head b { display: block; font-size: 14px; color: var(--wa-text-primary); }
+    .lp-chat-head small { font-size: 11.5px; color: var(--wa-accent); font-weight: 700; }
+    .lp-chat-body { padding: 18px 14px 20px; min-height: 330px; display: flex; flex-direction: column; gap: 10px; }
+    .cm-b { max-width: 82%; padding: 10px 14px; font-size: 13.5px; line-height: 1.4; font-weight: 600; opacity: 0; transform: translateY(12px) scale(0.94); }
+    .cm-in { align-self: flex-start; border-radius: 16px 16px 16px 4px; background: rgba(31, 224, 138, 0.1); border: 1px solid rgba(31, 224, 138, 0.16); color: var(--wa-text-primary); }
+    .cm-out { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: linear-gradient(135deg, #2de89a, #0fa968); color: #03130c; box-shadow: 0 6px 18px -4px rgba(31, 224, 138, 0.45); }
+    .cm-deal { align-self: center; margin-top: 6px; padding: 9px 18px; border-radius: 999px; background: #03130c; color: #1fe08a; border: 1px solid rgba(31, 224, 138, 0.6); font-size: 12.5px; font-weight: 900; letter-spacing: 0.06em; box-shadow: 0 0 26px -4px rgba(31, 224, 138, 0.7); opacity: 0; transform: scale(0.8); }
+    html.theme-light .cm-deal { background: #0b3d2a; }
+    .cm-b:nth-child(1) { animation: cm1 11s infinite; } .cm-b:nth-child(2) { animation: cm2 11s infinite; }
+    .cm-b:nth-child(3) { animation: cm3 11s infinite; } .cm-b:nth-child(4) { animation: cm4 11s infinite; }
+    .cm-deal { animation: cm5 11s infinite; }
+    @keyframes cm1 { 0%, 4% { opacity: 0; transform: translateY(12px) scale(0.94); } 8%, 92% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+    @keyframes cm2 { 0%, 16% { opacity: 0; transform: translateY(12px) scale(0.94); } 20%, 92% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+    @keyframes cm3 { 0%, 30% { opacity: 0; transform: translateY(12px) scale(0.94); } 34%, 92% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+    @keyframes cm4 { 0%, 44% { opacity: 0; transform: translateY(12px) scale(0.94); } 48%, 92% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+    @keyframes cm5 { 0%, 58% { opacity: 0; transform: scale(0.7); } 63% { opacity: 1; transform: scale(1.12); } 67%, 92% { opacity: 1; transform: scale(1); } 97%, 100% { opacity: 0; transform: scale(0.9); } }
+    .lp-chip { position: absolute; padding: 9px 14px; border-radius: 14px; font-size: 12.5px; font-weight: 800; background: rgba(11, 23, 19, 0.92); color: var(--wa-text-primary); border: 1px solid rgba(31, 224, 138, 0.3); box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.6); backdrop-filter: blur(10px); white-space: nowrap; }
+    html.theme-light .lp-chip { background: rgba(255, 255, 255, 0.95); }
+    .lp-chip b { color: var(--wa-accent); }
+    .lp-chip.a { top: -10px; left: -26px; animation: chatlyFloat 5s ease-in-out infinite; }
+    .lp-chip.b { bottom: 34px; right: -6px; animation: chatlyFloat 6s ease-in-out -2s infinite; }
+    @media (max-width: 480px) { .lp-chip.a { left: 0; top: -14px; } .lp-chip.b { right: 0; } }
+
+    /* Stats */
+    .lp-stats { margin-top: 18px; padding: 26px; border-radius: 24px; background: linear-gradient(135deg, rgba(31, 224, 138, 0.1), rgba(31, 224, 138, 0.03)); border: 1px solid rgba(31, 224, 138, 0.22); display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; box-shadow: 0 20px 60px -24px rgba(0, 0, 0, 0.5); }
+    .lp-stat { text-align: center; padding: 8px 6px; position: relative; }
+    .lp-stat + .lp-stat::before { content: ''; position: absolute; left: 0; top: 18%; bottom: 18%; width: 1px; background: rgba(31, 224, 138, 0.2); }
+    .lp-stat b { display: block; white-space: nowrap; font-size: clamp(22px, 2.7vw, 34px); font-weight: 900; letter-spacing: -0.03em; color: var(--wa-text-primary); font-variant-numeric: tabular-nums; }
+    .lp-stat b em { font-style: normal; color: var(--wa-accent); }
+    .lp-stat > span { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 600; color: var(--wa-text-secondary); }
+    @media (max-width: 860px) { .lp-stats { grid-template-columns: repeat(2, 1fr); gap: 18px 8px; } .lp-stat + .lp-stat::before { display: none; } .lp-stat:last-child { grid-column: 1 / -1; } }
+
+    /* Generic block spacing */
+    .lp-block { padding-top: 84px; }
+    .lp-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 38px; }
+    @media (max-width: 920px) { .lp-grid3 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 580px) { .lp-grid3 { grid-template-columns: 1fr; } }
+    .lp-card { padding: 24px; border-radius: 20px; background: var(--wa-card-bg); border: 1px solid var(--wa-card-border); transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; position: relative; overflow: hidden; }
+    .lp-card:hover { transform: translateY(-4px); border-color: rgba(31, 224, 138, 0.45); box-shadow: 0 18px 44px -18px rgba(31, 224, 138, 0.35); }
+    .lp-ico { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: linear-gradient(135deg, rgba(31, 224, 138, 0.22), rgba(31, 224, 138, 0.06)); border: 1px solid rgba(31, 224, 138, 0.3); margin-bottom: 14px; }
+    .lp-card h3 { font-size: 17px; font-weight: 800; margin-bottom: 6px; color: var(--wa-text-primary); letter-spacing: -0.01em; }
+    .lp-card p { font-size: 14px; line-height: 1.55; color: var(--wa-text-secondary); }
+
+    /* How it works */
+    .lp-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; counter-reset: st; position: relative; }
+    @media (max-width: 820px) { .lp-steps { grid-template-columns: 1fr; } }
+    .lp-step { padding: 26px 24px; border-radius: 20px; background: var(--wa-card-bg); border: 1px solid var(--wa-card-border); position: relative; }
+    .lp-step::before { counter-increment: st; content: counter(st); display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; font-size: 17px; font-weight: 900; color: #03130c; background: linear-gradient(135deg, #4cecab, #0fa968); box-shadow: 0 6px 18px -4px rgba(31, 224, 138, 0.55); margin-bottom: 16px; }
+    .lp-step h3 { font-size: 18px; font-weight: 800; margin-bottom: 6px; color: var(--wa-text-primary); }
+    .lp-step p { font-size: 14px; line-height: 1.55; color: var(--wa-text-secondary); }
+
+    /* Brands vs closers */
+    .lp-split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 38px; }
+    @media (max-width: 820px) { .lp-split { grid-template-columns: 1fr; } }
+    .lp-panel { padding: 32px 30px; border-radius: 24px; border: 1px solid var(--wa-card-border); background: var(--wa-card-bg); position: relative; overflow: hidden; }
+    .lp-panel.brand { background: linear-gradient(145deg, rgba(31, 224, 138, 0.16), rgba(31, 224, 138, 0.04) 60%), var(--wa-card-bg); border-color: rgba(31, 224, 138, 0.35); }
+    .lp-panel h3 { font-size: 24px; font-weight: 900; letter-spacing: -0.02em; margin: 12px 0 14px; color: var(--wa-text-primary); }
+    .lp-panel ul { list-style: none; display: flex; flex-direction: column; gap: 11px; margin-bottom: 24px; }
+    .lp-panel li { display: flex; gap: 10px; font-size: 14.5px; line-height: 1.45; color: var(--wa-text-secondary); }
+    .lp-panel li::before { content: '\2713'; flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #03130c; background: var(--wa-accent); margin-top: 1px; }
+
+    /* Brands strip */
+    .lp-brands { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 30px; }
+    .lp-brand-tile { display: flex; align-items: center; gap: 12px; padding: 12px 20px 12px 12px; border-radius: 16px; background: var(--wa-card-bg); border: 1px solid var(--wa-card-border); font-weight: 800; font-size: 15px; color: var(--wa-text-primary); }
+    .lp-brand-tile img { width: 38px; height: 38px; border-radius: 11px; display: block; }
+    .lp-brand-tile.more { color: var(--wa-text-secondary); border-style: dashed; padding: 12px 22px; }
+
+    /* Final CTA */
+    .lp-final { margin-top: 90px; padding: 54px 28px; border-radius: 30px; text-align: center; position: relative; overflow: hidden; background: radial-gradient(ellipse 70% 120% at 50% 0%, rgba(31, 224, 138, 0.28), transparent 65%), linear-gradient(180deg, #0a1f17, #060f0b); border: 1px solid rgba(31, 224, 138, 0.35); box-shadow: 0 30px 80px -30px rgba(31, 224, 138, 0.35); }
+    .lp-final h2 { font-size: clamp(26px, 4vw, 44px); font-weight: 900; letter-spacing: -0.03em; color: #effff7; margin-bottom: 10px; }
+    .lp-final p { color: #8db5a3; font-size: 16px; margin-bottom: 26px; }
+    .lp-final .lp-cta-row { justify-content: center; margin-top: 0; }
+    .lp-final .lp-btn-ghost { color: #effff7; }
+    .lp-foot { margin: 56px auto 36px; text-align: center; font-size: 12.5px; color: var(--wa-text-muted); }
+    .lp-foot img { height: 26px; margin: 0 auto 10px; display: block; opacity: 0.9; }
+    html.theme-light .lp-foot img.dark-logo { display: none; }
+
+    /* Access card section */
+    .lp-access-head { text-align: center; padding-top: 64px; margin-bottom: 26px; }
+    #access .landing-wrapper { margin-top: 0; margin-bottom: 0; }
+    @media (prefers-reduced-motion: reduce) { .cm-b, .cm-deal { animation: none !important; opacity: 1 !important; transform: none !important; } .lp-visual::before, .lp-chip { animation: none; } }
   </style>
 </head>
 <body>
@@ -676,7 +799,8 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <span class="wa-brand-tag" style="background:rgba(255,255,255,0.22); color:#fff; font-weight:700;">Sales Closing Platform</span>
   </a>
 
-  <div style="display:flex; align-items:center; gap:16px;">
+  <div style="display:flex; align-items:center; gap:18px;">
+    <nav class="lp-nav"><a href="#offer">What we offer</a><a href="#how">How it works</a><a href="#brands">For brands</a><a href="#access" class="lp-nav-cta">Log in</a></nav>
     <button onclick="toggleTheme()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600;">
       🌓 Theme
     </button>
@@ -698,6 +822,85 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     </div>
   </div>
 </div>
+<!-- ═══════════ LANDING: HERO ═══════════ -->
+<section class="lp-section lp-hero" id="top">
+  <div>
+    <span class="lp-eyebrow"><i></i> WhatsApp sales closing platform</span>
+    <h1>Turn WhatsApp chats into <span class="lp-grad">paying customers.</span></h1>
+    <p class="lp-lead">Chatly puts your product in front of a trained team of closers who sell for you on WhatsApp. You pay for promotion &mdash; we bring real conversations, real orders and real revenue.</p>
+    <div class="lp-cta-row">
+      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
+      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Become a closer</a>
+    </div>
+    <div class="lp-trust"><span>Pay for promotion</span><span>Trained closers</span><span>Live deal tracking</span></div>
+  </div>
+
+  <div class="lp-visual" aria-hidden="true">
+    <div class="lp-chat">
+      <div class="lp-chat-head">
+        <img src="assets/images/chatly-icon.png" alt="">
+        <div><b>Chatly Closer Desk</b><small>&#9679; online &middot; replying now</small></div>
+      </div>
+      <div class="lp-chat-body">
+        <div class="cm-b cm-in">Is this still available?</div>
+        <div class="cm-b cm-out">Yes! Delivering today. Want me to reserve one for you?</div>
+        <div class="cm-b cm-in">Great, I'll take it!</div>
+        <div class="cm-b cm-out">Order confirmed. Thank you!</div>
+        <div class="cm-deal">&#10003; DEAL CLOSED</div>
+      </div>
+    </div>
+    <div class="lp-chip a">&#9889; Avg reply <b>&lt; 2 min</b></div>
+    <div class="lp-chip b">&#128176; New order <b>+ Rs. 4,500</b></div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: STATS ═══════════
+     PLACEHOLDER FIGURES — replace data-count values with real numbers before launch. -->
+<section class="lp-section" id="stats">
+  <div class="lp-stats">
+    <div class="lp-stat"><b><span data-count="48500" data-suffix="+">0</span></b><span>Conversations handled</span></div>
+    <div class="lp-stat"><b><span data-count="3200" data-suffix="+">0</span></b><span>Deals closed</span></div>
+    <div class="lp-stat"><b><span data-count="24.8" data-decimals="1" data-prefix="Rs. " data-suffix="M+">0</span></b><span>Revenue generated for brands</span></div>
+    <div class="lp-stat"><b><span data-count="420" data-suffix="+">0</span></b><span>Active closers</span></div>
+    <div class="lp-stat"><b><span data-count="85" data-suffix="+">0</span></b><span>Brands promoted</span></div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: WHAT WE OFFER ═══════════ -->
+<section class="lp-section lp-block lp-center" id="offer">
+  <span class="lp-eyebrow">What we offer</span>
+  <h2 class="lp-h2">Everything you need to <span class="lp-grad">sell on WhatsApp</span></h2>
+  <p class="lp-lead">One platform for the whole journey &mdash; from the first message to the paid order.</p>
+  <div class="lp-grid3" style="text-align:left;">
+    <div class="lp-card"><div class="lp-ico">&#129309;</div><h3>Dedicated closers</h3><p>A trained team of closers chats with your buyers and turns interest into confirmed orders.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128172;</div><h3>Shared team inbox</h3><p>Every conversation in one live inbox, with anti-theft lead locking so customers never get double-messaged.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128640;</div><h3>Smart campaigns</h3><p>Reach your audience with campaign message variations, live previews and automatic sending from a linked account.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128202;</div><h3>Live deal pipeline</h3><p>Watch every lead move from fresh to ongoing to paid, with conversion and performance stats in real time.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#128176;</div><h3>Commissions &amp; payouts</h3><p>Closers earn on every deal and team leaders earn Rs. 500 per recruited closer, with a built-in earnings portal.</p></div>
+    <div class="lp-card"><div class="lp-ico">&#127970;</div><h3>Your own workspace</h3><p>Each brand gets an isolated company workspace and admin portal to manage people, limits and approvals.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: HOW IT WORKS ═══════════ -->
+<section class="lp-section lp-block lp-center" id="how">
+  <span class="lp-eyebrow">How it works</span>
+  <h2 class="lp-h2">From product to <span class="lp-grad">paid order</span> in three steps</h2>
+  <p class="lp-lead">No ad guesswork. You pay for promotion, closers do the selling.</p>
+  <div class="lp-steps" style="text-align:left;">
+    <div class="lp-step"><h3>List your product</h3><p>Set up your company workspace and tell us what you sell. Approve the closers who will represent your brand.</p></div>
+    <div class="lp-step"><h3>Closers start chatting</h3><p>Closers link WhatsApp in seconds, promote your product and handle every conversation in the shared inbox.</p></div>
+    <div class="lp-step"><h3>You get customers</h3><p>Track deals in real time. You pay for promotion and keep the customers and revenue that come in.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: ACCESS (existing login card lives here) ═══════════ -->
+<section id="access">
+  <div class="lp-access-head lp-section">
+    <span class="lp-eyebrow">Get started</span>
+    <h2 class="lp-h2">Access your <span class="lp-grad">Chatly workspace</span></h2>
+    <p class="lp-lead" style="margin:0 auto;">Closers scan a QR to link WhatsApp. Team leaders, brands and platform admins sign in below.</p>
+  </div>
+
 <!-- Main Floating Container -->
 <div class="landing-wrapper">
   <div class="wa-main-card">
@@ -1004,6 +1207,97 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
   </div>
 </div>
 
+</section>
+
+<!-- ═══════════ LANDING: FOR BRANDS / FOR CLOSERS ═══════════ -->
+<section class="lp-section lp-block lp-center" id="brands">
+  <span class="lp-eyebrow">Two ways to win</span>
+  <h2 class="lp-h2">Built for <span class="lp-grad">brands</span> and <span class="lp-grad">closers</span></h2>
+  <div class="lp-split" style="text-align:left;">
+    <div class="lp-panel brand">
+      <span class="lp-eyebrow">For brands</span>
+      <h3>Pay for promotion. Get real customers.</h3>
+      <ul>
+        <li>A trained closer team promotes and sells your product on WhatsApp</li>
+        <li>Your own company workspace with a full admin portal</li>
+        <li>Live pipeline, conversions and closer performance</li>
+        <li>Approve, pause or remove closers any time</li>
+      </ul>
+      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
+    </div>
+    <div class="lp-panel">
+      <span class="lp-eyebrow">For closers</span>
+      <h3>Turn your WhatsApp into income.</h3>
+      <ul>
+        <li>Link your WhatsApp by scanning a QR code &mdash; it takes seconds</li>
+        <li>Pick a brand, chat with buyers and close deals</li>
+        <li>Earn commission on every deal you close</li>
+        <li>Team leaders earn Rs. 500 for each closer they recruit</li>
+      </ul>
+      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Start as a closer</a>
+    </div>
+  </div>
+
+  <div style="margin-top:64px;">
+    <span class="lp-eyebrow">Brands on Chatly</span>
+    <div class="lp-brands">
+      <div class="lp-brand-tile"><img src="assets/images/nunno-logo.svg" alt="">Nunno</div>
+      <div class="lp-brand-tile"><img src="assets/images/apex-logo.svg" alt="">Apex</div>
+      <div class="lp-brand-tile"><img src="assets/images/paktrade-logo.svg" alt="">PakTrade</div>
+      <div class="lp-brand-tile more">+ your brand</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ LANDING: FINAL CTA + FOOTER ═══════════ -->
+<section class="lp-section">
+  <div class="lp-final">
+    <h2>Ready to sell more on WhatsApp?</h2>
+    <p>Put your product in front of real buyers &mdash; and let our closers do the selling.</p>
+    <div class="lp-cta-row">
+      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Start promoting today &rarr;</a>
+      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Join as a closer</a>
+    </div>
+  </div>
+  <div class="lp-foot">
+    <img src="assets/images/chatly-logo.png" alt="Chatly" class="dark-logo">
+    &copy; Chatly &middot; WhatsApp sales closing platform
+  </div>
+</section>
+
+<script>
+// Landing helpers: jump to the access card on a given role tab, and animate the stat counters.
+function scrollToAccess(role) {
+  try { if (role && typeof switchRole === 'function') switchRole(role); } catch (_) {}
+  const el = document.querySelector('#access .landing-wrapper') || document.getElementById('access');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+(function () {
+  const nodes = document.querySelectorAll('[data-count]');
+  if (!nodes.length) return;
+  const fmt = (n, d) => n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const render = (el, v) => {
+    const d = +(el.dataset.decimals || 0);
+    el.textContent = (el.dataset.prefix || '') + fmt(v, d) + '';
+    if (el.dataset.suffix) { const s = document.createElement('em'); s.textContent = el.dataset.suffix; el.appendChild(s); }
+  };
+  const run = el => {
+    const target = parseFloat(el.dataset.count), t0 = performance.now(), dur = 1700;
+    const tick = now => {
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      render(el, target * e);
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || !('IntersectionObserver' in window)) { nodes.forEach(el => render(el, parseFloat(el.dataset.count))); return; }
+  const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { run(en.target); io.unobserve(en.target); } }), { threshold: 0.4 });
+  nodes.forEach(n => io.observe(n));
+})();
+</script>
+
+
 <script>
 // Role switcher
 function switchRole(role) {
@@ -1063,7 +1357,7 @@ async function refreshQRCode(force = false) {
       if (box) box.style.display = 'none';
       if (scanLine) scanLine.style.display = 'block';
       try {
-        await fetch('api/direct_sender.php', {
+        await fetch('api/direct_sender.php?action=reset_whatsapp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'reset_whatsapp' })
@@ -1074,8 +1368,11 @@ async function refreshQRCode(force = false) {
     const res = await fetch('api/direct_sender.php?action=get_sender_info');
     const data = await res.json();
     if (data.success) {
-      if (data.qr && data.state === 'qr') {
-        if (qrImg) qrImg.src = data.qr;
+      if (data.qr && (!data.is_connected || data.state === 'qr')) {
+        if (qrImg) {
+          qrImg.src = data.qr;
+          qrImg.style.display = 'block';
+        }
         if (box) box.style.display = 'none';
         if (scanLine) scanLine.style.display = 'block';
         if (statusTxt) statusTxt.textContent = 'Pure WebSocket Bridge • Scan with WhatsApp';
@@ -1095,10 +1392,10 @@ async function refreshQRCode(force = false) {
           lastKnownState = 'already_connected';
           showConnectedCloserBox(data.connected_number);
         }
-      } else if (data.state === 'idle' || data.state === 'disconnected') {
+      } else if (data.state === 'idle' || data.state === 'disconnected' || (!data.qr && !data.is_connected)) {
         if (box) box.style.display = 'none';
         if (scanLine) scanLine.style.display = 'block';
-        fetch('api/direct_sender.php', {
+        fetch('api/direct_sender.php?action=connect_whatsapp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'connect_whatsapp' })
