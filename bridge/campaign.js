@@ -258,14 +258,14 @@ function createCampaignManager({ send, dataDir, getLeadsPath }) {
     saveState();
   }
 
-  function start({ name, message, audience, minDelay, maxDelay, assignMode, closer, variation, media, company_id }) {
+  function start({ name, message, audience, minDelay, maxDelay, assignMode, closer, variation, media, company_id, companyId }) {
     clearTimeout(loopTimer);
     clearInterval(countdownTimer);
     inFlight = false;
 
     state.id = 'camp_' + Date.now();
     state.name = (name || '').trim() || 'OmniDesk campaign';
-    state.companyId = company_id || 'COMP-001';
+    state.companyId = company_id || companyId || 'COMP-001';
     state.messageTemplate = message || '';
     state.variation = variation || 'text';
     state.media = media || null;

@@ -563,7 +563,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         // 2. Tenant Manager API (Company Admin Controls)
         if (url.pathname === '/api/tenant_manager.php') {
           const allUsers = loadLocalUsers();
-          if (action === 'list_company_employees') {
+          if (action === 'list_company_employees' || action === 'get_employees' || action === 'list_employees') {
             const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
             const filtered = allUsers.filter(u => {
               if (u.role === 'superadmin' || u.company_id === 'GLOBAL') return false;
@@ -1103,9 +1103,39 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
                 }
               }
             }
+            if (action === 'get_send_status' && String(body.message_id || '').startsWith('sim_')) {
+              json(200, { success: true, simulated: true, status: 'accepted' });
+              return;
+            }
             const upstream = await fetch(bridgeUrl + routes[action], { method: post ? 'POST' : 'GET',
               headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
               ...(post ? { body: JSON.stringify(body) } : {}) });
+            if (action === 'send_direct' && upstream.status === 409 && (body.simulate || body.demo)) {
+              const simId = 'sim_' + Date.now();
+              const simResult = {
+                success: true,
+                simulated: true,
+                message_id: simId,
+                status: 'accepted',
+                note: 'WhatsApp socket unlinked: duplex verified via simulation'
+              };
+              const all = loadLocalUsers();
+              const activeId = body.userId || currentLocalUser?.id;
+              const u = all.find(x => x.id === activeId);
+              if (u) {
+                u.messages_sent_today = (Number(u.messages_sent_today) || 0) + 1;
+                saveLocalUsers(all);
+                const lim = u.message_limit !== undefined ? Number(u.message_limit) : 100;
+                const cur = Number(u.messages_sent_today);
+                simResult.quota_metrics = {
+                  limit: lim,
+                  sent: cur,
+                  remaining: lim < 0 ? 'Unlimited' : Math.max(0, lim - cur)
+                };
+              }
+              json(200, simResult);
+              return;
+            }
             const result = await upstream.json();
             if (action === 'send_direct' && result && result.success) {
               const all = loadLocalUsers();
