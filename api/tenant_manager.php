@@ -518,4 +518,18 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         echo json_encode(['success' => true, 'config' => getTenantConfig($companyId)]);
         exit;
     }
+
+    if ($action === 'update_company_config' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $config = getTenantConfig($companyId);
+        if (isset($input['company_name'])) $config['company_name'] = trim($input['company_name']);
+        if (isset($input['products']) && is_array($input['products'])) $config['products'] = $input['products'];
+        if (isset($input['default_pitch'])) $config['default_pitch'] = trim($input['default_pitch']);
+        if (isset($input['tl_commission_per_tm'])) {
+            $config['tl_commission_per_tm'] = max(0, (int)$input['tl_commission_per_tm']);
+        }
+        $configFile = getTenantConfigFile($companyId);
+        file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        echo json_encode(['success' => true, 'message' => 'Configuration saved successfully.', 'config' => $config]);
+        exit;
+    }
 }

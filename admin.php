@@ -1005,25 +1005,56 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     </div>
   </div>
 
-  <!-- TAB 6: PRODUCTS & PITCH CONFIG -->
+  <!-- TAB 6: PRODUCTS & PRICING CONFIG (INTEGRATED WITH CLOSER DESK) -->
   <div class="dash-pane" id="paneProducts">
     <div class="content-box">
       <div class="box-header">
         <div>
-          <div class="box-title"><span>⚙️</span> Company Product Catalog & Sales Pitch Config</div>
-          <div class="box-desc">Define products, closing prices, and closer commission tiers for <?php echo htmlspecialchars($activeCompany['name']); ?>.</div>
+          <div class="box-title"><span>⚙️</span> Company Product Catalog &amp; Pricing Configuration</div>
+          <div class="box-desc">
+            Define products, packages, and closing prices for <strong><?php echo htmlspecialchars($activeCompany['name']); ?></strong>. When TMs or TLs mark deals as paid in their sales chat desk, this exact list and prices will automatically populate their payment verification form.
+          </div>
         </div>
-        <button class="btn btn-emerald" onclick="saveProductConfig()">💾 Save Changes</button>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button type="button" class="btn btn-secondary" onclick="addProductRow()" style="font-weight:700;">
+            <span>➕ Add Product</span>
+          </button>
+          <button type="button" class="btn btn-emerald" onclick="saveProductConfig()" style="font-weight:700;">
+            <span>💾 Save Products &amp; Pricing</span>
+          </button>
+        </div>
       </div>
 
-      <div class="form-group" style="max-width: 600px;">
-        <label class="form-label">Default WhatsApp Pitch Template</label>
+      <div style="margin-bottom: 24px; max-width: 850px; background: rgba(56, 189, 248, 0.05); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 14px 18px;">
+        <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#38bdf8; margin-bottom:4px;">
+          <span>💡</span> Sales Desk Integration:
+        </div>
+        <div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">
+          Whenever a closer (TM or TL) clicks <strong>"Mark Paid"</strong> on a customer lead, they select from this product catalog. The customer's total confirmed price and the closer's commission are calculated automatically according to the values defined here.
+        </div>
+      </div>
+
+      <div class="form-group" style="max-width: 850px; margin-bottom: 24px;">
+        <label class="form-label" style="font-weight:700;">Default WhatsApp Pitch Template</label>
         <textarea id="cfgDefaultPitch" class="form-control" rows="3">{Salam|AoA|Hello} {name}! Welcome to <?php echo htmlspecialchars($activeCompany['name']); ?>. Special limited-time offers available today.</textarea>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Supports Spintax syntax and <code>{name}</code> personalizer tag.</div>
       </div>
 
-      <h4 style="font-size: 14px; font-weight: 700; margin: 20px 0 12px;">Active Products & Commissions</h4>
-      <div id="productsListContainer" style="display: flex; flex-direction: column; gap: 10px; max-width: 700px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; max-width: 850px;">
+        <h4 style="font-size: 14px; font-weight: 800; margin: 0; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+          <span>📦</span> Active Products &amp; Pricing Tiers
+        </h4>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addProductRow()">+ Add Product</button>
+      </div>
+
+      <div id="productsListContainer" style="display: flex; flex-direction: column; gap: 12px; max-width: 850px;">
         <!-- Injected via JS -->
+      </div>
+
+      <div style="margin-top: 18px; max-width: 850px;">
+        <button type="button" class="btn btn-secondary" onclick="addProductRow()" style="font-weight:700; border-style:dashed; width:100%; padding:10px;">
+          ➕ Add Another Product / Package
+        </button>
       </div>
     </div>
   </div>
@@ -2252,48 +2283,115 @@ async function loadCompanyConfig() {
         const thRate = document.getElementById('thTLLedgerRate');
         if (thRate) thRate.textContent = `Commission Accrued (@ Rs. ${window.currentCompanyTLCommissionRate.toLocaleString()})`;
       }
-      renderProductsList(data.config.products || []);
+      window.companyProducts = Array.isArray(data.config.products) && data.config.products.length > 0 
+        ? data.config.products 
+        : [
+            { id: 'p_1', name: 'Starter Package', amount: 2500, commission: 1000, badge: '⚡ Starter' },
+            { id: 'p_2', name: 'Enterprise Package', amount: 7500, commission: 3000, badge: '💎 Enterprise' }
+          ];
+      renderProductsList();
     }
   } catch (err) {
     console.error('Error loading config:', err);
   }
 }
 
-function renderProductsList(products) {
+window.companyProducts = [];
+
+function renderProductsList() {
   const container = document.getElementById('productsListContainer');
-  container.innerHTML = products.map((p, idx) => `
-    <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:10px; background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:10px; padding:12px;">
+  if (!container) return;
+
+  if (!window.companyProducts.length) {
+    container.innerHTML = `
+      <div style="padding: 24px; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.02); border: 1px dashed var(--border-subtle); border-radius: 12px;">
+        No products defined yet. Click "➕ Add Product" below to configure products for your sales closers.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = window.companyProducts.map((p, idx) => `
+    <div class="product-config-row" style="display:grid; grid-template-columns: 2fr 1.2fr 1.2fr 1fr auto; gap:12px; align-items:center; background:rgba(255,255,255,0.03); border:1.5px solid var(--border-subtle); border-radius:12px; padding:14px;">
       <div>
-        <label style="font-size:11px; color:var(--text-muted); display:block;">Product Name</label>
-        <input type="text" id="prodName_${idx}" class="form-control" value="${p.name}">
+        <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Product / Plan Name *</label>
+        <input type="text" id="prodName_${idx}" class="form-control" style="font-weight:700;" value="${escapeHtml(p.name || '')}" placeholder="e.g. Starter Package">
       </div>
       <div>
-        <label style="font-size:11px; color:var(--text-muted); display:block;">Price (PKR)</label>
-        <input type="number" id="prodPrice_${idx}" class="form-control" value="${p.amount}">
+        <label style="font-size:11px; font-weight:700; color:#34d399; display:block; margin-bottom:4px;">Price (PKR) *</label>
+        <div style="position:relative;">
+          <span style="position:absolute; left:10px; top:10px; font-size:11px; font-weight:700; color:#10b981;">Rs.</span>
+          <input type="number" id="prodPrice_${idx}" class="form-control" style="padding-left:36px; font-weight:800; color:#34d399;" value="${p.amount || 0}" min="0" step="100">
+        </div>
       </div>
       <div>
-        <label style="font-size:11px; color:var(--text-muted); display:block;">Commission</label>
-        <input type="number" id="prodComm_${idx}" class="form-control" value="${p.commission}">
+        <label style="font-size:11px; font-weight:700; color:#38bdf8; display:block; margin-bottom:4px;">Closer Commission *</label>
+        <div style="position:relative;">
+          <span style="position:absolute; left:10px; top:10px; font-size:11px; font-weight:700; color:#38bdf8;">Rs.</span>
+          <input type="number" id="prodComm_${idx}" class="form-control" style="padding-left:36px; font-weight:800; color:#38bdf8;" value="${p.commission || 0}" min="0" step="50">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Badge / Icon</label>
+        <input type="text" id="prodBadge_${idx}" class="form-control" value="${escapeHtml(p.badge || '📦')}" placeholder="e.g. ⚡ Starter">
+      </div>
+      <div style="padding-top:18px;">
+        <button type="button" class="btn btn-danger" onclick="removeProductRow(${idx})" style="padding:8px 12px; font-size:13px;" title="Delete Product">🗑️</button>
       </div>
     </div>
   `).join('');
 }
 
+function addProductRow() {
+  window.companyProducts.push({
+    id: 'prod_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    name: 'New Product Package',
+    amount: 5000,
+    commission: 1500,
+    badge: '⭐ Package'
+  });
+  renderProductsList();
+}
+
+function removeProductRow(idx) {
+  if (window.companyProducts.length <= 1) {
+    if (!confirm('This is the only product. Are you sure you want to remove it?')) return;
+  }
+  window.companyProducts.splice(idx, 1);
+  renderProductsList();
+}
+
 async function saveProductConfig() {
-  const defaultPitch = document.getElementById('cfgDefaultPitch').value.trim();
-  const products = [];
-  for (let i = 0; i < 3; i++) {
+  const defaultPitch = document.getElementById('cfgDefaultPitch')?.value.trim() || '';
+  const updatedProducts = [];
+
+  for (let i = 0; i < window.companyProducts.length; i++) {
     const nameInp = document.getElementById('prodName_' + i);
     const priceInp = document.getElementById('prodPrice_' + i);
     const commInp = document.getElementById('prodComm_' + i);
-    if (nameInp && priceInp && commInp) {
-      products.push({
-        id: 'p_' + i,
-        name: nameInp.value.trim(),
-        amount: parseInt(priceInp.value) || 5000,
-        commission: parseInt(commInp.value) || 1500
-      });
+    const badgeInp = document.getElementById('prodBadge_' + i);
+
+    if (nameInp && priceInp) {
+      const name = nameInp.value.trim();
+      const amount = parseInt(priceInp.value, 10) || 0;
+      const commission = parseInt(commInp ? commInp.value : 0, 10) || 0;
+      const badge = badgeInp ? badgeInp.value.trim() : '📦';
+
+      if (name && amount > 0) {
+        updatedProducts.push({
+          id: window.companyProducts[i].id || ('p_' + i),
+          name: name,
+          amount: amount,
+          commission: commission,
+          badge: badge
+        });
+      }
     }
+  }
+
+  if (!updatedProducts.length) {
+    alert('Please define at least one product with a valid name and price.');
+    return;
   }
 
   try {
@@ -2302,18 +2400,21 @@ async function saveProductConfig() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'update_company_config',
+        company_id: '<?php echo $activeCompany['id']; ?>',
         default_pitch: defaultPitch,
-        products: products
+        products: updatedProducts
       })
     });
     const data = await res.json();
     if (data.success) {
-      alert('✅ Company products & sales pitch configuration saved!');
+      window.companyProducts = updatedProducts;
+      renderProductsList();
+      alert('✅ Company products & pricing saved successfully! Sales closers (TMs/TLs) will now see these options when closing leads.');
     } else {
       alert('⚠️ ' + (data.error || 'Failed to save configuration.'));
     }
   } catch (err) {
-    alert('Error saving configuration.');
+    alert('Network error saving configuration: ' + err.message);
   }
 }
 

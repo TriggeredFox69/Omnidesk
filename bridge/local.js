@@ -167,6 +167,34 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
         }
         const action = body.action || url.searchParams.get('action');
 
+        const loadTenantConfig = (cid) => {
+          const cFile = path.join(root, 'data/tenants', cid, 'config.json');
+          try {
+            if (fs.existsSync(cFile)) {
+              const parsed = JSON.parse(fs.readFileSync(cFile, 'utf8') || '{}');
+              if (parsed && typeof parsed === 'object' && Array.isArray(parsed.products) && parsed.products.length > 0) {
+                return parsed;
+              }
+            }
+          } catch (_) {}
+          const isNunno = (cid === 'COMP-001');
+          const isMetalink = (cid === 'COMP-004');
+          return {
+            company_id: cid,
+            company_name: isMetalink ? 'Metalink' : (isNunno ? 'Nunno Official' : 'Company ' + cid),
+            products: isMetalink ? [
+              { id: 'starter', name: 'Metalink Starter', amount: 2500, commission: 1000, badge: '⚡ Basic Node' },
+              { id: 'pro', name: 'Metalink Enterprise', amount: 7500, commission: 3000, badge: '💎 Core Node' },
+              { id: 'vip', name: 'Metalink Wolf VIP', amount: 20000, commission: 10000, badge: '🐺 Alpha Pack' }
+            ] : [
+              { id: 'pro', name: 'Nunno Pro', amount: 5000, commission: 2000, badge: '💎 Most Popular' },
+              { id: 'starter', name: 'Nunno Starter', amount: 1700, commission: 700, badge: '⚡ Scalper Entry' },
+              { id: 'whale', name: 'Whale VIP', amount: 15000, commission: 10000, badge: '🐋 Institutional Alpha' }
+            ],
+            default_pitch: isMetalink ? '{Salam|AoA} {name}! Welcome to Metalink.' : '{Salam|AoA|Hello} {name}! Welcome to Nunno.'
+          };
+        };
+
         // 1. Authentication API
         if (url.pathname === '/api/auth.php') {
           const allUsers = loadLocalUsers();
@@ -1204,41 +1232,38 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             }
             return;
           }
+
           if (action === 'get_company_config') {
-            const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
-            const compFile = path.join(root, 'data/companies.json');
-            let comps = [];
-            try { comps = JSON.parse(fs.readFileSync(compFile, 'utf8') || '[]'); } catch (_) {}
-            const comp = comps.find(c => c.id === compId);
-            json(200, {
-              success: true,
-              config: {
-                company_id: compId,
-                company_name: comp?.name || 'Company',
-                tl_commission_per_tm: Number(comp?.tl_commission_per_tm) || 500,
-                products: [
-                  { id: 'pro', name: 'Nunno Pro', amount: 5000, commission: 2000, badge: '💎 Most Popular' },
-                  { id: 'starter', name: 'Nunno Starter', amount: 1700, commission: 700, badge: '⚡ Scalper Entry' },
-                  { id: 'whale', name: 'Whale VIP', amount: 15000, commission: 10000, badge: '🐋 Institutional Alpha' }
-                ],
-                default_pitch: '{Salam|AoA|Hello} {name}! Welcome to Nunno. Special limited-time offers available today.'
-              }
-            });
+            const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
+            const tenantConfig = loadTenantConfig(compId);
+            json(200, { success: true, company_id: compId, config: tenantConfig });
             return;
           }
           if (action === 'update_company_config' && req.method === 'POST') {
-            const compFile = path.join(root, 'data/companies.json');
-            let comps = [];
-            try { comps = JSON.parse(fs.readFileSync(compFile, 'utf8') || '[]'); } catch (_) {}
-            const compId = currentLocalUser?.company_id || 'COMP-001';
-            const comp = comps.find(c => c.id === compId);
-            if (comp) {
-              if (body.tl_commission_per_tm !== undefined) {
-                comp.tl_commission_per_tm = Number(body.tl_commission_per_tm) || 500;
-              }
-              try { fs.writeFileSync(compFile, JSON.stringify(comps, null, 2), 'utf8'); } catch (_) {}
+            const compId = body.company_id || url.searchParams.get('company_id') || currentLocalUser?.company_id || 'COMP-001';
+            const tenantConfigFile = path.join(root, 'data/tenants', compId, 'config.json');
+            let config = loadTenantConfig(compId);
+            if (body.company_name) config.company_name = body.company_name;
+            if (Array.isArray(body.products)) config.products = body.products;
+            if (body.default_pitch) config.default_pitch = body.default_pitch;
+            if (body.tl_commission_per_tm !== undefined) {
+              config.tl_commission_per_tm = Number(body.tl_commission_per_tm);
+              const compFile = path.join(root, 'data/companies.json');
+              try {
+                let comps = JSON.parse(fs.readFileSync(compFile, 'utf8') || '[]');
+                const comp = comps.find(c => c.id === compId);
+                if (comp) {
+                  comp.tl_commission_per_tm = Number(body.tl_commission_per_tm);
+                  fs.writeFileSync(compFile, JSON.stringify(comps, null, 2), 'utf8');
+                }
+              } catch (_) {}
             }
-            json(200, { success: true, message: 'Company config updated successfully.' });
+            try {
+              const dir = path.dirname(tenantConfigFile);
+              if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+              fs.writeFileSync(tenantConfigFile, JSON.stringify(config, null, 2), 'utf8');
+            } catch (_) {}
+            json(200, { success: true, message: 'Company config updated successfully.', config });
             return;
           }
           if (action === 'get_audit_logs') {
@@ -1449,7 +1474,18 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             } catch (_) {}
           };
 
-          if (action === 'get_leads') { json(200, { success: true, leads: loadCurrentLeads() }); return; }
+          if (action === 'get_leads') {
+            const currentLeads = loadCurrentLeads();
+            const compConfig = loadTenantConfig(compId);
+            json(200, {
+              success: true,
+              leads: currentLeads,
+              count: currentLeads.length,
+              company_id: compId,
+              company_config: compConfig
+            });
+            return;
+          }
           if (action === 'delete_leads' || action === 'delete_lead') {
             const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
             ids.forEach(id => leads.delete(id));

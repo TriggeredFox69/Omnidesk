@@ -6628,24 +6628,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.paidCloserName) els.paidCloserName.textContent = closerName;
 
     // Dynamically render products for active company
+    const updateModalCommission = () => {
+      const opt = els.paidPlanSelect?.selectedOptions[0];
+      const commEl = document.getElementById('paidCloserCommissionVal');
+      if (opt && commEl) {
+        const comm = parseInt(opt.dataset.commission, 10) || 0;
+        commEl.textContent = `Rs. ${comm.toLocaleString()}`;
+      }
+    };
+
     if (els.paidPlanSelect) {
       const companyProducts = state.companyConfig?.products;
       if (Array.isArray(companyProducts) && companyProducts.length > 0) {
-        els.paidPlanSelect.innerHTML = companyProducts.map(p => `
-          <option value="${escapeHtml(p.name)}" data-amount="${p.amount}">${escapeHtml(p.badge || '📦')} ${escapeHtml(p.name)} (Rs. ${Number(p.amount).toLocaleString()})</option>
-        `).join('') + `<option value="Custom Plan" data-amount="0">💼 Custom Deal</option>`;
+        els.paidPlanSelect.innerHTML = companyProducts.map((p, idx) => `
+          <option value="${escapeHtml(p.name)}" data-amount="${p.amount}" data-commission="${p.commission || 0}" ${idx === 0 ? 'selected' : ''}>
+            ${escapeHtml(p.badge || '📦')} ${escapeHtml(p.name)} (Rs. ${Number(p.amount).toLocaleString()})
+          </option>
+        `).join('') + `<option value="Custom Plan" data-amount="0" data-commission="0">💼 Custom Deal</option>`;
       }
     }
 
-    // Default plan & amount based on lead interest
-    let defPlan = 'Pro';
+    // Default plan & amount based on lead interest or company products
+    let defPlan = '';
     let defAmount = 5000;
     if (lead.paidDetails && lead.paidDetails.plan) {
       defPlan = lead.paidDetails.plan;
       defAmount = lead.paidDetails.amount || 5000;
     } else if (state.companyConfig?.products?.length) {
-      defPlan = state.companyConfig.products[0].name;
-      defAmount = state.companyConfig.products[0].amount;
+      const matchedProd = state.companyConfig.products.find(p => (lead.interest && lead.interest.toLowerCase().includes(p.name.toLowerCase())));
+      if (matchedProd) {
+        defPlan = matchedProd.name;
+        defAmount = matchedProd.amount;
+      } else {
+        defPlan = state.companyConfig.products[0].name;
+        defAmount = state.companyConfig.products[0].amount;
+      }
     } else if (lead.interest && lead.interest.includes('Starter')) {
       defPlan = 'Starter';
       defAmount = 1700;
@@ -6654,11 +6671,12 @@ document.addEventListener('DOMContentLoaded', () => {
       defAmount = 15000;
     }
 
-    if (els.paidPlanSelect) els.paidPlanSelect.value = defPlan;
+    if (els.paidPlanSelect && defPlan) els.paidPlanSelect.value = defPlan;
     if (els.paidAmountInput) els.paidAmountInput.value = defAmount;
     if (els.paidMethodSelect) {
       els.paidMethodSelect.value = (lead.paidDetails && lead.paidDetails.method) ? lead.paidDetails.method : 'EasyPaisa';
     }
+    updateModalCommission();
 
     if (els.markPaidModal) els.markPaidModal.classList.add('open');
   }
@@ -6670,9 +6688,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.paidPlanSelect) {
     els.paidPlanSelect.addEventListener('change', () => {
       const opt = els.paidPlanSelect.selectedOptions[0];
-      if (opt && opt.dataset.amount) {
-        const amt = parseInt(opt.dataset.amount, 10);
-        if (amt > 0 && els.paidAmountInput) els.paidAmountInput.value = amt;
+      if (opt) {
+        if (opt.dataset.amount !== undefined) {
+          const amt = parseInt(opt.dataset.amount, 10);
+          if (amt > 0 && els.paidAmountInput) els.paidAmountInput.value = amt;
+        }
+        const commEl = document.getElementById('paidCloserCommissionVal');
+        if (commEl) {
+          const comm = parseInt(opt.dataset.commission, 10) || 0;
+          commEl.textContent = `Rs. ${comm.toLocaleString()}`;
+        }
       }
     });
   }
@@ -6711,9 +6736,14 @@ document.addEventListener('DOMContentLoaded', () => {
       lead.ownerName = closerName;
     }
 
+    const selOpt = els.paidPlanSelect?.selectedOptions[0];
+    const commission = parseInt(selOpt?.dataset.commission, 10) || 0;
+
     lead.paidDetails = {
       plan: plan,
+      product: plan,
       amount: amount,
+      commission: commission,
       method: method,
       email: email,
       trxId: trxId,

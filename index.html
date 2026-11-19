@@ -1520,19 +1520,20 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin:0;">
-            <label class="form-label">Plan Purchased</label>
+            <label class="form-label">Product / Package Sold</label>
             <select id="paidPlanSelect" class="form-select">
-              <option value="Nunno Pro" data-amount="5000">💎 Nunno Pro (Rs. 5,000)</option>
-              <option value="Nunno Starter" data-amount="1700">⚡ Nunno Starter (Rs. 1,700)</option>
-              <option value="Whale VIP" data-amount="15000">🐋 Whale VIP (Rs. 15,000)</option>
-              <option value="Annual Pass" data-amount="35000">👑 Annual Pass (Rs. 35,000)</option>
-              <option value="Custom Plan" data-amount="0">💼 Custom Deal</option>
+              <!-- Populated dynamically from company product catalog -->
+              <option value="Package Deal" data-amount="5000" data-commission="1500">📦 Package Deal (Rs. 5,000)</option>
             </select>
           </div>
           <div class="form-group" style="margin:0;">
-            <label class="form-label">Amount (PKR)</label>
+            <label class="form-label">Confirmed Price (PKR)</label>
             <input type="number" id="paidAmountInput" class="form-input mono" value="5000" required>
           </div>
+        </div>
+        <div id="paidCommissionPreviewBox" style="background:rgba(56, 189, 248, 0.08); border:1px solid rgba(56, 189, 248, 0.25); border-radius:8px; padding:8px 12px; display:flex; align-items:center; justify-content:space-between; font-size:12px;">
+          <span style="color:#94a3b8; font-weight:600;">💰 Closer Commission on this Sale:</span>
+          <strong style="color:#38bdf8; font-size:13.5px;" id="paidCloserCommissionVal">Rs. 0</strong>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div class="form-group" style="margin:0;">
