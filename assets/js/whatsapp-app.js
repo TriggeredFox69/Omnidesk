@@ -932,6 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
       body: JSON.stringify(payload)
     }).catch(() => {});
   }
+  window.NUNNO_SYNC_LEAD = syncLeadToServer;
 
   // Fetch Centralized Leads on cPanel (Tenant Isolated per Company)
   function fetchServerLeads() {

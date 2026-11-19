@@ -21,15 +21,20 @@
       return userRole === 'member' || userRole === 'closer' || designation.includes('closer');
     }
 
+    function isTLUser() {
+      const userRole = (state.currentUser?.role || '').toLowerCase();
+      const designation = (state.currentUser?.designation || '').toLowerCase();
+      return userRole === 'lead' || userRole === 'tl' || designation.includes('lead') || designation.includes('team lead');
+    }
+
     function shouldFilterNonCampaignMessages() {
-      // TMs only get campaign-oriented messages.
+      // If the active user is a Team Leader (TL), NEVER filter out any conversations!
+      // TLs cold outreach on social platforms and WhatsApp, so all external inbound and outbound messages must sync directly into their Chatly portal!
+      if (isTLUser()) return false;
+
+      // Regular TMs only get company campaign-oriented messages.
       // If someone else messages the TM's linked WhatsApp number from outside, ignore it.
       if (isTMUser()) return true;
-
-      // Note: later we will apply this logic to TLs
-      const enableForTL = false;
-      const userRole = (state.currentUser?.role || '').toLowerCase();
-      if (enableForTL && (userRole === 'lead' || userRole === 'tl')) return true;
 
       return false;
     }
@@ -44,17 +49,30 @@
         }
 
         const isTM = isTMUser();
-        const tmOwnerId = isTM ? state.currentUser.id : null;
-        const tmOwnerName = isTM ? state.currentUser.name : null;
-        const tmOwnerUsername = isTM ? state.currentUser.username : null;
-        const tmState = isTM ? 'ongoing' : 'fresh';
+        const isTL = isTLUser();
+        const ownerId = (isTL || isTM) ? (state.currentUser?.id || null) : null;
+        const ownerName = (isTL || isTM) ? (state.currentUser?.name || null) : null;
+        const ownerUsername = (isTL || isTM) ? (state.currentUser?.username || null) : null;
+        const leadState = (isTL || isTM) ? 'ongoing' : 'fresh';
 
         const defaultNumber = itemPhone ? ('+' + itemPhone) : (item.phone ? '+' + cleanDigits(item.phone) : '');
-        lead = { id: 'wa_lead_' + (itemPhone || item.phone), phone: itemPhone || item.phone, display: defaultNumber,
-          name: defaultNumber, city: '', network: '',
-          ownerId: tmOwnerId, ownerName: tmOwnerName, ownerUsername: tmOwnerUsername,
-          leadState: tmState,
-          status: 'unread', unreadCount: 0, interest: '', notes: '', messages: [] };
+        lead = {
+          id: 'wa_lead_' + (itemPhone || item.phone),
+          phone: itemPhone || item.phone,
+          display: defaultNumber,
+          name: item.name || defaultNumber,
+          city: '',
+          network: '',
+          ownerId: ownerId,
+          ownerName: ownerName,
+          ownerUsername: ownerUsername,
+          leadState: leadState,
+          status: 'unread',
+          unreadCount: 0,
+          interest: isTL ? 'TL Cold Outreach' : '',
+          notes: isTL ? 'External conversation synced from WhatsApp' : '',
+          messages: []
+        };
         state.leads.unshift(lead);
       }
       if (!lead) return null;
@@ -73,6 +91,9 @@
       lead.lastMessageAt = Math.max(lead.lastMessageAt || 0, item.timestamp);
       // Message time is not last-seen presence.
       if (!state.activeLeadId) state.activeLeadId = lead.id;
+      if (typeof window.NUNNO_SYNC_LEAD === 'function') {
+        window.NUNNO_SYNC_LEAD(lead, { newMessage: fields });
+      }
       return lead;
     }
     async function loadMedia(message) {

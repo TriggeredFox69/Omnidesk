@@ -725,10 +725,19 @@ switch ($action) {
         requireCompanyAdmin($currentUser);
         $companyId = resolveActiveCompanyId();
         $config = getTenantConfig($companyId);
+        
+        // Enrich with company-level TL commission
+        $companies = getCompanies($companiesFile);
+        foreach ($companies as $comp) {
+            if ($comp['id'] === $companyId) {
+                $config['tl_commission_per_tm'] = (int)($comp['tl_commission_per_tm'] ?? ($config['tl_commission_per_tm'] ?? 500));
+                break;
+            }
+        }
         echo json_encode(['success' => true, 'company_id' => $companyId, 'config' => $config]);
         exit;
 
-    // 11. Update Company Products & Pitch Config
+    // 11. Update Company Products, Pitch & TL Commission Config
     case 'update_company_config':
         requireCompanyAdmin($currentUser);
         $companyId = resolveActiveCompanyId();
@@ -739,12 +748,28 @@ switch ($action) {
         if (isset($data['company_name'])) $config['company_name'] = trim($data['company_name']);
         if (isset($data['products']) && is_array($data['products'])) $config['products'] = $data['products'];
         if (isset($data['default_pitch'])) $config['default_pitch'] = trim($data['default_pitch']);
+        if (isset($data['tl_commission_per_tm'])) {
+            $config['tl_commission_per_tm'] = max(0, (int)$data['tl_commission_per_tm']);
+        }
         
         $configFile = getTenantConfigFile($companyId);
         file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        // Also sync to companies.json
+        $companies = getCompanies($companiesFile);
+        foreach ($companies as &$comp) {
+            if ($comp['id'] === $companyId) {
+                if (isset($data['tl_commission_per_tm'])) {
+                    $comp['tl_commission_per_tm'] = max(0, (int)$data['tl_commission_per_tm']);
+                }
+                break;
+            }
+        }
+        unset($comp);
+        saveCompanies($companiesFile, $companies);
         
-        logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_config_updated', "Updated products and campaign pitch template.");
-        echo json_encode(['success' => true, 'message' => 'Company product and pitch configuration updated successfully.', 'config' => $config]);
+        logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_config_updated', "Updated products, campaign pitch, and TL commission rate.");
+        echo json_encode(['success' => true, 'message' => 'Company product, pitch, and TL commission configuration updated successfully.', 'config' => $config]);
         exit;
 
     // 12. Delete Company (Super Admin)

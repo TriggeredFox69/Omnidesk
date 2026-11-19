@@ -256,28 +256,37 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               return;
             }
 
-            const newTM = {
-              id: 'EMP-TM-' + Date.now().toString(36).toUpperCase(),
-              name: name,
+            const role = (body.role === 'lead' ? 'lead' : 'member');
+            const isTL = (role === 'lead');
+            const referredByTL = body.referred_by_tl || '';
+
+            const newAccount = {
+              id: (isTL ? 'EMP-TL-' : 'EMP-TM-') + Date.now().toString(36).toUpperCase(),
+              name: name + (isTL ? ' (Team Lead)' : ''),
               username: username,
               email: email,
               password: password,
-              role: 'member',
-              designation: 'Closer Specialist (Applicant)',
+              role: role,
+              designation: isTL ? 'Commission Team Lead' : 'Closer Specialist (Applicant)',
               gender: gender,
               city: city,
               phone: phone,
               pfp: pfp,
               status: 'pending', // Awaiting manual Company Admin approval
               company_id: company_id,
-              message_limit: 150,
+              message_limit: isTL ? 500 : 150,
               messages_sent_today: 0,
               applied_at: new Date().toISOString(),
               created_at: new Date().toISOString()
             };
-            allUsers.push(newTM);
+            if (isTL) {
+              newAccount.tl_commission_balance = 0;
+            } else if (referredByTL) {
+              newAccount.joined_via_tl = referredByTL;
+            }
+            allUsers.push(newAccount);
             saveLocalUsers(allUsers);
-            json(200, { success: true, message: 'Application submitted successfully! Your account is pending manual approval by company administration.', user: newTM });
+            json(200, { success: true, message: 'Application submitted successfully! Your account is pending manual approval by company administration.', user: newAccount });
             return;
           }
           if (action === 'list_pending_tms') {
@@ -291,12 +300,31 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             const target = allUsers.find(u => u.id === userId);
             if (target) {
               target.status = 'active';
-              target.designation = 'Closer Specialist';
-              target.message_limit = Number(body.message_limit) || 150;
+              const isTL = (target.role === 'lead');
+              target.designation = isTL ? 'Commission Team Lead' : 'Closer Specialist';
+              target.message_limit = Number(body.message_limit) || (isTL ? 500 : 150);
               target.approved_at = new Date().toISOString();
               target.approved_by = currentLocalUser?.username || 'admin';
+
+              let creditedNote = '';
+              const attributedTL = body.attributed_tl || target.joined_via_tl || '';
+              if (!isTL && attributedTL) {
+                target.joined_via_tl = attributedTL;
+                const compFile = path.join(root, 'data/companies.json');
+                let comps = [];
+                try { comps = JSON.parse(fs.readFileSync(compFile, 'utf8') || '[]'); } catch (_) {}
+                const targetComp = comps.find(c => c.id === target.company_id);
+                const bounty = Number(targetComp?.tl_commission_per_tm) || 500;
+
+                const sponsor = allUsers.find(u => u.id === attributedTL || u.username === attributedTL || u.phone === attributedTL);
+                if (sponsor) {
+                  sponsor.tl_commission_balance = (Number(sponsor.tl_commission_balance) || 0) + bounty;
+                  creditedNote = ` TL @${sponsor.username} credited with Rs. ${bounty.toLocaleString()} bounty.`;
+                }
+              }
+
               saveLocalUsers(allUsers);
-              json(200, { success: true, message: 'Closer applicant approved and activated successfully!' });
+              json(200, { success: true, message: (isTL ? 'Team Leader' : 'Closer') + ' applicant approved and activated successfully!' + creditedNote });
             } else {
               json(404, { success: false, error: 'Applicant not found.' });
             }
@@ -921,11 +949,16 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
           if (action === 'get_company_config') {
             const compId = url.searchParams.get('company_id') || body.company_id || 'COMP-001';
+            const compFile = path.join(root, 'data/companies.json');
+            let comps = [];
+            try { comps = JSON.parse(fs.readFileSync(compFile, 'utf8') || '[]'); } catch (_) {}
+            const comp = comps.find(c => c.id === compId);
             json(200, {
               success: true,
               config: {
                 company_id: compId,
-                company_name: 'Nunno Official',
+                company_name: comp?.name || 'Company',
+                tl_commission_per_tm: Number(comp?.tl_commission_per_tm) || 500,
                 products: [
                   { id: 'pro', name: 'Nunno Pro', amount: 5000, commission: 2000, badge: '💎 Most Popular' },
                   { id: 'starter', name: 'Nunno Starter', amount: 1700, commission: 700, badge: '⚡ Scalper Entry' },
@@ -937,6 +970,17 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'update_company_config' && req.method === 'POST') {
+            const compFile = path.join(root, 'data/companies.json');
+            let comps = [];
+            try { comps = JSON.parse(fs.readFileSync(compFile, 'utf8') || '[]'); } catch (_) {}
+            const compId = currentLocalUser?.company_id || 'COMP-001';
+            const comp = comps.find(c => c.id === compId);
+            if (comp) {
+              if (body.tl_commission_per_tm !== undefined) {
+                comp.tl_commission_per_tm = Number(body.tl_commission_per_tm) || 500;
+              }
+              try { fs.writeFileSync(compFile, JSON.stringify(comps, null, 2), 'utf8'); } catch (_) {}
+            }
             json(200, { success: true, message: 'Company config updated successfully.' });
             return;
           }

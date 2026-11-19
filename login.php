@@ -1437,21 +1437,26 @@ async function showConnectedCloserBox(phone) {
     if (data.exists && data.user) {
       const u = data.user;
       const compName = u.company_name || u.company_id || 'Company';
+      const isTL = (u.role === 'lead' || (u.designation && u.designation.toLowerCase().includes('lead')));
 
       if (u.status === 'pending') {
         // CASE 1: Applicant is pending manual approval by company admin
         if (badgeEl) {
-          badgeEl.textContent = '⏳ APPLICATION PENDING APPROVAL';
+          badgeEl.textContent = isTL ? '⏳ TEAM LEADER APPLICATION PENDING APPROVAL' : '⏳ APPLICATION PENDING APPROVAL';
           badgeEl.style.color = '#fbbf24';
         }
-        if (nameEl) nameEl.textContent = (u.name || 'Closer Applicant') + ' (@' + (u.username || 'closer') + ')';
+        if (nameEl) nameEl.textContent = (u.name || (isTL ? 'Team Leader Applicant' : 'Closer Applicant')) + ' (@' + (u.username || 'applicant') + ')';
         if (compEl) {
           compEl.style.display = 'block';
           compEl.style.color = '#fbbf24';
-          compEl.textContent = '🏢 Applied to: ' + compName;
+          compEl.textContent = '🏢 Applied to: ' + compName + (isTL ? ' • Role: Team Leader (TL)' : ' • Role: Sales Closer (TM)');
         }
         if (noteEl) {
-          noteEl.innerHTML = 'Your application to join <strong>' + compName + '</strong> is awaiting manual review by company administration in <strong>/cc</strong>.<br>You will be able to enter once approved.';
+          if (isTL) {
+            noteEl.innerHTML = 'Your application to join <strong>' + compName + '</strong> as <strong>Team Leader (TL)</strong> is awaiting manual review in <strong>/cc</strong>.<br>You can start recruiting TMs and earning commission bounties once approved.';
+          } else {
+            noteEl.innerHTML = 'Your application to join <strong>' + compName + '</strong> is awaiting manual review by company administration in <strong>/cc</strong>.<br>You will be able to enter once approved.';
+          }
         }
         if (enterBtn) {
           enterBtn.style.display = 'inline-block';
@@ -1462,24 +1467,28 @@ async function showConnectedCloserBox(phone) {
           };
         }
       } else if (u.status === 'active') {
-        // CASE 2: Approved active closer
+        // CASE 2: Approved active closer or team lead
         if (badgeEl) {
-          badgeEl.textContent = '🟢 VERIFIED SALES CLOSER';
-          badgeEl.style.color = 'var(--wa-accent)';
+          badgeEl.textContent = isTL ? '🚀 VERIFIED TEAM LEADER (TL)' : '🟢 VERIFIED SALES CLOSER';
+          badgeEl.style.color = isTL ? '#c084fc' : 'var(--wa-accent)';
         }
-        if (nameEl) nameEl.textContent = (u.name || 'Closer') + ' (@' + (u.username || 'closer') + ')';
+        if (nameEl) nameEl.textContent = (u.name || (isTL ? 'Team Leader' : 'Closer')) + ' (@' + (u.username || 'user') + ')';
         if (compEl) {
           compEl.style.display = 'block';
-          compEl.style.color = 'var(--wa-accent)';
+          compEl.style.color = isTL ? '#c084fc' : 'var(--wa-accent)';
           compEl.textContent = '🏢 ' + compName + ' • Ready';
         }
         if (noteEl) {
-          noteEl.innerHTML = 'Active sales session linked to <strong>' + compName + '</strong>. Click below to enter your closing desk.';
+          if (isTL) {
+            noteEl.innerHTML = 'Active Team Leader session linked to <strong>' + compName + '</strong>. Click below to enter your workspace to outreach and recruit TMs.';
+          } else {
+            noteEl.innerHTML = 'Active sales session linked to <strong>' + compName + '</strong>. Click below to enter your closing desk.';
+          }
         }
         if (enterBtn) {
           enterBtn.style.display = 'inline-block';
-          enterBtn.style.background = 'linear-gradient(135deg, #2de89a, #0fa968)';
-          enterBtn.textContent = 'Enter Sales Desk →';
+          enterBtn.style.background = isTL ? 'linear-gradient(135deg, #a855f7, #7c3aed)' : 'linear-gradient(135deg, #2de89a, #0fa968)';
+          enterBtn.textContent = isTL ? 'Enter Team Lead Portal →' : 'Enter Sales Desk →';
           enterBtn.onclick = function() {
             loginAsConnectedCloser(phone);
           };
@@ -1775,24 +1784,55 @@ async function handleSadminLogin(e) {
   </div>
 </div>
 
-<!-- MODAL: New TM Closer Registration Wizard -->
+<!-- MODAL: New TM / TL Closer Registration Wizard -->
 <div id="modalTMRegister" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px); overflow-y:auto; padding:20px 0;">
-  <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138,0.4); border-radius:20px; padding:30px; max-width:520px; width:92%; box-shadow:0 25px 60px rgba(0,0,0,0.6); position:relative;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+  <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138,0.4); border-radius:20px; padding:30px; max-width:540px; width:92%; box-shadow:0 25px 60px rgba(0,0,0,0.6); position:relative;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
       <div>
         <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--wa-accent); letter-spacing:0.05em;">Step-by-Step Onboarding</div>
-        <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary);">🚀 New Closer WhatsApp Setup</h3>
+        <h3 id="regModalTitle" style="font-size:20px; font-weight:800; color:var(--wa-text-primary);">🚀 Account Setup &amp; Role</h3>
       </div>
       <button type="button" onclick="closeTMRegisterModal()" style="background:none; border:none; color:var(--wa-text-muted); font-size:24px; cursor:pointer;">&times;</button>
     </div>
 
-    <div style="background:rgba(31, 224, 138,0.1); border:1px solid rgba(31, 224, 138,0.25); border-radius:10px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:var(--wa-accent); display:flex; align-items:center; gap:8px;">
+    <div style="background:rgba(31, 224, 138,0.1); border:1px solid rgba(31, 224, 138,0.25); border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:12px; color:var(--wa-accent); display:flex; align-items:center; gap:8px;">
       <span>📱</span>
       <span>WhatsApp Number: <strong id="regDisplayPhone">+92 300 1234567</strong></span>
       <span style="margin-left:auto; background:var(--wa-accent); color:#03130c; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">VERIFIED</span>
     </div>
 
     <form id="formTMRegisterSubmit" onsubmit="handleTMRegisterSubmit(event)">
+      <!-- Role Selector Toggle: Sales Closer (TM) vs Team Leader (TL) -->
+      <div style="margin-bottom:14px;">
+        <label class="input-label" style="margin-bottom:6px; font-weight:700;">Choose Your Role *</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div id="roleCardTM" onclick="selectOnboardingRole('member')" style="background:rgba(31,224,138,0.12); border:2px solid var(--wa-accent); border-radius:12px; padding:12px; cursor:pointer; transition:all 0.2s ease;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+              <span style="font-weight:800; font-size:13px; color:var(--wa-text-primary);">🎯 Sales Closer (TM)</span>
+              <span id="roleRadioTM" style="color:var(--wa-accent); font-size:14px; font-weight:900;">●</span>
+            </div>
+            <div style="font-size:11px; color:var(--wa-text-muted); line-height:1.4;">
+              Live WhatsApp sales desk. Pitch products and close customer deals.
+            </div>
+          </div>
+          <div id="roleCardTL" onclick="selectOnboardingRole('lead')" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:12px; cursor:pointer; transition:all 0.2s ease;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+              <span style="font-weight:800; font-size:13px; color:var(--wa-text-primary);">🚀 Team Leader (TL)</span>
+              <span id="roleRadioTL" style="color:var(--wa-text-muted); font-size:14px; font-weight:900;">○</span>
+            </div>
+            <div style="font-size:11px; color:var(--wa-text-muted); line-height:1.4;">
+              Cold outreach on external platforms to recruit TMs. Direct commission per TM!
+            </div>
+          </div>
+        </div>
+        <input type="hidden" id="regOnboardingRole" value="member">
+      </div>
+
+      <!-- TL Specific Explainer Banner (Shows only when TL is selected) -->
+      <div id="tlRoleBanner" style="display:none; background:rgba(147, 51, 234, 0.12); border:1px solid rgba(147, 51, 234, 0.35); border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:11.5px; color:#d8b4fe; line-height:1.5;">
+        💼 <strong>Team Leader (TL) Note:</strong> There is no fixed salary. Your role is cold outreach on other platforms to invite TMs to Chatly and sell company products. You earn direct company commission bounty for each approved TM you recruit! Outbound &amp; inbound message sync is enabled on your desk.
+      </div>
+
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
         <div class="input-group" style="margin:0;">
           <label class="input-label">Set Desired Username *</label>
@@ -1805,7 +1845,7 @@ async function handleSadminLogin(e) {
       </div>
 
       <div class="input-group" style="margin-bottom: 6px;">
-        <label class="input-label">Select Company * (Where you are applying as Closer)</label>
+        <label class="input-label" id="regCompanyLabel">Select Company * (Where you are applying as Closer)</label>
         <select id="regTMCompany" class="input-field" required style="cursor:pointer; font-weight:600;" onchange="updateSelectedCompanyPreview()">
           <option value="COMP-001">Nunno Official — Scalper Alpha &amp; SaaS</option>
           <option value="COMP-002">Apex Crypto Signals — Institutional Trading</option>
@@ -1825,6 +1865,13 @@ async function handleSadminLogin(e) {
         </div>
       </div>
 
+      <!-- Optional TL Referral Attribution (Only for TMs) -->
+      <div class="input-group" id="groupTMReferredByTL" style="margin-bottom:12px;">
+        <label class="input-label">Referred by Team Leader (TL) Username (Optional)</label>
+        <input type="text" id="regTMReferredByTL" class="input-field" placeholder="e.g. ali or leave blank if none" style="font-size:13px;">
+        <div style="font-size:10.5px; color:var(--wa-text-muted); margin-top:3px;">If a Chatly Team Leader recruited you, enter their username so they receive commission bounty.</div>
+      </div>
+
       <div class="input-group">
         <label class="input-label">Full Name *</label>
         <input type="text" id="regTMFullName" class="input-field" placeholder="e.g. Ali Ahmed" required>
@@ -1838,8 +1885,8 @@ async function handleSadminLogin(e) {
         <div class="input-group" style="margin:0;">
           <label class="input-label">Gender</label>
           <select id="regTMGender" class="input-field">
-            <option value="male">Male Closer</option>
-            <option value="female">Female Closer</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
           </select>
         </div>
       </div>
@@ -1855,24 +1902,29 @@ async function handleSadminLogin(e) {
         Submit Closer Application for Company Approval ⏳
       </button>
       
-      <div style="font-size:11px; color:var(--wa-text-muted); text-align:center; margin-top:10px;">
+      <div id="regFooterNotice" style="font-size:11px; color:var(--wa-text-muted); text-align:center; margin-top:10px;">
         ℹ️ Once submitted, company administration reviews and approves your account with a custom daily message quota.
       </div>
     </form>
   </div>
 </div>
 
-<!-- MODAL: TM Application Submitted Confirmation -->
+<!-- MODAL: TM / TL Application Submitted Confirmation -->
 <div id="modalTMSuccess" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
   <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138,0.4); border-radius:20px; padding:32px; max-width:460px; width:90%; box-shadow:0 25px 60px rgba(0,0,0,0.6); text-align:center;">
     <div style="display:flex; justify-content:center; margin-bottom:12px;">
       <img id="successCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width:64px; height:64px; border-radius:16px; object-fit:contain; background:#07140f; border:1px solid rgba(255,255,255,0.18); padding:5px; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
     </div>
-    <h3 style="font-size:20px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Closer Application Received!</h3>
-    <p style="font-size:13px; color:var(--wa-text-secondary); line-height:1.6; margin-bottom:20px;">
+    <h3 id="successModalTitle" style="font-size:20px; font-weight:800; color:var(--wa-text-primary); margin-bottom:8px;">Application Received!</h3>
+    <p id="successModalBody" style="font-size:13px; color:var(--wa-text-secondary); line-height:1.6; margin-bottom:20px;">
       Your application has been dispatched to <strong id="successCompName" style="color:var(--wa-accent);">Company</strong> administration.<br><br>
       Once approved by the company, you can log in directly anytime using your <strong>Username &amp; Password</strong> without needing to scan the QR code again!
     </p>
+    <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); margin:0;" onclick="closeTMSuccessModal()">
+      Understood, Continue to Login &rarr;
+    </button>
+  </div>
+</div>
     <button type="button" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); margin:0;" onclick="closeTMSuccessModal()">
       Understood, Continue to Login &rarr;
     </button>
@@ -1951,8 +2003,76 @@ function openTMRegisterModal(phone) {
   const cleanPhone = phone ? (phone.startsWith('+') ? phone : ('+' + phone.replace(/\D/g, ''))) : '+92 300 1234567';
   document.getElementById('regDisplayPhone').textContent = cleanPhone;
   document.getElementById('modalTMRegister').style.display = 'flex';
+  selectOnboardingRole('member');
+  const refInp = document.getElementById('regTMReferredByTL');
+  if (refInp) refInp.value = '';
   document.getElementById('regTMUsername').focus();
   loadCompaniesForRegister();
+}
+
+function selectOnboardingRole(role) {
+  const isTL = (role === 'lead');
+  const hiddenRole = document.getElementById('regOnboardingRole');
+  if (hiddenRole) hiddenRole.value = isTL ? 'lead' : 'member';
+
+  const cardTM = document.getElementById('roleCardTM');
+  const cardTL = document.getElementById('roleCardTL');
+  const radioTM = document.getElementById('roleRadioTM');
+  const radioTL = document.getElementById('roleRadioTL');
+  const bannerTL = document.getElementById('tlRoleBanner');
+  const refGroup = document.getElementById('groupTMReferredByTL');
+  const modalTitle = document.getElementById('regModalTitle');
+  const compLabel = document.getElementById('regCompanyLabel');
+  const btn = document.getElementById('btnSubmitTMReg');
+  const footerNotice = document.getElementById('regFooterNotice');
+
+  if (isTL) {
+    if (cardTL) {
+      cardTL.style.background = 'rgba(147, 51, 234, 0.18)';
+      cardTL.style.border = '2px solid #a855f7';
+    }
+    if (radioTL) {
+      radioTL.style.color = '#c084fc';
+      radioTL.textContent = '●';
+    }
+    if (cardTM) {
+      cardTM.style.background = 'rgba(255,255,255,0.03)';
+      cardTM.style.border = '1px solid rgba(255,255,255,0.12)';
+    }
+    if (radioTM) {
+      radioTM.style.color = 'var(--wa-text-muted)';
+      radioTM.textContent = '○';
+    }
+    if (bannerTL) bannerTL.style.display = 'block';
+    if (refGroup) refGroup.style.display = 'none';
+    if (compLabel) compLabel.textContent = 'Select Company * (Where you are applying as Team Leader)';
+    if (modalTitle) modalTitle.textContent = '🚀 New Team Leader (TL) Setup';
+    if (btn) btn.textContent = 'Submit Team Leader (TL) Application for Approval ⏳';
+    if (footerNotice) footerNotice.textContent = 'ℹ️ Once approved, you can cold outreach prospects & earn commission bounty for each verified TM brought to this company!';
+  } else {
+    if (cardTM) {
+      cardTM.style.background = 'rgba(31,224,138,0.12)';
+      cardTM.style.border = '2px solid var(--wa-accent)';
+    }
+    if (radioTM) {
+      radioTM.style.color = 'var(--wa-accent)';
+      radioTM.textContent = '●';
+    }
+    if (cardTL) {
+      cardTL.style.background = 'rgba(255,255,255,0.03)';
+      cardTL.style.border = '1px solid rgba(255,255,255,0.12)';
+    }
+    if (radioTL) {
+      radioTL.style.color = 'var(--wa-text-muted)';
+      radioTL.textContent = '○';
+    }
+    if (bannerTL) bannerTL.style.display = 'none';
+    if (refGroup) refGroup.style.display = 'block';
+    if (compLabel) compLabel.textContent = 'Select Company * (Where you are applying as Closer)';
+    if (modalTitle) modalTitle.textContent = '🚀 New Closer WhatsApp Setup';
+    if (btn) btn.textContent = 'Submit Closer Application for Company Approval ⏳';
+    if (footerNotice) footerNotice.textContent = 'ℹ️ Once submitted, company administration reviews and approves your account with a custom daily message quota.';
+  }
 }
 
 function closeTMRegisterModal() {
@@ -2014,6 +2134,8 @@ async function handleTMRegisterSubmit(e) {
   btn.textContent = 'Submitting Application…';
   errBox.style.display = 'none';
 
+  const role = document.getElementById('regOnboardingRole')?.value || 'member';
+  const isTL = (role === 'lead');
   const phone = document.getElementById('regDisplayPhone').textContent.trim();
   const username = document.getElementById('regTMUsername').value.trim();
   const password = document.getElementById('regTMPassword').value.trim();
@@ -2022,6 +2144,7 @@ async function handleTMRegisterSubmit(e) {
   const city = document.getElementById('regTMCity').value.trim();
   const gender = document.getElementById('regTMGender').value;
   const pfp = document.getElementById('regTMPfp').value.trim();
+  const referred_by_tl = isTL ? '' : (document.getElementById('regTMReferredByTL')?.value.trim() || '');
 
   try {
     const res = await fetch('api/auth.php', {
@@ -2036,7 +2159,9 @@ async function handleTMRegisterSubmit(e) {
         company_id,
         city,
         gender,
-        pfp
+        pfp,
+        role,
+        referred_by_tl
       })
     });
     const data = await res.json();
@@ -2044,7 +2169,14 @@ async function handleTMRegisterSubmit(e) {
       closeTMRegisterModal();
       const compSelect = document.getElementById('regTMCompany');
       const compName = compSelect.options[compSelect.selectedIndex]?.text || 'Company';
-      document.getElementById('successCompName').textContent = compName;
+      const successTitle = document.getElementById('successModalTitle');
+      const successBody = document.getElementById('successModalBody');
+      if (successTitle) {
+        successTitle.textContent = isTL ? 'Team Leader Application Received!' : 'Closer Application Received!';
+      }
+      if (successBody) {
+        successBody.innerHTML = `Your application to join <strong style="color:var(--wa-accent);">${compName}</strong> as <strong>${isTL ? 'Team Leader (TL)' : 'Sales Closer (TM)'}</strong> has been dispatched for company review.<br><br>Once approved by company administration in <strong>/cc</strong>, you can log in directly anytime using your <strong>Username &amp; Password</strong> without needing to scan the QR code again!`;
+      }
       const compMatch = loadedCompaniesCache.find(c => c.id === company_id);
       if (compMatch && compMatch.logo) {
         document.getElementById('successCompLogo').src = compMatch.logo;
@@ -2066,6 +2198,9 @@ async function handleTMRegisterSubmit(e) {
     errBox.style.display = 'block';
   } finally {
     btn.disabled = false;
+    btn.textContent = isTL ? 'Submit Team Leader (TL) Application for Approval ⏳' : 'Submit Closer Application for Company Approval ⏳';
+  }
+}
     btn.textContent = 'Submit Closer Application for Company Approval ⏳';
   }
 }

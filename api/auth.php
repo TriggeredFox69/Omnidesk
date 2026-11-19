@@ -357,6 +357,8 @@ switch ($action) {
                     'id'           => $matched['id'],
                     'name'         => $matched['name'],
                     'username'     => $matched['username'],
+                    'role'         => $matched['role'] ?? 'member',
+                    'designation'  => $matched['designation'] ?? 'Closer',
                     'phone'        => $matched['phone'],
                     'status'       => $matched['status'] ?? 'active',
                     'company_id'   => $matched['company_id'] ?? 'COMP-001',
@@ -371,7 +373,7 @@ switch ($action) {
         }
         exit;
 
-    // 0b. TM Self-Registration (Pending Company Manual Approval)
+    // 0b. TM / TL Self-Registration (Pending Company Manual Approval)
     case 'tm_register':
         $raw = file_get_contents('php://input');
         $data = json_decode($raw, true) ?: $_POST;
@@ -384,6 +386,12 @@ switch ($action) {
         $city = trim($data['city'] ?? 'Pakistan');
         $gender = trim($data['gender'] ?? 'male');
         $pfp = trim($data['pfp'] ?? '');
+        $role = trim($data['role'] ?? 'member');
+        if (!in_array($role, ['member', 'lead'], true)) {
+            $role = 'member';
+        }
+        $isTL = ($role === 'lead');
+        $referredByTL = trim($data['referred_by_tl'] ?? '');
 
         if (!$username || !$password || !$name || !$phone) {
             http_response_code(400);
@@ -413,34 +421,39 @@ switch ($action) {
             }
         }
 
-        $newTM = [
-            'id'                  => 'EMP-TM-' . time(),
-            'name'                => $name,
+        $newAccount = [
+            'id'                  => ($isTL ? 'EMP-TL-' : 'EMP-TM-') . time(),
+            'name'                => $name . ($isTL ? ' (Team Lead)' : ''),
             'username'            => $username,
             'email'               => $email,
             'password_hash'       => password_hash($password, PASSWORD_BCRYPT),
-            'role'                => 'member',
-            'designation'         => 'Closer Specialist (Applicant)',
+            'role'                => $role,
+            'designation'         => $isTL ? 'Commission Team Lead' : 'Closer Specialist (Applicant)',
             'gender'              => $gender,
             'city'                => $city,
             'phone'               => $phone,
             'pfp'                 => $pfp ?: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
             'status'              => 'pending', // Awaiting manual Company Admin approval
             'company_id'          => $companyId,
-            'message_limit'       => 150,
+            'message_limit'       => $isTL ? 500 : 150,
             'messages_sent_today' => 0,
             'quota_reset_date'    => date('Y-m-d'),
             'applied_at'          => date('Y-m-d H:i:s'),
             'created_at'          => date('Y-m-d H:i:s')
         ];
+        if ($isTL) {
+            $newAccount['tl_commission_balance'] = 0;
+        } elseif ($referredByTL) {
+            $newAccount['joined_via_tl'] = $referredByTL;
+        }
 
-        $users[] = $newTM;
+        $users[] = $newAccount;
         saveUsers($usersFile, $users);
 
         echo json_encode([
             'success' => true,
             'message' => 'Application submitted successfully! Your account is pending manual approval by company administration.',
-            'user'    => sanitizeUser($newTM)
+            'user'    => sanitizeUser($newAccount)
         ]);
         exit;
 
@@ -470,7 +483,7 @@ switch ($action) {
         echo json_encode(['success' => true, 'pending' => $pending, 'count' => count($pending)]);
         exit;
 
-    // 0d. Approve Pending TM (Set Status to Active and Message Limit)
+    // 0d. Approve Pending TM or TL (Set Status to Active, Limit & Credit Sponsoring TL)
     case 'approve_tm':
         if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['admin', 'superadmin'], true)) {
             http_response_code(403);
@@ -482,6 +495,7 @@ switch ($action) {
         $data = json_decode($raw, true) ?: $_POST;
         $userId = trim($data['user_id'] ?? ($data['id'] ?? ''));
         $msgLimit = intval($data['message_limit'] ?? 150);
+        $attributedTL = trim($data['attributed_tl'] ?? ($data['tl_id'] ?? ''));
 
         if (!$userId) {
             http_response_code(400);
@@ -491,21 +505,63 @@ switch ($action) {
 
         $users = getUsers($usersFile);
         $found = false;
+        $approvedUser = null;
         foreach ($users as &$u) {
             if ($u['id'] === $userId) {
                 $u['status'] = 'active';
-                $u['designation'] = 'Closer Specialist';
-                $u['message_limit'] = $msgLimit > 0 ? $msgLimit : 150;
+                $isLead = (($u['role'] ?? '') === 'lead');
+                if ($isLead) {
+                    $u['designation'] = 'Commission Team Lead';
+                    $u['message_limit'] = $msgLimit > 0 ? $msgLimit : 500;
+                } else {
+                    $u['designation'] = 'Closer Specialist';
+                    $u['message_limit'] = $msgLimit > 0 ? $msgLimit : 150;
+                    if ($attributedTL) {
+                        $u['joined_via_tl'] = $attributedTL;
+                    }
+                }
                 $u['approved_at'] = date('Y-m-d H:i:s');
                 $u['approved_by'] = $currentUser['username'];
                 $found = true;
+                $approvedUser = $u;
                 break;
+            }
+        }
+        unset($u);
+
+        // If an approved member was brought by a TL, credit the sponsoring TL!
+        if ($found && $approvedUser && ($approvedUser['role'] ?? '') === 'member') {
+            $tlIdToCredit = $attributedTL ?: ($approvedUser['joined_via_tl'] ?? '');
+            if ($tlIdToCredit) {
+                $companyId = $approvedUser['company_id'] ?? 'COMP-001';
+                $commRate = 500;
+                $compsFile = __DIR__ . '/../data/companies.json';
+                if (file_exists($compsFile)) {
+                    $comps = json_decode(file_get_contents($compsFile), true);
+                    if (is_array($comps)) {
+                        foreach ($comps as $c) {
+                            if (($c['id'] ?? '') === $companyId) {
+                                $commRate = (int)($c['tl_commission_per_tm'] ?? 500);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                foreach ($users as &$tlUser) {
+                    if (($tlUser['id'] === $tlIdToCredit || $tlUser['username'] === $tlIdToCredit) && ($tlUser['role'] ?? '') === 'lead') {
+                        $tlUser['tl_commission_balance'] = ((int)($tlUser['tl_commission_balance'] ?? 0)) + $commRate;
+                        break;
+                    }
+                }
+                unset($tlUser);
             }
         }
 
         if ($found) {
             saveUsers($usersFile, $users);
-            echo json_encode(['success' => true, 'message' => 'Closer applicant approved and activated!']);
+            $roleLabel = ($approvedUser && $approvedUser['role'] === 'lead') ? 'Team Leader (TL)' : 'Sales Closer (TM)';
+            echo json_encode(['success' => true, 'message' => "{$roleLabel} applicant approved and activated!"]);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Applicant not found.']);

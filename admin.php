@@ -812,12 +812,41 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 
   <!-- TAB 5: TL COMMISSION & NUNNO PLAN LEDGER -->
   <div class="dash-pane" id="paneCommissions">
+    <!-- TL Commission Bounty Configuration for this Company -->
+    <div class="content-box" style="margin-bottom: 20px;">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>⚙️</span> Team Leader (TL) Commission Bounty Configuration</div>
+          <div class="box-desc">
+            Configure how much commission bounty <strong><?php echo htmlspecialchars($activeCompany['name']); ?></strong> awards to Team Leaders (TL) for each approved Sales Closer (TM) they bring to the company.
+          </div>
+        </div>
+        <button class="btn btn-emerald" onclick="saveTLCommissionRate()">💾 Save Bounty Rate</button>
+      </div>
+
+      <div style="display: flex; align-items: flex-end; gap: 16px; max-width: 500px; margin-top: 8px;">
+        <div style="flex: 1;">
+          <label class="form-label">TL Commission Bounty Per Approved TM (PKR)</label>
+          <div style="position: relative;">
+            <span style="position: absolute; left: 12px; top: 11px; font-weight: 700; color: #10b981;">Rs.</span>
+            <input type="number" id="inputTLCommissionRate" class="form-control" style="padding-left: 45px; font-weight: 800; font-size: 16px; color: #34d399;" value="<?php echo intval($activeCompany['tl_commission_per_tm'] ?? 500); ?>" min="0" step="50">
+          </div>
+        </div>
+        <div>
+          <span id="tlCommRateSavedIndicator" style="display: none; color: #10b981; font-size: 12px; font-weight: 700; padding-bottom: 10px;">✓ Saved</span>
+        </div>
+      </div>
+      <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 8px;">
+        💡 Whenever an applicant recruited by a TL is approved by this company admin, this bounty is instantly credited to that TL's commission balance.
+      </div>
+    </div>
+
     <div class="content-box">
       <div class="box-header">
         <div>
           <div class="box-title"><span>💰</span> Team Leader (TL) Commission & Nunno Plan Ledger</div>
-          <div class="box-desc">
-            Team Leaders earn <strong>Rs. 500 PKR</strong> per joined TM. TMs are required to buy the Nunno Rs. 1,700 plan to unlock live closing.
+          <div class="box-desc" id="tlLedgerDesc">
+            Team Leaders earn commission bounties per recruited TM for <?php echo htmlspecialchars($activeCompany['name']); ?>. TMs are required to buy the Nunno Rs. 1,700 plan to unlock live closing.
           </div>
         </div>
       </div>
@@ -829,7 +858,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
               <th>Team Leader</th>
               <th>Recruited TMs</th>
               <th>Nunno Rs. 1700 Plan Verified</th>
-              <th>Commission Accrued (@ Rs. 500)</th>
+              <th id="thTLLedgerRate">Commission Accrued (@ Rs. <?php echo number_format(intval($activeCompany['tl_commission_per_tm'] ?? 500)); ?>)</th>
               <th>Payout Status</th>
               <th>Action</th>
             </tr>
@@ -923,25 +952,37 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   </div>
 </div>
 
-<!-- MODAL: Approve Pending TM Closer -->
+<!-- MODAL: Approve Pending TM / TL Closer -->
 <div id="modalApproveTM" class="modal-overlay" style="display: none;">
-  <div class="modal-card" style="max-width: 480px;">
+  <div class="modal-card" style="max-width: 490px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
       <div>
         <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:#10b981; letter-spacing:0.05em;">Manual Verification</div>
-        <h3 class="modal-title" style="margin:0;">Approve Closer Application</h3>
+        <h3 class="modal-title" id="approveModalHeading" style="margin:0;">Approve Application</h3>
       </div>
       <button type="button" onclick="closeApproveTMModal()" style="background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer;">&times;</button>
     </div>
 
     <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:12px 16px; margin-bottom:18px;">
-      <div style="font-size:14px; font-weight:800; color:#34d399;" id="approveTMName">Applicant Name</div>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-size:14px; font-weight:800; color:#34d399;" id="approveTMName">Applicant Name</div>
+        <span id="approveTMRoleBadge" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; background:rgba(16,185,129,0.2); color:#34d399;">Sales Closer (TM)</span>
+      </div>
       <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;" id="approveTMUsername">@username</div>
     </div>
 
     <form onsubmit="submitApproveTM(event)">
       <input type="hidden" id="approveTMId">
       
+      <!-- Attributed TL selection (Only when approving a Sales Closer TM) -->
+      <div class="form-group" id="approveTMAttributedTLGroup">
+        <label class="form-label">Sponsoring Team Leader (TL) for Bounty</label>
+        <select id="approveTMAttributedTL" class="form-control" style="cursor:pointer; font-size:13px;">
+          <option value="">-- No Sponsoring TL (Direct Applicant) --</option>
+        </select>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">When approved, this Team Leader will be credited with <?php echo htmlspecialchars($activeCompany['name']); ?>'s commission bounty.</div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Assign Daily Message Quota *</label>
         <div style="display:flex; gap:8px; align-items:center;">
@@ -949,14 +990,14 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
           <button type="button" class="btn btn-secondary" onclick="adjustApproveLimit(50)">+50</button>
           <button type="button" class="btn btn-secondary" onclick="adjustApproveLimit(100)">+100</button>
         </div>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:5px;">This closer will be able to dispatch this many messages per day. (You can adjust anytime).</div>
+        <div id="approveTMLimitNote" style="font-size:11px; color:var(--text-muted); margin-top:5px;">Quota of WhatsApp messages this employee can dispatch per day.</div>
       </div>
 
       <div id="approveTMError" style="display: none; padding: 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185; font-size: 12.5px; margin-bottom: 14px;"></div>
 
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
         <button type="button" class="btn btn-secondary" onclick="closeApproveTMModal()">Cancel</button>
-        <button type="submit" id="approveTMSubmitBtn" class="btn btn-emerald">Approve &amp; Activate Closer 🚀</button>
+        <button type="submit" id="approveTMSubmitBtn" class="btn btn-emerald">Approve &amp; Activate 🚀</button>
       </div>
     </form>
   </div>
@@ -966,6 +1007,39 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 let currentEmployees = [];
 let currentCompanyLeads = [];
 let currentPendingTMs = [];
+window.currentCompanyTLCommissionRate = <?php echo intval($activeCompany['tl_commission_per_tm'] ?? 500); ?>;
+
+async function saveTLCommissionRate() {
+  const rateInp = document.getElementById('inputTLCommissionRate');
+  const rate = parseInt(rateInp?.value) || 500;
+  try {
+    const res = await fetch('api/companies.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update_company_config',
+        tl_commission_per_tm: rate
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.currentCompanyTLCommissionRate = rate;
+      const thRate = document.getElementById('thTLLedgerRate');
+      if (thRate) thRate.textContent = `Commission Accrued (@ Rs. ${rate.toLocaleString()})`;
+      const ind = document.getElementById('tlCommRateSavedIndicator');
+      if (ind) {
+        ind.style.display = 'inline-block';
+        setTimeout(() => { ind.style.display = 'none'; }, 2500);
+      }
+      alert('✅ TL Commission per TM saved: Rs. ' + rate.toLocaleString() + ' PKR');
+      loadEmployees();
+    } else {
+      alert('⚠️ ' + (data.error || 'Failed to save TL commission rate.'));
+    }
+  } catch (err) {
+    alert('Error saving TL commission rate: ' + err.message);
+  }
+}
 
 function switchDashboardTab(tabName) {
   const tabs = ['closers', 'pending', 'leads', 'campaigns', 'commissions', 'products'];
@@ -978,6 +1052,7 @@ function switchDashboardTab(tabName) {
   if (tabName === 'pending') loadPendingTMs();
   if (tabName === 'leads') loadCompanyLeads();
   if (tabName === 'products') loadCompanyConfig();
+  if (tabName === 'commissions') loadEmployees();
 }
 
 function adjustApproveLimit(delta) {
@@ -986,12 +1061,53 @@ function adjustApproveLimit(delta) {
 }
 
 function openApproveTMModal(id) {
-  const app = currentPendingTMs.find(a => a.id === id) || { id: id, name: 'Applicant', username: 'closer' };
+  const app = currentPendingTMs.find(a => a.id === id) || { id: id, name: 'Applicant', username: 'closer', role: 'member' };
+  const isTL = (app.role === 'lead');
+
   document.getElementById('approveTMId').value = app.id;
   document.getElementById('approveTMName').textContent = app.name;
   document.getElementById('approveTMUsername').textContent = '@' + app.username;
-  document.getElementById('approveTMLimit').value = 150;
+  document.getElementById('approveTMLimit').value = isTL ? 500 : 150;
   document.getElementById('approveTMError').style.display = 'none';
+
+  const headingEl = document.getElementById('approveModalHeading');
+  const roleBadge = document.getElementById('approveTMRoleBadge');
+  const tlGroup = document.getElementById('approveTMAttributedTLGroup');
+  const submitBtn = document.getElementById('approveTMSubmitBtn');
+
+  if (headingEl) headingEl.textContent = isTL ? 'Approve Team Leader (TL)' : 'Approve Sales Closer (TM)';
+  if (roleBadge) {
+    roleBadge.textContent = isTL ? '🚀 Team Leader (TL)' : '🎯 Sales Closer (TM)';
+    roleBadge.style.background = isTL ? 'rgba(147, 51, 234, 0.2)' : 'rgba(16, 185, 129, 0.2)';
+    roleBadge.style.color = isTL ? '#c084fc' : '#34d399';
+  }
+  if (submitBtn) {
+    submitBtn.textContent = isTL ? 'Approve & Activate Team Leader 🚀' : 'Approve & Activate Closer 🚀';
+  }
+
+  // Populate TL dropdown if applicant is TM
+  if (tlGroup) {
+    if (isTL) {
+      tlGroup.style.display = 'none';
+    } else {
+      tlGroup.style.display = 'block';
+      const tlSelect = document.getElementById('approveTMAttributedTL');
+      if (tlSelect) {
+        tlSelect.innerHTML = '<option value="">-- No Sponsoring TL (Direct Applicant) --</option>';
+        const tls = currentEmployees.filter(e => e.role === 'lead');
+        tls.forEach(tl => {
+          const opt = document.createElement('option');
+          opt.value = tl.id;
+          opt.textContent = `${tl.name} (@${tl.username}) - Accrued: Rs. ${(parseInt(tl.tl_commission_balance) || 0).toLocaleString()}`;
+          if (app.joined_via_tl && (app.joined_via_tl === tl.id || app.joined_via_tl === tl.username || app.joined_via_tl === tl.phone)) {
+            opt.selected = true;
+          }
+          tlSelect.appendChild(opt);
+        });
+      }
+    }
+  }
+
   document.getElementById('modalApproveTM').style.display = 'flex';
 }
 
@@ -1004,11 +1120,12 @@ async function submitApproveTM(e) {
   const btn = document.getElementById('approveTMSubmitBtn');
   const errBox = document.getElementById('approveTMError');
   btn.disabled = true;
-  btn.textContent = 'Activating Closer…';
+  btn.textContent = 'Activating…';
   errBox.style.display = 'none';
 
   const userId = document.getElementById('approveTMId').value;
   const limit = parseInt(document.getElementById('approveTMLimit').value) || 150;
+  const attributedTL = document.getElementById('approveTMAttributedTL')?.value || '';
 
   try {
     const res = await fetch('api/auth.php', {
@@ -1017,17 +1134,18 @@ async function submitApproveTM(e) {
       body: JSON.stringify({
         action: 'approve_tm',
         user_id: userId,
-        message_limit: limit
+        message_limit: limit,
+        attributed_tl: attributedTL
       })
     });
     const data = await res.json();
     if (data.success) {
       closeApproveTMModal();
-      alert('🎉 Closer approved and activated! They can now log in using their credentials.');
+      alert('🎉 ' + (data.message || 'Applicant approved and activated!'));
       loadPendingTMs();
       loadEmployees();
     } else {
-      errBox.textContent = data.error || 'Failed to approve closer.';
+      errBox.textContent = data.error || 'Failed to approve applicant.';
       errBox.style.display = 'block';
     }
   } catch (err) {
@@ -1035,7 +1153,7 @@ async function submitApproveTM(e) {
     errBox.style.display = 'block';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Approve & Activate Closer 🚀';
+    btn.textContent = 'Approve & Activate 🚀';
   }
 }
 
@@ -1081,12 +1199,13 @@ async function loadPendingTMs() {
       }
 
       if (!count) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">✨ No pending closer applications right now. When users scan their WhatsApp QR and select your company, they will appear here.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--text-muted);">✨ No pending applications right now. When users scan their WhatsApp QR and select your company, they will appear here.</td></tr>';
         return;
       }
 
       tbody.innerHTML = currentPendingTMs.map(app => {
         const pfp = app.pfp || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80';
+        const isTL = (app.role === 'lead');
         return `
           <tr>
             <td>
@@ -1094,7 +1213,12 @@ async function loadPendingTMs() {
                 <img src="${pfp}" alt="${app.name}" style="width:38px; height:38px; border-radius:10px; object-fit:cover; border:1px solid rgba(255,255,255,0.1);">
                 <div>
                   <div class="user-name">${app.name}</div>
-                  <div class="user-meta">Applicant</div>
+                  <div style="margin-top:2px;">
+                    ${isTL 
+                      ? '<span style="background:rgba(147, 51, 234, 0.2); color:#c084fc; border:1px solid rgba(147, 51, 234, 0.4); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">🚀 Team Leader (TL)</span>'
+                      : '<span style="background:rgba(16, 185, 129, 0.2); color:#34d399; border:1px solid rgba(16, 185, 129, 0.4); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px;">🎯 Sales Closer (TM)</span>'}
+                  </div>
+                  ${app.joined_via_tl ? `<div style="font-size:10.5px; color:#fbbf24; margin-top:2px;">Referred by TL: <strong>${app.joined_via_tl}</strong></div>` : ''}
                 </div>
               </div>
             </td>
@@ -1109,7 +1233,7 @@ async function loadPendingTMs() {
             </td>
             <td>
               <div style="font-size:12px; font-weight:600;">${app.city || 'Pakistan'}</div>
-              <div style="font-size:11px; color:var(--text-muted); text-transform:capitalize;">${app.gender || 'male'} closer</div>
+              <div style="font-size:11px; color:var(--text-muted); text-transform:capitalize;">${app.gender || 'male'} ${isTL ? 'lead' : 'closer'}</div>
             </td>
             <td>
               <span style="font-size:11.5px; color:var(--text-secondary);">${app.applied_at || app.created_at || 'Just now'}</span>
@@ -1117,7 +1241,7 @@ async function loadPendingTMs() {
             <td>
               <div style="display:flex; gap:8px;">
                 <button class="btn btn-emerald" style="padding:6px 12px; font-size:11.5px;" onclick="openApproveTMModal('${app.id}')">
-                  ✅ Approve (Set Limit)
+                  ✅ Approve
                 </button>
                 <button class="btn btn-danger" style="padding:6px 10px; font-size:11.5px;" onclick="rejectTM('${app.id}')">
                   ❌ Decline
@@ -1127,6 +1251,11 @@ async function loadPendingTMs() {
           </tr>
         `;
       }).join('');
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pending applications.</td></tr>';
+  }
+}
     }
   } catch (err) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#fb7185;">Failed to load pending applications.</td></tr>';
@@ -1374,18 +1503,27 @@ async function handleAddEmployee(e) {
 function renderTLLedger(employees) {
   const tls = employees.filter(e => e.role === 'lead');
   const tbody = document.getElementById('tlLedgerTableBody');
+  const rate = window.currentCompanyTLCommissionRate || 500;
+  const thRate = document.getElementById('thTLLedgerRate');
+  if (thRate) thRate.textContent = `Commission Accrued (@ Rs. ${rate.toLocaleString()})`;
+
   if (!tls.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No Team Leads appointed yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">No Team Leads appointed yet for this company.</td></tr>';
     return;
   }
 
   tbody.innerHTML = tls.map(tl => {
-    const recruited = employees.filter(m => m.joined_via_tl === tl.id).length;
-    const commission = (parseInt(tl.tl_commission_balance) || (recruited * 500));
+    const recruited = employees.filter(m => m.joined_via_tl && (m.joined_via_tl === tl.id || m.joined_via_tl === tl.username || m.joined_via_tl === tl.phone)).length;
+    const balance = parseInt(tl.tl_commission_balance);
+    const commission = !isNaN(balance) ? balance : (recruited * rate);
     return `
       <tr>
-        <td><strong>${tl.name}</strong><br><span style="font-size:11px; color:var(--text-muted);">${tl.phone || 'No phone'}</span></td>
-        <td><strong style="color:#34d399;">${recruited}</strong> active TMs</td>
+        <td>
+          <strong>${tl.name}</strong>
+          <div style="font-size:11px; color:#10b981; font-family:'JetBrains Mono',monospace;">@${tl.username}</div>
+          <span style="font-size:11px; color:var(--text-muted);">${tl.phone || 'No phone'}</span>
+        </td>
+        <td><strong style="color:#34d399; font-size:14px;">${recruited}</strong> active TMs</td>
         <td><span style="color:#10b981; font-weight:700;">✓ Verified</span></td>
         <td><strong style="color:#8ff5c8; font-size:15px;">Rs. ${commission.toLocaleString()}</strong></td>
         <td><span class="badge-status status-active">Accrued</span></td>
@@ -1565,6 +1703,13 @@ async function loadCompanyConfig() {
     const data = await res.json();
     if (data.success && data.config) {
       if (data.config.default_pitch) document.getElementById('cfgDefaultPitch').value = data.config.default_pitch;
+      if (data.config.tl_commission_per_tm !== undefined) {
+        window.currentCompanyTLCommissionRate = parseInt(data.config.tl_commission_per_tm) || 500;
+        const rateInp = document.getElementById('inputTLCommissionRate');
+        if (rateInp) rateInp.value = window.currentCompanyTLCommissionRate;
+        const thRate = document.getElementById('thTLLedgerRate');
+        if (thRate) thRate.textContent = `Commission Accrued (@ Rs. ${window.currentCompanyTLCommissionRate.toLocaleString()})`;
+      }
       renderProductsList(data.config.products || []);
     }
   } catch (err) {
@@ -1678,6 +1823,7 @@ async function handleAdminLogin(e) {
 loadEmployees();
 loadPendingTMs();
 loadCompanyLeads();
+loadCompanyConfig();
 setInterval(loadPendingTMs, 8000);
 <?php endif; ?>
 
