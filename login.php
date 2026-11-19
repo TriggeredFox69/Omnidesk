@@ -708,6 +708,106 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     .lp-trust span::before { content: '\2713'; color: var(--wa-accent); font-weight: 900; margin-right: 6px; }
     @media (max-width: 920px) { .lp-hero { grid-template-columns: 1fr; padding-top: 112px; gap: 36px; } }
 
+    
+    /* Hero Login Card & QR Desk */
+    .hero-login-card {
+      position: relative;
+      width: min(100%, 390px);
+      margin: 0 auto;
+      border-radius: 24px;
+      background: rgba(11, 23, 19, 0.92);
+      border: 1px solid rgba(31, 224, 138, 0.3);
+      box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.7), 0 0 50px -15px rgba(31, 224, 138, 0.35);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      padding: 24px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    html.theme-light .hero-login-card {
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(16, 185, 129, 0.28);
+      box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.12), 0 0 30px -10px rgba(16, 185, 129, 0.2);
+    }
+    .hero-qr-header { text-align: center; margin-bottom: 8px; }
+    .hero-qr-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(31, 224, 138, 0.12);
+      color: var(--wa-accent);
+      border: 1px solid rgba(31, 224, 138, 0.3);
+      margin-bottom: 5px;
+    }
+    .hero-qr-title {
+      font-size: 17px;
+      font-weight: 850;
+      color: var(--wa-text-primary);
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+    .hero-login-card .wa-qr-frame {
+      margin: 0 auto;
+      width: 220px;
+      height: 220px;
+      padding: 8px;
+      border-radius: 18px;
+      background: #ffffff;
+      border: 1px solid rgba(31, 224, 138, 0.35);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hero-login-card .wa-qr-img { width: 100%; height: 100%; object-fit: contain; border-radius: 12px; }
+    .btn-continue-pwd {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(31, 224, 138, 0.08);
+      border: 1px solid rgba(31, 224, 138, 0.28);
+      color: var(--wa-text-primary);
+      font-size: 12.5px;
+      font-weight: 750;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-continue-pwd:hover {
+      background: rgba(31, 224, 138, 0.18);
+      border-color: var(--wa-accent);
+      color: var(--wa-accent);
+    }
+    .user-pass-role-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .user-pass-role-switch .role-tab-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--wa-card-border);
+      color: var(--wa-text-secondary);
+      border-radius: 10px;
+      font-size: 12px;
+      padding: 9px 6px;
+      font-weight: 800;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .user-pass-role-switch .role-tab-btn.active {
+      background: rgba(31, 224, 138, 0.16);
+      border-color: var(--wa-accent);
+      color: var(--wa-accent);
+      box-shadow: 0 0 16px -4px var(--wa-accent);
+    }
+
     /* Hero visual: animated chat */
     .lp-visual { position: relative; display: flex; justify-content: center; padding: 18px 0; }
     .lp-visual::before { content: ''; position: absolute; width: 380px; height: 380px; border-radius: 50%; background: radial-gradient(circle, rgba(31, 224, 138, 0.35), rgba(31, 224, 138, 0) 68%); filter: blur(30px); top: 50%; left: 50%; transform: translate(-50%, -50%); animation: chatlyFloat 6s ease-in-out infinite; }
@@ -853,8 +953,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
 
   <div style="display:flex; align-items:center; gap:18px;">
     <nav class="lp-nav">
-      <a href="#access" class="lp-nav-cta" onclick="window.scrollTo({top:0,behavior:'smooth'}); return false;">⚡ Workspace Login</a>
-      <a href="#overview">Overview</a>
+      <a href="#top" class="lp-nav-cta" onclick="focusHeroQR(); return false;">⚡ Workspace Login</a>
       <a href="#offer">What we offer</a>
       <a href="#how">How it works</a>
       <a href="#brands">For brands</a>
@@ -880,329 +979,165 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     </div>
   </div>
 </div>
-<!-- ═══════════ LANDING: ACCESS (Primary Workspace Login Desk) ═══════════ -->
-<section id="access">
-  <div class="lp-access-head lp-section">
-    <span class="lp-eyebrow"><i></i> Live WhatsApp Closing Desk</span>
-    <h1 class="lp-h2">Log In &amp; <span class="lp-grad">Start Closing Deals</span></h1>
-    <p class="lp-lead" style="margin:0 auto;">Scan WhatsApp to link your closer terminal immediately, or sign in to your team leader, company admin, or master console.</p>
+<!-- ═══════════ LANDING: HERO & LIVE WORKSPACE DESK ═══════════ -->
+<section class="lp-section lp-hero" id="top">
+  <!-- Left Column: Headline & Platform Pitch (Image 1) -->
+  <div>
+    <span class="lp-eyebrow"><i></i> WhatsApp sales closing platform</span>
+    <h1>Turn WhatsApp chats into <span class="lp-grad">paying customers.</span></h1>
+    <p class="lp-lead">Chatly puts your product in front of a trained team of closers who sell for you on WhatsApp. You pay for promotion &mdash; we bring real conversations, real orders and real revenue.</p>
+    <div class="lp-cta-row">
+      <a href="admin.php" class="lp-btn lp-btn-primary">Promote my product &rarr;</a>
+      <a href="javascript:void(0)" class="lp-btn lp-btn-ghost" onclick="focusHeroQR(); return false;">Start closing as TM</a>
+    </div>
+    <div class="lp-trust">
+      <span>Pay for promotion</span>
+      <span>Trained closers</span>
+      <span>Live deal tracking</span>
+    </div>
   </div>
 
-<!-- Main Floating Container -->
-<div class="landing-wrapper">
-  <div class="wa-main-card">
+  <!-- Right Column: Live WhatsApp QR Scanner & TM / TL Login Switcher -->
+  <div class="hero-login-card" id="heroLoginCard">
     
-    <!-- 4-Role Navigation Bar -->
-    <div class="role-nav-bar">
-      <button class="role-tab-btn active" id="tabBtnTM" onclick="switchRole('tm')">
-        <span>📱</span> 1. Closer (TM) QR Login
-      </button>
-      <button class="role-tab-btn tab-tl" id="tabBtnTL" onclick="switchRole('tl')">
-        <span>👑</span> 2. Team Lead (TL) Login
-      </button>
-      <button class="role-tab-btn tab-admin" id="tabBtnAdmin" onclick="switchRole('admin')">
-        <span>🏢</span> 3. Company Admin (/admin)
-      </button>
-      <button class="role-tab-btn tab-sadmin" id="tabBtnSadmin" onclick="switchRole('sadmin')">
-        <span>⚡</span> 4. Super Admin (/sadmin)
-      </button>
+    <!-- State 1: QR Scanner (Default View) -->
+    <div id="heroQrView">
+      <div class="hero-qr-header">
+        <span class="hero-qr-badge">⚡ 24/7 Live Closing Desk</span>
+        <h3 class="hero-qr-title">Scan QR with WhatsApp</h3>
+        <p style="font-size:12px; color:var(--wa-text-secondary); margin:4px 0 0;">Link your closer WhatsApp in seconds to start working</p>
+      </div>
+
+      <!-- Live WebSocket QR Frame -->
+      <div class="wa-qr-frame">
+        <div class="qr-scan-line"></div>
+        <img id="landingQrImage" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='230' height='230' viewBox='0 0 230 230'><rect width='230' height='230' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b' font-weight='700'>⚡ Generating QR Code...</text></svg>" alt="WhatsApp QR Code" class="wa-qr-img">
+        <div class="wa-qr-center-logo" style="width:40px; height:40px; border-radius:10px; background:#07140f; border:2px solid var(--wa-accent); overflow:hidden; padding:2px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+          <img src="assets/images/chatly-icon.png" alt="Chatly" style="width:100%; height:100%; object-fit:contain; border-radius:6px;">
+        </div>
+      </div>
+
+      <div class="qr-status-badge" id="qrStatusBadge">
+        <span class="pulse-dot"></span>
+        <span id="qrStatusText">Pure WebSocket Bridge • Scan with WhatsApp</span>
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:0 4px;">
+        <label class="qr-checkbox-row" style="margin:0;">
+          <input type="checkbox" id="keepSignedIn" checked>
+          <span style="font-size:12px;">Keep me signed in</span>
+        </label>
+        <a href="javascript:void(0)" onclick="refreshQRCode(true)" class="footer-link" style="font-size:11.5px;">🔄 Refresh</a>
+      </div>
+
+      <!-- Connected WhatsApp Closer Card -->
+      <div id="connectedPhoneActionsBox" style="display:none; width:100%; margin-top:10px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.3); border-radius:12px; padding:12px; text-align:center;">
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--wa-accent); font-weight:800; margin-bottom:2px;">Connected WhatsApp Closer</div>
+        <div id="connectedCloserName" style="font-size:14px; font-weight:800; color:var(--wa-text-primary);">Closer Account</div>
+        <div id="connectedCloserPhone" style="font-size:11.5px; color:var(--wa-text-secondary); margin-bottom:10px;"></div>
+        <div style="display:flex; gap:8px; justify-content:center;">
+          <button type="button" id="btnEnterConnectedCloser" class="btn-action-primary" style="margin:0; padding:8px 12px; font-size:12px; flex:1.3; white-space:nowrap;">
+            Enter Desk →
+          </button>
+          <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:8px 10px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" title="Disconnect WhatsApp session and show fresh QR code">
+            🔄 Disconnect
+          </button>
+        </div>
+      </div>
+
+      <!-- Direct Phone Input -->
+      <div style="margin-top:10px; width:100%;">
+        <div style="font-size:11px; color:var(--wa-text-muted); margin-bottom:4px; text-align:left;">
+          📱 Or link phone number directly:
+        </div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="simPhoneInput" placeholder="+923001234567" value="" class="input-field" style="padding:7px 10px; font-size:12px; font-family:monospace;">
+          <button type="button" class="btn-action-primary" style="margin:0; padding:7px 12px; width:auto; font-size:12px; background:var(--wa-accent); white-space:nowrap;" onclick="handlePhonePairSubmit()">
+            ⚡ Link
+          </button>
+        </div>
+      </div>
+
+      <!-- Option below QR: Continue with Username & Password -->
+      <div style="margin-top:14px; text-align:center;">
+        <button type="button" class="btn-continue-pwd" onclick="toggleHeroLoginMode('password')">
+          <span>🔑 Continue with Username &amp; Password &rarr;</span>
+        </button>
+      </div>
+
+      <div style="margin-top:10px; display:flex; justify-content:center; gap:12px; font-size:11.5px; color:var(--wa-text-secondary);">
+        <a href="admin.php" class="footer-link">Company Admin (/admin)</a>
+        <span>•</span>
+        <a href="sadmin.php" class="footer-link">Super Admin (/sadmin)</a>
+      </div>
     </div>
 
-    <!-- TAB 1: TM CLOSER QR CODE JOURNEY (WhatsApp Web Mirror) -->
-    <div class="tab-pane active" id="paneTM">
-      
-      <!-- Sub-Toggle: QR Pair vs Direct Password Login -->
-      <div class="tm-subtoggle" style="display:flex; gap:10px; margin-bottom:22px; max-width:540px; margin-left:auto; margin-right:auto;">
-        <button type="button" class="role-tab-btn active" id="btnTMSubQR" onclick="toggleTMSubMode('qr')" style="flex:1; border-radius:10px; font-weight:700;">
-          <span>📱</span> Scan WhatsApp QR Code
+    <!-- State 2: Username & Password Login with TM / TL Switch -->
+    <div id="heroPasswordView" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <button type="button" class="btn-back-qr" onclick="toggleHeroLoginMode('qr')" style="background:none; border:none; color:var(--wa-accent); font-size:12px; font-weight:750; cursor:pointer; display:inline-flex; align-items:center; gap:4px; padding:0;">
+          <span>&larr; Back to QR Scanner</span>
         </button>
-        <button type="button" class="role-tab-btn" id="btnTMSubPW" onclick="toggleTMSubMode('password')" style="flex:1; border-radius:10px; font-weight:700;">
-          <span>🔑</span> Continue with Username &amp; Password
+        <span style="font-size:11px; color:var(--wa-text-muted); font-weight:600;">Credential Login</span>
+      </div>
+
+      <!-- Switch between TM (Team Member) and TL (Team Leader) -->
+      <div class="user-pass-role-switch">
+        <button type="button" class="role-tab-btn active" id="btnSwitchTM" onclick="switchPasswordRole('tm')">
+          <span>📱 TM (Team Member)</span>
+        </button>
+        <button type="button" class="role-tab-btn" id="btnSwitchTL" onclick="switchPasswordRole('tl')">
+          <span>👑 TL (Team Leader)</span>
         </button>
       </div>
 
-      <!-- VIEW A: WhatsApp Web QR Pairing -->
-      <div id="tmViewQR">
-        <div class="wa-journey-layout">
-          
-          <!-- Left: Step-by-Step Instructions -->
-          <div>
-            <h2 class="wa-journey-title">To start closing on your computer:</h2>
-
-            <ol class="wa-steps-list">
-              <li class="wa-step-item">
-                <span class="wa-step-num">1.</span>
-                <div>Open <strong>WhatsApp</strong> on your mobile phone</div>
-              </li>
-              <li class="wa-step-item">
-                <span class="wa-step-num">2.</span>
-                <div>
-                  Tap <strong>Menu <span class="wa-icon-hint">⋮</span></strong> on Android, or <strong>Settings <span class="wa-icon-hint">⚙️</span></strong> on iPhone
-                </div>
-              </li>
-              <li class="wa-step-item">
-                <span class="wa-step-num">3.</span>
-                <div>
-                  Tap <strong>Linked devices</strong> and then <strong>Link a device</strong>
-                </div>
-              </li>
-              <li class="wa-step-item">
-                <span class="wa-step-num">4.</span>
-                <div>
-                  Point your phone to this screen to capture the QR code
-                </div>
-              </li>
-            </ol>
-
-            <!-- Continue as TL Highlight Banner -->
-            <div class="tl-cta-banner" onclick="switchRole('tl')">
-              <div>
-                <div class="tl-cta-badge">👑 Team Leader Opportunity</div>
-                <div class="tl-cta-title">Or Continue as a Team Leader (TL)</div>
-                <div class="tl-cta-sub">Earn Rs. 500 PKR commission per joined TM closer with an instant recruitment dashboard.</div>
-              </div>
-              <button class="tl-cta-btn">Access TL Portal &rarr;</button>
-            </div>
-
-            <div class="qr-links" style="margin-top: 24px; font-size: 13px; color: var(--wa-text-secondary); display: flex; align-items: center; gap: 16px;">
-              <a href="javascript:void(0)" onclick="refreshQRCode(true)" class="footer-link">🔄 Refresh QR code</a>
-              <span>•</span>
-              <a href="admin.php" class="footer-link">Company Admin Portal</a>
-              <span>•</span>
-              <a href="sadmin.php" class="footer-link">Super Admin</a>
-            </div>
+      <!-- TM Password Form -->
+      <div id="heroTMPasswordPane">
+        <form id="formTMPasswordLogin" onsubmit="handleTMPasswordLogin(event)">
+          <div class="input-group" style="margin-bottom:12px;">
+            <label class="input-label" style="font-size:11.5px;">Closer (TM) Username</label>
+            <input type="text" id="tmDirectUsername" class="input-field" placeholder="e.g. askari" required style="padding:9px 12px; font-size:13px;">
           </div>
-
-          <!-- Right: WhatsApp Web QR Frame -->
-          <div class="qr-column">
-            <div class="wa-qr-frame">
-              <div class="qr-scan-line"></div>
-              <img id="landingQrImage" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='230' height='230' viewBox='0 0 230 230'><rect width='230' height='230' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2364748b' font-weight='700'>⚡ Generating QR Code...</text></svg>" alt="WhatsApp QR Code" class="wa-qr-img">
-              <div class="wa-qr-center-logo" style="width:44px; height:44px; border-radius:12px; background:#07140f; border:2px solid var(--wa-accent); overflow:hidden; padding:2px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(0,0,0,0.3);">
-                <img src="assets/images/chatly-icon.png" alt="Chatly" style="width:100%; height:100%; object-fit:contain; border-radius:8px;">
-              </div>
-            </div>
-
-            <div class="qr-status-badge" id="qrStatusBadge">
-              <span class="pulse-dot"></span>
-              <span id="qrStatusText">Pure WebSocket Bridge • Ready to Pair</span>
-            </div>
-
-            <label class="qr-checkbox-row">
-              <input type="checkbox" id="keepSignedIn" checked>
-              <span>Keep me signed in</span>
-            </label>
-
-            <!-- Connected WhatsApp Closer Card (shown when WhatsApp bridge is already linked) -->
-            <div id="connectedPhoneActionsBox" style="display:none; width:100%; max-width:270px; margin-top:14px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.3); border-radius:14px; padding:14px; text-align:center;">
-              <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.6px; color:var(--wa-accent); font-weight:800; margin-bottom:4px;">Connected WhatsApp Closer</div>
-              <div id="connectedCloserName" style="font-size:15px; font-weight:800; color:var(--wa-text-primary);">Closer Account</div>
-              <div id="connectedCloserPhone" style="font-size:12px; color:var(--wa-text-secondary); margin-bottom:12px;"></div>
-              <div style="display:flex; gap:8px; justify-content:center;">
-                <button type="button" id="btnEnterConnectedCloser" class="btn-action-primary" style="margin:0; padding:9px 12px; font-size:12px; flex:1.3; white-space:nowrap;">
-                  Enter Desk →
-                </button>
-                <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:9px 10px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" title="Disconnect WhatsApp session and show fresh QR code">
-                  🔄 Disconnect
-                </button>
-              </div>
-            </div>
-
-            <!-- Pair / Test WhatsApp Phone Input -->
-            <div style="margin-top: 14px; width: 100%; max-width: 270px;">
-              <div style="font-size: 11px; color: var(--wa-text-muted); margin-bottom: 5px; text-align: left;">
-                📱 Link WhatsApp Number:
-              </div>
-              <div style="display: flex; gap: 6px;">
-                <input type="text" id="simPhoneInput" placeholder="+923001234567" value="" class="input-field" style="padding: 8px 10px; font-size: 13px; font-family: monospace;">
-                <button type="button" class="btn-action-primary" style="margin: 0; padding: 8px 12px; width: auto; font-size: 12px; background: var(--wa-accent); white-space: nowrap;" onclick="handlePhonePairSubmit()">
-                  ⚡ Link
-                </button>
-              </div>
-            </div>
+          <div class="input-group" style="margin-bottom:12px;">
+            <label class="input-label" style="font-size:11.5px;">Password</label>
+            <input type="password" id="tmDirectPassword" class="input-field" placeholder="Password" required style="padding:9px 12px; font-size:13px;">
           </div>
-
-        </div>
+          <div class="error-box" id="tmPasswordLoginError"></div>
+          <button type="submit" id="tmDirectLoginBtn" class="btn-action-primary" style="margin-top:6px; padding:10px; font-size:13px; font-weight:800; background:linear-gradient(135deg, #2de89a, #0fa968); box-shadow:0 6px 18px rgba(31, 224, 138, 0.35);">
+            Sign In as Closer (TM) 🚀
+          </button>
+        </form>
       </div>
 
-      <!-- VIEW B: Direct TM Username & Password Login -->
-      <div id="tmViewPassword" style="display:none;">
-        <div class="form-container">
-          <div class="form-header">
-            <div class="form-badge-icon" style="background:rgba(31, 224, 138, 0.18); color:var(--wa-accent);">🔑</div>
-            <h2 class="form-title">Team Member (TM) Closer Login</h2>
-            <p class="form-subtitle">Already registered &amp; approved? Sign in directly without scanning QR.</p>
-          </div>
-
-          <form id="formTMPasswordLogin" onsubmit="handleTMPasswordLogin(event)">
-            <div class="input-group">
-              <label class="input-label">Username (e.g. askari or your approved username)</label>
-              <input type="text" id="tmDirectUsername" class="input-field" placeholder="askari" required>
-            </div>
-            <div class="input-group">
-              <label class="input-label">Password</label>
-              <input type="password" id="tmDirectPassword" class="input-field" placeholder="123456" required>
-            </div>
-            <div class="error-box" id="tmPasswordLoginError"></div>
-            <button type="submit" id="tmDirectLoginBtn" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); box-shadow:0 6px 20px rgba(31, 224, 138, 0.35);">
-              Sign In to Closer Workspace 🚀
-            </button>
-          </form>
-
-          <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
-            New to Chatly? <a href="javascript:void(0)" onclick="toggleTMSubMode('qr')" class="footer-link">Scan your WhatsApp QR to apply</a>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- TAB 2: TEAM LEADER (TL) COMMISSION PORTAL -->
-    <div class="tab-pane" id="paneTL">
-      <div class="form-container">
-        <div class="form-header">
-          <div class="form-badge-icon" style="background:rgba(31, 224, 138, 0.2); color:#8ff5c8;">👑</div>
-          <h2 class="form-title">Team Leader (TL) Commission Portal</h2>
-          <p class="form-subtitle">Recruit closers, manage team quotas, and monitor commission earnings.</p>
-        </div>
-
-        <!-- TL Login Form (TLs only sign in) -->
+      <!-- TL Password Form -->
+      <div id="heroTLPasswordPane" style="display:none;">
         <form id="formTLLogin" onsubmit="handleTLLogin(event)">
-          <div class="input-group">
-            <label class="input-label">TL Username (e.g. ali or asima)</label>
-            <input type="text" id="tlUsername" class="input-field" placeholder="ali" required>
+          <div class="input-group" style="margin-bottom:12px;">
+            <label class="input-label" style="font-size:11.5px;">Team Lead (TL) Username</label>
+            <input type="text" id="tlUsername" class="input-field" placeholder="e.g. ali or asima" required style="padding:9px 12px; font-size:13px;">
           </div>
-          <div class="input-group">
-            <label class="input-label">Password</label>
-            <input type="password" id="tlPassword" class="input-field" placeholder="ali123 or password" required>
+          <div class="input-group" style="margin-bottom:12px;">
+            <label class="input-label" style="font-size:11.5px;">Password</label>
+            <input type="password" id="tlPassword" class="input-field" placeholder="ali123 or password" required style="padding:9px 12px; font-size:13px;">
           </div>
           <div class="error-box" id="tlLoginError"></div>
-          <button type="submit" id="tlLoginBtn" class="btn-action-primary btn-tl">
+          <button type="submit" id="tlLoginBtn" class="btn-action-primary btn-tl" style="margin-top:6px; padding:10px; font-size:13px; font-weight:800; background:linear-gradient(135deg, #f59e0b, #d97706); box-shadow:0 6px 18px rgba(245, 158, 11, 0.35);">
             Access TL Commission Desk 👑
           </button>
         </form>
+      </div>
 
-        <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
-          Demo accounts: <span style="font-family:monospace; color:#8ff5c8;">ali / ali123</span> &bull; <span style="font-family:monospace; color:#8ff5c8;">asima / asima123</span>
-        </div>
+      <div style="margin-top:14px; text-align:center; font-size:11.5px; color:var(--wa-text-secondary); display:flex; justify-content:center; gap:10px;">
+        <a href="admin.php" class="footer-link">Company Admin (/admin)</a>
+        <span>•</span>
+        <a href="sadmin.php" class="footer-link">Super Admin (/sadmin)</a>
       </div>
     </div>
 
-    <!-- TAB 3: COMPANY ADMIN PORTAL -->
-    <div class="tab-pane" id="paneAdmin">
-      <div class="form-container">
-        <div class="form-header">
-          <div class="form-badge-icon" style="background:rgba(245, 158, 11, 0.2); color:#fbbf24;">🏢</div>
-          <h2 class="form-title">Company Admin Portal</h2>
-          <p class="form-subtitle">Provision employees, adjust message limits & manage lead takeovers.</p>
-        </div>
-
-        <form id="formAdminLogin" onsubmit="handleAdminLogin(event)">
-          <div class="input-group">
-            <label class="input-label">Admin Username</label>
-            <input type="text" id="adminUsername" class="input-field" placeholder="admin" required>
-          </div>
-          <div class="input-group">
-            <label class="input-label">Admin Password</label>
-            <input type="password" id="adminPassword" class="input-field" placeholder="admin123" required>
-          </div>
-          <div class="error-box" id="adminLoginError"></div>
-          <button type="submit" id="adminLoginBtn" class="btn-action-primary btn-admin">
-            Sign In to Company Admin (/admin) 🏢
-          </button>
-        </form>
-
-        <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
-          <a href="admin.php" class="footer-link">Go directly to full /admin page &rarr;</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 4: SUPER ADMIN MASTER COMMAND -->
-    <div class="tab-pane" id="paneSadmin">
-      <div class="form-container">
-        <div class="form-header">
-          <div class="form-badge-icon" style="background:rgba(234, 179, 8, 0.2); color:#fde047;">⚡</div>
-          <h2 class="form-title">Super Admin Command Center</h2>
-          <p class="form-subtitle">Platform Owner Master Access — Multi-Company Telemetry & Stats.</p>
-        </div>
-
-        <form id="formSadminLogin" onsubmit="handleSadminLogin(event)">
-          <div class="input-group">
-            <label class="input-label">Super Admin Key</label>
-            <input type="text" id="sadminUsername" class="input-field" placeholder="sadmin" required>
-          </div>
-          <div class="input-group">
-            <label class="input-label">Master Password</label>
-            <input type="password" id="sadminPassword" class="input-field" placeholder="sadmin123" required>
-          </div>
-          <div class="error-box" id="sadminLoginError"></div>
-          <button type="submit" id="sadminLoginBtn" class="btn-action-primary btn-sadmin">
-            Unlock Super Command (/sadmin) ⚡
-          </button>
-        </form>
-
-        <div style="margin-top:20px; text-align:center; font-size:12px; color:var(--wa-text-secondary);">
-          <a href="sadmin.php" class="footer-link">Go directly to full /sadmin page &rarr;</a>
-        </div>
-      </div>
-    </div>
-
-    <!-- WhatsApp Web Card Bottom Bar -->
-    <div class="wa-card-footer">
-      <div>
-        <span>Chatly Multi-Tenant Closing Infrastructure</span>
-        <span style="margin: 0 6px;">&bull;</span>
-        <span style="color:var(--wa-accent); font-weight:700;">24/7 Pure WebSocket Engine</span>
-      </div>
-      <div style="display:flex; gap:16px;">
-        <a href="login.php?switch=1" class="footer-link">Switch Account</a>
-        <a href="admin.php" class="footer-link">Company Admin</a>
-        <a href="sadmin.php" class="footer-link">Super Admin</a>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-</section>
-
-
-
-<!-- ═══════════ LANDING: PLATFORM SHOWCASE ═══════════ -->
-<section class="lp-section lp-hero" id="overview">
-  <div>
-    <span class="lp-eyebrow"><i></i> WhatsApp sales closing platform</span>
-    <h2>Turn WhatsApp chats into <span class="lp-grad">paying customers.</span></h2>
-    <p class="lp-lead">Chatly puts your product in front of a trained team of closers who sell for you on WhatsApp. You pay for promotion &mdash; we bring real conversations, real orders and real revenue.</p>
-    <div class="lp-cta-row">
-      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
-      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Start closing as TM</a>
-    </div>
-    <div class="lp-trust"><span>Pay for promotion</span><span>Trained closers</span><span>Live deal tracking</span></div>
-  </div>
-
-  <div class="lp-visual" aria-hidden="true">
-    <div class="lp-chat">
-      <div class="lp-chat-head">
-        <img src="assets/images/chatly-icon.png" alt="">
-        <div><b>Chatly Closer Desk</b><small>&#9679; online &middot; replying now</small></div>
-      </div>
-      <div class="lp-chat-body">
-        <div class="cm-b cm-in">Is this still available?</div>
-        <div class="cm-b cm-out">Yes! Delivering today. Want me to reserve one for you?</div>
-        <div class="cm-b cm-in">Great, I'll take it!</div>
-        <div class="cm-b cm-out">Order confirmed. Thank you!</div>
-        <div class="cm-deal">&#10003; DEAL CLOSED</div>
-      </div>
-    </div>
-    <div class="lp-chip a">&#9889; Avg reply <b>&lt; 2 min</b></div>
-    <div class="lp-chip b">&#128176; New order <b>+ Rs. 4,500</b></div>
   </div>
 </section>
 
-<!-- ═══════════ LANDING: STATS ═══════════
-     PLACEHOLDER FIGURES — replace data-count values with real numbers before launch. -->
+<!-- ═══════════ LANDING: STATS (Image 2) ═══════════ -->
 <section class="lp-section" id="stats">
   <div class="lp-stats">
     <div class="lp-stat"><b><span data-count="48500" data-suffix="+">0</span></b><span>Conversations handled</span></div>
@@ -1254,7 +1189,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         <li>Live pipeline, conversions and closer performance</li>
         <li>Approve, pause or remove closers any time</li>
       </ul>
-      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
+      <a href="#top" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Promote my product &rarr;</a>
     </div>
     <div class="lp-panel">
       <span class="lp-eyebrow">For closers</span>
@@ -1265,7 +1200,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         <li>Earn commission on every deal you close</li>
         <li>Team leaders earn Rs. 500 for each closer they recruit</li>
       </ul>
-      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Start as a closer</a>
+      <a href="#top" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Start as a closer</a>
     </div>
   </div>
 
@@ -1286,8 +1221,8 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     <h2>Ready to sell more on WhatsApp?</h2>
     <p>Put your product in front of real buyers &mdash; and let our closers do the selling.</p>
     <div class="lp-cta-row">
-      <a href="#access" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Start promoting today &rarr;</a>
-      <a href="#access" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Join as a closer</a>
+      <a href="#top" class="lp-btn lp-btn-primary" onclick="scrollToAccess('admin'); return false;">Start promoting today &rarr;</a>
+      <a href="#top" class="lp-btn lp-btn-ghost" onclick="scrollToAccess('tm'); return false;">Join as a closer</a>
     </div>
   </div>
   <div class="lp-foot">
@@ -1298,7 +1233,58 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
 
 <script>
 // Landing helpers: jump to the access card on a given role tab, and animate the stat counters.
+
+// Hero Login Card State Switchers
+function toggleHeroLoginMode(mode) {
+  const qrView = document.getElementById('heroQrView');
+  const pwdView = document.getElementById('heroPasswordView');
+  if (mode === 'password') {
+    if (qrView) qrView.style.display = 'none';
+    if (pwdView) pwdView.style.display = 'block';
+  } else {
+    if (qrView) qrView.style.display = 'block';
+    if (pwdView) pwdView.style.display = 'none';
+  }
+}
+
+function switchPasswordRole(role) {
+  const btnTM = document.getElementById('btnSwitchTM');
+  const btnTL = document.getElementById('btnSwitchTL');
+  const paneTM = document.getElementById('heroTMPasswordPane');
+  const paneTL = document.getElementById('heroTLPasswordPane');
+  if (role === 'tl') {
+    if (btnTL) btnTL.classList.add('active');
+    if (btnTM) btnTM.classList.remove('active');
+    if (paneTL) paneTL.style.display = 'block';
+    if (paneTM) paneTM.style.display = 'none';
+  } else {
+    if (btnTM) btnTM.classList.add('active');
+    if (btnTL) btnTL.classList.remove('active');
+    if (paneTM) paneTM.style.display = 'block';
+    if (paneTL) paneTL.style.display = 'none';
+  }
+}
+
+function focusHeroQR() {
+  toggleHeroLoginMode('qr');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function scrollToAccess(role) {
+  if (role === 'admin') {
+    window.location.href = 'admin.php';
+    return;
+  }
+  if (role === 'tl') {
+    toggleHeroLoginMode('password');
+    switchPasswordRole('tl');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+  focusHeroQR();
+}
+
+function _origScrollToAccess(role) {
   try { if (role && typeof switchRole === 'function') switchRole(role); } catch (_) {}
   const el = document.querySelector('#access .landing-wrapper') || document.getElementById('access');
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
