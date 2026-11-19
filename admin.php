@@ -40,20 +40,29 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 // Load company details
 $companiesFile = __DIR__ . '/data/companies.json';
 $companies = file_exists($companiesFile) ? json_decode(file_get_contents($companiesFile), true) : [];
-$companyId = ($currentUser['role'] ?? '') === 'superadmin' && !empty($_GET['company_id'])
+$companyId = !empty($_GET['company_id'])
     ? $_GET['company_id']
     : ($currentUser['company_id'] ?? 'COMP-001');
 
 $activeCompany = null;
 if (is_array($companies)) {
     foreach ($companies as $c) {
-        if ($c['id'] === $companyId) {
+        if ($c['id'] === $companyId || ($c['slug'] ?? '') === $companyId) {
             $activeCompany = $c;
             break;
         }
     }
 }
-if (!$activeCompany) {
+if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink')) {
+    $activeCompany = [
+        'id'                    => 'COMP-004',
+        'name'                  => 'Metalink',
+        'slug'                  => 'metalink',
+        'plan'                  => 'Enterprise Growth',
+        'default_message_limit' => 250,
+        'logo'                  => 'assets/images/metalink-logo.webp'
+    ];
+} elseif (!$activeCompany) {
     $activeCompany = [
         'id'                    => 'COMP-001',
         'name'                  => 'Nunno Official',

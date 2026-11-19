@@ -29,7 +29,35 @@ require_once __DIR__ . '/tenant_manager.php';
 function getCompanies($file) {
     if (!file_exists($file)) return [];
     $data = @json_decode(file_get_contents($file), true);
-    return is_array($data) ? $data : [];
+    $comps = is_array($data) ? $data : [];
+
+    $hasMetalink = false;
+    foreach ($comps as $c) {
+        if (($c['id'] ?? '') === 'COMP-004' || ($c['slug'] ?? '') === 'metalink') {
+            $hasMetalink = true;
+            break;
+        }
+    }
+    if (!$hasMetalink) {
+        $comps[] = [
+            'id'                    => 'COMP-004',
+            'name'                  => 'Metalink',
+            'short_name'            => 'Metalink',
+            'slug'                  => 'metalink',
+            'owner_name'            => 'Zeeshan',
+            'owner_email'           => 'admin@metalink.pk',
+            'plan'                  => 'Enterprise Growth',
+            'badge'                 => 'Digital Trading & Closer Desk',
+            'logo'                  => 'assets/images/metalink-logo.webp',
+            'brand_color'           => '#06b6d4',
+            'max_employees'         => 50,
+            'default_message_limit' => 250,
+            'status'                => 'active',
+            'created_at'            => date('Y-m-d H:i:s')
+        ];
+        saveCompanies($file, $comps);
+    }
+    return $comps;
 }
 
 function saveCompanies($file, $data) {

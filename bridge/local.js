@@ -14,7 +14,7 @@ function templateLoginPhp(content) {
   return rendered;
 }
 
-function templateAdminPhp(content, currentUser) {
+function templateAdminPhp(content, currentUser, targetCompId = null) {
   const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin');
   let rendered = content;
   if (!isAdmin) {
@@ -25,10 +25,10 @@ function templateAdminPhp(content, currentUser) {
   let compName = 'Nunno Official';
   let compPlan = 'Enterprise Billion';
   let compLogo = 'assets/images/nunno-logo.png';
-  const compId = currentUser?.company_id || 'COMP-001';
+  const compId = targetCompId || currentUser?.company_id || 'COMP-001';
   try {
     const comps = JSON.parse(fs.readFileSync(path.join(root, 'data/companies.json'), 'utf8') || '[]');
-    const match = comps.find(c => c.id === compId);
+    const match = comps.find(c => c.id === compId || c.slug === compId);
     if (match) {
       compName = match.name || compName;
       compPlan = match.plan || compPlan;
@@ -92,6 +92,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
     return [
       { id: 'USR-SADMIN-01', name: 'Master Administrator', username: 'sadmin', role: 'superadmin', designation: 'Platform Owner', gender: 'male', status: 'active', company_id: 'GLOBAL' },
       { id: 'USR-ADMIN-01', name: 'System Administrator', username: 'admin', role: 'admin', designation: 'Admin', gender: 'male', status: 'active', company_id: 'COMP-001' },
+      { id: 'USR-ADMIN-04', name: 'Zeeshan (Metalink)', username: 'metalink', role: 'admin', designation: 'Company Admin', gender: 'male', status: 'active', company_id: 'COMP-004', password: 'Zeeshan123' },
+      { id: 'USR-ADMIN-04-ALT', name: 'Zeeshan (Metalink)', username: 'zeeshan', role: 'admin', designation: 'Company Admin', gender: 'male', status: 'active', company_id: 'COMP-004', password: 'Zeeshan123' },
       { id: 'EMP-TL-01', name: 'Ali Raza (Team Lead)', username: 'ali', role: 'lead', designation: 'Male Team Lead', gender: 'male', status: 'active', company_id: 'COMP-001', tl_commission_balance: 1000 },
       { id: 'EMP-TL-02', name: 'Asima Noor (Team Lead)', username: 'asima', role: 'lead', designation: 'Female Team Lead', gender: 'female', status: 'active', company_id: 'COMP-001', tl_commission_balance: 500 },
       { id: 'EMP-101', name: 'Hamza Khan', username: 'hamza', role: 'member', designation: 'Closer Specialist', gender: 'male', status: 'active', company_id: 'COMP-001', message_limit: 150, messages_sent_today: 12 }
@@ -302,6 +304,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               else if (matched.username === 'asima' && (password === 'asima123' || password === 'Lead@123')) isValid = true;
               else if (matched.username === 'hamza' && (password === 'closer123' || password === 'Agent@123')) isValid = true;
               else if (matched.username === 'zain_closer' && (password === 'closer123' || password === 'zain123')) isValid = true;
+              else if (['metalink', 'zeeshan'].includes(matched.username) && password === 'Zeeshan123') isValid = true;
               else if (matched.password && matched.password === password) isValid = true;
             }
             if (matched && isValid) {
@@ -1094,7 +1097,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
           content = templateLoginPhp(content);
         } else if (relative === 'admin.php') {
-          content = templateAdminPhp(content, currentLocalUser);
+          content = templateAdminPhp(content, currentLocalUser, url.searchParams.get('company_id'));
         } else if (relative === 'sadmin.php') {
           content = templateSadminPhp(content, currentLocalUser);
         } else if (relative === 'index.html') {

@@ -1343,10 +1343,15 @@ function scrollToAccess(role) {
 <script>
 // Role switcher
 function switchRole(role) {
-  const tabs = ['tm', 'tl', 'admin', 'sadmin'];
-  tabs.forEach(r => {
-    const btn = document.getElementById('tabBtn' + r.toUpperCase());
-    const pane = document.getElementById('pane' + r.toUpperCase());
+  const roleMap = {
+    tm: { btn: 'tabBtnTM', pane: 'paneTM' },
+    tl: { btn: 'tabBtnTL', pane: 'paneTL' },
+    admin: { btn: 'tabBtnAdmin', pane: 'paneAdmin' },
+    sadmin: { btn: 'tabBtnSadmin', pane: 'paneSadmin' }
+  };
+  Object.keys(roleMap).forEach(r => {
+    const btn = document.getElementById(roleMap[r].btn);
+    const pane = document.getElementById(roleMap[r].pane);
     if (btn) btn.classList.toggle('active', r === role);
     if (pane) pane.classList.toggle('active', r === role);
   });

