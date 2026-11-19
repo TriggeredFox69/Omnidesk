@@ -759,6 +759,131 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             });
             return;
           }
+
+          // 3a. Pure Commission Settlement Ledger for Nunno & Chatly
+          if (action === 'get_nunno_settlement') {
+            const nunnoTMs = allUsers.filter(u => (u.company_id === 'COMP-001' || !u.company_id || (u.company_id || '').toLowerCase() === 'nunno') && u.role === 'member');
+            const salesFile = path.join(root, 'data/nunno_sales.json');
+            let salesData = { sales_by_tm: {}, log: [] };
+            try {
+              if (fs.existsSync(salesFile)) {
+                salesData = JSON.parse(fs.readFileSync(salesFile, 'utf8') || '{"sales_by_tm":{}}');
+              }
+            } catch (_) {}
+            const byTM = salesData.sales_by_tm || {};
+
+            let totalConfirmedPlans = 0;
+            let totalAmountPayableByNunno = 0;
+            let totalConfirmedRevenue = 0;
+            let totalNunnoProfit = 0;
+
+            const closers = nunnoTMs.map(tm => {
+              const tmId = tm.id;
+              const username = tm.username;
+              const rec = byTM[tmId] || byTM[username] || {};
+              const plansSold = Number(rec.plans_sold) || 0;
+              const grossRevenue = plansSold * 1700;
+              const basePlans = Math.min(plansSold, 6);
+              const basePayable = basePlans * 1700;
+              const surplusPlans = Math.max(0, plansSold - 6);
+              const surplusPayable = surplusPlans * 700;
+              const nunnoProfit = surplusPlans * 1000;
+              const totalPayable = basePayable + surplusPayable;
+
+              totalConfirmedPlans += plansSold;
+              totalConfirmedRevenue += grossRevenue;
+              totalAmountPayableByNunno += totalPayable;
+              totalNunnoProfit += nunnoProfit;
+
+              return {
+                id: tmId,
+                name: tm.name,
+                username: username,
+                phone: tm.phone || '',
+                status: tm.status || 'active',
+                plans_sold: plansSold,
+                gross_revenue: grossRevenue,
+                base_plans: basePlans,
+                base_payable: basePayable,
+                surplus_plans: surplusPlans,
+                surplus_payable: surplusPayable,
+                amount_payable_by_nunno: totalPayable,
+                nunno_retained_profit: nunnoProfit,
+                task_completed: plansSold >= 6
+              };
+            });
+
+            json(200, {
+              success: true,
+              summary: {
+                total_tms: nunnoTMs.length,
+                total_plans_sold: totalConfirmedPlans,
+                total_confirmed_revenue: totalConfirmedRevenue,
+                total_payable_by_nunno: totalAmountPayableByNunno,
+                total_nunno_profit: totalNunnoProfit,
+                plan_unit_price: 1700,
+                base_task_target: 6,
+                base_task_amount: 10200,
+                surplus_commission_per_plan: 700,
+                surplus_nunno_profit_per_plan: 1000
+              },
+              closers: closers
+            });
+            return;
+          }
+
+          if (action === 'record_nunno_sale' && req.method === 'POST') {
+            const userId = (body.user_id || body.id || '').trim();
+            const plansToAdd = Number(body.plans) || 1;
+            const salesFile = path.join(root, 'data/nunno_sales.json');
+            let salesData = { sales_by_tm: {}, log: [] };
+            try {
+              if (fs.existsSync(salesFile)) {
+                salesData = JSON.parse(fs.readFileSync(salesFile, 'utf8') || '{"sales_by_tm":{},"log":[]}');
+              }
+            } catch (_) {}
+            if (!salesData.sales_by_tm) salesData.sales_by_tm = {};
+            if (!salesData.log) salesData.log = [];
+
+            const current = Number(salesData.sales_by_tm[userId]?.plans_sold) || 0;
+            const newTotal = current + plansToAdd;
+            salesData.sales_by_tm[userId] = {
+              user_id: userId,
+              plans_sold: newTotal,
+              updated_at: new Date().toISOString()
+            };
+            salesData.log.push({
+              id: 'NSALE-' + Date.now(),
+              tm_id: userId,
+              plans: plansToAdd,
+              amount: plansToAdd * 1700,
+              created_at: new Date().toISOString()
+            });
+            try { fs.writeFileSync(salesFile, JSON.stringify(salesData, null, 2), 'utf8'); } catch (_) {}
+            json(200, { success: true, message: `Recorded ${plansToAdd} confirmed plan sale(s). New total: ${newTotal} plans.` });
+            return;
+          }
+
+          if (action === 'set_nunno_tm_sales' && req.method === 'POST') {
+            const userId = (body.user_id || body.id || '').trim();
+            const plansSold = Math.max(0, Number(body.plans_sold) || 0);
+            const salesFile = path.join(root, 'data/nunno_sales.json');
+            let salesData = { sales_by_tm: {}, log: [] };
+            try {
+              if (fs.existsSync(salesFile)) {
+                salesData = JSON.parse(fs.readFileSync(salesFile, 'utf8') || '{"sales_by_tm":{},"log":[]}');
+              }
+            } catch (_) {}
+            if (!salesData.sales_by_tm) salesData.sales_by_tm = {};
+            salesData.sales_by_tm[userId] = {
+              user_id: userId,
+              plans_sold: plansSold,
+              updated_at: new Date().toISOString()
+            };
+            try { fs.writeFileSync(salesFile, JSON.stringify(salesData, null, 2), 'utf8'); } catch (_) {}
+            json(200, { success: true, message: `Confirmed plans sold updated to ${plansSold}.` });
+            return;
+          }
           if (action === 'get_live_chat_stream') {
             const comps = loadComps();
             const compMap = {};

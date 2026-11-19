@@ -495,7 +495,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
       <span>📋</span> 7. Platform Security Logs
     </button>
     <button class="sadmin-tab-btn" id="tabBtnFinancials" onclick="switchSadminTab('financials')">
-      <span>💳</span> 8. Billing &amp; Nunno 1700 Ledger
+      <span>💳</span> 8. Nunno Commission Ledger
     </button>
     <button class="sadmin-tab-btn" id="tabBtnBrandInquiries" onclick="switchSadminTab('brandInquiries')">
       <span>📢</span> 9. Brand Product Inquiries <span id="sadminBrandBadge" style="display:none; background:#10b981; color:#03130c; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:800; margin-left:4px;">0</span>
@@ -803,32 +803,124 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     </div>
   </div>
 
-  <!-- TAB 5: BILLING & NUNNO 1700 LEDGER -->
+  <!-- TAB 8: NUNNO PURE COMMISSION SETTLEMENT LEDGER -->
   <div class="sadmin-pane" id="paneFinancials">
     <div class="content-box">
       <div class="box-header">
         <div>
-          <div class="box-title"><span>💳</span> Platform Billing & Nunno Rs. 1,700 Plan Settlement</div>
-          <div class="box-desc">Overview of mandatory closer plan purchases (Rs. 1,700/TM) and Team Leader commission payouts (Rs. 500/TM).</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="box-title" style="margin-bottom:0;"><span>💳</span> Nunno Pure Commission Settlement Ledger</div>
+            <span style="background:rgba(16, 185, 129, 0.15); color:#34d399; font-size:11px; font-weight:800; padding:3px 8px; border-radius:12px; border:1px solid rgba(16, 185, 129, 0.3);">
+              ⚡ Exclusive Nunno &amp; Chatly Model
+            </span>
+          </div>
+          <div class="box-desc" style="margin-top:4px;">
+            Chatly operates on a pure commission model exclusively with Nunno. Displays confirmed paid sales revenue, the exact amount Nunno owes Chatly for TM task disbursements &amp; commissions, and Nunno retained profits.
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-secondary" onclick="loadNunnoSettlement()" style="padding:8px 14px; font-size:12.5px;">
+            <span>🔄</span> Refresh Ledger
+          </button>
+          <button class="btn btn-primary" onclick="openRecordNunnoSaleModal()" style="padding:8px 16px; font-size:12.5px; font-weight:700;">
+            <span>➕</span> Record Confirmed Sale
+          </button>
         </div>
       </div>
 
-      <div class="metric-grid" style="margin-bottom:20px;">
+      <!-- Top Summary Cards -->
+      <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+        <!-- Card 1: Total Confirmed Revenue -->
         <div class="metric-card">
-          <div class="metric-header"><span class="metric-label">Nunno Plan Revenue</span><div style="font-size:18px;">💳</div></div>
-          <div class="metric-val" style="color:#34d399;">Rs. 85,000</div>
-          <div class="metric-sub">50 closer activations (@ Rs. 1,700)</div>
+          <div class="metric-header">
+            <span class="metric-label">Nunno Confirmed Sales Revenue</span>
+            <div style="font-size:18px;">📈</div>
+          </div>
+          <div class="metric-val" id="nunnoConfirmedRev" style="color:#34d399;">Rs. 0</div>
+          <div class="metric-sub" id="nunnoConfirmedRevSub">0 confirmed plans sold (@ Rs. 1,700)</div>
         </div>
+
+        <!-- Card 2: Amount Payable by Nunno to Chatly (Prominent Highlight) -->
+        <div class="metric-card" style="border: 2px solid #10b981; background: linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.03) 100%); box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);">
+          <div class="metric-header">
+            <span class="metric-label" style="color:#6ee7b7; font-weight:800; letter-spacing:0.04em;">AMOUNT PAYABLE BY NUNNO</span>
+            <div style="font-size:18px;">🏦</div>
+          </div>
+          <div class="metric-val" id="nunnoPayableToChatly" style="color:#10b981; font-weight:900; font-size:28px;">Rs. 0</div>
+          <div class="metric-sub" style="color:#a7f3d0;">Total Nunno owes Chatly for TM task salaries &amp; commissions</div>
+        </div>
+
+        <!-- Card 3: Nunno Retained Profits -->
         <div class="metric-card">
-          <div class="metric-header"><span class="metric-label">TL Commissions Paid</span><div style="font-size:18px;">💰</div></div>
-          <div class="metric-val" style="color:#8ff5c8;">Rs. 25,000</div>
-          <div class="metric-sub">50 TMs recruited (@ Rs. 500)</div>
+          <div class="metric-header">
+            <span class="metric-label">Nunno Retained Profits</span>
+            <div style="font-size:18px;">💰</div>
+          </div>
+          <div class="metric-val" id="nunnoRetainedProfit" style="color:#fbbf24;">Rs. 0</div>
+          <div class="metric-sub" id="nunnoRetainedProfitSub">Rs. 1,000 kept by Nunno per surplus plan beyond 6</div>
         </div>
+
+        <!-- Card 4: Active Nunno Closers -->
         <div class="metric-card">
-          <div class="metric-header"><span class="metric-label">Platform Net Spread</span><div style="font-size:18px;">📈</div></div>
-          <div class="metric-val" style="color:#fde047;">Rs. 60,000</div>
-          <div class="metric-sub">Net profit from onboarding fee</div>
+          <div class="metric-header">
+            <span class="metric-label">Active Nunno Closers</span>
+            <div style="font-size:18px;">👥</div>
+          </div>
+          <div class="metric-val" id="nunnoActiveTMs" style="color:#60a5fa;">0 Closers</div>
+          <div class="metric-sub">Base Target: 6 plans (Rs. 10,200) · Rs. 700/plan surplus</div>
         </div>
+      </div>
+
+      <!-- Policy & Calculation Formula Explainer Callout -->
+      <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px 18px; margin-bottom: 22px; font-size: 12px; line-height: 1.6;">
+        <div style="font-weight: 800; color: #10b981; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <span>📌</span> Nunno Settlement Policy &amp; Disbursement Logic (Applied Exclusively to Nunno):
+        </div>
+        <div style="color: var(--text-secondary); display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px;">
+          <div>
+            <strong style="color:var(--text-primary);">1. Initial Base Task Target (Plans 1 to 6):</strong>
+            <br>
+            Each plan is worth Rs. 1,700. When a TM sells up to 6 plans (worth Rs. 10,200), Chatly pays the TM their Rs. 10,000 target earnings. Nunno owes <strong>100% of the sales (Rs. 1,700 / plan = Rs. 10,200)</strong> to Chatly.
+          </div>
+          <div>
+            <strong style="color:var(--text-primary);">2. Surplus Sales Commission Tier (Plans 7+):</strong>
+            <br>
+            For each additional sale beyond 6 plans, Nunno owes Chatly <strong>only Rs. 700</strong> (paid to TM as commission). Nunno retains the remaining <strong>Rs. 1,000 per sale</strong> as company profit.
+          </div>
+        </div>
+      </div>
+
+      <!-- Table Header & Closer Breakdown -->
+      <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="font-size: 14px; font-weight: 800; color: var(--text-primary);">
+          Nunno Closers Performance &amp; Payable Breakdown
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary);">
+          Real-time synchronized with confirmed sales ledger and verified customer payments
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Nunno Closer</th>
+              <th>Confirmed Plans Sold</th>
+              <th>Gross Sales Revenue</th>
+              <th>Task Target &amp; Commission Tier</th>
+              <th style="color:#10b981;">Payable by Nunno to Chatly</th>
+              <th style="color:#fbbf24;">Nunno Retained Profit</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableNunnoSettlementBody">
+            <tr>
+              <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">
+                Loading Nunno settlement data...
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -1052,6 +1144,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
   </div>
 </div>
 
+<!-- RECORD NUNNO CONFIRMED SALE MODAL -->
+<div class="modal-overlay" id="recordNunnoSaleModal">
+  <div class="modal-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div>
+        <div class="modal-title">Record Confirmed Plan Sale (Nunno)</div>
+        <div style="font-size:12px; color:var(--text-secondary);">Add confirmed paid plan sales for a Nunno closer.</div>
+      </div>
+      <button class="btn btn-secondary" onclick="closeRecordNunnoSaleModal()" style="padding:4px 8px; cursor:pointer;">✕</button>
+    </div>
+    <form onsubmit="submitRecordNunnoSale(event)">
+      <div class="form-group">
+        <label class="form-label">Select Nunno Closer (TM)</label>
+        <select id="recordNunnoSaleTMSelect" class="form-control" required style="cursor:pointer;"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Number of Plans Sold (Rs. 1,700 each)</label>
+        <input type="number" id="recordNunnoSalePlansInput" class="form-control" value="1" min="1" max="1000" required>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+          Note: Plans 1-6 = Rs. 1,700 payable to Chatly each. Plans 7+ = Rs. 700 payable to Chatly + Rs. 1,000 kept by Nunno.
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeRecordNunnoSaleModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Confirmed Sale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 let currentCompanies = [];
 let currentChatterStream = [];
@@ -1094,6 +1216,7 @@ function switchSadminTab(tabName) {
   if (tabName === 'numbers') loadNumberPool();
   if (tabName === 'audit') loadAuditLogs();
   if (tabName === 'brandInquiries') loadBrandInquiries();
+  if (tabName === 'financials') loadNunnoSettlement();
 }
 
 function openProvisionModal() { switchSadminTab('provision'); }
@@ -2096,14 +2219,217 @@ function closeSadminToast() {
   if (toast) toast.style.display = 'none';
 }
 
+// ==========================================
+// 8. NUNNO PURE COMMISSION SETTLEMENT LEDGER
+// ==========================================
+let nunnoSettlementData = null;
+
+async function loadNunnoSettlement() {
+  try {
+    const res = await fetch('api/companies.php?action=get_nunno_settlement');
+    const data = await res.json();
+    if (!data.success) return;
+    nunnoSettlementData = data;
+    renderNunnoSettlement(data);
+  } catch (err) {
+    console.error('Error loading Nunno settlement:', err);
+  }
+}
+
+function renderNunnoSettlement(data) {
+  const s = data.summary || {};
+  const closers = data.closers || [];
+
+  const revEl = document.getElementById('nunnoConfirmedRev');
+  const revSubEl = document.getElementById('nunnoConfirmedRevSub');
+  const payableEl = document.getElementById('nunnoPayableToChatly');
+  const profitEl = document.getElementById('nunnoRetainedProfit');
+  const profitSubEl = document.getElementById('nunnoRetainedProfitSub');
+  const tmsEl = document.getElementById('nunnoActiveTMs');
+
+  if (revEl) revEl.textContent = 'Rs. ' + Number(s.total_confirmed_revenue || 0).toLocaleString();
+  if (revSubEl) revSubEl.textContent = `${Number(s.total_plans_sold || 0).toLocaleString()} confirmed plans sold (@ Rs. 1,700)`;
+  
+  if (payableEl) payableEl.textContent = 'Rs. ' + Number(s.total_payable_by_nunno || 0).toLocaleString();
+  
+  if (profitEl) profitEl.textContent = 'Rs. ' + Number(s.total_nunno_profit || 0).toLocaleString();
+  if (profitSubEl) profitSubEl.textContent = `Rs. 1,000 kept by Nunno per surplus plan beyond initial 6`;
+
+  if (tmsEl) tmsEl.textContent = `${s.total_tms || closers.length} Closers`;
+
+  // Render Table Rows
+  const tbody = document.getElementById('tableNunnoSettlementBody');
+  if (!tbody) return;
+
+  if (closers.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No closers currently assigned to Nunno.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = closers.map(c => {
+    let tierBadge = '';
+    if (c.plans_sold < 6) {
+      const remaining = 6 - c.plans_sold;
+      tierBadge = `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(234, 179, 8, 0.15); color:#fde047; border:1px solid rgba(234, 179, 8, 0.3);">
+        🎯 Target in Progress (${c.plans_sold}/6 plans · ${remaining} to unlock)
+      </span>`;
+    } else if (c.plans_sold === 6) {
+      tierBadge = `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(16, 185, 129, 0.15); color:#34d399; border:1px solid rgba(16, 185, 129, 0.3);">
+        ✅ Base Target Met (6/6 · Full 10,200 Unlocked)
+      </span>`;
+    } else {
+      tierBadge = `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(99, 102, 241, 0.15); color:#a5b4fc; border:1px solid rgba(99, 102, 241, 0.3);">
+        🚀 Surplus Tier (6 Base + ${c.surplus_plans} Extra @ Rs. 700)
+      </span>`;
+    }
+
+    return `
+      <tr>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">
+              ${(c.name || 'TM').charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div style="font-weight:700; color:var(--text-primary); font-size:13px;">${escapeHtml(c.name || 'Closer')}</div>
+              <div style="font-size:11px; color:var(--text-muted); display:flex; gap:6px;">
+                <span>@${escapeHtml(c.username)}</span>
+                ${c.phone ? `<span>· ${escapeHtml(c.phone)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td style="font-weight:800; font-size:14px; color:var(--text-primary);">
+          <span style="display:inline-block; padding:3px 10px; border-radius:6px; background:rgba(255,255,255,0.06); border:1px solid var(--border-subtle);">
+            ${c.plans_sold} plans
+          </span>
+        </td>
+        <td style="font-weight:700; color:#34d399;">
+          Rs. ${Number(c.gross_revenue).toLocaleString()}
+        </td>
+        <td>
+          ${tierBadge}
+          <div style="font-size:10.5px; color:var(--text-secondary); margin-top:3px;">
+            ${c.plans_sold <= 6 ? `Base: ${c.plans_sold} × Rs. 1,700` : `Base: 6 × 1,700 (=10,200) + ${c.surplus_plans} × 700`}
+          </div>
+        </td>
+        <td style="font-weight:800; font-size:14px; color:#10b981;">
+          Rs. ${Number(c.amount_payable_by_nunno).toLocaleString()}
+        </td>
+        <td style="font-weight:700; color:#fbbf24;">
+          Rs. ${Number(c.nunno_retained_profit).toLocaleString()}
+          <span style="font-size:10px; color:var(--text-secondary); display:block;">(${c.surplus_plans} × Rs. 1,000)</span>
+        </td>
+        <td>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; border-color:rgba(16, 185, 129, 0.4); color:#34d399;" onclick="quickAddNunnoSale('${c.id}', '${escapeHtml(c.name)}')">
+              +1 Sale
+            </button>
+            <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="promptSetNunnoSales('${c.id}', '${escapeHtml(c.name)}', ${c.plans_sold})">
+              Adjust
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function quickAddNunnoSale(userId, name) {
+  if (!confirm(`Confirm recording 1 additional plan sale (Rs. 1,700) for ${name}?`)) return;
+  try {
+    const res = await fetch('api/companies.php?action=record_nunno_sale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, plans: 1 })
+    });
+    const d = await res.json();
+    if (d.success) {
+      loadNunnoSettlement();
+    } else {
+      alert('⚠️ ' + (d.error || 'Failed to record sale.'));
+    }
+  } catch (e) {
+    alert('Error recording sale.');
+  }
+}
+
+async function promptSetNunnoSales(userId, name, currentPlans) {
+  const input = prompt(`Enter total confirmed plans sold for ${name}:`, currentPlans);
+  if (input === null) return;
+  const plans = parseInt(input, 10);
+  if (isNaN(plans) || plans < 0) {
+    alert('Please enter a valid non-negative number of plans.');
+    return;
+  }
+  try {
+    const res = await fetch('api/companies.php?action=set_nunno_tm_sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, plans_sold: plans })
+    });
+    const d = await res.json();
+    if (d.success) {
+      loadNunnoSettlement();
+    } else {
+      alert('⚠️ ' + (d.error || 'Failed to update sales.'));
+    }
+  } catch (e) {
+    alert('Error updating sales.');
+  }
+}
+
+function openRecordNunnoSaleModal() {
+  const select = document.getElementById('recordNunnoSaleTMSelect');
+  if (select && nunnoSettlementData && nunnoSettlementData.closers) {
+    select.innerHTML = nunnoSettlementData.closers.map(c => `
+      <option value="${c.id}">${escapeHtml(c.name)} (@${escapeHtml(c.username)}) — Current: ${c.plans_sold} plans</option>
+    `).join('');
+  }
+  document.getElementById('recordNunnoSaleModal').style.display = 'flex';
+}
+
+function closeRecordNunnoSaleModal() {
+  document.getElementById('recordNunnoSaleModal').style.display = 'none';
+}
+
+async function submitRecordNunnoSale(e) {
+  if (e) e.preventDefault();
+  const select = document.getElementById('recordNunnoSaleTMSelect');
+  const userId = select ? select.value : '';
+  const plans = parseInt(document.getElementById('recordNunnoSalePlansInput').value, 10) || 1;
+  if (!userId) {
+    alert('Please select a closer.');
+    return;
+  }
+  try {
+    const res = await fetch('api/companies.php?action=record_nunno_sale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, plans: plans })
+    });
+    const d = await res.json();
+    if (d.success) {
+      closeRecordNunnoSaleModal();
+      loadNunnoSettlement();
+    } else {
+      alert('⚠️ ' + (d.error || 'Failed to record sale.'));
+    }
+  } catch (err) {
+    alert('Error recording sale.');
+  }
+}
+
 // Initial Boot
 <?php if ($isSuperAdmin): ?>
 loadDashboardData();
 loadMasterPendingTMs();
 loadBrandInquiries();
+loadNunnoSettlement();
 setInterval(loadDashboardData, 8000);
 setInterval(loadMasterPendingTMs, 8000);
 setInterval(loadBrandInquiries, 6000);
+setInterval(loadNunnoSettlement, 10000);
 <?php endif; ?>
 
 function toggleTheme() {
