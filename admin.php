@@ -603,6 +603,9 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     <button class="dash-tab-btn" id="tabBtnProducts" onclick="switchDashboardTab('products')">
       <span>⚙️</span> Products &amp; Pitch Config
     </button>
+    <button class="dash-tab-btn" id="tabBtnWithdrawals" onclick="switchDashboardTab('withdrawals')">
+      <span>💸</span> Closer Withdrawals &amp; Payouts <span id="badgePendingWdCount" style="display:none; background:#f59e0b; color:#000; font-size:10px; padding:2px 7px; border-radius:10px; font-weight:800; margin-left:6px;">0</span>
+    </button>
   </div>
 
   <!-- TAB 0: PENDING CLOSER APPLICATIONS -->
@@ -894,8 +897,131 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     </div>
   </div>
 
+  <!-- TAB 7: CLOSER WITHDRAWALS & PAYOUTS -->
+  <div class="dash-pane" id="paneWithdrawals">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>💸</span> Closer Commission Withdrawals &amp; Disbursement Ledger</div>
+          <div class="box-desc">
+            Audit and settle payout requests submitted by your sales closers (TMs) and team leaders (TLs). Settle directly to EasyPaisa, JazzCash, or Pakistani Bank accounts.
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-secondary" onclick="loadCompanyWithdrawals()">
+            <span>🔄</span> Refresh Ledger
+          </button>
+          <button class="btn btn-emerald" onclick="openAdminPayoutModal()">
+            <span>➕</span> Request Company Profit Payout
+          </button>
+        </div>
+      </div>
+
+      <!-- Withdrawal Summary Metrics -->
+      <div class="metric-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 20px;">
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Pending Closer Requests</span>
+            <div style="font-size:18px;">⏳</div>
+          </div>
+          <div class="metric-val" id="compPendingWdAmount" style="color:#fbbf24;">PKR 0</div>
+          <div class="metric-sub" id="compPendingWdSub">0 requests awaiting verification</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Total Settled Payouts</span>
+            <div style="font-size:18px;">✅</div>
+          </div>
+          <div class="metric-val" id="compSettledWdAmount" style="color:#34d399;">PKR 0</div>
+          <div class="metric-sub" id="compSettledWdSub">0 disbursements completed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Company Closer Workforce</span>
+            <div style="font-size:18px;">👥</div>
+          </div>
+          <div class="metric-val" id="compCloserCount" style="color:#60a5fa;">0 Closers</div>
+          <div class="metric-sub">Earning commission on closed sales</div>
+        </div>
+      </div>
+
+      <!-- Withdrawals Table -->
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Applicant / Closer</th>
+              <th>Amount</th>
+              <th>Payout Channel &amp; Institution</th>
+              <th>Beneficiary Title &amp; Account / Phone</th>
+              <th>Date &amp; Time</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="tableCompanyWithdrawalsBody">
+            <tr>
+              <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">
+                Loading closer withdrawal requests...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 <?php endif; ?>
 
+</div>
+
+<!-- COMPANY ADMIN PAYOUT REQUEST MODAL -->
+<div class="modal-overlay" id="modalAdminPayout">
+  <div class="modal-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div>
+        <h3 class="modal-title">Request Company Profit / Admin Payout</h3>
+        <div style="font-size:12px; color:var(--text-secondary);">Disburse company earnings to your verified account</div>
+      </div>
+      <button onclick="closeAdminPayoutModal()" style="background:none; border:none; color:var(--text-muted); font-size:22px; cursor:pointer;">&times;</button>
+    </div>
+    <form onsubmit="handleAdminPayoutSubmit(event)">
+      <div class="form-group">
+        <label class="form-label">Payout Amount (PKR) *</label>
+        <input type="number" id="adminWdAmount" class="form-control" placeholder="e.g. 15000" min="1000" step="500" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Payout Method *</label>
+          <select id="adminWdMethod" class="form-control" required>
+            <option value="EasyPaisa">EasyPaisa</option>
+            <option value="JazzCash">JazzCash</option>
+            <option value="Meezan Bank" selected>Meezan Bank Limited</option>
+            <option value="HBL">Habib Bank Limited (HBL)</option>
+            <option value="Bank Alfalah">Bank Alfalah</option>
+            <option value="SadaPay">SadaPay</option>
+            <option value="NayaPay">NayaPay</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Beneficiary Account Title *</label>
+          <input type="text" id="adminWdTitle" class="form-control" placeholder="e.g. <?php echo htmlspecialchars($activeCompany['owner_name']); ?>" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Account Number / IBAN / Wallet Phone *</label>
+        <input type="text" id="adminWdNumber" class="form-control" placeholder="e.g. PK36MEZN... or 03001234567" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note / Reference</label>
+        <input type="text" id="adminWdNote" class="form-control" placeholder="e.g. Weekly company revenue payout">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeAdminPayoutModal()">Cancel</button>
+        <button type="submit" class="btn btn-emerald">Submit Payout Request 🚀</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- ADD EMPLOYEE / CLOSER MODAL -->
@@ -1042,7 +1168,7 @@ async function saveTLCommissionRate() {
 }
 
 function switchDashboardTab(tabName) {
-  const tabs = ['closers', 'pending', 'leads', 'campaigns', 'commissions', 'products'];
+  const tabs = ['closers', 'pending', 'leads', 'campaigns', 'commissions', 'products', 'withdrawals'];
   tabs.forEach((t) => {
     const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
     const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1053,6 +1179,7 @@ function switchDashboardTab(tabName) {
   if (tabName === 'leads') loadCompanyLeads();
   if (tabName === 'products') loadCompanyConfig();
   if (tabName === 'commissions') loadEmployees();
+  if (tabName === 'withdrawals') loadCompanyWithdrawals();
 }
 
 function adjustApproveLimit(delta) {
@@ -1818,13 +1945,238 @@ async function handleAdminLogin(e) {
   }
 }
 
+// ==========================================
+// 7. CLOSER WITHDRAWALS & PAYOUTS MANAGEMENT
+// ==========================================
+let currentCompanyWithdrawals = [];
+
+async function loadCompanyWithdrawals() {
+  try {
+    const res = await fetch(`api/withdrawals.php?action=get_withdrawals&company_id=<?php echo htmlspecialchars($activeCompany['id']); ?>`);
+    const data = await res.json();
+    if (!data.success) return;
+    currentCompanyWithdrawals = data.withdrawals || [];
+    renderCompanyWithdrawals(currentCompanyWithdrawals);
+  } catch (err) {
+    console.error('Error loading withdrawals:', err);
+  }
+}
+
+function renderCompanyWithdrawals(wds) {
+  const pending = wds.filter(w => w.status === 'pending');
+  const settled = wds.filter(w => w.status === 'approved');
+
+  const pendingAmt = pending.reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+  const settledAmt = settled.reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+
+  const pendingEl = document.getElementById('compPendingWdAmount');
+  const pendingSub = document.getElementById('compPendingWdSub');
+  const settledEl = document.getElementById('compSettledWdAmount');
+  const settledSub = document.getElementById('compSettledWdSub');
+  const closerCountEl = document.getElementById('compCloserCount');
+  const badgeEl = document.getElementById('badgePendingWdCount');
+
+  if (pendingEl) pendingEl.textContent = 'PKR ' + pendingAmt.toLocaleString();
+  if (pendingSub) pendingSub.textContent = `${pending.length} request${pending.length === 1 ? '' : 's'} awaiting verification`;
+  if (settledEl) settledEl.textContent = 'PKR ' + settledAmt.toLocaleString();
+  if (settledSub) settledSub.textContent = `${settled.length} disbursement${settled.length === 1 ? '' : 's'} completed`;
+  if (closerCountEl) closerCountEl.textContent = `${currentEmployees.filter(e => e.role === 'member').length} Closers`;
+
+  if (badgeEl) {
+    if (pending.length > 0) {
+      badgeEl.textContent = pending.length;
+      badgeEl.style.display = 'inline-block';
+    } else {
+      badgeEl.style.display = 'none';
+    }
+  }
+
+  const tbody = document.getElementById('tableCompanyWithdrawalsBody');
+  if (!tbody) return;
+
+  if (wds.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No withdrawal requests lodged yet for this company.</td></tr>`;
+    return;
+  }
+
+  const methodIcons = {
+    'Digital Wallet': '📱',
+    'EasyPaisa': '📱',
+    'JazzCash': '📱',
+    'SadaPay': '📱',
+    'NayaPay': '📱',
+    'UPaisa': '📱',
+    'Zindigi': '📱',
+    'Bank Account': '🏦',
+    'Bank Transfer': '🏦',
+    'Meezan Bank': '🏦',
+    'HBL': '🏦',
+    'Bank Alfalah': '🏦'
+  };
+
+  tbody.innerHTML = wds.map(w => {
+    const isPending = (w.status === 'pending');
+    const isApproved = (w.status === 'approved');
+    const isRejected = (w.status === 'rejected');
+    const icon = methodIcons[w.institution] || methodIcons[w.method] || '📱';
+    const dateStr = w.created_at ? new Date(w.created_at).toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently';
+
+    const roleBadge = (w.userRole === 'lead')
+      ? `<span style="font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(168, 85, 247, 0.15); color:#c084fc; font-weight:700;">TL</span>`
+      : (w.userRole === 'admin')
+        ? `<span style="font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(16, 185, 129, 0.15); color:#34d399; font-weight:700;">ADMIN</span>`
+        : `<span style="font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(59, 130, 246, 0.15); color:#60a5fa; font-weight:700;">TM</span>`;
+
+    const statusBadge = isApproved
+      ? `<span class="badge-status status-active">🟢 Paid & Settled</span>`
+      : isPending
+        ? `<span class="badge-status" style="background:rgba(245, 158, 11, 0.15); color:#fbbf24; border:1px solid rgba(245, 158, 11, 0.3);">🟡 Pending Audit</span>`
+        : `<span class="badge-status status-suspended">🔴 Rejected</span>`;
+
+    const actions = isPending ? `
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-emerald" style="padding:4px 8px; font-size:11px;" onclick="settleCompanyWithdrawal('${escapeHtml(w.id)}', '${escapeHtml(w.userName)}', ${w.amount})">
+          ✓ Settle &amp; Mark Paid
+        </button>
+        <button class="btn btn-danger" style="padding:4px 8px; font-size:11px;" onclick="rejectCompanyWithdrawal('${escapeHtml(w.id)}', '${escapeHtml(w.userName)}')">
+          ✕ Reject
+        </button>
+      </div>
+    ` : (w.txRef ? `<span style="font-size:11px; color:var(--text-muted); font-family:monospace;">Tx: ${escapeHtml(w.txRef)}</span>` : `<span style="font-size:11px; color:var(--text-muted);">-</span>`);
+
+    return `
+      <tr>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="font-weight:700; color:var(--text-primary); font-size:13px;">${escapeHtml(w.userName || 'Closer')}</div>
+            ${roleBadge}
+          </div>
+          <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(w.userId || '')}</div>
+        </td>
+        <td style="font-weight:800; font-size:14px; color:#34d399;">
+          PKR ${Number(w.amount).toLocaleString()}
+        </td>
+        <td>
+          <div style="font-size:12.5px; font-weight:600;">${icon} ${escapeHtml(w.institution || w.method || 'Digital Wallet')}</div>
+          ${w.note ? `<div style="font-size:11px; color:var(--text-secondary); font-style:italic;">"${escapeHtml(w.note)}"</div>` : ''}
+        </td>
+        <td>
+          <div style="font-weight:700; font-size:12.5px; color:var(--text-primary);">${escapeHtml(w.accountTitle || '-')}</div>
+          <div style="font-family:monospace; font-size:12px; color:var(--text-muted);">${escapeHtml(w.accountNumber || '-')}</div>
+        </td>
+        <td style="font-size:12px; color:var(--text-secondary);">${escapeHtml(dateStr)}</td>
+        <td>${statusBadge}</td>
+        <td>${actions}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function settleCompanyWithdrawal(wdId, closerName, amount) {
+  const txRef = prompt(`Disbursing PKR ${Number(amount).toLocaleString()} to ${closerName}.\nEnter Bank / Digital Wallet Transaction Reference (e.g. EP-992104 or Meezan-TX-8812):`, 'TX-' + Math.floor(100000 + Math.random() * 900000));
+  if (txRef === null) return;
+
+  try {
+    const res = await fetch('api/withdrawals.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_status', id: wdId, status: 'approved', txRef: txRef.trim() })
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert(`✅ Payout of PKR ${Number(amount).toLocaleString()} marked as settled! Notification sent.`);
+      loadCompanyWithdrawals();
+    } else {
+      alert('⚠️ ' + (d.error || 'Failed to update withdrawal status.'));
+    }
+  } catch (err) {
+    alert('Network error updating withdrawal.');
+  }
+}
+
+async function rejectCompanyWithdrawal(wdId, closerName) {
+  if (!confirm(`Are you sure you want to reject the payout request for ${closerName}? Their available balance will be restored.`)) return;
+
+  try {
+    const res = await fetch('api/withdrawals.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_status', id: wdId, status: 'rejected' })
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert(`Payout request rejected.`);
+      loadCompanyWithdrawals();
+    } else {
+      alert('⚠️ ' + (d.error || 'Failed to reject withdrawal.'));
+    }
+  } catch (err) {
+    alert('Network error updating withdrawal.');
+  }
+}
+
+function openAdminPayoutModal() {
+  document.getElementById('modalAdminPayout').style.display = 'flex';
+}
+
+function closeAdminPayoutModal() {
+  document.getElementById('modalAdminPayout').style.display = 'none';
+}
+
+async function handleAdminPayoutSubmit(e) {
+  e.preventDefault();
+  const amt = Number(document.getElementById('adminWdAmount').value);
+  const method = document.getElementById('adminWdMethod').value;
+  const title = document.getElementById('adminWdTitle').value.trim();
+  const num = document.getElementById('adminWdNumber').value.trim();
+  const note = document.getElementById('adminWdNote').value.trim();
+
+  if (!amt || amt <= 0 || !title || !num) {
+    alert('Please fill all required payout fields.');
+    return;
+  }
+
+  try {
+    const res = await fetch('api/withdrawals.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'request_withdrawal',
+        userId: '<?php echo htmlspecialchars($activeCompany['id']); ?>-ADMIN',
+        userName: '<?php echo htmlspecialchars($activeCompany['owner_name']); ?> (Admin)',
+        userRole: 'admin',
+        company_id: '<?php echo htmlspecialchars($activeCompany['id']); ?>',
+        company_name: '<?php echo htmlspecialchars($activeCompany['name']); ?>',
+        amount: amt,
+        method: method,
+        institution: method,
+        accountTitle: title,
+        accountNumber: num,
+        note: note
+      })
+    });
+    const d = await res.json();
+    if (d.success) {
+      alert(`✅ Payout request of PKR ${amt.toLocaleString()} submitted!`);
+      closeAdminPayoutModal();
+      loadCompanyWithdrawals();
+    } else {
+      alert('⚠️ ' + (d.error || 'Failed to submit payout.'));
+    }
+  } catch (err) {
+    alert('Network error submitting payout.');
+  }
+}
+
 // Initial boot for authenticated company admin
 <?php if ($isAdmin): ?>
 loadEmployees();
 loadPendingTMs();
 loadCompanyLeads();
 loadCompanyConfig();
+loadCompanyWithdrawals();
 setInterval(loadPendingTMs, 8000);
+setInterval(loadCompanyWithdrawals, 8000);
 <?php endif; ?>
 
 function toggleTheme() {

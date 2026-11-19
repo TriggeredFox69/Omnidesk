@@ -4394,8 +4394,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (wdSectionEyebrow) wdSectionEyebrow.textContent = 'SETTLEMENTS & CLOSER DISBURSEMENTS';
       if (wdSectionTitle) wdSectionTitle.textContent = 'Withdrawals Requested & Approval Ledger';
       if (wdSectionSub) wdSectionSub.textContent = 'Review, audit and settle closer payout requests to EasyPaisa, JazzCash, or Bank.';
-      if (openWdModalBtn) openWdModalBtn.style.display = 'none';
-      if (cardQuickWithdrawBtn) cardQuickWithdrawBtn.style.display = 'none';
+      if (openWdModalBtn) {
+        openWdModalBtn.style.display = 'inline-flex';
+        openWdModalBtn.innerHTML = '<span>💳 Request Payout / Profit</span>';
+      }
+      if (cardQuickWithdrawBtn) {
+        cardQuickWithdrawBtn.style.display = 'inline-flex';
+        cardQuickWithdrawBtn.innerHTML = '<span>Payout →</span>';
+      }
       if (adminWdFilterTabs) adminWdFilterTabs.style.display = 'inline-flex';
       if (wdHistoryTitle) wdHistoryTitle.textContent = 'Closer Withdrawal Requests Ledger';
 
@@ -4937,7 +4943,9 @@ document.addEventListener('DOMContentLoaded', () => {
       action: 'request_withdrawal',
       userId: user?.id || 'EMP-TL-01',
       userName: user?.name || 'Ali Raza',
-      userRole: user?.role || 'lead',
+      userRole: user?.role || 'member',
+      company_id: user?.company_id || window.NUNNO_ACTIVE_USER?.company_id || 'COMP-001',
+      company_name: user?.company_name || window.NUNNO_ACTIVE_USER?.company_name || 'Metalink',
       amount,
       method: selectedMethod,
       institution,
@@ -5011,7 +5019,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('withdrawRequestForm')?.addEventListener('submit', handleWithdrawSubmit);
-  document.getElementById('submitWithdrawBtn')?.addEventListener('click', handleWithdrawSubmit);
 
   // ==========================================
   // AUTHENTICATION & EMPLOYEE PROVISIONING MODULE

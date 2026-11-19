@@ -59,16 +59,290 @@ function getTenantDir(string $companyId): string {
 function getTenantLeadsFile(string $companyId): string {
     $dir = getTenantDir($companyId);
     $file = $dir . '/leads.json';
-    if (!file_exists($file)) {
+    if (!file_exists($file) || filesize($file) <= 10) {
         // Migration safeguard: if COMP-001, load existing leads from root data/leads.json if it exists
         $legacy = __DIR__ . '/../data/leads.json';
         if ($companyId === 'COMP-001' && file_exists($legacy) && filesize($legacy) > 10) {
             @copy($legacy, $file);
+        } elseif ($companyId === 'COMP-004' || strtolower($companyId) === 'metalink') {
+            $metalinkLeads = getMetalinkDemoLeads();
+            file_put_contents($file, json_encode($metalinkLeads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         } else {
             file_put_contents($file, json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
     }
     return $file;
+}
+
+function getMetalinkDemoLeads(): array {
+    return [
+        [
+            'id' => 'meta_lead_01',
+            'company_id' => 'COMP-004',
+            'name' => 'Tariq Mehmood',
+            'phone' => '923015544332',
+            'display' => '+92 301 5544332',
+            'city' => 'Lahore',
+            'network' => 'Jazz',
+            'ownerId' => null,
+            'ownerName' => null,
+            'ownerUsername' => null,
+            'leadState' => 'fresh',
+            'status' => 'fresh',
+            'unreadCount' => 2,
+            'interest' => 'Metalink Enterprise',
+            'lastActive' => 'Just now',
+            'dealAmount' => 7500,
+            'notes' => 'Inbound prospect from Facebook campaign. Needs multi-exchange trading nodes. UNCLAIMED - Ready to claim!',
+            'messages' => [
+                [
+                    'id' => 'msg_01_1',
+                    'sender' => 'lead',
+                    'text' => 'Salam bhai, mene Metalink Enterprise node ka campaign dekha tha. Kya aap mujhe monthly subscription aur features explain kr sakte hain?',
+                    'time' => '02:15 PM'
+                ],
+                [
+                    'id' => 'msg_01_2',
+                    'sender' => 'lead',
+                    'text' => 'Mujhe 3 multi-exchange nodes chahiye automated trading ke liye. Kya isme risk trailing included hai?',
+                    'time' => '02:16 PM'
+                ]
+            ]
+        ],
+        [
+            'id' => 'meta_lead_02',
+            'company_id' => 'COMP-004',
+            'name' => 'Bilal Ashraf',
+            'phone' => '923224455667',
+            'display' => '+92 322 4455667',
+            'city' => 'Faisalabad',
+            'network' => 'Warid',
+            'ownerId' => null,
+            'ownerName' => null,
+            'ownerUsername' => null,
+            'leadState' => 'fresh',
+            'status' => 'fresh',
+            'unreadCount' => 1,
+            'interest' => 'Metalink Starter',
+            'lastActive' => '10m ago',
+            'dealAmount' => 2500,
+            'notes' => 'Asked about minimum balance for Starter node. UNCLAIMED - Ready to claim!',
+            'messages' => [
+                [
+                    'id' => 'msg_02_1',
+                    'sender' => 'lead',
+                    'text' => 'AoA sir, Starter package mein minimum balance kitna chahiye? EasyPaisa se payment kr sakta hu?',
+                    'time' => '03:10 PM'
+                ]
+            ]
+        ],
+        [
+            'id' => 'meta_lead_03',
+            'company_id' => 'COMP-004',
+            'name' => 'Dr. Kamran Qureshi',
+            'phone' => '923337788990',
+            'display' => '+92 333 7788990',
+            'city' => 'Karachi',
+            'network' => 'Ufone',
+            'ownerId' => null,
+            'ownerName' => null,
+            'ownerUsername' => null,
+            'leadState' => 'fresh',
+            'status' => 'fresh',
+            'unreadCount' => 1,
+            'interest' => 'Metalink Wolf VIP',
+            'lastActive' => '25m ago',
+            'dealAmount' => 20000,
+            'notes' => 'High-ticket fund manager. Wants custom API integration & Alpha Wolf group. UNCLAIMED - High commission!',
+            'messages' => [
+                [
+                    'id' => 'msg_03_1',
+                    'sender' => 'lead',
+                    'text' => 'Hello team Metalink, I manage a private crypto & forex fund. Wolf VIP tier mein kya custom API integrations aur alpha group access included hai? Please call or reply.',
+                    'time' => '03:45 PM'
+                ]
+            ]
+        ],
+        [
+            'id' => 'meta_lead_04',
+            'company_id' => 'COMP-004',
+            'name' => 'Hassan Farooq',
+            'phone' => '923129988112',
+            'display' => '+92 312 9988112',
+            'city' => 'Islamabad',
+            'network' => 'Zong',
+            'ownerId' => 'USR-ADMIN-04',
+            'ownerName' => 'Zeeshan',
+            'ownerUsername' => 'zeeshan',
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Metalink Enterprise',
+            'lastActive' => '5m ago',
+            'dealAmount' => 7500,
+            'notes' => 'Payment initiated via Meezan Bank. Awaiting deposit receipt to close.',
+            'messages' => [
+                [
+                    'id' => 'msg_04_1',
+                    'sender' => 'lead',
+                    'text' => 'AoA Hassan bhai, Enterprise package ke features confirm kr dein.',
+                    'time' => '01:20 PM'
+                ],
+                [
+                    'id' => 'msg_04_2',
+                    'sender' => 'agent',
+                    'agentName' => 'Zeeshan',
+                    'text' => 'W/Salam Hassan bhai! Metalink Enterprise me apko 3 multi-exchange nodes, 24/7 automated risk trailing, aur VIP desk support milti hai. Monthly sub PKR 7,500 hai.',
+                    'time' => '01:22 PM'
+                ],
+                [
+                    'id' => 'msg_04_3',
+                    'sender' => 'lead',
+                    'text' => 'Zabardast. Bank account details send karein, me Meezan bank se transfer kr deta hu.',
+                    'time' => '01:25 PM'
+                ],
+                [
+                    'id' => 'msg_04_4',
+                    'sender' => 'agent',
+                    'agentName' => 'Zeeshan',
+                    'text' => 'Ye lein account details: Meezan Bank | Metalink Systems | IBAN: PK36MEZN0099281726354001. Transfer kr ke receipt yahan share kr dein.',
+                    'time' => '01:26 PM'
+                ],
+                [
+                    'id' => 'msg_04_5',
+                    'sender' => 'lead',
+                    'text' => 'Transfer initiating now. Sending slip in 5 minutes.',
+                    'time' => '01:30 PM'
+                ]
+            ]
+        ],
+        [
+            'id' => 'meta_lead_05',
+            'company_id' => 'COMP-004',
+            'name' => 'Usman Ghani',
+            'phone' => '923451122334',
+            'display' => '+92 345 1122334',
+            'city' => 'Rawalpindi',
+            'network' => 'Telenor',
+            'ownerId' => 'USR-ADMIN-04',
+            'ownerName' => 'Zeeshan',
+            'ownerUsername' => 'zeeshan',
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Metalink Starter',
+            'lastActive' => '40m ago',
+            'dealAmount' => 2500,
+            'notes' => 'Ready to send payment via JazzCash for Starter node.',
+            'messages' => [
+                [
+                    'id' => 'msg_05_1',
+                    'sender' => 'lead',
+                    'text' => 'Bhai kya isme 7 din ka performance check guarantee hai?',
+                    'time' => '11:45 AM'
+                ],
+                [
+                    'id' => 'msg_05_2',
+                    'sender' => 'agent',
+                    'agentName' => 'Zeeshan',
+                    'text' => 'Ji bilkul Usman bhai! Metalink standard 7-day performance guarantee deti hai. Aap risk-free join kr sakte hain.',
+                    'time' => '11:48 AM'
+                ],
+                [
+                    'id' => 'msg_05_3',
+                    'sender' => 'lead',
+                    'text' => 'Theek hai, JazzCash number bhejein me payment bhej raha hu.',
+                    'time' => '11:50 AM'
+                ]
+            ]
+        ],
+        [
+            'id' => 'meta_lead_06',
+            'company_id' => 'COMP-004',
+            'name' => 'Malik Jahangir',
+            'phone' => '923008899112',
+            'display' => '+92 300 8899112',
+            'city' => 'Multan',
+            'network' => 'Mobilink',
+            'ownerId' => 'USR-ADMIN-04',
+            'ownerName' => 'Zeeshan',
+            'ownerUsername' => 'zeeshan',
+            'leadState' => 'paid',
+            'status' => 'paid',
+            'unreadCount' => 0,
+            'interest' => 'Metalink Wolf VIP',
+            'lastActive' => '1h ago',
+            'dealAmount' => 20000,
+            'verificationStatus' => 'verified',
+            'verifiedBy' => 'Zeeshan (Admin)',
+            'verifiedAt' => '2026-11-19T10:18:00Z',
+            'paidDetails' => [
+                'plan' => 'Metalink Wolf VIP',
+                'amount' => 20000,
+                'commission' => 10000,
+                'closedBy' => 'Zeeshan'
+            ],
+            'notes' => 'Won Deal! Rs. 20,000 paid via HBL. Wolf Alpha node deployed.',
+            'messages' => [
+                [
+                    'id' => 'msg_06_1',
+                    'sender' => 'lead',
+                    'text' => 'Salam Zeeshan bhai, Wolf VIP plan ki 20,000 payment HBL online se transfer kr di hai. Reference: HBL-99120488.',
+                    'time' => '10:15 AM'
+                ],
+                [
+                    'id' => 'msg_06_2',
+                    'sender' => 'agent',
+                    'agentName' => 'Admin Audit Verification',
+                    'text' => "🟢 PAYMENT VERIFIED & APPROVED (DEAL WON)!\n• Verified By: Zeeshan (Admin)\n• Closer Credited: Zeeshan\n• Plan: Metalink Wolf VIP (Rs. 20,000)\n• Commission Earned: Rs. 10,000\n• Node Alpha License Activated! 🚀",
+                    'time' => '10:18 AM'
+                ]
+            ]
+        ],
+        [
+            'id' => 'meta_lead_07',
+            'company_id' => 'COMP-004',
+            'name' => 'Sufyan Ahmed',
+            'phone' => '923067711223',
+            'display' => '+92 306 7711223',
+            'city' => 'Gujranwala',
+            'network' => 'Jazz',
+            'ownerId' => 'USR-ADMIN-04',
+            'ownerName' => 'Zeeshan',
+            'ownerUsername' => 'zeeshan',
+            'leadState' => 'paid',
+            'status' => 'paid',
+            'unreadCount' => 0,
+            'interest' => 'Metalink Enterprise',
+            'lastActive' => '2h ago',
+            'dealAmount' => 7500,
+            'verificationStatus' => 'verified',
+            'verifiedBy' => 'Zeeshan (Admin)',
+            'verifiedAt' => '2026-11-19T09:45:00Z',
+            'paidDetails' => [
+                'plan' => 'Metalink Enterprise',
+                'amount' => 7500,
+                'commission' => 3000,
+                'closedBy' => 'Zeeshan'
+            ],
+            'notes' => 'Won Deal! Rs. 7,500 paid via EasyPaisa. Enterprise node deployed.',
+            'messages' => [
+                [
+                    'id' => 'msg_07_1',
+                    'sender' => 'lead',
+                    'text' => 'Salam bhai, EasyPaisa se 7,500 bhej diye hain. TID: 28819200411.',
+                    'time' => '09:40 AM'
+                ],
+                [
+                    'id' => 'msg_07_2',
+                    'sender' => 'agent',
+                    'agentName' => 'Admin Audit Verification',
+                    'text' => "🟢 PAYMENT VERIFIED & APPROVED (DEAL WON)!\n• Verified By: Zeeshan (Admin)\n• Closer Credited: Zeeshan\n• Plan: Metalink Enterprise (Rs. 7,500)\n• Commission Earned: Rs. 3,000\n• 3 Multi-Exchange Nodes Active! 🚀",
+                    'time' => '09:45 AM'
+                ]
+            ]
+        ]
+    ];
 }
 
 function getTenantCampaignLogsFile(string $companyId): string {

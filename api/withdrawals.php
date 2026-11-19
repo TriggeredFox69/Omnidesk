@@ -12,12 +12,49 @@ session_start();
 $wdFile = __DIR__ . '/../data/withdrawals.json';
 
 function getStoredWithdrawals($file) {
-    if (file_exists($file)) {
+    if (file_exists($file) && filesize($file) > 10) {
         $content = file_get_contents($file);
         $decoded = json_decode($content, true);
         if (is_array($decoded)) return $decoded;
     }
-    return [];
+    // Auto-seed initial state if file is empty or missing
+    $seed = [
+        [
+            'id' => 'WD-META-001',
+            'userId' => 'EMP-TM-META01',
+            'userName' => 'Farhan Ali',
+            'userRole' => 'member',
+            'company_id' => 'COMP-004',
+            'company_name' => 'Metalink',
+            'amount' => 3000,
+            'method' => 'EasyPaisa',
+            'institution' => 'EasyPaisa',
+            'accountTitle' => 'Farhan Ali',
+            'accountNumber' => '03019887766',
+            'note' => 'Enterprise node closed deal commission',
+            'status' => 'pending',
+            'created_at' => date('c', time() - 3600)
+        ],
+        [
+            'id' => 'WD-MWMVDDS5',
+            'userId' => 'EMP-101',
+            'userName' => 'Hamza Khan',
+            'userRole' => 'member',
+            'company_id' => 'COMP-001',
+            'company_name' => 'Nunno Official',
+            'amount' => 2500,
+            'method' => 'EasyPaisa',
+            'institution' => 'Telenor Microfinance Bank (EasyPaisa)',
+            'accountTitle' => 'Hamza Khan',
+            'accountNumber' => '03001234567',
+            'note' => 'Verified deal commissions payout',
+            'status' => 'approved',
+            'txRef' => 'EP-TX-998822',
+            'created_at' => date('c', time() - 86400)
+        ]
+    ];
+    saveStoredWithdrawals($file, $seed);
+    return $seed;
 }
 
 function saveStoredWithdrawals($file, $data) {
@@ -42,7 +79,7 @@ $data = json_decode($rawInput, true) ?: [];
 $action = isset($_GET['action']) ? $_GET['action'] : (isset($data['action']) ? $data['action'] : 'get_withdrawals');
 
 $currentUser = $_SESSION['omnidesk_user'] ?? $_SESSION['user'] ?? null;
-$isAdmin = $currentUser && isset($currentUser['role']) && $currentUser['role'] === 'admin';
+$isAdmin = $currentUser && isset($currentUser['role']) && in_array($currentUser['role'], ['admin', 'superadmin'], true);
 
 // Guard: Suspended closer cannot perform withdrawal transactions
 if ($currentUser && isset($currentUser['status']) && $currentUser['status'] === 'suspended') {
@@ -54,7 +91,16 @@ if ($currentUser && isset($currentUser['status']) && $currentUser['status'] === 
 if ($action === 'get_withdrawals') {
     $withdrawals = getStoredWithdrawals($wdFile);
     $targetUser = isset($_GET['user_id']) ? $_GET['user_id'] : (isset($data['user_id']) ? $data['user_id'] : null);
+    $filterComp = isset($_GET['company_id']) ? $_GET['company_id'] : (isset($data['company_id']) ? $data['company_id'] : ($currentUser['company_id'] ?? null));
     
+    // Filter by company if requested and not GLOBAL
+    if ($filterComp && $filterComp !== 'GLOBAL') {
+        $withdrawals = array_values(array_filter($withdrawals, function($w) use ($filterComp) {
+            $wComp = $w['company_id'] ?? 'COMP-001';
+            return $wComp === $filterComp;
+        }));
+    }
+
     // If not admin, restrict to their own requests
     if (!$isAdmin && $targetUser) {
         $withdrawals = array_values(array_filter($withdrawals, function($w) use ($targetUser) {
@@ -81,6 +127,8 @@ if ($action === 'request_withdrawal') {
     $accountTitle = isset($data['accountTitle']) ? trim($data['accountTitle']) : '';
     $accountNumber = isset($data['accountNumber']) ? trim($data['accountNumber']) : '';
     $note = isset($data['note']) ? trim($data['note']) : '';
+    $companyId = isset($data['company_id']) ? trim($data['company_id']) : ($currentUser['company_id'] ?? 'COMP-001');
+    $companyName = isset($data['company_name']) ? trim($data['company_name']) : 'Company';
     
     if (empty($accountTitle) || empty($accountNumber)) {
         echo json_encode(['success' => false, 'error' => 'Account title and account number are required.']);
@@ -110,7 +158,7 @@ if ($action === 'request_withdrawal') {
     
     $userId = isset($data['userId']) ? $data['userId'] : ($currentUser ? $currentUser['id'] : 'EMP-TL-01');
     $userName = isset($data['userName']) ? $data['userName'] : ($currentUser ? $currentUser['name'] : 'Team Member');
-    $userRole = isset($data['userRole']) ? $data['userRole'] : ($currentUser ? $currentUser['role'] : 'lead');
+    $userRole = isset($data['userRole']) ? $data['userRole'] : ($currentUser ? $currentUser['role'] : 'member');
     
     $withdrawals = getStoredWithdrawals($wdFile);
     
@@ -119,6 +167,8 @@ if ($action === 'request_withdrawal') {
         'userId' => $userId,
         'userName' => $userName,
         'userRole' => $userRole,
+        'company_id' => $companyId,
+        'company_name' => $companyName,
         'amount' => $amount,
         'method' => $method,
         'institution' => $institution,

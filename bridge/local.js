@@ -1046,8 +1046,18 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             return;
           }
           if (action === 'get_company_leads') {
-            const leadsList = [...leads.values()];
-            json(200, { success: true, leads: leadsList, count: leadsList.length });
+            const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
+            const tenantLeadsFile = path.join(root, 'data/tenants', compId, 'leads.json');
+            let leadsList = [];
+            try {
+              if (fs.existsSync(tenantLeadsFile)) {
+                leadsList = JSON.parse(fs.readFileSync(tenantLeadsFile, 'utf8') || '[]');
+              }
+            } catch (_) {}
+            if (leadsList.length === 0 && compId === 'COMP-001') {
+              leadsList = [...leads.values()];
+            }
+            json(200, { success: true, leads: leadsList, count: leadsList.length, company_id: compId });
             return;
           }
           if (action === 'takeover_lead' && req.method === 'POST') {
@@ -1293,14 +1303,38 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
           }
         }
 
-        // 4. Leads Sync API
+        // 4. Leads Sync API (Multi-Tenant aware)
         if (url.pathname === '/api/leads_sync.php') {
-          if (action === 'get_leads') { json(200, { success: true, leads: [...leads.values()] }); return; }
+          const compId = url.searchParams.get('company_id') || body.company_id || currentLocalUser?.company_id || 'COMP-001';
+          const tenantLeadsFile = path.join(root, 'data/tenants', compId, 'leads.json');
+          const loadCurrentLeads = () => {
+            try {
+              if (fs.existsSync(tenantLeadsFile)) {
+                const arr = JSON.parse(fs.readFileSync(tenantLeadsFile, 'utf8') || '[]');
+                if (Array.isArray(arr) && arr.length > 0) return arr;
+              }
+            } catch (_) {}
+            return [...leads.values()].filter(l => (l.company_id || 'COMP-001') === compId || compId === 'COMP-001');
+          };
+          const saveCurrentLeads = (arr) => {
+            try {
+              const dir = path.dirname(tenantLeadsFile);
+              if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+              fs.writeFileSync(tenantLeadsFile, JSON.stringify(arr, null, 2), 'utf8');
+              if (compId === 'COMP-001') {
+                fs.writeFileSync(path.join(root, 'data/leads.json'), JSON.stringify(arr, null, 2), 'utf8');
+              }
+            } catch (_) {}
+          };
+
+          if (action === 'get_leads') { json(200, { success: true, leads: loadCurrentLeads() }); return; }
           if (action === 'delete_leads' || action === 'delete_lead') {
             const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
             ids.forEach(id => leads.delete(id));
+            let cur = loadCurrentLeads().filter(l => !ids.includes(l.id));
+            saveCurrentLeads(cur);
             saveLeadsDisk();
-            json(200, { success: true, deleted_count: ids.length, remaining_count: leads.size });
+            json(200, { success: true, deleted_count: ids.length, remaining_count: cur.length });
             return;
           }
           if (action === 'update_lead' && req.method === 'POST') {
@@ -1308,6 +1342,11 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             if (body.newMessage && !lead.messages.some(m => m.id === body.newMessage.id)) lead.messages.push(body.newMessage);
             if (body.updateMessage) lead.messages = lead.messages.map(m => m.waMessageId === body.updateMessage.waMessageId ? { ...m, ...body.updateMessage } : m);
             leads.set(body.id, lead);
+            let cur = loadCurrentLeads();
+            const idx = cur.findIndex(l => l.id === body.id);
+            if (idx >= 0) cur[idx] = lead;
+            else cur.push(lead);
+            saveCurrentLeads(cur);
             saveLeadsDisk();
             json(200, { success: true }); return;
           }
@@ -1323,7 +1362,16 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             try { fs.writeFileSync(wdFile, JSON.stringify(arr, null, 2), 'utf8'); } catch (_) {}
           };
           if (action === 'get_withdrawals' || !action) {
-            json(200, { success: true, withdrawals: loadWd() });
+            let list = loadWd();
+            const filterComp = url.searchParams.get('company_id') || body.company_id;
+            const targetUser = url.searchParams.get('user_id') || body.user_id;
+            if (filterComp && filterComp !== 'GLOBAL') {
+              list = list.filter(w => (w.company_id || 'COMP-001') === filterComp);
+            }
+            if (targetUser && (!currentLocalUser || (currentLocalUser.role !== 'admin' && currentLocalUser.role !== 'superadmin'))) {
+              list = list.filter(w => w.userId === targetUser);
+            }
+            json(200, { success: true, withdrawals: list });
             return;
           }
           if (action === 'request_withdrawal' && req.method === 'POST') {
@@ -1343,6 +1391,8 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               userId: body.userId || currentLocalUser?.id || 'EMP-TM-01',
               userName: body.userName || currentLocalUser?.name || 'Closer Specialist',
               userRole: body.userRole || currentLocalUser?.role || 'member',
+              company_id: body.company_id || currentLocalUser?.company_id || 'COMP-001',
+              company_name: body.company_name || 'Company',
               amount: amount,
               method: method,
               institution: institution,
