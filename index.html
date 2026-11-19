@@ -215,9 +215,9 @@
           <div class="bento-badge-row">
             <span class="bento-tag tag-verified">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8"><polyline points="20 6 9 17 4 12"/></svg>
-              <span>VERIFIED REVENUE</span>
+              <span id="bentoRevenueBadgeText">VERIFIED REVENUE</span>
             </span>
-            <span class="bento-target-pill">Target: PKR 25,000</span>
+            <span class="bento-target-pill" id="bentoTargetPill">Target: PKR 25,000</span>
           </div>
           <div class="bento-revenue-amount-wrap">
             <span class="currency-symbol">PKR</span>
@@ -227,7 +227,8 @@
           <span class="bento-caption" id="employeeMetricDeals">0 verified client transactions</span>
         </div>
         
-        <div class="bento-revenue-right">
+        <!-- FOR TM / TL: Monthly Target Pace -->
+        <div class="bento-revenue-right" id="tmMonthlyTargetBox">
           <div class="bento-track-header">
             <span>Monthly Target Pace</span>
             <strong id="revenueQuotaPercent">0%</strong>
@@ -242,6 +243,119 @@
             </button>
           </div>
         </div>
+
+        <!-- FOR ADMIN: Executive Conversion Velocity & Response Pulse -->
+        <div class="bento-revenue-right bento-admin-right" id="adminRevenueSummaryBox" style="display:none;">
+          <div class="admin-kpi-summary-grid">
+            <div class="admin-kpi-summary-pill">
+              <span class="admin-kpi-label">Conversion Rate</span>
+              <strong class="admin-kpi-val text-emerald" id="adminHeroConversionRate">0%</strong>
+              <span class="admin-kpi-sub" id="adminHeroConversionSub">Deals won vs pipeline</span>
+            </div>
+            <div class="admin-kpi-summary-pill">
+              <span class="admin-kpi-label">Inbound Response</span>
+              <strong class="admin-kpi-val text-sky" id="adminHeroReplyRate">0%</strong>
+              <span class="admin-kpi-sub" id="adminHeroReplyCount">0 of 0 leads replied</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ADMIN EXCLUSIVE KPI 1: Total Messages Sent -->
+      <article class="bento-card bento-card-messages admin-only-widget" id="kpiCardAdminMessages" style="display:none;">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-messages">
+              <div class="radar-pulse"></div>
+              <span>💬</span>
+            </div>
+            <div>
+              <span class="bento-card-title">Messages Sent</span>
+              <span class="bento-card-desc">Company-wide traffic</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-sky">Live Sync</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="adminMetricMessagesSent">0</strong>
+          <div class="bento-wave-sparkline">
+            <span class="spark-bar bar-1"></span>
+            <span class="spark-bar bar-2"></span>
+            <span class="spark-bar bar-3"></span>
+            <span class="spark-bar bar-4"></span>
+            <span class="spark-bar bar-5"></span>
+          </div>
+        </div>
+        <span class="bento-footer-note" id="adminMetricMessagesSub">Outbound & closer messages</span>
+      </article>
+
+      <!-- ADMIN EXCLUSIVE KPI 2: People Replied -->
+      <article class="bento-card bento-card-replies admin-only-widget" id="kpiCardAdminReplies" style="display:none;">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-replies">
+              <span>👥</span>
+            </div>
+            <div>
+              <span class="bento-card-title">People Replied</span>
+              <span class="bento-card-desc">Inbound customer responses</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-emerald" id="adminMetricReplyRateBadge">0% Replied</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="adminMetricPeopleReplied">0</strong>
+          <span class="bento-micro-badge" id="adminMetricReplyCountBadge">0 leads</span>
+        </div>
+        <span class="bento-footer-note" id="adminMetricReplyFooter">Active conversations engaged</span>
+      </article>
+
+      <!-- ADMIN EXCLUSIVE KPI 3: Dead Leads (Won't Pay / Dropped) -->
+      <article class="bento-card bento-card-dead admin-only-widget" id="kpiCardAdminDead" style="display:none;">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-dead">
+              <span>🚫</span>
+            </div>
+            <div>
+              <span class="bento-card-title">Dead Leads</span>
+              <span class="bento-card-desc">Cold or Won't Pay</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-rose">Dropped</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="adminMetricDeadLeads">0</strong>
+          <span class="bento-micro-badge muted" id="adminMetricDeadPercent">0% of total</span>
+        </div>
+        <span class="bento-footer-note">Refused or dropped contacts</span>
+      </article>
+
+      <!-- ADMIN EXCLUSIVE KPI 4: Conversion Rate -->
+      <article class="bento-card bento-card-conversion admin-only-widget" id="kpiCardAdminConversion" style="display:none;">
+        <div class="bento-card-header">
+          <div class="bento-header-left">
+            <div class="bento-icon-box box-conversion">
+              <span>🎯</span>
+            </div>
+            <div>
+              <span class="bento-card-title">Conversion Rate</span>
+              <span class="bento-card-desc">Closing efficiency</span>
+            </div>
+          </div>
+          <span class="bento-status-chip chip-purple">Efficiency</span>
+        </div>
+        <div class="bento-metric-body">
+          <strong class="bento-counter" id="adminMetricConversionVal">0%</strong>
+          <div class="bento-mini-ring-wrap" title="Closing Efficiency">
+            <svg class="bento-mini-ring" width="36" height="36" viewBox="0 0 36 36">
+              <circle class="ring-bg" cx="18" cy="18" r="14" fill="none" stroke-width="3.5"/>
+              <circle class="ring-fg" id="adminConversionMiniRing" cx="18" cy="18" r="14" fill="none" stroke-width="3.5" stroke-dasharray="88" stroke-dashoffset="88"/>
+            </svg>
+            <span class="ring-center-icon">⚡</span>
+          </div>
+        </div>
+        <span class="bento-footer-note" id="adminMetricWonSummary">0 won out of 0 closed</span>
       </article>
 
       <!-- 2. Ongoing Leads Widget -->
@@ -389,9 +503,9 @@
     <section class="employee-withdrawal-section" id="employeeWithdrawalSection">
       <div class="withdrawal-header-row">
         <div>
-          <span class="workspace-eyebrow">COMMISSION &amp; SETTLEMENTS</span>
-          <h2 class="withdrawal-section-title">Earnings &amp; Payout Portal</h2>
-          <p class="withdrawal-section-sub">Request withdrawals directly to EasyPaisa, JazzCash, or Bank Account.</p>
+          <span class="workspace-eyebrow" id="wdSectionEyebrow">COMMISSION &amp; SETTLEMENTS</span>
+          <h2 class="withdrawal-section-title" id="wdSectionTitle">Earnings &amp; Payout Portal</h2>
+          <p class="withdrawal-section-sub" id="wdSectionSub">Request withdrawals directly to EasyPaisa, JazzCash, or Bank Account.</p>
         </div>
         <button type="button" class="btn btn-request-payout" id="openWithdrawModalBtn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -401,45 +515,45 @@
 
       <!-- Financial Balance Strip -->
       <div class="withdrawal-balance-strip">
-        <div class="wd-balance-card card-available">
+        <div class="wd-balance-card card-available" id="wdCard1">
           <div class="wd-card-top">
-            <span class="wd-card-label">Available for Payout</span>
-            <span class="wd-card-badge badge-green">Ready</span>
+            <span class="wd-card-label" id="wdCard1Label">Available for Payout</span>
+            <span class="wd-card-badge badge-green" id="wdCard1Badge">Ready</span>
           </div>
           <div class="wd-card-amount">
             <span class="wd-currency">PKR</span>
             <strong class="wd-value" id="wdAvailableAmount">0</strong>
           </div>
-          <div class="wd-card-action-row">
-            <span class="wd-card-footer">Earned from verified closed deals</span>
+          <div class="wd-card-action-row" id="wdCard1ActionRow">
+            <span class="wd-card-footer" id="wdCard1Footer">Earned from verified closed deals</span>
             <button type="button" class="btn btn-card-withdraw" id="cardQuickWithdrawBtn">
               <span>Withdraw →</span>
             </button>
           </div>
         </div>
 
-        <div class="wd-balance-card card-pending">
+        <div class="wd-balance-card card-pending" id="wdCard2">
           <div class="wd-card-top">
-            <span class="wd-card-label">Pending Clearance</span>
-            <span class="wd-card-badge badge-amber">Processing</span>
+            <span class="wd-card-label" id="wdCard2Label">Pending Clearance</span>
+            <span class="wd-card-badge badge-amber" id="wdCard2Badge">Processing</span>
           </div>
           <div class="wd-card-amount">
             <span class="wd-currency">PKR</span>
             <strong class="wd-value" id="wdPendingAmount">0</strong>
           </div>
-          <span class="wd-card-footer" id="wdPendingCount">0 requests under admin review</span>
+          <span class="wd-card-footer" id="wdPendingCount">0 requests under review</span>
         </div>
 
-        <div class="wd-balance-card card-settled">
+        <div class="wd-balance-card card-settled" id="wdCard3">
           <div class="wd-card-top">
-            <span class="wd-card-label">Total Withdrawn</span>
-            <span class="wd-card-badge badge-blue">Settled</span>
+            <span class="wd-card-label" id="wdCard3Label">Total Withdrawn</span>
+            <span class="wd-card-badge badge-blue" id="wdCard3Badge">Settled</span>
           </div>
           <div class="wd-card-amount">
             <span class="wd-currency">PKR</span>
             <strong class="wd-value" id="wdSettledAmount">0</strong>
           </div>
-          <span class="wd-card-footer" id="wdSettledCount">Transferred to your accounts</span>
+          <span class="wd-card-footer" id="wdSettledCount">Transferred to accounts</span>
         </div>
       </div>
 
@@ -447,10 +561,19 @@
       <div class="withdrawal-history-box">
         <div class="withdrawal-history-header">
           <div style="display:flex;align-items:center;gap:8px;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            <strong>Recent Withdrawal Requests</strong>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 1 0 7h5a3.5 3.5 0 0 0 0 7H6"/></svg>
+            <strong id="withdrawalHistoryTitle">Recent Withdrawal Requests</strong>
           </div>
-          <span class="text-xs text-muted" id="withdrawalHistoryCount">0 Requests</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <!-- Filter tabs for Admin -->
+            <div class="wd-filter-tabs" id="adminWdFilterTabs" style="display:none;align-items:center;gap:6px;">
+              <button type="button" class="wd-filter-btn active" data-wd-filter="all">All</button>
+              <button type="button" class="wd-filter-btn" data-wd-filter="pending">Pending</button>
+              <button type="button" class="wd-filter-btn" data-wd-filter="approved">Approved</button>
+              <button type="button" class="wd-filter-btn" data-wd-filter="rejected">Rejected</button>
+            </div>
+            <span class="text-xs text-muted" id="withdrawalHistoryCount">0 Requests</span>
+          </div>
         </div>
         <div class="withdrawal-history-list" id="withdrawalHistoryList">
           <!-- Populated dynamically via JS -->

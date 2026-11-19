@@ -4071,7 +4071,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (profCompName) profCompName.textContent = resolvedCompName;
     if (profCompLogo) profCompLogo.src = resolvedCompLogo;
 
-    // 2. Compute the 5 Core Requested Metrics
+    // 2. Compute the Core Requested Metrics
     const activeId = user.id;
     const mine = isAdmin 
       ? state.leads 
@@ -4083,6 +4083,87 @@ document.addEventListener('DOMContentLoaded', () => {
     const wontPay = mine.filter(lead => getLeadState(lead) === 'useless');
     const totalClosed = paid.length + wontPay.length;
     const revenue = paid.reduce((sum, lead) => sum + (Number(lead.paidDetails?.amount) || (String(lead.interest || '').includes('Starter') ? 1700 : 5000)), 0);
+
+    // Deep Message & Communication Intelligence (Company-wide)
+    let totalMessagesSent = 0;
+    let totalPeopleReplied = 0;
+    const allLeadsForStats = isAdmin ? state.leads : mine;
+    allLeadsForStats.forEach(lead => {
+      const msgs = lead.messages || [];
+      msgs.forEach(m => {
+        if (m.sender === 'agent' || m.sender === 'me' || m.fromMe === true) {
+          totalMessagesSent++;
+        }
+      });
+      const hasLeadReply = msgs.some(m => m.sender === 'lead' || m.fromMe === false);
+      if (hasLeadReply) {
+        totalPeopleReplied++;
+      }
+    });
+
+    const replyRate = allLeadsForStats.length > 0 ? Math.round((totalPeopleReplied / allLeadsForStats.length) * 100) : 0;
+    const conversionRate = totalClosed > 0 ? Math.round((paid.length / totalClosed) * 100) : (allLeadsForStats.length > 0 ? Math.round((paid.length / allLeadsForStats.length) * 100) : 0);
+    const deadLeadsCount = wontPay.length;
+    const deadPct = allLeadsForStats.length > 0 ? Math.round((deadLeadsCount / allLeadsForStats.length) * 100) : 0;
+
+    // Admin vs TM/TL Differentiation for Hero Card:
+    const bentoTargetPill = document.getElementById('bentoTargetPill');
+    const tmMonthlyTargetBox = document.getElementById('tmMonthlyTargetBox');
+    const adminRevenueSummaryBox = document.getElementById('adminRevenueSummaryBox');
+    const bentoRevenueBadgeText = document.getElementById('bentoRevenueBadgeText');
+
+    if (isAdmin) {
+      if (bentoTargetPill) bentoTargetPill.style.display = 'none';
+      if (tmMonthlyTargetBox) tmMonthlyTargetBox.style.display = 'none';
+      if (adminRevenueSummaryBox) adminRevenueSummaryBox.style.display = 'flex';
+      if (bentoRevenueBadgeText) bentoRevenueBadgeText.textContent = 'COMPANY GROSS REVENUE';
+
+      const heroConvEl = document.getElementById('adminHeroConversionRate');
+      if (heroConvEl) heroConvEl.textContent = `${conversionRate}%`;
+      const heroReplyEl = document.getElementById('adminHeroReplyRate');
+      if (heroReplyEl) heroReplyEl.textContent = `${replyRate}%`;
+      const heroReplyCount = document.getElementById('adminHeroReplyCount');
+      if (heroReplyCount) heroReplyCount.textContent = `${totalPeopleReplied} of ${allLeadsForStats.length} leads replied`;
+    } else {
+      if (bentoTargetPill) bentoTargetPill.style.display = 'inline-flex';
+      if (tmMonthlyTargetBox) tmMonthlyTargetBox.style.display = 'flex';
+      if (adminRevenueSummaryBox) adminRevenueSummaryBox.style.display = 'none';
+      if (bentoRevenueBadgeText) bentoRevenueBadgeText.textContent = 'VERIFIED REVENUE';
+    }
+
+    // Toggle Admin-only widgets
+    const adminWidgets = document.querySelectorAll('.admin-only-widget');
+    adminWidgets.forEach(w => {
+      w.style.display = isAdmin ? 'flex' : 'none';
+    });
+
+    if (isAdmin) {
+      animateCount('adminMetricMessagesSent', totalMessagesSent);
+      animateCount('adminMetricPeopleReplied', totalPeopleReplied);
+      animateCount('adminMetricDeadLeads', deadLeadsCount);
+
+      const convValEl = document.getElementById('adminMetricConversionVal');
+      if (convValEl) convValEl.textContent = `${conversionRate}%`;
+
+      const repBadge = document.getElementById('adminMetricReplyRateBadge');
+      if (repBadge) repBadge.textContent = `${replyRate}% Replied`;
+
+      const repCountBadge = document.getElementById('adminMetricReplyCountBadge');
+      if (repCountBadge) repCountBadge.textContent = `${totalPeopleReplied} leads`;
+
+      const deadPctEl = document.getElementById('adminMetricDeadPercent');
+      if (deadPctEl) deadPctEl.textContent = `${deadPct}% of total`;
+
+      const wonSumEl = document.getElementById('adminMetricWonSummary');
+      if (wonSumEl) wonSumEl.textContent = `${paid.length} won • ${deadLeadsCount} lost`;
+
+      const convMiniRing = document.getElementById('adminConversionMiniRing');
+      if (convMiniRing) {
+        const circ = 88;
+        const off = circ - (conversionRate / 100) * circ;
+        convMiniRing.style.strokeDashoffset = off;
+      }
+    }
 
     // 3. Dynamic Animated Bento KPI Widgets
     animateCount('employeeMetricOngoing', ongoing.length);
@@ -4104,13 +4185,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const assignedCount = document.getElementById('profileAssignedCount');
     if (assignedCount) assignedCount.textContent = mine.length;
 
-    // Monthly Target Quota Progress
-    const targetQuota = 25000;
-    const quotaPct = Math.min(Math.round((revenue / targetQuota) * 100), 100);
-    const quotaFill = document.getElementById('revenueQuotaFill');
-    if (quotaFill) quotaFill.style.width = `${quotaPct}%`;
-    const quotaPctEl = document.getElementById('revenueQuotaPercent');
-    if (quotaPctEl) quotaPctEl.textContent = `${quotaPct}%`;
+    // Monthly Target Quota Progress (For TM/TL only)
+    if (!isAdmin) {
+      const targetQuota = 25000;
+      const quotaPct = Math.min(Math.round((revenue / targetQuota) * 100), 100);
+      const quotaFill = document.getElementById('revenueQuotaFill');
+      if (quotaFill) quotaFill.style.width = `${quotaPct}%`;
+      const quotaPctEl = document.getElementById('revenueQuotaPercent');
+      if (quotaPctEl) quotaPctEl.textContent = `${quotaPct}%`;
+    }
 
     // SVG Circular Win Rate Ring
     const closedDeals = paid.length + wontPay.length;
@@ -4243,6 +4326,18 @@ document.addEventListener('DOMContentLoaded', () => {
     return localWithdrawals;
   }
 
+  let currentAdminWdFilter = 'all';
+
+  // Admin Withdrawal Filter Click Handler
+  document.addEventListener('click', e => {
+    const filterBtn = e.target.closest('[data-wd-filter]');
+    if (!filterBtn) return;
+    document.querySelectorAll('[data-wd-filter]').forEach(b => b.classList.remove('active'));
+    filterBtn.classList.add('active');
+    currentAdminWdFilter = filterBtn.getAttribute('data-wd-filter') || 'all';
+    renderEmployeeWorkspace();
+  });
+
   async function renderWithdrawalSection(user, mineLeads, totalRevenue) {
     if (!user) return;
     const isAdmin = user.role === 'admin';
@@ -4264,43 +4359,134 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // For TL & TM: base payout pool with test allowance if 0 leads yet, plus commissions
-    const basePayoutPool = isAdmin ? (totalRevenue > 0 ? totalRevenue : 25000) : Math.max(earnedCommission, paidLeads.length ? 5000 : 7500);
+    const basePayoutPool = Math.max(earnedCommission, paidLeads.length ? 5000 : 7500);
 
     const userWds = isAdmin ? localWithdrawals : localWithdrawals.filter(w => w.userId === activeUserId);
-    const pendingWds = userWds.filter(w => w.status === 'pending');
-    const settledWds = userWds.filter(w => w.status === 'approved');
+    const pendingWds = (isAdmin ? localWithdrawals : userWds).filter(w => w.status === 'pending');
+    const settledWds = (isAdmin ? localWithdrawals : userWds).filter(w => w.status === 'approved');
 
     const totalPending = pendingWds.reduce((s, w) => s + (Number(w.amount) || 0), 0);
     const totalSettled = settledWds.reduce((s, w) => s + (Number(w.amount) || 0), 0);
 
     withdrawalAvailableBalance = Math.max(0, basePayoutPool - totalSettled - totalPending);
 
-    // Update financial balance cards with animated counter rolling
-    animateCount('wdAvailableAmount', withdrawalAvailableBalance);
-    animateCount('wdPendingAmount', totalPending);
-    animateCount('wdSettledAmount', totalSettled);
+    // Dynamic UI Elements
+    const wdSectionEyebrow = document.getElementById('wdSectionEyebrow');
+    const wdSectionTitle = document.getElementById('wdSectionTitle');
+    const wdSectionSub = document.getElementById('wdSectionSub');
+    const openWdModalBtn = document.getElementById('openWithdrawModalBtn');
+    const cardQuickWithdrawBtn = document.getElementById('cardQuickWithdrawBtn');
+    const adminWdFilterTabs = document.getElementById('adminWdFilterTabs');
+    const wdHistoryTitle = document.getElementById('withdrawalHistoryTitle');
 
-    const pCountEl = document.getElementById('wdPendingCount');
-    if (pCountEl) pCountEl.textContent = `${pendingWds.length} request${pendingWds.length === 1 ? '' : 's'} under review`;
+    const wdCard1Label = document.getElementById('wdCard1Label');
+    const wdCard1Badge = document.getElementById('wdCard1Badge');
+    const wdCard1Footer = document.getElementById('wdCard1Footer');
 
-    const sCountEl = document.getElementById('wdSettledCount');
-    if (sCountEl) sCountEl.textContent = `${settledWds.length} payout${settledWds.length === 1 ? '' : 's'} completed`;
+    const wdCard2Label = document.getElementById('wdCard2Label');
+    const wdCard2Badge = document.getElementById('wdCard2Badge');
+
+    const wdCard3Label = document.getElementById('wdCard3Label');
+    const wdCard3Badge = document.getElementById('wdCard3Badge');
+
+    if (isAdmin) {
+      if (wdSectionEyebrow) wdSectionEyebrow.textContent = 'SETTLEMENTS & CLOSER DISBURSEMENTS';
+      if (wdSectionTitle) wdSectionTitle.textContent = 'Withdrawals Requested & Approval Ledger';
+      if (wdSectionSub) wdSectionSub.textContent = 'Review, audit and settle closer payout requests to EasyPaisa, JazzCash, or Bank.';
+      if (openWdModalBtn) openWdModalBtn.style.display = 'none';
+      if (cardQuickWithdrawBtn) cardQuickWithdrawBtn.style.display = 'none';
+      if (adminWdFilterTabs) adminWdFilterTabs.style.display = 'inline-flex';
+      if (wdHistoryTitle) wdHistoryTitle.textContent = 'Closer Withdrawal Requests Ledger';
+
+      if (wdCard1Label) wdCard1Label.textContent = 'Pending Requests';
+      if (wdCard1Badge) {
+        wdCard1Badge.textContent = 'Needs Review';
+        wdCard1Badge.className = 'wd-card-badge badge-amber';
+      }
+      if (wdCard1Footer) wdCard1Footer.textContent = `${pendingWds.length} request${pendingWds.length === 1 ? '' : 's'} awaiting admin approval`;
+
+      if (wdCard2Label) wdCard2Label.textContent = 'Total Settled Payouts';
+      if (wdCard2Badge) {
+        wdCard2Badge.textContent = 'Paid Out';
+        wdCard2Badge.className = 'wd-card-badge badge-green';
+      }
+
+      const pCountEl = document.getElementById('wdPendingCount');
+      if (pCountEl) pCountEl.textContent = `${settledWds.length} closer payouts disbursed`;
+
+      if (wdCard3Label) wdCard3Label.textContent = 'Verified Gross Revenue';
+      if (wdCard3Badge) {
+        wdCard3Badge.textContent = 'Company Gross';
+        wdCard3Badge.className = 'wd-card-badge badge-blue';
+      }
+
+      const sCountEl = document.getElementById('wdSettledCount');
+      if (sCountEl) sCountEl.textContent = 'Gross client revenue collected';
+
+      // Animate Admin values:
+      animateCount('wdAvailableAmount', totalPending);
+      animateCount('wdPendingAmount', totalSettled);
+      animateCount('wdSettledAmount', totalRevenue);
+    } else {
+      if (wdSectionEyebrow) wdSectionEyebrow.textContent = 'COMMISSION & SETTLEMENTS';
+      if (wdSectionTitle) wdSectionTitle.textContent = 'Earnings & Payout Portal';
+      if (wdSectionSub) wdSectionSub.textContent = 'Request withdrawals directly to EasyPaisa, JazzCash, or Bank Account.';
+      if (openWdModalBtn) openWdModalBtn.style.display = 'inline-flex';
+      if (cardQuickWithdrawBtn) cardQuickWithdrawBtn.style.display = 'inline-flex';
+      if (adminWdFilterTabs) adminWdFilterTabs.style.display = 'none';
+      if (wdHistoryTitle) wdHistoryTitle.textContent = 'Recent Withdrawal Requests';
+
+      if (wdCard1Label) wdCard1Label.textContent = 'Available for Payout';
+      if (wdCard1Badge) {
+        wdCard1Badge.textContent = 'Ready';
+        wdCard1Badge.className = 'wd-card-badge badge-green';
+      }
+      if (wdCard1Footer) wdCard1Footer.textContent = 'Earned from verified closed deals';
+
+      if (wdCard2Label) wdCard2Label.textContent = 'Pending Clearance';
+      if (wdCard2Badge) {
+        wdCard2Badge.textContent = 'Processing';
+        wdCard2Badge.className = 'wd-card-badge badge-amber';
+      }
+
+      const pCountEl = document.getElementById('wdPendingCount');
+      if (pCountEl) pCountEl.textContent = `${pendingWds.length} request${pendingWds.length === 1 ? '' : 's'} under review`;
+
+      if (wdCard3Label) wdCard3Label.textContent = 'Total Withdrawn';
+      if (wdCard3Badge) {
+        wdCard3Badge.textContent = 'Settled';
+        wdCard3Badge.className = 'wd-card-badge badge-blue';
+      }
+
+      const sCountEl = document.getElementById('wdSettledCount');
+      if (sCountEl) sCountEl.textContent = 'Transferred to your accounts';
+
+      animateCount('wdAvailableAmount', withdrawalAvailableBalance);
+      animateCount('wdPendingAmount', totalPending);
+      animateCount('wdSettledAmount', totalSettled);
+    }
 
     const modalBalEl = document.getElementById('modalWdAvailableBalance');
     if (modalBalEl) modalBalEl.textContent = withdrawalAvailableBalance.toLocaleString();
 
-    // Render Recent Withdrawal Requests
+    // Render Withdrawal Requests List
     const historyList = document.getElementById('withdrawalHistoryList');
     const historyCount = document.getElementById('withdrawalHistoryCount');
-    if (historyCount) historyCount.textContent = `${userWds.length} Request${userWds.length === 1 ? '' : 's'}`;
+
+    let displayWds = userWds;
+    if (isAdmin && currentAdminWdFilter !== 'all') {
+      displayWds = userWds.filter(w => w.status === currentAdminWdFilter);
+    }
+
+    if (historyCount) historyCount.textContent = `${displayWds.length} Request${displayWds.length === 1 ? '' : 's'}`;
 
     if (!historyList) return;
 
-    if (!userWds.length) {
+    if (!displayWds.length) {
       historyList.innerHTML = `
         <div style="padding:24px 16px;text-align:center;color:var(--text-muted);font-size:12px;">
           <span style="font-size:22px;display:block;margin-bottom:4px;">💳</span>
-          No withdrawal requests yet. Click <strong>"Request Payout"</strong> above to cash out earnings.
+          ${isAdmin ? 'No closer withdrawal requests found under this filter.' : 'No withdrawal requests yet. Click <strong>"Request Payout"</strong> above to cash out earnings.'}
         </div>
       `;
       return;
@@ -4319,7 +4505,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'USDT (TRC20)': '💎'
     };
 
-    historyList.innerHTML = userWds.map(wd => {
+    historyList.innerHTML = displayWds.map(wd => {
       const isPending = wd.status === 'pending';
       const isApproved = wd.status === 'approved';
       const isRejected = wd.status === 'rejected';
@@ -4329,19 +4515,28 @@ document.addEventListener('DOMContentLoaded', () => {
       const dateStr = wd.created_at ? new Date(wd.created_at).toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently';
 
       // 24-Hour Settlement Guarantee countdown clock for pending requests
-      const timerPill = isPending ? `
+      const timerPill = (isPending && !isAdmin) ? `
         <div class="wd-timer-pill" data-created="${escapeHtml(wd.created_at || new Date().toISOString())}">
           <span>⏳ Settling in:</span>
           <span class="wd-timer-clock">24h 00m 00s remaining</span>
         </div>
       ` : '';
 
+      const requesterBadge = isAdmin ? `
+        <div style="display:inline-flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <strong style="color:var(--text-primary);font-size:12.5px;">${escapeHtml(wd.userName || 'Closer')}</strong>
+          <span style="font-size:9.5px;padding:1px 6px;border-radius:4px;background:rgba(16,185,129,0.12);color:#10b981;font-weight:700;text-transform:uppercase;">
+            ${escapeHtml(wd.userRole || 'closer')}
+          </span>
+        </div>
+      ` : '';
+
       const adminActions = (isAdmin && isPending) ? `
         <div style="display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:flex-end;">
-          <button type="button" class="btn btn-emerald btn-xs" onclick="updateWithdrawalStatus('${escapeHtml(wd.id)}', 'approved')" style="padding:3px 10px;font-size:11px;border-radius:6px;font-weight:700;">
-            ✓ Mark Paid
+          <button type="button" class="btn btn-emerald btn-xs" onclick="updateWithdrawalStatus('${escapeHtml(wd.id)}', 'approved')" style="padding:4px 11px;font-size:11px;border-radius:6px;font-weight:750;background:#10b981;color:#fff;border:none;cursor:pointer;">
+            ✓ Approve &amp; Mark Paid
           </button>
-          <button type="button" class="btn btn-rose btn-xs" onclick="updateWithdrawalStatus('${escapeHtml(wd.id)}', 'rejected')" style="padding:3px 10px;font-size:11px;border-radius:6px;font-weight:700;">
+          <button type="button" class="btn btn-rose btn-xs" onclick="updateWithdrawalStatus('${escapeHtml(wd.id)}', 'rejected')" style="padding:4px 11px;font-size:11px;border-radius:6px;font-weight:750;background:#f43f5e;color:#fff;border:none;cursor:pointer;">
             ✕ Reject
           </button>
         </div>
@@ -4352,6 +4547,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="wd-row-left">
             <div class="wd-method-icon-circle">${icon}</div>
             <div class="wd-row-info">
+              ${requesterBadge}
               <span class="wd-row-title">${escapeHtml(institutionDisplay)} • ${escapeHtml(wd.accountTitle || wd.userName)}</span>
               <div class="wd-row-meta">
                 <span class="mono">${escapeHtml(wd.accountNumber)}</span>

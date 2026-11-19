@@ -3864,6 +3864,97 @@ body.theme-dark .bento-card:hover {
   color: #ffffff;
 }
 
+/* Bento Hero Admin Summary Box */
+.bento-admin-right {
+  min-width: 320px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px 16px;
+}
+.admin-kpi-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+.admin-kpi-summary-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.admin-kpi-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+.admin-kpi-val {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.admin-kpi-sub {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.text-emerald { color: #34d399 !important; }
+.text-sky { color: #38bdf8 !important; }
+
+/* Bento Icon Boxes for Admin Cards */
+.box-messages {
+  background: rgba(56, 189, 248, 0.15) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+}
+.box-replies {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #10b981 !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+.box-dead {
+  background: rgba(244, 63, 94, 0.15) !important;
+  color: #f43f5e !important;
+  border: 1px solid rgba(244, 63, 94, 0.3) !important;
+}
+.box-conversion {
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(168, 85, 247, 0.3) !important;
+}
+.chip-sky {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+/* Withdrawal Admin Filter Tabs */
+.wd-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wd-filter-btn {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.15));
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.wd-filter-btn.active, .wd-filter-btn:hover {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
 @media (max-width: 720px) {
   .bento-card-revenue {
     flex-direction: column;
