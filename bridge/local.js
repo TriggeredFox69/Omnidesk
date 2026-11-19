@@ -316,8 +316,31 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             } else if (referredByTL) {
               newAccount.joined_via_tl = referredByTL;
             }
+
+            const isNunnoTM = (company_id === 'COMP-001' && !isTL);
+            if (isNunnoTM) {
+              newAccount.status = 'active';
+              newAccount.has_nunno_plan = false;
+              newAccount.nunno_plan_status = 'unpaid';
+              newAccount.nunno_plan_price = 1000;
+              newAccount.nunno_plan_official_price = 1700;
+            }
+
             allUsers.push(newAccount);
             saveLocalUsers(allUsers);
+
+            if (isNunnoTM) {
+              currentLocalUser = newAccount;
+              json(200, {
+                success: true,
+                message: 'Welcome to Nunno Official! Redirecting to closer desk...',
+                redirect: 'index.html?tab=employee',
+                is_nunno_tm: true,
+                user: newAccount
+              });
+              return;
+            }
+
             json(200, { success: true, message: 'Application submitted successfully! Your account is pending manual approval by company administration.', user: newAccount });
             return;
           }
@@ -374,6 +397,46 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
             }
             return;
           }
+          if (action === 'submit_tm_plan_payment') {
+            const trxId = String(body.trx_id || body.transaction_id || '').trim();
+            const method = String(body.payment_method || 'easypaisa').trim();
+            if (!trxId) {
+              json(400, { success: false, error: 'Transaction ID is required.' });
+              return;
+            }
+            const u = allUsers.find(x => x.id === currentLocalUser?.id || x.username === currentLocalUser?.username);
+            if (u) {
+              u.nunno_plan_status = 'pending_verification';
+              u.nunno_plan_trx = trxId;
+              u.nunno_plan_method = method;
+              u.nunno_plan_submitted_at = new Date().toISOString();
+              saveLocalUsers(allUsers);
+              currentLocalUser = u;
+              json(200, { success: true, message: 'Payment proof submitted! Administration will verify shortly.', user: u });
+            } else {
+              json(404, { success: false, error: 'User account not found.' });
+            }
+            return;
+          }
+          if (action === 'activate_tm_plan') {
+            const userId = String(body.user_id || body.id || '').trim();
+            const username = String(body.username || '').trim();
+            const activate = body.activate !== undefined ? Boolean(body.activate) : true;
+            const u = allUsers.find(x => (userId && x.id === userId) || (username && x.username === username));
+            if (u) {
+              u.has_nunno_plan = activate;
+              u.nunno_plan_status = activate ? 'active' : 'unpaid';
+              if (activate) u.nunno_plan_activated_at = new Date().toISOString();
+              saveLocalUsers(allUsers);
+              if (currentLocalUser && currentLocalUser.id === u.id) {
+                currentLocalUser = u;
+              }
+              json(200, { success: true, message: activate ? 'Nunno Special Plan (Rs. 1,000) activated!' : 'Plan deactivated.', user: u });
+            } else {
+              json(404, { success: false, error: 'Target closer account not found.' });
+            }
+            return;
+          }
           if (action === 'list_logins') {
             const loginsFile = path.join(root, 'data/logins.json');
             let logs = [];
@@ -402,12 +465,24 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               else if (matched.password && matched.password === password) isValid = true;
             }
             if (matched && isValid) {
+              const isNunnoTM = (matched.company_id === 'COMP-001' && matched.role === 'member');
               if (matched.status === 'pending') {
-                json(403, {
-                  success: false,
-                  error: '⏳ Your account is pending manual approval by company administration. Please contact your company administrator or wait for approval.'
-                });
-                return;
+                if (isNunnoTM) {
+                  matched.status = 'active';
+                  if (matched.has_nunno_plan === undefined) {
+                    matched.has_nunno_plan = false;
+                    matched.nunno_plan_status = 'unpaid';
+                    matched.nunno_plan_price = 1000;
+                    matched.nunno_plan_official_price = 1700;
+                  }
+                  saveLocalUsers(allUsers);
+                } else {
+                  json(403, {
+                    success: false,
+                    error: '⏳ Your account is pending manual approval by company administration. Please contact your company administrator or wait for approval.'
+                  });
+                  return;
+                }
               }
               if (matched.status === 'suspended') {
                 json(403, {
@@ -436,7 +511,13 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
                 });
                 fs.writeFileSync(loginsFile, JSON.stringify(logs.slice(0, 100), null, 2), 'utf8');
               } catch (_) {}
-              json(200, { success: true, authenticated: true, user: matched, message: 'Logged in successfully.' });
+
+              let redirectUrl = 'index.html';
+              if (isNunnoTM && !matched.has_nunno_plan) {
+                redirectUrl = 'index.html?tab=employee';
+              }
+
+              json(200, { success: true, authenticated: true, user: matched, redirect: redirectUrl, message: 'Logged in successfully.' });
             } else {
               json(401, { success: false, error: 'Invalid username or password.' });
             }

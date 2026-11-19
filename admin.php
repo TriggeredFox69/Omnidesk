@@ -1612,6 +1612,22 @@ function renderEmployeeTable(employees) {
     const isLead = emp.role === 'lead';
     const isSuspended = emp.status === 'suspended';
 
+    const isNunno = '<?php echo $activeCompany['id']; ?>' === 'COMP-001';
+    let planBadge = '';
+    let planAction = '';
+    if (isNunno && !isLead) {
+      if (emp.has_nunno_plan) {
+        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">🟢 Plan Active (Rs. 1,000)</span></div>`;
+        planAction = `<button class="btn btn-secondary" style="padding:5px 8px; font-size:11px; color:#ef4444;" onclick="toggleNunnoPlan('${emp.id}', false)" title="Revoke Nunno Collab Plan">🔒 Revoke</button>`;
+      } else if (emp.nunno_plan_status === 'pending_verification') {
+        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);" title="Proof Submitted: Trx #${emp.nunno_plan_trx || ''}">⏳ Proof: #${emp.nunno_plan_trx || 'Review'}</span></div>`;
+        planAction = `<button class="btn btn-emerald" style="padding:5px 8px; font-size:11px; font-weight:800;" onclick="toggleNunnoPlan('${emp.id}', true)" title="Verify and Activate Nunno Special Plan">✓ Activate Plan</button>`;
+      } else {
+        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">🔒 Unpaid (Rs. 1,000)</span></div>`;
+        planAction = `<button class="btn btn-emerald" style="padding:5px 8px; font-size:11px; font-weight:800;" onclick="toggleNunnoPlan('${emp.id}', true)" title="Activate Nunno Special Plan">⚡ Activate Plan</button>`;
+      }
+    }
+
     return `
       <tr>
         <td>
@@ -1629,6 +1645,7 @@ function renderEmployeeTable(employees) {
           <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; ${isLead ? 'background:rgba(31, 224, 138,0.15); color:#8ff5c8; border:1px solid rgba(31, 224, 138,0.3);' : 'background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3);'}">
             ${isLead ? '👑 Team Lead' : '📱 Closer TM'}
           </span>
+          ${planBadge}
         </td>
         <td>
           <span style="font-family:'JetBrains Mono',monospace; font-size:12px;">${emp.phone || '<em>Not linked</em>'}</span>
@@ -1651,10 +1668,11 @@ function renderEmployeeTable(employees) {
           </span>
         </td>
         <td>
-          <div style="display:flex; gap:6px;">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn btn-emerald" style="padding:5px 10px; font-size:11.5px; font-weight:800; white-space:nowrap;" onclick="directLoginAsEmployee('${emp.username}')" title="Directly log into ${emp.name}'s closer portal">
               ⚡ Direct Login
             </button>
+            ${planAction}
             <button class="btn btn-secondary" style="padding:5px 10px; font-size:11.5px;" onclick="toggleEmployeeStatus('${emp.id}')">
               ${isSuspended ? 'Activate' : 'Suspend'}
             </button>
@@ -1668,6 +1686,34 @@ function renderEmployeeTable(employees) {
   }).join('');
 
   renderTLLedger(employees);
+}
+
+async function toggleNunnoPlan(empId, activate) {
+  const actionText = activate ? 'Activate Nunno Special Plan (Rs. 1,000)' : 'Deactivate / Lock Nunno Plan';
+  if (!confirm(`${actionText} for this closer?\n\nThis will immediately ${activate ? 'unlock' : 'lock'} their Team Inbox and sales desk.`)) return;
+
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'activate_tm_plan',
+        user_id: empId,
+        activate: activate
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(data.message || 'Plan status updated successfully.');
+      loadEmployees();
+    } else {
+      alert(data.error || 'Failed to update plan status.');
+    }
+  } catch (err) {
+    alert('Error updating plan: ' + err.message);
+  }
+}
+window.toggleNunnoPlan = toggleNunnoPlan;
 }
 
 async function directLoginAsEmployee(username) {

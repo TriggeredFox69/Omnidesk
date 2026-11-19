@@ -3796,10 +3796,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // TOPBAR TAB NAVIGATION
+  // TOPBAR TAB NAVIGATION & NUNNO PLAN GUARD
   // ==========================================
 
+  function isNunnoPlanLocked(user = state.currentUser || window.NUNNO_ACTIVE_USER) {
+    if (!user) return false;
+    // Strictly applies ONLY to Nunno Official (COMP-001) TMs (role: 'member')
+    const isNunno = (user.company_id === 'COMP-001');
+    const isTM = (user.role === 'member');
+    const hasPlan = Boolean(user.has_nunno_plan);
+    return (isNunno && isTM && !hasPlan);
+  }
+  window.isNunnoPlanLocked = isNunnoPlanLocked;
+
   function switchTab(tabName) {
+    if (isNunnoPlanLocked() && (tabName === 'inbox' || tabName === 'campaign')) {
+      showToast('🔒 Nunno Special Plan (Rs. 1,000) required to access Team Inbox and close leads.');
+      tabName = 'employee';
+      const lockCard = document.getElementById('nunnoPlanLockCard');
+      if (lockCard) {
+        setTimeout(() => {
+          lockCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+    }
+
     if (tabName === 'campaign' && !canAccessCampaignStudio()) {
       showToast('Campaign Studio is available to administrators only.');
       return;
@@ -3838,7 +3859,65 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.tabInbox) els.tabInbox.addEventListener('click', () => switchTab('inbox'));
   if (els.tabCampaign) els.tabCampaign.addEventListener('click', () => switchTab('campaign'));
   if (els.tabEmployee) els.tabEmployee.addEventListener('click', () => switchTab('employee'));
-  document.getElementById('employeeOpenInboxBtn')?.addEventListener('click', () => switchTab('inbox'));
+  document.getElementById('employeeOpenInboxBtn')?.addEventListener('click', () => {
+    if (isNunnoPlanLocked()) {
+      showToast('🔒 Nunno Special Plan (Rs. 1,000) required to access Team Inbox.');
+      const lockCard = document.getElementById('nunnoPlanLockCard');
+      if (lockCard) lockCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    switchTab('inbox');
+  });
+
+  async function handleNunnoPlanVerifySubmit(e) {
+    if (e) e.preventDefault();
+    const trxInp = document.getElementById('nunnoTrxInput');
+    const methodSel = document.getElementById('nunnoMethodSelect');
+    const btn = document.getElementById('nunnoSubmitProofBtn');
+    const trx = trxInp ? trxInp.value.trim() : '';
+    const method = methodSel ? methodSel.value : 'easypaisa';
+
+    if (!trx) {
+      showToast('Please enter your Transaction ID or Reference.');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>Submitting Proof...</span> <span>⏳</span>';
+    }
+
+    try {
+      const res = await fetch('api/auth.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submit_tm_plan_payment',
+          trx_id: trx,
+          payment_method: method
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (state.currentUser) {
+          state.currentUser.nunno_plan_status = 'pending_verification';
+          state.currentUser.nunno_plan_trx = trx;
+        }
+        showToast('✅ Payment proof submitted! Administration will verify and unlock your desk.');
+        renderEmployeeWorkspace();
+      } else {
+        showToast(data.error || 'Failed to submit payment proof.');
+      }
+    } catch (err) {
+      showToast('Network error submitting payment proof.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>Submit Proof for Instant Activation</span> <span>⚡</span>';
+      }
+    }
+  }
+  window.handleNunnoPlanVerifySubmit = handleNunnoPlanVerifySubmit;
 
   // Pipeline Multi-Select & Delete State
   let pipelineDeleteMode = false;
@@ -4026,6 +4105,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const resolvedCompLogo = compCatalog?.logo || 'assets/images/nunno-logo.png';
     if (profCompName) profCompName.textContent = resolvedCompName;
     if (profCompLogo) profCompLogo.src = resolvedCompLogo;
+
+    // Nunno Collab Special Plan Lock Card check
+    const lockCard = document.getElementById('nunnoPlanLockCard');
+    const locked = isNunnoPlanLocked(user);
+    if (lockCard) {
+      lockCard.style.display = locked ? 'block' : 'none';
+      if (locked) {
+        const verifPendingMsg = document.getElementById('nunnoVerifPendingMsg');
+        const submittedTrxSpan = document.getElementById('submittedTrxSpan');
+        if (user.nunno_plan_status === 'pending_verification') {
+          if (verifPendingMsg) verifPendingMsg.style.display = 'block';
+          if (submittedTrxSpan) submittedTrxSpan.textContent = user.nunno_plan_trx || 'Pending Review';
+        } else {
+          if (verifPendingMsg) verifPendingMsg.style.display = 'none';
+        }
+      }
+    }
+
+    const openInboxBtn = document.getElementById('employeeOpenInboxBtn');
+    if (openInboxBtn) {
+      if (locked) {
+        openInboxBtn.innerHTML = `<span>🔒 Unlock with Rs. 1,000 Plan</span> <span class="hero-arrow">&rarr;</span>`;
+        openInboxBtn.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+        openInboxBtn.title = 'Nunno Collab Plan (Rs. 1,000) required to unlock sales desk';
+      } else {
+        openInboxBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1 3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> <span>Open Team Inbox</span> <span class="hero-arrow">&rarr;</span>`;
+        openInboxBtn.style.background = '';
+        openInboxBtn.title = 'Open Team Inbox';
+      }
+    }
+
+    if (els.tabInbox) {
+      if (locked) {
+        els.tabInbox.title = 'Team Inbox 🔒 (Locked — Rs. 1,000 Special Plan Required)';
+      } else {
+        els.tabInbox.title = 'Team Inbox';
+      }
+    }
 
     // 2. Compute the Core Requested Metrics
     const activeId = user.id;
@@ -5224,7 +5341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderConversationsList();
     renderActiveChat();
     renderEmployeeWorkspace();
-    if (user.role === 'admin' || isImpersonated || hasChatParam) switchTab('inbox');
+    if (!isNunnoPlanLocked(user) && (user.role === 'admin' || isImpersonated || hasChatParam)) switchTab('inbox');
     else switchTab('employee');
   }
 

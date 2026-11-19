@@ -3489,6 +3489,228 @@ body.theme-dark .campaign-image-bubble {
   color: var(--accent-wa-hover);
 }
 
+/* ─── NUNNO COLLAB SPECIAL PLAN LOCK BANNER (MANDATORY FOR NUNNO TMs) ─── */
+.nunno-plan-lock-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(8, 22, 16, 0.98) 0%, rgba(14, 38, 29, 0.95) 100%);
+  border: 2px solid rgba(45, 232, 154, 0.4);
+  border-radius: 24px;
+  padding: 26px 30px;
+  margin-bottom: 24px;
+  box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.65), 0 0 32px rgba(45, 232, 154, 0.15);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nunno-lock-ambient {
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(45, 232, 154, 0.22) 0%, rgba(245, 158, 11, 0.1) 50%, transparent 70%);
+  pointer-events: none;
+  filter: blur(30px);
+}
+.nunno-lock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  position: relative;
+  z-index: 2;
+}
+.nunno-lock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 6px 14px;
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.1);
+}
+.nunno-lock-save-pill {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #2de89a;
+  background: rgba(45, 232, 154, 0.16);
+  border: 1px solid rgba(45, 232, 154, 0.35);
+  padding: 6px 14px;
+  border-radius: 999px;
+  letter-spacing: 0.4px;
+  animation: pulsePlanPill 2s infinite ease-in-out;
+}
+@keyframes pulsePlanPill {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 232, 154, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(45, 232, 154, 0); }
+}
+.nunno-lock-body {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 28px;
+  align-items: start;
+  position: relative;
+  z-index: 2;
+}
+@media (max-width: 900px) {
+  .nunno-lock-body {
+    grid-template-columns: 1fr;
+  }
+}
+.nunno-lock-title {
+  font-size: 23px;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.4px;
+  line-height: 1.25;
+}
+.nunno-philosophy-quote {
+  background: rgba(45, 232, 154, 0.08);
+  border-left: 4px solid #2de89a;
+  padding: 12px 18px;
+  border-radius: 0 14px 14px 0;
+  margin: 12px 0 16px 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #ecfdf5;
+  font-style: italic;
+}
+.nunno-philosophy-quote strong {
+  color: #2de89a;
+  font-style: normal;
+}
+.nunno-lock-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin: 0 0 16px 0;
+}
+.nunno-pricing-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 18px;
+  border-radius: 14px;
+}
+.nunno-price-box {
+  display: flex;
+  flex-direction: column;
+}
+.nunno-price-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.nunno-price-original {
+  font-size: 15px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+.nunno-price-arrow {
+  color: #2de89a;
+  font-size: 18px;
+  font-weight: 800;
+}
+.nunno-price-discounted {
+  font-size: 24px;
+  font-weight: 900;
+  color: #2de89a;
+  letter-spacing: -0.5px;
+}
+.nunno-lock-action-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.btn-nunno-buy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 20px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+.btn-nunno-buy:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #18c98e 0%, #089d70 100%);
+  box-shadow: 0 14px 32px rgba(16, 185, 129, 0.55);
+}
+.btn-cart-icon {
+  font-size: 24px;
+}
+.nunno-verification-box {
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+.verif-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+.verif-header strong {
+  font-size: 13.5px;
+  color: #ffffff;
+}
+.verif-header span {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.verif-inputs-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.btn-verify-proof {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 11px;
+  background: rgba(45, 232, 154, 0.16);
+  border: 1px solid rgba(45, 232, 154, 0.4);
+  color: #2de89a;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-verify-proof:hover {
+  background: rgba(45, 232, 154, 0.28);
+  border-color: rgba(45, 232, 154, 0.6);
+  transform: translateY(-1px);
+}
+
 /* ─── 16. EXECUTIVE BENTO WORKSPACE & STATS DASHBOARD ───────────────── */
 .profile-hero-card {
   position: relative;

@@ -165,6 +165,83 @@
   </header>
 
   <main class="employee-workspace" id="viewEmployee" style="display:none;">
+    <!-- NUNNO COLLAB SPECIAL PLAN LOCK BANNER (MANDATORY FOR NUNNO TMs) -->
+    <section class="nunno-plan-lock-card" id="nunnoPlanLockCard" style="display:none;">
+      <div class="nunno-lock-ambient"></div>
+      <div class="nunno-lock-header">
+        <div class="nunno-lock-badge">
+          <span>🔒</span>
+          <span>ACTION REQUIRED &bull; NUNNO OFFICIAL COLLAB PLAN</span>
+        </div>
+        <span class="nunno-lock-save-pill">🔥 41% COLLAB DISCOUNT (SAVE PKR 700)</span>
+      </div>
+
+      <div class="nunno-lock-body">
+        <div class="nunno-lock-text-col">
+          <h2 class="nunno-lock-title">Unlock Your Nunno Closer License &amp; Sales Desk</h2>
+          
+          <div class="nunno-philosophy-quote">
+            “In order to work on Chatly and make money, TMs must buy a 1000rs plan on <strong>Nunno.cloud/pricing</strong> because <strong>in order to sell the product, first you should own the product.</strong>”
+          </div>
+
+          <p class="nunno-lock-desc">
+            As a collaborative closer for Nunno Official, you receive an exclusive Rs. 700 partner subsidy. Activate your license to unlock your Team Inbox, live campaigns, and start earning commissions directly to your wallet.
+          </p>
+
+          <div class="nunno-pricing-row">
+            <div class="nunno-price-box">
+              <span class="nunno-price-label">Official Price</span>
+              <span class="nunno-price-original">PKR 1,700</span>
+            </div>
+            <div class="nunno-price-arrow">→</div>
+            <div class="nunno-price-box">
+              <span class="nunno-price-label">Collab Special Plan</span>
+              <strong class="nunno-price-discounted">PKR 1,000</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="nunno-lock-action-col">
+          <!-- Buy Plan Button -->
+          <a href="https://nunno.cloud/pricing" target="_blank" rel="noopener noreferrer" class="btn-nunno-buy" id="nunnoBuyPlanBtn">
+            <span class="btn-cart-icon">🛒</span>
+            <div>
+              <span style="display:block; font-size:15px; font-weight:800; letter-spacing:0.3px;">Get Nunno Special Plan (Rs. 1,000)</span>
+              <span style="display:block; font-size:11px; opacity:0.85; font-weight:500;">Opens Nunno.cloud/pricing in new tab &rarr;</span>
+            </div>
+          </a>
+
+          <!-- Payment Proof Submission Box -->
+          <div class="nunno-verification-box" id="nunnoVerificationBox">
+            <div class="verif-header">
+              <strong>⚡ Already Bought the Plan?</strong>
+              <span>Submit your Transaction ID to verify and unlock your desk immediately</span>
+            </div>
+            
+            <div id="nunnoVerifPendingMsg" style="display:none; margin-bottom:10px; font-size:12px; padding:10px 14px; border-radius:10px; background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.35);">
+              ⏳ <strong>Payment Proof Submitted!</strong> Nunno administration is reviewing your Transaction ID (<code id="submittedTrxSpan" style="color:#fff; font-weight:700;"></code>). Your sales desk will unlock automatically upon verification.
+            </div>
+
+            <form id="nunnoPlanVerifyForm" onsubmit="handleNunnoPlanVerifySubmit(event)">
+              <div class="verif-inputs-grid">
+                <input type="text" id="nunnoTrxInput" class="form-control" placeholder="Transaction ID (e.g. 104829104)" required style="font-family:'JetBrains Mono',monospace; font-size:12px;">
+                <select id="nunnoMethodSelect" class="form-control" style="font-size:12px;">
+                  <option value="easypaisa">EasyPaisa</option>
+                  <option value="jazzcash">JazzCash</option>
+                  <option value="raast">Raast / Bank</option>
+                  <option value="nunnocloud">Nunno.cloud</option>
+                </select>
+              </div>
+              <button type="submit" class="btn-verify-proof" id="nunnoSubmitProofBtn">
+                <span>Submit Proof for Instant Activation</span>
+                <span>⚡</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 1. Executive Bento Hero Profile Card -->
     <section class="profile-hero-card">
       <div class="profile-hero-ambient"></div>

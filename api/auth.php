@@ -437,8 +437,31 @@ switch ($action) {
             $newAccount['joined_via_tl'] = $referredByTL;
         }
 
+        $isNunnoTM = ($companyId === 'COMP-001' && !$isTL);
+        if ($isNunnoTM) {
+            $newAccount['status'] = 'active'; // Immediate access to Closer Stats Desk
+            $newAccount['has_nunno_plan'] = false; // Locked behind Rs. 1,000 Special Plan
+            $newAccount['nunno_plan_status'] = 'unpaid';
+            $newAccount['nunno_plan_price'] = 1000;
+            $newAccount['nunno_plan_official_price'] = 1700;
+        }
+
         $users[] = $newAccount;
         saveUsers($usersFile, $users);
+
+        if ($isNunnoTM) {
+            $sanitizedTM = sanitizeUser($newAccount);
+            $_SESSION['omnidesk_user'] = $sanitizedTM;
+            $_SESSION['current_user'] = $sanitizedTM;
+            echo json_encode([
+                'success'     => true,
+                'message'     => 'Welcome to Nunno Official! Redirecting to closer desk...',
+                'redirect'    => 'index.php?tab=employee',
+                'is_nunno_tm' => true,
+                'user'        => $sanitizedTM
+            ]);
+            exit;
+        }
 
         echo json_encode([
             'success' => true,
@@ -594,6 +617,113 @@ switch ($action) {
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Applicant not found.']);
+        }
+        exit;
+
+    // 0e-1. Submit TM Nunno Plan Payment Proof
+    case 'submit_tm_plan_payment':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $currentUser = getCurrentUser($usersFile);
+        if (!$currentUser) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required.']);
+            exit;
+        }
+        $trxId = trim($data['trx_id'] ?? ($data['transaction_id'] ?? ''));
+        $paymentMethod = trim($data['payment_method'] ?? 'easypaisa');
+        $senderPhone = trim($data['sender_phone'] ?? '');
+        $notes = trim($data['notes'] ?? '');
+
+        if (!$trxId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Transaction ID or Payment Reference is required.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        $found = false;
+        $updatedUser = null;
+        foreach ($users as &$u) {
+            if ($u['id'] === $currentUser['id'] || strcasecmp($u['username'], $currentUser['username']) === 0) {
+                $u['nunno_plan_status'] = 'pending_verification';
+                $u['nunno_plan_trx'] = $trxId;
+                $u['nunno_plan_method'] = $paymentMethod;
+                $u['nunno_plan_sender_phone'] = $senderPhone;
+                $u['nunno_plan_notes'] = $notes;
+                $u['nunno_plan_submitted_at'] = date('Y-m-d H:i:s');
+                $found = true;
+                $updatedUser = sanitizeUser($u);
+                $_SESSION['omnidesk_user'] = $updatedUser;
+                $_SESSION['current_user'] = $updatedUser;
+                break;
+            }
+        }
+        unset($u);
+
+        if ($found) {
+            saveUsers($usersFile, $users);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Payment proof submitted successfully! Nunno administration will verify and unlock your account shortly.',
+                'user'    => $updatedUser
+            ]);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'User account not found.']);
+        }
+        exit;
+
+    // 0e-2. Activate or Deactivate TM Nunno Plan (Company Admin or Superadmin)
+    case 'activate_tm_plan':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $authAdmin = $_SESSION['omnidesk_user'] ?? getCurrentUser($usersFile);
+        if (!$authAdmin || !in_array(($authAdmin['role'] ?? ''), ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied: Administrator privileges required.']);
+            exit;
+        }
+        $userId = trim($data['user_id'] ?? ($data['id'] ?? ''));
+        $username = trim($data['username'] ?? '');
+        $activate = isset($data['activate']) ? (bool)$data['activate'] : true;
+
+        if (!$userId && !$username) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'user_id or username is required.']);
+            exit;
+        }
+
+        $users = getUsers($usersFile);
+        $found = false;
+        $updatedUser = null;
+        foreach ($users as &$u) {
+            if (($userId && ($u['id'] ?? '') === $userId) || ($username && strcasecmp($u['username'], $username) === 0)) {
+                $u['has_nunno_plan'] = $activate;
+                $u['nunno_plan_status'] = $activate ? 'active' : 'unpaid';
+                if ($activate) {
+                    $u['nunno_plan_activated_at'] = date('Y-m-d H:i:s');
+                }
+                $found = true;
+                $updatedUser = sanitizeUser($u);
+                if (isset($_SESSION['omnidesk_user']) && ($_SESSION['omnidesk_user']['id'] ?? '') === $u['id']) {
+                    $_SESSION['omnidesk_user'] = $updatedUser;
+                }
+                break;
+            }
+        }
+        unset($u);
+
+        if ($found) {
+            saveUsers($usersFile, $users);
+            echo json_encode([
+                'success' => true,
+                'message' => $activate ? 'Nunno Special Plan (Rs. 1,000) activated! Sales closer desk is now unlocked.' : 'Plan deactivated.',
+                'user'    => $updatedUser
+            ]);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Target closer account not found.']);
         }
         exit;
 
@@ -881,26 +1011,41 @@ switch ($action) {
             exit;
         }
 
+        $isNunnoTM = (($matchedUser['company_id'] ?? '') === 'COMP-001' && ($matchedUser['role'] ?? '') === 'member');
+
         if (($matchedUser['status'] ?? 'active') === 'pending') {
-            http_response_code(403);
-            $compName = 'Company';
-            $compsFile = __DIR__ . '/../data/companies.json';
-            if (file_exists($compsFile)) {
-                $comps = json_decode(file_get_contents($compsFile), true);
-                if (is_array($comps)) {
-                    foreach ($comps as $c) {
-                        if ($c['id'] === ($matchedUser['company_id'] ?? '')) {
-                            $compName = $c['name'];
-                            break;
+            if ($isNunnoTM) {
+                // Nunno TMs are allowed into their Stats desk where the 1,000 RS plan lock is displayed
+                $matchedUser['status'] = 'active';
+                if (!isset($matchedUser['has_nunno_plan'])) {
+                    $matchedUser['has_nunno_plan'] = false;
+                    $matchedUser['nunno_plan_status'] = 'unpaid';
+                    $matchedUser['nunno_plan_price'] = 1000;
+                    $matchedUser['nunno_plan_official_price'] = 1700;
+                }
+                $users[$userIndex] = $matchedUser;
+                saveUsers($usersFile, $users);
+            } else {
+                http_response_code(403);
+                $compName = 'Company';
+                $compsFile = __DIR__ . '/../data/companies.json';
+                if (file_exists($compsFile)) {
+                    $comps = json_decode(file_get_contents($compsFile), true);
+                    if (is_array($comps)) {
+                        foreach ($comps as $c) {
+                            if ($c['id'] === ($matchedUser['company_id'] ?? '')) {
+                                $compName = $c['name'];
+                                break;
+                            }
                         }
                     }
                 }
+                echo json_encode([
+                    'success' => false,
+                    'error'   => "⏳ Your account is pending manual approval by {$compName} administration. Please contact your company administrator or wait for approval."
+                ]);
+                exit;
             }
-            echo json_encode([
-                'success' => false,
-                'error'   => "⏳ Your account is pending manual approval by {$compName} administration. Please contact your company administrator or wait for approval."
-            ]);
-            exit;
         }
 
         if (($matchedUser['status'] ?? 'active') === 'suspended') {
@@ -954,10 +1099,16 @@ switch ($action) {
         $_SESSION['omnidesk_user'] = $safeUser;
         session_write_close();
 
+        $redirectUrl = 'index.php';
+        if ($isNunnoTM && empty($matchedUser['has_nunno_plan'])) {
+            $redirectUrl = 'index.php?tab=employee';
+        }
+
         echo json_encode([
-            'success' => true,
-            'message' => 'Logged in successfully.',
-            'user'    => $safeUser
+            'success'  => true,
+            'message'  => 'Logged in successfully.',
+            'redirect' => $redirectUrl,
+            'user'     => $safeUser
         ]);
         exit;
 
