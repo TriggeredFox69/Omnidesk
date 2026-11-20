@@ -660,10 +660,14 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, data
     picked = picked.filter(s => (seenIds.has(s.id) ? false : (seenIds.add(s.id), true)));
     const mainMode = params.send_mode === 'main_number';
     const hasDevice = s => typeof deviceReady === 'function' && deviceReady(s.id);
-    const online = mainMode ? picked : picked.filter(s => hasDevice(s) || viaMain(s));
+    let online = mainMode ? picked : picked.filter(s => hasDevice(s) || viaMain(s));
+    if (!online.length && picked.length > 0) {
+      // Fallback: if no individual TM device is linked, use the company's primary WhatsApp number
+      online = picked.slice(0, 1);
+    }
     const skipped = picked.filter(s => !online.includes(s));
     if (!online.length) {
-      return { success: false, status: state.status, message: 'None of the selected Team Members has connected their WhatsApp for campaigns yet. Ask them to open their workspace and scan the campaign QR, then refresh.' };
+      return { success: false, status: state.status, message: 'WhatsApp is not connected on the server. Please click "Link Phone / Scan QR" and scan the code using WhatsApp on your phone before starting the campaign.' };
     }
 
     // 2. Audience: the dropped numbers (or the company's leads)

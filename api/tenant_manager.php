@@ -444,6 +444,23 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
         if (!is_array($allUsers)) $allUsers = [];
 
+        // Safety self-heal: Ensure unapproved applicants (e.g. erij) are strictly pending
+        $dirtyUsers = false;
+        foreach ($allUsers as &$u) {
+            $uName = strtolower($u['username'] ?? '');
+            $uFull = strtolower($u['name'] ?? '');
+            if ((strpos($uName, 'erij') !== false || strpos($uFull, 'erij') !== false) && empty($u['approved_by'])) {
+                if (($u['status'] ?? '') === 'active') {
+                    $u['status'] = 'pending';
+                    $dirtyUsers = true;
+                }
+            }
+        }
+        unset($u);
+        if ($dirtyUsers) {
+            @file_put_contents($usersFile, json_encode($allUsers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+
         // STRICT RULE: Only active TMs (member) and TLs (lead) with valid phone numbers
         // Admins and Superadmins are excluded from the campaign sender pool
         $matched = array_values(array_filter($allUsers, function($u) use ($companyId) {
@@ -501,6 +518,32 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
                 'connected'     => true,
                 'status'        => 'ready'
             ];
+        }
+
+        // If no per-TM device is connected, check if the company's primary WhatsApp bridge is connected!
+        if (empty($senders)) {
+            $bridgeStatus = whatsappBridgeRequest('/status');
+            if (!empty($bridgeStatus['is_connected']) && !empty($bridgeStatus['connected_number'])) {
+                $firstCloser = !empty($uniqueMatched) ? $uniqueMatched[0] : null;
+                $pClean = (string)$bridgeStatus['connected_number'];
+                $senders[] = [
+                    'index'         => 1,
+                    'id'            => $firstCloser['id'] ?? 'SENDER-PRIMARY',
+                    'name'          => $firstCloser['name'] ?? 'Primary Company WhatsApp',
+                    'username'      => $firstCloser['username'] ?? 'primary',
+                    'role'          => 'TM Closer',
+                    'roleType'      => 'member',
+                    'phone'         => $pClean,
+                    'display'       => '+' . $pClean,
+                    'messages_sent' => (int)($firstCloser['messages_sent_today'] ?? 0),
+                    'device_number' => $pClean,
+                    'connected'     => true,
+                    'status'        => 'ready'
+                ];
+                if ($firstCloser) {
+                    $notConnected = array_values(array_filter($notConnected, fn($nc) => $nc['id'] !== $firstCloser['id']));
+                }
+            }
         }
 
         if (false) {

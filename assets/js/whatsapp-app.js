@@ -6144,6 +6144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     els.teamRosterList.innerHTML = employees.map(emp => {
       const isLead = emp.role === 'lead';
       const isSuspended = emp.status === 'suspended';
+      const isPending = emp.status === 'pending';
       const initials = (emp.name || 'Closer').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       const isMale = (emp.gender || 'male') === 'male';
       const genderTag = isMale ? '👨 Male' : '👩 Female';
@@ -6166,9 +6167,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="${isLead ? 'badge-role-tl' : 'badge-role-closer'}">
                   ${isLead ? '👑 Team Lead' : '📱 Closer TM'}
                 </span>
-                <span class="emp-status-badge ${isSuspended ? 'suspended' : 'active'}" style="padding:2px 7px; font-size:10.5px;">
-                  <span class="emp-status-indicator" aria-hidden="true"></span>${isSuspended ? 'Suspended' : 'Active'}
-                </span>
+                ${isPending
+                  ? `<span class="emp-status-badge pending" style="padding:2px 7px; font-size:10.5px; background:rgba(245,158,11,0.18); color:#fbbf24; border:1px solid rgba(245,158,11,0.35); border-radius:6px; font-weight:750;"><span class="emp-status-indicator" style="background:#fbbf24;" aria-hidden="true"></span>Pending Approval</span>`
+                  : `<span class="emp-status-badge ${isSuspended ? 'suspended' : 'active'}" style="padding:2px 7px; font-size:10.5px;"><span class="emp-status-indicator" aria-hidden="true"></span>${isSuspended ? 'Suspended' : 'Active'}</span>`
+                }
               </div>
               <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary); margin-top:3px; flex-wrap:wrap;">
                 <span>${genderTag} • ${vmStatus}</span>
@@ -6197,14 +6199,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <!-- Right: ⚡ Direct Login & Quick Controls -->
           <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-            <!-- DIRECT LOGIN BUTTON -->
-            <button type="button" class="btn-direct-login" onclick="window.OmnideskDirectLogin('${escapeHtml(emp.username)}')" title="Directly log into ${escapeHtml(emp.name)}'s closer desk">
-              <span>⚡ Direct Login</span>
+            ${isPending ? `
+              <button type="button" class="btn btn-emerald btn-xs" onclick="window.OmnideskApproveTMFromRoster('${emp.id}')" style="font-weight:800; padding:6px 12px; font-size:11.5px; border-radius:6px; background:#10b981; color:#fff;" title="Approve this applicant">
+                <span>✅ Approve Closer</span>
+              </button>
+            ` : `
+              <button type="button" class="btn-direct-login" onclick="window.OmnideskDirectLogin('${escapeHtml(emp.username)}')" title="Directly log into ${escapeHtml(emp.name)}'s closer desk">
+                <span>⚡ Direct Login</span>
+              </button>
+              <button type="button" class="btn-emp-action ${isSuspended ? 'reactivate' : 'suspend'}" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Reactivate Access' : 'Suspend Access'}">
+                ${isSuspended ? '✅ Reactivate' : '🚫 Suspend'}
+              </button>
+            `}
+            <button type="button" class="btn-emp-action mail" onclick="window.OmnideskQuickEmail('${emp.id}')" title="Dispatch Credentials Email">
+              ✉️
             </button>
-
-            <button type="button" class="btn-emp-action ${isSuspended ? 'reactivate' : 'suspend'}" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Reactivate Access' : 'Suspend Access'}">
-              ${isSuspended ? '✅ Reactivate' : '🚫 Suspend'}
+            <button type="button" class="btn-emp-action delete" onclick="window.OmnideskDeleteEmp('${emp.id}', '${escapeHtml(emp.name)}')" title="Remove Closer">
+              ✕
             </button>
+          </div>
             <button type="button" class="btn-emp-action mail" onclick="window.OmnideskQuickEmail('${emp.id}')" title="Dispatch Credentials Email">
               ✉️
             </button>
@@ -6218,6 +6231,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Global window hooks for inline onclicks in roster
+  window.OmnideskApproveTMFromRoster = function(empId) {
+    if (!confirm('Approve and activate this closer application?')) return;
+    fetch('api/auth.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve_tm', user_id: empId, message_limit: 150 })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        showToast('✓ Closer application approved and activated!');
+        fetchTeamRoster();
+      } else {
+        alert(d.error || 'Failed to approve closer.');
+      }
+    })
+    .catch(err => alert('Network error: ' + err.message));
+  };
+
   window.OmnideskToggleAddDrawer = function() {
     const drawer = document.getElementById('addEmpDrawer');
     const btnText = document.getElementById('addDrawerBtnText');
