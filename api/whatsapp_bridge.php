@@ -106,7 +106,8 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
     }
     $curl = curl_init($base . $path);
     $timeout = match(true) {
-        $path === '/send' => 60,
+        $path === '/send', $path === '/device/send' => 60,
+        $path === '/device/adopt' => 20,
         str_starts_with($path, '/media') => 20,
         str_starts_with($path, '/campaign') => 15,
         default => 4
@@ -336,6 +337,9 @@ function handleWhatsAppBridge(string $action, array $input): void {
     if (in_array($action, ['campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'list_campaign_devices'], true)) {
         handleCampaignDevice($action, $input);
     }
+    if (in_array($action, ['login_qr_start', 'login_qr_status', 'login_qr_reset'], true)) {
+        handleLoginQr($action);
+    }
     // Auto-authenticate default administrator if no session exists (matching the local app)
     if (empty($_SESSION['omnidesk_user'])) {
         $_SESSION['omnidesk_user'] = [
@@ -531,10 +535,20 @@ function handleWhatsAppBridge(string $action, array $input): void {
         elseif (str_starts_with($phone, '03') && strlen($phone) === 11) $phone = '92' . substr($phone, 1);
         elseif (str_starts_with($phone, '3') && strlen($phone) === 10) $phone = '92' . $phone;
         $requestId = !empty($input['request_id']) ? (string) $input['request_id'] : ('req_' . bin2hex(random_bytes(10)));
-        $result = whatsappBridgeRequest('/send', ['phone' => $phone,
+        $sendBody = ['phone' => $phone,
             'message' => (string) ($input['message'] ?? ''),
             'media' => $input['media'] ?? null,
-            'request_id' => $requestId]);
+            'request_id' => $requestId];
+        $sendRoute = '/send';
+        // A Team Member who linked their own WhatsApp sends from it, not from the company number.
+        if (!$admin && !empty($user['id']) && empty($user['auto'])) {
+            $dev = whatsappBridgeRequest('/device/status?id=' . rawurlencode((string) $user['id']));
+            if (!empty($dev['is_connected'])) {
+                $sendRoute = '/device/send';
+                $sendBody['id'] = (string) $user['id'];
+            }
+        }
+        $result = whatsappBridgeRequest($sendRoute, $sendBody);
         // If the bridge is truly offline on cPanel (daemon not responding), return offline guidance
         if (($result['state'] ?? '') === 'offline') {
             http_response_code(503);
@@ -630,11 +644,99 @@ function handleCampaignDevice(string $action, array $input): void {
 }
 
 /** Map of userId => connected device number, from the bridge. Empty when the bridge is down. */
-function campaignConnectedDevices(): array {
+function campaignConnectedDevices(array $users = []): array {
     $res = whatsappBridgeRequest('/devices');
     $out = [];
     foreach (($res['devices'] ?? []) as $d) {
         if (!empty($d['is_connected']) && !empty($d['user_id'])) $out[$d['user_id']] = (string) ($d['connected_number'] ?? '');
     }
+    // The company's main linked WhatsApp belongs to whichever TM scanned it; count that TM too.
+    $main = whatsappBridgeRequest('/status');
+    $mainNum = preg_replace('/\D+/', '', (string) ($main['connected_number'] ?? ''));
+    if (!empty($main['is_connected']) && strlen($mainNum) >= 9) {
+        foreach ($users as $u) {
+            $p = preg_replace('/\D+/', '', (string) ($u['phone'] ?? ''));
+            if (strlen($p) >= 9 && substr($p, -9) === substr($mainNum, -9) && !isset($out[$u['id']])) $out[$u['id']] = $mainNum;
+        }
+    }
     return $out;
+}
+
+/** Find the Chatly account that owns a WhatsApp number (last 9 digits match). */
+function findUserByWhatsApp(string $phone): ?array {
+    $phone = preg_replace('/\D+/', '', $phone);
+    if (strlen($phone) < 9) return null;
+    $users = json_decode((string) @file_get_contents(__DIR__ . '/../data/users.json'), true);
+    foreach ((is_array($users) ? $users : []) as $u) {
+        $p = preg_replace('/\D+/', '', (string) ($u['phone'] ?? ''));
+        if (strlen($p) >= 9 && substr($p, -9) === substr($phone, -9)) return $u;
+    }
+    return null;
+}
+
+/**
+ * Login QR. Each visitor gets their OWN WhatsApp session (not the company's main
+ * number). When they scan it, the server learns the phone; if it belongs to an
+ * account, that session becomes the TM's linked WhatsApp (campaigns, chats). The
+ * verified phone is stored in this PHP session so qr_login / tm_register can trust it.
+ */
+function handleLoginQr(string $action): void {
+    $loginId = $_SESSION['qr_login_id'] ?? '';
+    // Already scanned in this browser a moment ago: stay on the "connected" card.
+    if ($action === 'login_qr_status' && !$loginId && !empty($_SESSION['qr_verified_phone']) && time() - (int) ($_SESSION['qr_verified_at'] ?? 0) < 900) {
+        $phone = (string) $_SESSION['qr_verified_phone'];
+        session_write_close();
+        echo json_encode(['success' => true, 'mode' => 'whatsapp_web', 'state' => 'ready', 'qr' => null, 'is_connected' => true,
+            'connected_number' => $phone, 'registered' => (bool) findUserByWhatsApp($phone), 'message' => '']);
+        exit;
+    }
+    if ($action === 'login_qr_reset' && $loginId) {
+        whatsappBridgeRequest('/device/reset', ['id' => $loginId]);
+        $loginId = '';
+    }
+    if ($action !== 'login_qr_status' || !$loginId) {
+        if (!$loginId) {
+            $loginId = 'login_' . bin2hex(random_bytes(8));
+            $_SESSION['qr_login_id'] = $loginId;
+            unset($_SESSION['qr_verified_phone'], $_SESSION['qr_verified_at'], $_SESSION['qr_pending_device']);
+        }
+        $snap = whatsappBridgeRequest('/device/connect', ['id' => $loginId, 'name' => 'Login']);
+    } else {
+        $snap = whatsappBridgeRequest('/device/status?id=' . rawurlencode($loginId));
+        if (($snap['state'] ?? '') === 'disconnected' && empty($snap['user_id'])) {
+            // The bridge restarted or the scan expired: start a fresh code.
+            $snap = whatsappBridgeRequest('/device/connect', ['id' => $loginId, 'name' => 'Login']);
+        }
+    }
+
+    $out = [
+        'success' => !empty($snap['success']),
+        'mode' => 'whatsapp_web',
+        'state' => $snap['state'] ?? 'offline',
+        'qr' => $snap['qr'] ?? null,
+        'is_connected' => false,
+        'connected_number' => '',
+        'message' => $snap['message'] ?? '',
+    ];
+    if (!empty($snap['is_connected']) && !empty($snap['connected_number'])) {
+        $phone = preg_replace('/\D+/', '', (string) $snap['connected_number']);
+        $_SESSION['qr_verified_phone'] = $phone;
+        $_SESSION['qr_verified_at'] = time();
+        $owner = findUserByWhatsApp($phone);
+        if ($owner) {
+            // This scan is now that TM's own linked WhatsApp.
+            $adopted = whatsappBridgeRequest('/device/adopt', ['from' => $loginId, 'to' => $owner['id'], 'name' => $owner['name'] ?? '']);
+            if (!empty($adopted['success'])) unset($_SESSION['qr_login_id'], $_SESSION['qr_pending_device']);
+        } else {
+            $_SESSION['qr_pending_device'] = $loginId;   // claimed when they finish signing up
+        }
+        $out['is_connected'] = true;
+        $out['state'] = 'ready';
+        $out['connected_number'] = $phone;
+        $out['registered'] = (bool) $owner;
+    }
+    session_write_close();
+    if (empty($out['success'])) http_response_code(503);
+    echo json_encode($out);
+    exit;
 }

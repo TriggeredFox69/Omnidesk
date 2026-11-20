@@ -47,7 +47,12 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, deviceSend, deviceReady, dataDir, getLeadsPath, getUsersPath, offlineGraceMs }) {
+function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, dataDir, getLeadsPath, getUsersPath, offlineGraceMs }) {
+  const digits = v => String(v || '').replace(/\D/g, '');
+  const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
+  // A TM is linked if they have their own device session, or if the company's main
+  // WhatsApp session is their phone (how TMs used to log in).
+  const viaMain = s => { const m = typeof mainStatus === 'function' ? mainStatus() : null; return !!(m && m.ready && samePhone(m.number, s.phone)); };
   const stateFile = path.join(dataDir, 'campaign_state.json');
 
   let state = {
@@ -499,7 +504,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, dataDir, getLead
 
   const isDone = c => ['accepted', 'sent', 'delivered', 'read', 'failed'].includes(c.status);
   const laneOf = id => (state.lanes || []).find(l => l.id === id);
-  const deviceOnline = lane => lane.mode === 'main' ? true : (typeof deviceReady === 'function' && deviceReady(lane.id));
+  const deviceOnline = lane => lane.mode === 'main' ? viaMain(lane) : (typeof deviceReady === 'function' && deviceReady(lane.id));
   const laneSender = lane => ({ id: lane.id, name: lane.name, username: lane.username, role: lane.role, roleType: lane.roleType, phone: lane.phone });
 
   function clearLaneTimers() {
@@ -654,7 +659,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, dataDir, getLead
     const seenIds = new Set();
     picked = picked.filter(s => (seenIds.has(s.id) ? false : (seenIds.add(s.id), true)));
     const mainMode = params.send_mode === 'main_number';
-    const online = mainMode ? picked : picked.filter(s => typeof deviceReady === 'function' && deviceReady(s.id));
+    const hasDevice = s => typeof deviceReady === 'function' && deviceReady(s.id);
+    const online = mainMode ? picked : picked.filter(s => hasDevice(s) || viaMain(s));
     const skipped = picked.filter(s => !online.includes(s));
     if (!online.length) {
       return { success: false, status: state.status, message: 'None of the selected Team Members has connected their WhatsApp for campaigns yet. Ask them to open their workspace and scan the campaign QR, then refresh.' };
@@ -702,7 +708,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, dataDir, getLead
         index: idx + 1, id: s.id, name: s.name || `TM ${idx + 1}`, username: s.username || '',
         role: s.role || (s.roleType === 'lead' ? 'Team Leader (TL)' : 'TM Closer'), roleType: s.roleType || 'member',
         phone, display: s.device_number ? ('+' + s.device_number) : (s.display || (phone ? '+' + phone : '')),
-        mode: mainMode ? 'main' : 'device',
+        mode: (mainMode || (!hasDevice(s) && viaMain(s))) ? 'main' : 'device',
         assigned: 0, sent: 0, failed: 0, status: 'ready', offlineSince: null, nextAt: null, lastSentAt: null
       };
     });

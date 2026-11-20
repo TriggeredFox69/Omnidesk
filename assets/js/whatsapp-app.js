@@ -3012,6 +3012,8 @@ document.addEventListener('DOMContentLoaded', () => {
           }).join('');
         }
 
+        if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, senders, window.lastCampaignStatus || null);
+
         if (preview) {
           const flow = senders.map(s => `<strong>${escapeHtml(s.name.split(' ')[0])}</strong>`).join(' · ');
           preview.innerHTML = `<strong>⚖️ Equal split:</strong> the numbers are divided equally between ${flow}; each sends their share from their own WhatsApp, in parallel.`;
@@ -3028,8 +3030,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } else {
         window.currentCampaignSenders = [];
-        if (container) {
-          container.innerHTML = `<div class="text-xs text-muted" style="padding:10px;text-align:center;">No Team Member has linked their WhatsApp for campaigns yet. Each TM taps <strong>Connect my WhatsApp</strong> in their workspace.</div>`;
+        if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, [], null);
+        else if (container) {
+          container.innerHTML = `<div class="text-xs text-muted" style="padding:10px;text-align:center;">No Team Member WhatsApp is linked yet.</div>`;
         }
         if (badge) badge.textContent = '0 Devices';
       }
@@ -3068,6 +3071,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyServerCampaignState(data) {
     if (!data || !data.status) return;
+    // live red / orange / green lights on the connected-WhatsApps widget
+    window.lastCampaignStatus = data;
+    const waContainer = els.campaignSendersPoolContainer || document.getElementById('campaignSendersPoolContainer');
+    if (waContainer && window.ChatlyWaWidget && Array.isArray(window.currentCampaignSenders) && window.currentCampaignSenders.length) {
+      window.ChatlyWaWidget.render(waContainer, window.currentCampaignSenders, data);
+    }
     const isRunning = data.status === 'running';
     const isPaused = data.status === 'paused';
     const isCompleted = data.status === 'completed';
@@ -3251,7 +3260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!(window.currentCampaignSenders || []).length && !window.NUNNO_OFFLINE_PREVIEW) {
       campaignState.isStarting = false;
       if (els.startCampaignBtn) els.startCampaignBtn.disabled = false;
-      showToast('⚠️ No Team Member has linked their WhatsApp for campaigns yet. Each TM taps "Connect my WhatsApp" in their workspace.');
+      showToast('⚠️ No Team Member WhatsApp is linked yet. Closers link it by scanning the login QR (or Connect my WhatsApp in their workspace), then click Refresh.');
       return;
     }
 

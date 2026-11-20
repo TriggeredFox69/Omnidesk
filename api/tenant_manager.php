@@ -473,7 +473,7 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         }
 
         require_once __DIR__ . '/whatsapp_bridge.php';
-        $connectedDevices = campaignConnectedDevices();
+        $connectedDevices = campaignConnectedDevices($uniqueMatched);
         $notConnected = [];
         $senders = [];
         $idx = 1;

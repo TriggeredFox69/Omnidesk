@@ -1085,8 +1085,8 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           <button type="button" id="btnEnterConnectedCloser" class="btn-action-primary" style="margin:0; padding:9px 14px; font-size:12px; flex:1.4; white-space:nowrap;">
             Enter Desk →
           </button>
-          <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:9px 12px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" onclick="disconnectWhatsAppBridge()" title="Disconnect WhatsApp session and show fresh QR code">
-            🔄 Disconnect
+          <button type="button" id="btnDisconnectWhatsApp" class="btn-action-secondary" style="margin:0; padding:9px 12px; font-size:12px; background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.28); flex:1; white-space:nowrap;" onclick="disconnectWhatsAppBridge()" title="Sign in with a different WhatsApp">
+            🔄 Other number
           </button>
         </div>
       </div>
@@ -1377,55 +1377,43 @@ function triggerLoginAnimation(brandName, subtext, redirectUrl) {
 let qrPollTimer = null;
 let lastKnownState = '';
 
+// Each visitor gets their OWN WhatsApp login session (never the company's main
+// number). Once scanned, that session stays linked to the closer's account, so
+// campaigns and chats run from every closer's own WhatsApp at the same time.
 async function refreshQRCode(force = false) {
   const qrImg = document.getElementById('landingQrImage');
   const statusTxt = document.getElementById('qrStatusText');
   const scanLine = document.querySelector('.qr-scan-line');
   const box = document.getElementById('connectedPhoneActionsBox');
+  if (!force && lastKnownState === 'connected') return;
   try {
+    const action = force ? 'login_qr_reset' : 'login_qr_status';
     if (force) {
-      if (statusTxt) statusTxt.textContent = '🔄 Generating fresh WhatsApp QR code...';
+      if (statusTxt) statusTxt.textContent = '🔄 Generating a fresh QR code...';
       if (box) box.style.display = 'none';
       if (scanLine) scanLine.style.display = 'block';
-      try {
-        await fetch('api/direct_sender.php?action=reset_whatsapp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'reset_whatsapp' })
-        });
-      } catch (_) {}
       lastKnownState = '';
     }
-    const res = await fetch('api/direct_sender.php?action=get_sender_info');
+    const res = await fetch('api/direct_sender.php?action=' + action, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    });
     const data = await res.json();
-    if (data.success) {
-      if (data.qr && (!data.is_connected || data.state === 'qr')) {
-        if (qrImg) {
-          qrImg.src = data.qr;
-          qrImg.style.display = 'block';
-        }
-        if (box) box.style.display = 'none';
-        if (scanLine) scanLine.style.display = 'block';
-        if (statusTxt) statusTxt.textContent = 'Pure WebSocket Bridge • Scan with WhatsApp';
-        lastKnownState = 'qr';
-      } else if (data.is_connected && data.connected_number) {
-        lastKnownState = 'connected';
-        showConnectedCloserBox(data.connected_number);
-      } else if (data.state === 'idle' || data.state === 'disconnected' || (!data.qr && !data.is_connected)) {
-        if (box) box.style.display = 'none';
-        if (scanLine) scanLine.style.display = 'block';
-        fetch('api/direct_sender.php?action=connect_whatsapp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'connect_whatsapp' })
-        });
-        if (statusTxt) statusTxt.textContent = 'Initializing WhatsApp bridge…';
-      } else {
-        if (statusTxt) statusTxt.textContent = data.message || 'Connecting to WhatsApp bridge…';
-      }
+    if (data.is_connected && data.connected_number) {
+      lastKnownState = 'connected';
+      showConnectedCloserBox(data.connected_number);
+    } else if (data.qr) {
+      if (qrImg) { qrImg.src = data.qr; qrImg.style.display = 'block'; }
+      if (box) box.style.display = 'none';
+      if (scanLine) scanLine.style.display = 'block';
+      if (statusTxt) statusTxt.textContent = 'Scan with WhatsApp';
+      lastKnownState = 'qr';
+    } else if (statusTxt) {
+      statusTxt.textContent = data.state === 'offline' ? 'WhatsApp service is restarting… one moment' : (data.message || 'Preparing your QR code…');
     }
   } catch (err) {
-    if (statusTxt) statusTxt.textContent = 'Bridge reconnecting…';
+    if (statusTxt) statusTxt.textContent = 'Reconnecting…';
   }
 }
 
@@ -1602,9 +1590,9 @@ async function loginAsConnectedCloser(phone) {
 }
 
 async function disconnectWhatsAppBridge() {
-  if (!confirm('Disconnect this WhatsApp from Chatly? It will need to scan the QR again.')) return;
+  if (!confirm('Show a new QR code to sign in with a different WhatsApp?')) return;
   const statusTxt = document.getElementById('qrStatusText');
-  if (statusTxt) statusTxt.textContent = '🔄 Disconnecting WhatsApp & generating fresh QR code...';
+  if (statusTxt) statusTxt.textContent = '🔄 Generating a fresh QR code...';
   const box = document.getElementById('connectedPhoneActionsBox');
   if (box) box.style.display = 'none';
   const scanLine = document.querySelector('.qr-scan-line');

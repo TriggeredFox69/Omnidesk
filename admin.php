@@ -1350,6 +1350,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   </div>
 </div>
 
+<script src="assets/js/wa-widget.js?v=1"></script>
 <script>
 let currentEmployees = [];
 let currentCompanyLeads = [];
@@ -2203,7 +2204,9 @@ async function loadCampaignSenders() {
         }
       }
 
-      if (container) {
+      if (container && window.ChatlyWaWidget) {
+        window.ChatlyWaWidget.render(container, senders, window.lastCampaignStatus || null);
+      } else if (container) {
         if (!senders.length) {
           container.innerHTML = `<div style="color:var(--text-muted); padding:16px;">No Team Member has linked their WhatsApp yet. Each TM opens their workspace and taps <strong>Connect my WhatsApp</strong> under "My WhatsApp for Campaigns", then click Refresh.</div>`;
         } else {
@@ -2433,6 +2436,11 @@ async function pollCampaignStatus() {
 }
 
 function updateCampaignMonitorUI(data) {
+  window.lastCampaignStatus = data;
+  const waBox = document.getElementById('campaignSendersPoolContainer');
+  if (waBox && window.ChatlyWaWidget && (window.currentCampaignSenders || []).length) {
+    window.ChatlyWaWidget.render(waBox, window.currentCampaignSenders, data);
+  }
   const monitorBox = document.getElementById('campaignLiveMonitorBox');
   if (!monitorBox) return;
 

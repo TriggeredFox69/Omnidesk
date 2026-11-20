@@ -58,6 +58,8 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
     send,
     deviceSend: (id, body) => devicePool.send(id, body),
     deviceReady: id => devicePool.isReady(id),
+    // The company's main linked WhatsApp, so a TM whose phone is linked there also counts.
+    mainStatus: () => ({ ready: phase === 'ready', number }),
     dataDir: bridgeDataDir,
     getLeadsPath: (companyId = 'COMP-001') => {
       const cleanId = String(companyId || 'COMP-001').replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
@@ -310,6 +312,8 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         reply(200, { success: true });
         return;
       }
+      if (url.pathname === '/device/adopt') { reply(200, await devicePool.adopt(body.from, body.to, body.name)); return; }
+      if (url.pathname === '/device/send') { reply(200, await devicePool.send(body.id, body)); return; }
       if (url.pathname === '/device/connect') { reply(200, devicePool.connect(body.id, body.name, Boolean(body.force))); return; }
       if (url.pathname === '/device/reset') {
         await devicePool.disconnect(body.id, true);

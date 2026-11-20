@@ -244,6 +244,19 @@ function saveUsers($usersFile, $users) {
 }
 
 // Strip password_hash before returning to client
+/**
+ * True when THIS browser just proved it owns the WhatsApp number by scanning the
+ * login QR (set by handleLoginQr in whatsapp_bridge.php). Logging in or signing up
+ * by phone number requires it; a phone typed into a request proves nothing.
+ */
+function qrVerifiedPhoneMatches(string $phone): bool {
+    $verified = preg_replace('/\D+/', '', (string) ($_SESSION['qr_verified_phone'] ?? ''));
+    $phone = preg_replace('/\D+/', '', $phone);
+    if (strlen($verified) < 9 || strlen($phone) < 9) return false;
+    if (time() - (int) ($_SESSION['qr_verified_at'] ?? 0) > 1800) return false;
+    return substr($verified, -9) === substr($phone, -9);
+}
+
 function sanitizeUser($user) {
     if (!is_array($user)) return null;
     unset($user['password_hash']);
@@ -407,6 +420,11 @@ switch ($action) {
         }
 
         $cleanPhone = preg_replace('/\D+/', '', $phone);
+        if (!qrVerifiedPhoneMatches($cleanPhone)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Please scan the QR code with this WhatsApp number first, then complete the form.']);
+            exit;
+        }
         $users = getUsers($usersFile);
 
         foreach ($users as $u) {
@@ -456,6 +474,13 @@ switch ($action) {
 
         $users[] = $newAccount;
         saveUsers($usersFile, $users);
+
+        // The WhatsApp they just scanned stays linked as this account's own number.
+        if (!empty($_SESSION['qr_pending_device'])) {
+            require_once __DIR__ . '/whatsapp_bridge.php';
+            $adopt = whatsappBridgeRequest('/device/adopt', ['from' => $_SESSION['qr_pending_device'], 'to' => $newAccount['id'], 'name' => $name]);
+            if (!empty($adopt['success'])) unset($_SESSION['qr_pending_device'], $_SESSION['qr_login_id']);
+        }
 
         echo json_encode([
             'success' => true,
@@ -750,7 +775,12 @@ switch ($action) {
         $raw = file_get_contents('php://input');
         $data = json_decode($raw, true) ?: $_POST;
         $phone = preg_replace('/\D+/', '', trim($data['phone'] ?? ''));
-        $demo = !empty($data['demo']);
+        $demo = false;   // the old "demo" shortcut logged anyone in as a real closer
+        if (!qrVerifiedPhoneMatches($phone)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Scan the QR code with your WhatsApp to sign in, or use your username and password.']);
+            exit;
+        }
 
         $users = getUsers($usersFile);
         $matchedUser = null;
