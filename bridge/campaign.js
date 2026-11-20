@@ -428,27 +428,15 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         cycle: currentCycle,
         sender_index: senderIndex + 1,
         simulate: false,
-        allow_simulation: true
+        allow_simulation: false
       };
       if (state.media) {
         sendPayload.media = state.media;
       }
 
-      let result;
-      try {
-        result = await send(sendPayload);
-      } catch (sendErr) {
-        // If socket is unlinked (phase !== 'ready'), allow seamless simulation for partner presentation
-        if (sendErr.status === 409 || sendErr.message?.includes('Link WhatsApp')) {
-          result = {
-            success: true,
-            simulated: true,
-            message_id: 'sim_camp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-            status: 'accepted'
-          };
-        } else {
-          throw sendErr;
-        }
+      const result = await send(sendPayload);
+      if (result && result.simulated) {
+        throw new Error('WhatsApp device is not connected on server. Scan QR code to link your phone.');
       }
 
       contact.status = 'accepted';

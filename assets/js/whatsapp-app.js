@@ -3036,8 +3036,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'inline-flex';
       if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'block';
 
-      if (els.campaignProgressCount) els.campaignProgressCount.textContent = `${campaignState.totalSent} / ${total}`;
-      const pct = total > 0 ? Math.round((campaignState.totalSent / total) * 100) : 0;
+      const sent = campaignState.totalSent || 0;
+      const failed = campaignState.totalFailed || 0;
+      const pct = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+
+      if (els.campaignProgressCount) {
+        els.campaignProgressCount.textContent = failed > 0 ? `${sent} sent (${failed} failed) / ${total}` : `${sent} / ${total}`;
+      }
       if (els.campaignProgressPct) els.campaignProgressPct.textContent = `${pct}%`;
       if (els.campaignProgressFill) els.campaignProgressFill.style.width = `${pct}%`;
 
@@ -3055,7 +3060,7 @@ document.addEventListener('DOMContentLoaded', () => {
           els.campaignStatusBadge.style.color = '#00a884';
           els.campaignStatusBadge.style.background = '#0a332c';
           els.campaignStatusBadge.style.borderColor = '#00a884';
-          els.campaignStatusBadge.innerHTML = `🟢 Server Sending (${campaignState.totalSent}/${total})`;
+          els.campaignStatusBadge.innerHTML = `🟢 Server Sending (${sent}/${total})`;
         }
       }
     } else if (isCompleted) {
@@ -3063,24 +3068,38 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
       if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
       if (els.campaignCountdown) els.campaignCountdown.textContent = 'Complete';
-      if (els.campaignProgressPct) els.campaignProgressPct.textContent = '100%';
-      if (els.campaignProgressFill) els.campaignProgressFill.style.width = '100%';
+      const sent = campaignState.totalSent || 0;
+      const failed = campaignState.totalFailed || 0;
+      const pct = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+      if (els.campaignProgressCount) {
+        els.campaignProgressCount.textContent = failed > 0 ? `${sent} sent (${failed} failed) / ${total}` : `${sent} / ${total}`;
+      }
+      if (els.campaignProgressPct) els.campaignProgressPct.textContent = `${pct}%`;
+      if (els.campaignProgressFill) els.campaignProgressFill.style.width = `${pct}%`;
       if (els.campaignStatusBadge) {
-        els.campaignStatusBadge.style.color = '#00a884';
+        els.campaignStatusBadge.style.color = failed > 0 ? '#fbbf24' : '#00a884';
         els.campaignStatusBadge.style.background = '#0a332c';
-        els.campaignStatusBadge.style.borderColor = '#00a884';
-        els.campaignStatusBadge.innerHTML = `✅ Server Completed (${campaignState.totalSent} Sent)`;
+        els.campaignStatusBadge.style.borderColor = failed > 0 ? '#fbbf24' : '#00a884';
+        els.campaignStatusBadge.innerHTML = `✅ Finished: ${sent} Sent${failed > 0 ? `, ${failed} Failed` : ''} of ${total}`;
       }
     } else if (isStopped) {
       if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
       if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
       if (els.stopCampaignBtn) els.stopCampaignBtn.style.display = 'none';
       if (els.campaignCountdown) els.campaignCountdown.textContent = 'Stopped';
+      const sent = campaignState.totalSent || 0;
+      const failed = campaignState.totalFailed || 0;
+      const pct = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+      if (els.campaignProgressCount) {
+        els.campaignProgressCount.textContent = failed > 0 ? `${sent} sent (${failed} failed) / ${total}` : `${sent} / ${total}`;
+      }
+      if (els.campaignProgressPct) els.campaignProgressPct.textContent = `${pct}%`;
+      if (els.campaignProgressFill) els.campaignProgressFill.style.width = `${pct}%`;
       if (els.campaignStatusBadge) {
         els.campaignStatusBadge.style.color = '#ef4444';
         els.campaignStatusBadge.style.background = '#311417';
         els.campaignStatusBadge.style.borderColor = '#ef4444';
-        els.campaignStatusBadge.innerHTML = `⏹️ Stopped (${campaignState.totalSent} Sent)`;
+        els.campaignStatusBadge.innerHTML = `⏹️ Stopped (${sent} Sent${failed > 0 ? `, ${failed} Failed` : ''})`;
       }
     }
 

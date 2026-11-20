@@ -28,7 +28,7 @@ function ensureBridgeRunning(): bool {
         $nodePath = trim((string) @shell_exec('which node 2>/dev/null')) ?: 'node';
     }
     $bridgeDir = $baseDir . '/bridge';
-    $scriptPath = file_exists($bridgeDir . '/dist/index.js') ? ($bridgeDir . '/dist/index.js') : ($bridgeDir . '/server.js');
+    $scriptPath = $bridgeDir . '/server.js';
     if (!is_dir($dataDir)) @mkdir($dataDir, 0775, true);
 
     if (!file_exists($dataDir . '/baileys_auth/creds.json') && file_exists($dataDir . '/creds.json.bak')) {

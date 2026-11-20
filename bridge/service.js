@@ -157,7 +157,7 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
     const promise = sendQueue.then(async () => {
       if (phase !== 'ready') {
         requests.delete(body.request_id); // Nothing was submitted; safe to resume after linking.
-        if (body.simulate || body.demo || body.allow_simulation) {
+        if (body.simulate) {
           const simId = 'sim_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
           return {
             success: true,
@@ -167,7 +167,7 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
             sender_phone: body.sender_phone || number || '923318036576'
           };
         }
-        throw Object.assign(new Error('Link WhatsApp with the QR code before sending.'), { status: 409 });
+        throw Object.assign(new Error(`WhatsApp is not connected (status: ${phase}). Please link your phone via QR code before sending.`), { status: 409 });
       }
       const recipient = await client.getNumberId(body.phone);
       if (!recipient) {

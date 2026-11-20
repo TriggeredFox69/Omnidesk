@@ -14,10 +14,7 @@ if [ ! -x "$NODE" ]; then
     NODE="$(which node 2>/dev/null || echo node)"
 fi
 
-SCRIPT="$BASE_DIR/bridge/dist/index.js"
-if [ ! -f "$SCRIPT" ]; then
-    SCRIPT="$BASE_DIR/bridge/server.js"
-fi
+SCRIPT="$BASE_DIR/bridge/server.js"
 
 PIDFILE="$WHATSAPP_DATA_DIR/daemon.pid"
 LOGFILE="$WHATSAPP_DATA_DIR/bridge.log"

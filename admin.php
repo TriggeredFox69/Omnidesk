@@ -2462,11 +2462,17 @@ function updateCampaignMonitorUI(data) {
     activeSenderRole.textContent = data.activeSender ? `${data.activeSender.role} · ${data.activeSender.display || data.activeSender.phone}` : 'WhatsApp Device';
   }
 
+  const total = Math.max(1, data.totalContacts || 1);
+  const sent = data.totalSent || 0;
+  const failed = data.totalFailed || 0;
+  const current = data.currentIndex || 0;
+  const pct = Math.min(100, Math.round((sent / total) * 100));
+
   const ratioEl = document.getElementById('liveCampSentRatio');
-  if (ratioEl) ratioEl.textContent = `${data.totalSent || 0} / ${data.totalContacts || 0}`;
+  if (ratioEl) ratioEl.textContent = failed > 0 ? `${sent} sent (${failed} failed) / ${total}` : `${sent} / ${total}`;
 
   const failedEl = document.getElementById('liveCampFailedCount');
-  if (failedEl) failedEl.textContent = `${data.totalFailed || 0} failed`;
+  if (failedEl) failedEl.textContent = `${failed} failed`;
 
   const countdownEl = document.getElementById('liveCampCountdownVal');
   if (countdownEl) {
@@ -2474,9 +2480,6 @@ function updateCampaignMonitorUI(data) {
   }
 
   // Progress Bar
-  const total = Math.max(1, data.totalContacts || 1);
-  const current = data.currentIndex || 0;
-  const pct = data.status === 'completed' ? 100 : Math.min(100, Math.round((current / total) * 100));
   const pctEl = document.getElementById('liveCampPct');
   const barEl = document.getElementById('liveCampProgressBar');
   if (pctEl) pctEl.textContent = `${pct}%`;
