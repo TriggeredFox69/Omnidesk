@@ -829,6 +829,7 @@ document.addEventListener('DOMContentLoaded', () => {
     clearTimeout(waPollTimer);
     pollWhatsAppConnection(++waModalGeneration);
   }
+  window.openConnectWaModal = openConnectWaModal;
 
   function closeConnectWaModal() {
     pendingCampaignStart = false;
@@ -2948,12 +2949,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (container) {
+          const isBridgeLive = Boolean(state.senderConfigured);
           container.innerHTML = senders.map(s => {
             const isTL = (s.roleType === 'lead');
             const isAdmin = (s.roleType === 'admin');
             const roleTag = isTL ? 'Team Leader (TL)' : (isAdmin ? 'Admin' : 'TM Closer');
             const roleColor = isTL ? '#34d399' : (isAdmin ? '#c084fc' : '#38bdf8');
             const badgeBg = isTL ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #38bdf8, #0284c7)';
+            const statusLabel = isBridgeLive
+              ? `<span style="font-size:10px;font-weight:700;color:#10b981;display:flex;align-items:center;gap:4px;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span> CONNECTED
+                </span>`
+              : `<span style="font-size:10px;font-weight:700;color:#f59e0b;display:flex;align-items:center;gap:4px;cursor:pointer;" onclick="window.openConnectWaModal()" title="Click to scan QR code and link this device">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> ⚠️ NOT LINKED (Scan QR)
+                </span>`;
 
             return `
               <div style="background:rgba(255,255,255,0.03);border:1.5px solid var(--border-subtle);border-radius:10px;padding:12px 14px;position:relative;">
@@ -2961,9 +2970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span style="font-size:10.5px;font-weight:800;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:5px;font-family:monospace;color:#fff;">
                     #${s.index}
                   </span>
-                  <span style="font-size:10px;font-weight:700;color:#10b981;display:flex;align-items:center;gap:4px;">
-                    <span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span> CONNECTED
-                  </span>
+                  ${statusLabel}
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;">
                   <div style="width:34px;height:34px;border-radius:50%;background:${badgeBg};display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px;flex-shrink:0;">
@@ -3200,6 +3207,27 @@ document.addEventListener('DOMContentLoaded', () => {
       ? window.currentCampaignSenders
       : [];
 
+    // Verify server WhatsApp connection status before launching campaign
+    if (!state.senderConfigured) {
+      try {
+        const connRes = await fetch('api/direct_sender.php?action=get_sender_info');
+        const connData = await connRes.json();
+        if (connData && connData.is_connected) {
+          state.senderConfigured = true;
+          state.connectedWaNumber = connData.connected_number || '';
+          renderConnectedNumber();
+        }
+      } catch (_) {}
+    }
+
+    if (!state.senderConfigured && !window.NUNNO_OFFLINE_PREVIEW) {
+      campaignState.isStarting = false;
+      if (els.startCampaignBtn) els.startCampaignBtn.disabled = false;
+      showToast('⚠️ WhatsApp is not linked on server. Please scan the QR code to link your phone.');
+      openConnectWaModal();
+      return;
+    }
+
     campaignState.isStarting = true;
     if (els.startCampaignBtn) els.startCampaignBtn.disabled = true;
 
@@ -3280,6 +3308,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => fetchServerLeads(true), 1200);
       } else {
         showToast('⚠️ Could not start campaign: ' + (data?.message || 'Server error'));
+        if (data && data.is_connected === false) {
+          openConnectWaModal();
+        }
       }
     } catch (err) {
       showToast('⚠️ Could not start campaign: ' + err.message);
@@ -3926,6 +3957,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.startCampaignBtn) els.startCampaignBtn.addEventListener('click', startCampaign);
   if (els.pauseCampaignBtn) els.pauseCampaignBtn.addEventListener('click', pauseCampaign);
   if (els.stopCampaignBtn) els.stopCampaignBtn.addEventListener('click', stopCampaign);
+
+  document.getElementById('campaignScanQrBtn')?.addEventListener('click', () => {
+    openConnectWaModal();
+  });
 
   // ==========================================
   // MOBILE & TABLET RESPONSIVE DRAWER CONTROLS

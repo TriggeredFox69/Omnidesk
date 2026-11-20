@@ -123,6 +123,12 @@
 
     <!-- Top Right Actions -->
     <div class="topbar-actions" style="display:flex;align-items:center;gap:6px;">
+      <!-- Connected WhatsApp Direct Number Pill -->
+      <button type="button" class="btn-header-wa-status" id="connectedNumberPill" style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:750; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.18); color:#fff; cursor:pointer;" title="Click to Link / Reconnect WhatsApp">
+        <span class="pulse-circle offline" style="width:8px; height:8px; border-radius:50%; background:#ef4444; display:inline-block;"></span>
+        <span id="connectedNumberText">WhatsApp Disconnected · Click to Link</span>
+      </button>
+
       <!-- Closer Daily Message Quota Pill -->
       <div class="header-quota-pill" id="headerQuotaPill" style="display:none; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; font-size:11px; font-weight:700; background:rgba(31, 224, 138, 0.15); border:1px solid rgba(31, 224, 138, 0.3); color:#8ff5c8;" title="Daily Message Limit">
         <span>⚡</span>
@@ -1052,6 +1058,9 @@
           <span id="campaignPoolCountBadge" class="panel-badge" style="color:var(--emerald); background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.35); font-size:12px; font-weight:750; padding:5px 12px;">
             Loading devices…
           </span>
+          <button type="button" class="btn btn-warning btn-xs" id="campaignScanQrBtn" style="padding:7px 14px; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <span>📱</span> Link Phone / Scan QR
+          </button>
           <button type="button" class="btn btn-emerald btn-xs" id="refreshCampaignSendersBtn" style="padding:7px 14px; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px;">
             <span>🔄</span> Refresh WhatsApps
           </button>

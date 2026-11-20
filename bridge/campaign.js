@@ -317,34 +317,17 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         const ownerUsername = contact.assignedOwnerUsername || ownerName;
         const personalizedMsg = personalizeMessage(messageTemplate, contact, state.companyName);
 
-        const initialMsg = {
-          id: `msg_c_${Date.now()}_${cleanPhone.slice(-4)}`,
-          waMessageId: contact.messageId || `msg_camp_${Date.now()}_${cleanPhone.slice(-4)}`,
-          deliveryStatus: 'accepted',
-          sender: 'agent',
-          agentName: ownerName,
-          senderPhone: contact.senderPhone || contact.phone,
-          senderRole: contact.assignedOwnerRole || 'TM Closer',
-          cycle: 1,
-          text: personalizedMsg || 'Outreach dispatched',
-          timestamp: nowTs,
-          time: nowStr
-        };
-
         if (existing) {
           existing.ownerId = ownerId;
           existing.ownerName = ownerName;
           existing.ownerUsername = ownerUsername;
           if (existing.leadState !== 'paid' && existing.leadState !== 'pending_verification') {
-            existing.leadState = 'ongoing';
+            existing.leadState = 'fresh';
           }
-          existing.status = 'sent';
+          existing.status = 'queued';
           existing.lastActive = 'Just now';
           existing.lastMessageAt = nowTs;
           existing.messages = existing.messages || [];
-          if (!existing.messages.some(m => m.text === personalizedMsg)) {
-            existing.messages.push(initialMsg);
-          }
           modified = true;
         } else {
           const newLead = {
@@ -361,14 +344,14 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
             sender_id: ownerId,
             sender_name: ownerName,
             sender_phone: contact.senderPhone || null,
-            leadState: 'ongoing',
-            status: 'sent',
+            leadState: 'fresh',
+            status: 'queued',
             unreadCount: 0,
             interest: 'Campaign Outreach',
             lastActive: 'Just now',
             lastMessageAt: nowTs,
-            notes: `Outreach dispatched via campaign "${campaignName}". Allocated Closer: ${ownerName}.`,
-            messages: [initialMsg]
+            notes: `Queued for outreach via campaign "${campaignName}". Allocated Closer: ${ownerName}.`,
+            messages: []
           };
           leads.unshift(newLead);
           modified = true;
@@ -617,22 +600,12 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
       contact.error = err.message;
       state.totalFailed++;
       log(`❌ [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] Failed for ${contact.display || contact.phone}: ${err.message}`, 'error');
-      try {
-        const failCrmMsg = {
-          id: `msg_c_${Date.now()}`,
-          waMessageId: contact.messageId || `fail_${Date.now()}`,
-          deliveryStatus: 'failed',
-          deliveryError: err.message,
-          sender: 'agent',
-          agentName: activeSender.name,
-          senderPhone: activeSender.phone,
-          senderRole: activeSender.role,
-          cycle: currentCycle,
-          text: personalizedMsg,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        updateCrmLead(contact, failCrmMsg, state.assignMode, activeSender);
-      } catch (_) {}
+      
+      const isDisconnected = err.message && (err.message.includes('not connected') || err.message.includes('QR code') || err.message.includes('offline'));
+      if (isDisconnected) {
+        state.status = 'stopped';
+        log('🛑 Campaign stopped: WhatsApp phone is not linked on server. Please scan QR code in Settings/Topbar to link your device.', 'error');
+      }
     } finally {
       inFlight = false;
       state.currentIndex++;

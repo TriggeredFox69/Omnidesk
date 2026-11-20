@@ -147,6 +147,47 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
     return $result;
 }
 
+function resolveBridgeSpintax(string $text): string {
+    if ($text === '') return '';
+    return preg_replace_callback('/\{([^{}]+)\}/', function($m) {
+        $contents = $m[1];
+        $lower = strtolower(trim($contents));
+        if (in_array($lower, ['name', 'phone', 'city', 'plan', 'price', 'coupon', 'link', 'company'], true)) {
+            return $m[0];
+        }
+        if (str_contains($contents, '|')) {
+            $parts = explode('|', $contents);
+            return trim($parts[array_rand($parts)]);
+        }
+        return $contents;
+    }, $text);
+}
+
+function personalizeBridgeMessage(string $template, array $contact, string $companyName = 'Nunno Official'): string {
+    if ($template === '') return '';
+    $cleanPhone = preg_replace('/\D+/', '', $contact['phone'] ?? '');
+    $cName = !empty($contact['name']) && !str_starts_with($contact['name'], '+') ? $contact['name'] : '';
+    $cPhone = !empty($contact['display']) ? $contact['display'] : ('+' . $cleanPhone);
+    $cCity = $contact['city'] ?? 'Pakistan';
+
+    $msg = preg_replace_callback('/\{name(?:\|([^{}]+))?\}/i', function($m) use ($cName, $cPhone) {
+        if (!empty($cName)) return $cName;
+        if (!empty($m[1])) {
+            $parts = explode('|', $m[1]);
+            return trim($parts[array_rand($parts)]);
+        }
+        return $cPhone;
+    }, $template);
+
+    $msg = resolveBridgeSpintax($msg);
+    $msg = str_ireplace(
+        ['{name}', '{phone}', '{city}', '{company}', '{plan}', '{price}', '{coupon}', '{link}'],
+        [$cName ?: $cPhone, $cPhone, $cCity, $companyName, 'Exclusive Business Plan', 'Rs. 5,000', 'NUNNO30', 'https://chatly.pk'],
+        $msg
+    );
+    return $msg;
+}
+
 function syncCampaignAudienceToCrm(array $input): void {
     require_once __DIR__ . '/tenant_manager.php';
     $companyId = $input['company_id'] ?? resolveActiveCompanyId();
@@ -188,9 +229,7 @@ function syncCampaignAudienceToCrm(array $input): void {
     }
 
     $closerCount = count($closers);
-    $template = $input['message'] ?? 'Hello from Nunno';
     $campName = $input['name'] ?? 'Outreach Campaign';
-    $timeNow = date('h:i A');
     $timestampNow = time();
     $modified = false;
 
@@ -208,26 +247,6 @@ function syncCampaignAudienceToCrm(array $input): void {
         $ownerName = $assignedCloser['name'] ?? 'askariraza';
         $ownerUsername = $assignedCloser['username'] ?? $ownerName;
 
-        $msgText = str_replace(
-            ['{name}', '{phone}', '{city}'],
-            [$contact['name'] ?? ('+' . $cleanPhone), '+' . $cleanPhone, $contact['city'] ?? 'Pakistan'],
-            $template
-        );
-
-        $initialMessage = [
-            'id' => 'msg_c_' . ($timestampNow * 1000 + $idx),
-            'waMessageId' => $contact['messageId'] ?? ('msg_out_' . bin2hex(random_bytes(6))),
-            'deliveryStatus' => 'accepted',
-            'sender' => 'agent',
-            'agentName' => $ownerName,
-            'senderPhone' => $assignedCloser['phone'] ?? null,
-            'senderRole' => $assignedCloser['role'] ?? 'TM Closer',
-            'cycle' => 1,
-            'text' => $msgText,
-            'timestamp' => $timestampNow,
-            'time' => $timeNow
-        ];
-
         $found = false;
         foreach ($leads as &$lead) {
             $lp = preg_replace('/\D+/', '', $lead['phone'] ?? '');
@@ -235,21 +254,11 @@ function syncCampaignAudienceToCrm(array $input): void {
                 $lead['ownerId'] = $ownerId;
                 $lead['ownerName'] = $ownerName;
                 $lead['ownerUsername'] = $ownerUsername;
-                if (($lead['leadState'] ?? '') !== 'paid' && ($lead['leadState'] ?? '') !== 'pending_verification') {
-                    $lead['leadState'] = 'ongoing';
+                if (!isset($lead['leadState']) || $lead['leadState'] === 'fresh') {
+                    $lead['leadState'] = 'fresh';
                 }
-                $lead['status'] = 'sent';
-                $lead['lastActive'] = 'Just now';
-                $lead['lastMessageAt'] = $timestampNow;
                 if (!isset($lead['messages']) || !is_array($lead['messages'])) {
                     $lead['messages'] = [];
-                }
-                $hasMsg = false;
-                foreach ($lead['messages'] as $m) {
-                    if (($m['text'] ?? '') === $msgText) { $hasMsg = true; break; }
-                }
-                if (!$hasMsg) {
-                    $lead['messages'][] = $initialMessage;
                 }
                 $found = true;
                 $modified = true;
@@ -273,14 +282,14 @@ function syncCampaignAudienceToCrm(array $input): void {
                 'sender_id' => $ownerId,
                 'sender_name' => $ownerName,
                 'sender_phone' => $assignedCloser['phone'] ?? null,
-                'leadState' => 'ongoing',
-                'status' => 'sent',
+                'leadState' => 'fresh',
+                'status' => 'queued',
                 'unreadCount' => 0,
                 'interest' => 'Campaign Outreach',
                 'lastActive' => 'Just now',
                 'lastMessageAt' => $timestampNow,
-                'notes' => "Outreach dispatched via campaign \"{$campName}\". Allocated Closer: {$ownerName}.",
-                'messages' => [$initialMessage]
+                'notes' => "Queued for outreach via campaign \"{$campName}\". Allocated Closer: {$ownerName}.",
+                'messages' => []
             ];
             array_unshift($leads, $newLead);
             $modified = true;
@@ -379,14 +388,14 @@ function handleWhatsAppBridge(string $action, array $input): void {
         ensureBridgeRunning(true);
         $result = ['success' => true, 'message' => 'WhatsApp bridge supervisor restarted with latest v15.0 Baileys engine.'];
     } elseif ($action === 'start_campaign') {
-        // 1. Immediately register and allocate all audience leads in the centralized CRM
+        // 1. Immediately register and allocate audience leads in CRM with status queued
         try {
             syncCampaignAudienceToCrm($input);
         } catch (Throwable $e) {
             error_log('[CRM Campaign Lead Sync Error]: ' . $e->getMessage());
         }
 
-        // 2. Verify bridge process is active and running latest v15.0 engine
+        // 2. Verify bridge process is active and running
         $check = whatsappBridgeRequest('/status');
         if (empty($check['version']) || $check['version'] !== '15.0') {
             ensureBridgeRunning(true);
@@ -396,9 +405,27 @@ function handleWhatsAppBridge(string $action, array $input): void {
                 if (!empty($check['success'])) break;
             }
         }
+
+        // 3. Verify WhatsApp is actually connected and linked to a physical device
+        if (empty($check['is_connected']) || ($check['state'] ?? '') !== 'ready') {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'is_connected' => false,
+                'state' => $check['state'] ?? 'offline',
+                'message' => 'WhatsApp is not connected on the server. Please click "Link Phone / Scan QR" and scan the code using WhatsApp on your phone before starting the campaign.'
+            ]);
+            exit;
+        }
+
         $result = whatsappBridgeRequest('/campaign/start', $input);
         if (empty($result['success'])) {
-            $result = ['success' => true, 'message' => 'Campaign registered and leads allocated to closers.', 'status' => 'running'];
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not start campaign on WhatsApp bridge. Please verify your WhatsApp phone is linked.'
+            ]);
+            exit;
         }
     } elseif ($action === 'pause_campaign') {
         $result = whatsappBridgeRequest('/campaign/pause', $input);
