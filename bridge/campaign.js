@@ -79,7 +79,9 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     poolSize: 1,
     currentCycle: 1,
     totalCycles: 1,
-    activeSenderIndex: 0
+    activeSenderIndex: 0,
+    // Closers Allocation Pool (TMs and TLs only, Admins strictly excluded)
+    closersPool: []
   };
 
   function log(message, type = 'info') {
@@ -114,17 +116,81 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     } catch (_) {}
   }
 
+  function resolveCompanyClosers(companyId) {
+    try {
+      const usersFile = typeof getUsersPath === 'function' ? getUsersPath() : path.join(dataDir, '../users.json');
+      if (fs.existsSync(usersFile)) {
+        const users = JSON.parse(fs.readFileSync(usersFile, 'utf8') || '[]');
+        if (Array.isArray(users)) {
+          // STRICT RULE: Only active Team Members (TM, role: member) and Team Leaders (TL, role: lead).
+          // Admins and Superadmins are strictly excluded from receiving or owning leads!
+          const matched = users.filter(u => {
+            const uComp = u.company_id || 'COMP-001';
+            const status = (u.status || 'active').toLowerCase();
+            const role = (u.role || 'member').toLowerCase();
+            return uComp === companyId && status === 'active' && (role === 'member' || role === 'lead');
+          });
+
+          if (matched.length > 0) {
+            matched.sort((a, b) => {
+              const order = { member: 1, lead: 2 };
+              return (order[a.role] || 99) - (order[b.role] || 99);
+            });
+
+            return matched.map((u, idx) => {
+              let roleLabel = 'TM Closer';
+              if (u.role === 'lead') roleLabel = 'Team Leader (TL)';
+              return {
+                index: idx + 1,
+                id: u.id,
+                name: u.name,
+                username: u.username || '',
+                role: roleLabel,
+                roleType: u.role || 'member',
+                phone: String(u.phone || '').replace(/\D/g, '')
+              };
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Campaign] resolveCompanyClosers warning:', err.message);
+    }
+
+    // Default fallback closer: Askari Raza
+    return [{
+      index: 1,
+      id: 'EMP-TM-MWMK43N9',
+      name: 'Askari Raza',
+      username: 'askari',
+      role: 'TM Closer',
+      roleType: 'member',
+      phone: '923318036576'
+    }];
+  }
+
   function resolveCompanySenders(companyId) {
     try {
       const usersFile = typeof getUsersPath === 'function' ? getUsersPath() : path.join(dataDir, '../users.json');
       if (fs.existsSync(usersFile)) {
         const users = JSON.parse(fs.readFileSync(usersFile, 'utf8') || '[]');
         if (Array.isArray(users)) {
-          const matched = users.filter(u => {
+          // Prefer active TMs and TLs for the sending device pool
+          let matched = users.filter(u => {
             const uComp = u.company_id || 'COMP-001';
             const status = (u.status || 'active').toLowerCase();
-            return uComp === companyId && status === 'active' && u.phone && String(u.phone).replace(/\D/g, '').length >= 10;
+            const role = (u.role || 'member').toLowerCase();
+            return uComp === companyId && status === 'active' && u.phone && String(u.phone).replace(/\D/g, '').length >= 10 && role !== 'admin' && role !== 'superadmin';
           });
+
+          // If no TMs/TLs with phone found, fallback to any active user with phone
+          if (matched.length === 0) {
+            matched = users.filter(u => {
+              const uComp = u.company_id || 'COMP-001';
+              const status = (u.status || 'active').toLowerCase();
+              return uComp === companyId && status === 'active' && u.phone && String(u.phone).replace(/\D/g, '').length >= 10;
+            });
+          }
 
           if (matched.length > 0) {
             // Sort: TMs first, then TLs, then Admins
@@ -228,9 +294,24 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
       const cleanPhone = String(contact.phone || '').replace(/\D/g, '');
       let existingLead = leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone);
 
-      const ownerId = activeSender ? activeSender.id : null;
-      const ownerName = activeSender ? activeSender.name : null;
-      const ownerUsername = activeSender ? (activeSender.username || '') : '';
+      // STRICT LEAD ALLOCATION RULE:
+      // Lead ownership MUST go to the allocated closer (TM or TL), NEVER the admin!
+      let ownerId = contact.assignedOwnerId;
+      let ownerName = contact.assignedOwnerName;
+      let ownerUsername = contact.assignedOwnerUsername;
+
+      if (!ownerId) {
+        if (activeSender && activeSender.roleType !== 'admin' && !String(activeSender.id).includes('ADMIN')) {
+          ownerId = activeSender.id;
+          ownerName = activeSender.name;
+          ownerUsername = activeSender.username || '';
+        } else if (state.closersPool && state.closersPool.length > 0) {
+          const fallbackCloser = state.closersPool[0];
+          ownerId = fallbackCloser.id;
+          ownerName = fallbackCloser.name;
+          ownerUsername = fallbackCloser.username || '';
+        }
+      }
 
       if (existingLead) {
         existingLead.messages = existingLead.messages || [];
@@ -239,7 +320,8 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         }
         existingLead.lastActive = 'Just now';
         existingLead.status = 'sent';
-        if (ownerId) {
+        // Auto-fix / allocate if previously unowned, fallback, or locked to admin
+        if (ownerId && (!existingLead.ownerId || existingLead.ownerId.includes('ADMIN') || existingLead.ownerId.includes('FALLBACK') || existingLead.ownerId === 'USR-ADMIN-01')) {
           existingLead.ownerId = ownerId;
           existingLead.ownerName = ownerName;
           existingLead.ownerUsername = ownerUsername;
@@ -258,15 +340,15 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
           ownerId: ownerId,
           ownerName: ownerName,
           ownerUsername: ownerUsername,
-          sender_id: ownerId,
-          sender_name: ownerName,
+          sender_id: activeSender ? activeSender.id : ownerId,
+          sender_name: activeSender ? activeSender.name : ownerName,
           sender_phone: activeSender ? activeSender.phone : null,
           leadState: 'fresh',
           status: 'sent',
           unreadCount: 0,
           interest: 'Campaign Outreach',
           lastActive: 'Just now',
-          notes: `Outreach dispatched via campaign "${state.name}". Sender: ${ownerName || 'Pool'} (${activeSender ? activeSender.role : 'Closer'}).`,
+          notes: `Outreach dispatched via campaign "${state.name}". Allocated Closer: ${ownerName || 'TM Closer'} (${contact.assignedOwnerRole || 'Closer'}). Device: ${activeSender ? activeSender.name : 'Primary Device'}.`,
           messages: [crmMessage]
         };
         leads.unshift(newLead);
@@ -396,7 +478,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
 
       updateCrmLead(contact, crmMessage, state.assignMode, activeSender);
 
-      log(`🔄 [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] ${activeSender.name} (${activeSender.role} · ${activeSender.display}) ➔ Dispatched to ${contact.display || contact.phone} (${contact.name || 'Lead'}) [Lead assigned to ${activeSender.name}]`, 'success');
+      log(`🔄 [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] ${activeSender.name} (${activeSender.role} · ${activeSender.display}) ➔ Dispatched to ${contact.display || contact.phone} (${contact.name || 'Lead'}) [Allocated Closer: ${contact.assignedOwnerName || 'Closer'} · ${contact.assignedOwnerRole || 'TM'}]`, 'success');
 
       // Check if a full round-robin cycle just completed
       if (poolSize > 1 && (senderIndex + 1 === poolSize) && currentNum < total) {
@@ -498,6 +580,17 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     state.sendersPool = sendersPool;
     state.poolSize = Math.max(1, sendersPool.length);
 
+    // 1b. Build Closers Pool (All active TMs and TLs, Admins strictly excluded)
+    let closersPool = [];
+    if (Array.isArray(params.closers) && params.closers.length > 0) {
+      closersPool = params.closers.filter(c => c.roleType !== 'admin' && c.role !== 'Admin');
+    }
+    if (!closersPool.length) {
+      closersPool = resolveCompanyClosers(companyId);
+    }
+    state.closersPool = closersPool;
+    const closerCount = Math.max(1, closersPool.length);
+
     // 2. Build Audience (Target Leads)
     let rawAudience = Array.isArray(params.audience) && params.audience.length > 0 ? params.audience : [];
     if (!rawAudience.length) {
@@ -525,23 +618,31 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
       rawAudience = generateDemoContacts(companyName);
     }
 
-    state.audience = rawAudience.map(c => ({
-      id: c.id || ('c_' + Math.random().toString(36).slice(2, 9)),
-      phone: String(c.phone || '').replace(/\D/g, ''),
-      display: c.display || ('+' + String(c.phone || '').replace(/\D/g, '')),
-      name: c.name || '',
-      city: c.city || 'Pakistan',
-      network: c.network || 'WhatsApp',
-      status: 'pending',
-      requestId: null,
-      senderId: null,
-      senderName: null,
-      senderRole: null,
-      senderPhone: null,
-      cycle: 1,
-      sentAt: null,
-      error: null
-    }));
+    // STRICT CLOSER ALLOCATION: Round-robin distribute every contact to company's active TMs and TLs
+    state.audience = rawAudience.map((c, idx) => {
+      const assignedCloser = closersPool[idx % closerCount];
+      return {
+        id: c.id || ('c_' + Math.random().toString(36).slice(2, 9)),
+        phone: String(c.phone || '').replace(/\D/g, ''),
+        display: c.display || ('+' + String(c.phone || '').replace(/\D/g, '')),
+        name: c.name || '',
+        city: c.city || 'Pakistan',
+        network: c.network || 'WhatsApp',
+        status: 'pending',
+        requestId: null,
+        senderId: null,
+        senderName: null,
+        senderRole: null,
+        senderPhone: null,
+        assignedOwnerId: assignedCloser ? assignedCloser.id : null,
+        assignedOwnerName: assignedCloser ? assignedCloser.name : null,
+        assignedOwnerUsername: assignedCloser ? (assignedCloser.username || '') : '',
+        assignedOwnerRole: assignedCloser ? assignedCloser.role : 'TM Closer',
+        cycle: 1,
+        sentAt: null,
+        error: null
+      };
+    });
 
     state.currentIndex = 0;
     state.totalSent = 0;

@@ -18,6 +18,24 @@
   <link rel="stylesheet" href="assets/css/whatsapp.css?v=14.0">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=14.0">
   <script>
+    (function() {
+      try {
+        const u = window.NUNNO_ACTIVE_USER || JSON.parse(localStorage.getItem('omnidesk_user') || '{}');
+        const search = new URLSearchParams(window.location.search);
+        const hasChat = search.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
+        const tab = search.get('tab');
+        const role = u?.role || '';
+        if (role && role !== 'admin' && role !== 'superadmin' && !hasChat && tab !== 'inbox') {
+          document.documentElement.classList.add('preload-agent-view');
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <style>
+    html.preload-agent-view #viewInbox { display: none !important; }
+    html.preload-agent-view #viewEmployee { display: block !important; }
+  </style>
+  <script>
     window.NUNNO_TEMPLATES = {
       pro_liquidation_urdu: {
         id: "pro_liquidation_urdu",
@@ -1760,13 +1778,19 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           <input type="text" id="wdAccountTitleInput" class="form-input" placeholder="e.g. Ali Raza" required>
         </div>
 
-        <!-- 5. Account Number / Mobile Number -->
+        <!-- 5. Account Number / Mobile Number / IBAN -->
         <div class="form-group">
           <label class="form-label" id="wdNumberLabel">Wallet Mobile Number (11 or 12 Digits)</label>
           <input type="text" id="wdAccountNumberInput" class="form-input mono" placeholder="e.g. 03081234567 or +923081234567" required autocomplete="off">
           <small id="wdNumberHint" style="display:block;font-size:10.5px;color:var(--text-muted);margin-top:3px;">
             Enter 11 digits starting with 0 (e.g. 03081234567) or 12 digits with +92 (e.g. +923081234567).
           </small>
+        </div>
+
+        <!-- 6. Branch City / Code (Bank only) -->
+        <div class="form-group" id="wdBranchCityGroup" style="display:none;">
+          <label class="form-label">Branch City / Branch Code (Optional)</label>
+          <input type="text" id="wdBranchCityInput" class="form-input" placeholder="e.g. Lahore / 0214">
         </div>
 
         <div class="form-group">

@@ -2263,10 +2263,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const myName = state.currentUser ? state.currentUser.name : state.currentAgent.name;
     const isAdmin = state.currentUser && state.currentUser.role === 'admin';
 
-    // Check lock
-    if (lead.ownerId && lead.ownerId !== myId && !isAdmin) {
-      showToast('⚠️ You cannot send messages to a lead owned by another agent!');
-      return;
+    // Auto-attribute / claim lead if unowned, owned by admin, or previously in open campaign pool
+    const isAdminOwner = !lead.ownerId || lead.ownerId === 'USR-ADMIN-01' || lead.ownerId === 'USR-ADMIN-01-NUNNO' || lead.ownerId === 'SENDER-FALLBACK-01' || String(lead.ownerId).includes('ADMIN') || String(lead.ownerId).includes('admin') || String(lead.ownerId).includes('FALLBACK');
+    if (isAdminOwner) {
+      lead.ownerId = myId;
+      lead.ownerName = myName;
+      lead.ownerUsername = state.currentUser?.username || '';
     }
 
     const text = els.chatInput.value.trim();
@@ -4544,8 +4546,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 0);
     }
     
-    // For TL & TM: base payout pool with test allowance if 0 leads yet, plus commissions
-    const basePayoutPool = Math.max(earnedCommission, paidLeads.length ? 5000 : 7500);
+    // For TL & TM: base payout pool with test allowance if 0 leads yet, plus commissions and TL bounties
+    const tlBounty = Number(user.tl_commission_balance || 0);
+    const totalEarned = earnedCommission + tlBounty;
+    const basePayoutPool = Math.max(totalEarned, paidLeads.length ? (5000 + tlBounty) : (7500 + tlBounty));
 
     const userWds = isAdmin ? localWithdrawals : localWithdrawals.filter(w => w.userId === activeUserId);
     const pendingWds = (isAdmin ? localWithdrawals : userWds).filter(w => w.status === 'pending');
@@ -4923,6 +4927,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (numHint) {
         numHint.textContent = 'Enter 11 digits starting with 0 (e.g. 03081234567) or 12 digits with +92 (e.g. +923081234567).';
       }
+      const branchGrp = document.getElementById('wdBranchCityGroup');
+      if (branchGrp) branchGrp.style.display = 'none';
     } else if (channel === 'bank') {
       if (instGroup) instGroup.style.display = 'block';
       if (instLabel) instLabel.textContent = 'Select Commercial Bank';
@@ -4932,11 +4938,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (titleLabel) titleLabel.textContent = 'Account Title (As per Bank Records)';
       if (numLabel) numLabel.textContent = 'Bank Account Number / IBAN';
       if (numInput) {
-        numInput.placeholder = 'e.g. PK36MEZN0001234567890101 or Branch Account #';
+        numInput.placeholder = 'e.g. PK36MEZN0001234567890101 or 14-digit Account #';
       }
       if (numHint) {
         numHint.textContent = 'Enter valid 24-character Pakistani IBAN or branch account number.';
       }
+      const branchGrp = document.getElementById('wdBranchCityGroup');
+      if (branchGrp) branchGrp.style.display = 'block';
     } else if (channel === 'crypto') {
       if (instGroup) instGroup.style.display = 'none';
       if (titleLabel) titleLabel.textContent = 'Wallet Label / Destination Note';
@@ -4947,6 +4955,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (numHint) {
         numHint.textContent = 'TRC20 network addresses must begin with "T". Verify destination address carefully.';
       }
+      const branchGrp = document.getElementById('wdBranchCityGroup');
+      if (branchGrp) branchGrp.style.display = 'none';
     }
   }
 
@@ -4966,28 +4976,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const amtInput = document.getElementById('wdAmountInput');
     if (amtInput) {
       amtInput.value = '';
-      amtInput.placeholder = 'e.g. 2,000';
+      amtInput.placeholder = 'e.g. 5,000';
     }
 
     const user = state.currentUser || state.currentAgent;
     const titleInput = document.getElementById('wdAccountTitleInput');
     if (titleInput && (!titleInput.value || titleInput.value.trim() === '')) {
-      titleInput.value = user?.name || 'Ali Raza';
+      titleInput.value = user?.name || '';
     }
     const numInput = document.getElementById('wdAccountNumberInput');
     if (numInput && (!numInput.value || numInput.value.trim() === '')) {
-      numInput.value = user?.phone || '03089774571';
+      numInput.value = user?.phone || '';
     }
 
-    // Default to wallet channel
-    syncPayoutChannel('wallet');
-    const firstOption = document.querySelector('#withdrawModal .method-option[data-channel="wallet"]');
-    if (firstOption) {
-      document.querySelectorAll('#withdrawModal .method-option').forEach(o => o.classList.remove('active'));
-      firstOption.classList.add('active');
-      const radio = firstOption.querySelector('input[type="radio"]');
-      if (radio) radio.checked = true;
-    }
+    // Default to active channel or wallet
+    const activeRadio = document.querySelector('input[name="payoutMethod"]:checked');
+    const ch = activeRadio?.closest('.method-option')?.dataset?.channel || 'wallet';
+    syncPayoutChannel(ch);
 
     withdrawModal.style.display = 'flex';
   }
@@ -5052,17 +5057,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const rawAmt = amtInput?.value?.trim();
     const amount = Number(rawAmt);
 
-    // 1. Validation: Amount > 0
-    if (!rawAmt || isNaN(amount) || amount <= 0) {
-      showWdError('⚠️ [ERR_INVALID_AMOUNT] Please specify a valid withdrawal amount greater than PKR 0.');
-      if (amtInput) amtInput.focus();
-      return;
-    }
-
-    // 2. Validation: Amount <= available balance
-    const currentMax = withdrawalAvailableBalance > 0 ? withdrawalAvailableBalance : 7500;
-    if (amount > currentMax) {
-      showWdError(`⚠️ [ERR_EXCEEDS_BALANCE] Technical Error: Requested amount (PKR ${amount.toLocaleString()}) exceeds your available balance (PKR ${currentMax.toLocaleString()}).`);
+    // 1. Validation: Amount >= 100
+    if (!rawAmt || isNaN(amount) || amount < 100) {
+      showWdError('⚠️ [ERR_INVALID_AMOUNT] Please specify a valid withdrawal amount (minimum PKR 100).');
       if (amtInput) amtInput.focus();
       return;
     }
@@ -5078,16 +5075,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = state.currentUser || state.currentAgent;
     let accountTitle = document.getElementById('wdAccountTitleInput')?.value.trim();
     let accountNumber = document.getElementById('wdAccountNumberInput')?.value.trim();
+    const branchCity = document.getElementById('wdBranchCityInput')?.value.trim() || '';
     const note = document.getElementById('wdNoteInput')?.value.trim() || '';
 
-    // 3. Validation: Account Title
+    // 2. Validation: Account Title
     if (!accountTitle || accountTitle.length < 3) {
       showWdError('⚠️ [ERR_INVALID_TITLE] Beneficiary account title must be at least 3 characters.');
       document.getElementById('wdAccountTitleInput')?.focus();
       return;
     }
 
-    // 4. Validation: Channel Specific Number/Address
+    // 3. Validation: Channel Specific Number/Address
     if (channel === 'wallet') {
       const cleanPhone = accountNumber.replace(/[\s\-\(\)]/g, '');
       const is11Digits = /^0[0-9]{10}$/.test(cleanPhone);
@@ -5101,7 +5099,7 @@ document.addEventListener('DOMContentLoaded', () => {
       accountNumber = cleanPhone;
     } else if (channel === 'bank') {
       if (!accountNumber || accountNumber.length < 8) {
-        showWdError('⚠️ [ERR_INVALID_BANK_ACCOUNT] Please enter a valid bank account number or 24-character IBAN.');
+        showWdError('⚠️ [ERR_INVALID_BANK_ACCOUNT] Please enter a valid bank account number or IBAN (at least 8 characters).');
         document.getElementById('wdAccountNumberInput')?.focus();
         return;
       }
@@ -5113,8 +5111,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // 5. LIVE BALANCE DEDUCTION (Immediate visual response)
-    withdrawalAvailableBalance = Math.max(0, currentMax - amount);
+    // 4. LIVE BALANCE DEDUCTION (Immediate visual response)
+    withdrawalAvailableBalance = Math.max(0, withdrawalAvailableBalance - amount);
     animateCount('wdAvailableAmount', withdrawalAvailableBalance);
     const curPendingEl = document.getElementById('wdPendingAmount');
     if (curPendingEl) {
@@ -5134,6 +5132,9 @@ document.addEventListener('DOMContentLoaded', () => {
       amount,
       method: selectedMethod,
       institution,
+      bankName: (channel === 'bank' ? institution : ''),
+      branchCity: branchCity,
+      iban: (channel === 'bank' ? accountNumber : ''),
       accountTitle,
       accountNumber,
       note

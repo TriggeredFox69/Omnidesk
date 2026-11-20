@@ -734,40 +734,40 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 
   <!-- TAB 3: MULTI-DEVICE CAMPAIGN DISPATCHER (ROUND-ROBIN) -->
   <div class="dash-pane" id="paneCampaigns">
-    <!-- Active Connected WhatsApps Pool Matrix -->
+    <!-- ═══════════════ STEP 1: Connected WhatsApps Widget ═══════════════ -->
     <div class="content-box" style="margin-bottom: 20px;">
       <div class="box-header">
         <div>
-          <div class="box-title"><span>📱</span> Connected WhatsApp Devices Roster (Multi-Sender Pool)</div>
+          <div class="box-title"><span>📱</span> Connected WhatsApp Numbers (TMs & TLs)</div>
           <div class="box-desc">
-            All connected TMs and TLs for <strong><?php echo htmlspecialchars($activeCompany['name']); ?></strong> are aligned in the sender pool. Outbound campaigns dispatch strictly <strong>1-by-1 in round-robin order</strong> across all numbers, repeating the full cycle until the target audience is completed.
+            All active Team Members and Team Leaders of <strong><?php echo htmlspecialchars($activeCompany['name']); ?></strong> whose WhatsApp numbers are registered. These numbers will <strong>send messages simultaneously in batches</strong> during campaigns. Click <strong>Refresh</strong> after adding new TMs/TLs.
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           <span id="campaignPoolCountBadge" class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; padding: 6px 12px; font-size: 13px;">
-            Loading devices...
+            Loading...
           </span>
-          <button class="btn btn-secondary" onclick="loadCampaignSenders()" style="padding: 6px 12px; font-size: 12px;">🔄 Refresh Pool</button>
+          <button class="btn btn-emerald" onclick="loadCampaignSenders()" style="padding: 8px 14px; font-size: 12px; font-weight: 700;">🔄 Refresh WhatsApps</button>
         </div>
       </div>
 
       <!-- Senders Cards Grid -->
-      <div id="campaignSendersPoolContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-top: 14px;">
+      <div id="campaignSendersPoolContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 14px;">
         <div style="color: var(--text-muted); font-size: 13px;">Loading company WhatsApp numbers...</div>
       </div>
 
-      <!-- Round-Robin Visual Sequence Banner -->
+      <!-- Batch Send Visual Explanation Banner -->
       <div style="margin-top: 18px; padding: 14px 18px; background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 12px;">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
           <div style="font-size: 12px; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
-            <span>🔄</span> Round-Robin Dispatch Sequence:
+            <span>⚡</span> Batch Send Algorithm:
           </div>
           <div id="campaignCycleMathInfo" style="font-size: 11.5px; color: var(--text-secondary);">
-            Messages alternate 1-by-1 across all devices &bull; Cycle repeats until completed
+            All connected WhatsApps send simultaneously &bull; Each batch = 1 message per WhatsApp &bull; Repeats until all numbers done
           </div>
         </div>
         <div id="campaignRotationFlowPreview" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace;">
-          <!-- Dynamically populated: [Device 1] ➔ [Device 2] ➔ [Device 3] ➔ [Repeat] -->
+          <!-- Dynamically populated -->
         </div>
       </div>
     </div>
@@ -838,12 +838,53 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       </div>
     </div>
 
-    <!-- Campaign Launch Configuration Box -->
+    <!-- ═══════════════ STEP 2: Drop Numbers Section ═══════════════ -->
+    <div class="content-box" style="margin-bottom: 20px;">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>📋</span> Drop Receiver Numbers</div>
+          <div class="box-desc">
+            Paste phone numbers below (one per line) or upload a <strong>.txt / .csv</strong> file containing the numbers that will <strong>receive</strong> the campaign message. The system will distribute them across all connected WhatsApps above.
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <label for="campFileUpload" class="btn btn-secondary" style="padding: 7px 14px; font-size: 12px; cursor: pointer; margin:0;">📁 Upload File</label>
+          <input type="file" id="campFileUpload" accept=".txt,.csv,.xlsx" style="display:none;" onchange="handleCampFileUpload(event)">
+          <button class="btn btn-secondary" onclick="clearDropNumbers()" style="padding: 7px 10px; font-size: 12px;">🗑️ Clear</button>
+        </div>
+      </div>
+
+      <div style="position: relative;">
+        <textarea id="campDropNumbersArea" class="form-control" rows="6" style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; resize: vertical; line-height: 1.6;" placeholder="Paste receiver phone numbers here (one per line)&#10;&#10;Example:&#10;923001234567&#10;923211234567&#10;+923331234567&#10;03001234567"></textarea>
+        <div style="position: absolute; bottom: 8px; right: 12px; font-size: 11px; color: var(--text-muted); pointer-events: none;">
+          <span id="campDropNumberCount" style="font-weight: 700; color: #38bdf8;">0</span> numbers loaded
+        </div>
+      </div>
+
+      <!-- Live Allocation Preview -->
+      <div id="campAllocationPreview" style="margin-top: 14px; padding: 14px 18px; background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: #38bdf8;">
+              📊 Batch Send Calculation:
+            </div>
+            <div id="calcSummaryText" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+              Drop numbers above to see allocation preview
+            </div>
+          </div>
+          <div id="calcOrderTag" style="font-size: 11.5px; font-weight: 700; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 6px;">
+            Waiting for numbers...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ STEP 3: Message & Launch ═══════════════ -->
     <div class="content-box">
       <div class="box-header">
         <div>
-          <div class="box-title"><span>🚀</span> Launch Multi-Device Campaign — 3 Starting Variations</div>
-          <div class="box-desc">Choose from Text Message, Flyer Image Brochure, or Voice Note Pitch. The campaign will automatically rotate through all active devices above.</div>
+          <div class="box-title"><span>🚀</span> Campaign Message & Launch</div>
+          <div class="box-desc">Choose message type, write your message, and launch. All connected WhatsApps will send simultaneously in batches.</div>
         </div>
       </div>
 
@@ -851,33 +892,33 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
         <!-- Variation 1: Text Only -->
         <div style="background: rgba(255,255,255,0.03); border: 1.5px solid var(--border-accent); border-radius: 14px; padding: 20px; cursor: pointer;" onclick="selectCampaignVar('text')">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-            <strong style="font-size:15px;">📝 Variation 1: Text Message Only</strong>
+            <strong style="font-size:15px;">📝 Text Message</strong>
             <input type="radio" name="campVarRadio" id="radioVarText" checked>
           </div>
           <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;">
-            Dynamic spun text template with personalized variables like <code>{name}</code>, <code>{company}</code>, and greetings <code>{Salam|AoA|Hello}</code>.
+            Dynamic spun text with <code>{name}</code>, <code>{company}</code>, and <code>{Salam|AoA|Hello}</code>.
           </p>
         </div>
 
-        <!-- Variation 2: Text + Image Brochure -->
+        <!-- Variation 2: Text + Image -->
         <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px; cursor: pointer;" onclick="selectCampaignVar('text_image')">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-            <strong style="font-size:15px;">🖼️ Variation 2: Text + Image Flyer</strong>
+            <strong style="font-size:15px;">🖼️ Text + Image</strong>
             <input type="radio" name="campVarRadio" id="radioVarImage">
           </div>
           <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;">
-            Sends a high-converting product image or flyer attachment with personalized caption directly in WhatsApp.
+            Product image or flyer with personalized caption.
           </p>
         </div>
 
-        <!-- Variation 3: Voice Note / Audio -->
+        <!-- Variation 3: Voice Note -->
         <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 20px; cursor: pointer;" onclick="selectCampaignVar('audio')">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-            <strong style="font-size:15px;">🎙️ Variation 3: Voice Note Pitch</strong>
+            <strong style="font-size:15px;">🎙️ Voice Note</strong>
             <input type="radio" name="campVarRadio" id="radioVarAudio">
           </div>
           <p style="font-size:12.5px; color:var(--text-secondary); line-height:1.5;">
-            Dispatches authentic WhatsApp voice note (PTT opus waveform) for maximum trust and 4x higher listener response rates.
+            WhatsApp voice note (PTT) for maximum trust.
           </p>
         </div>
       </div>
@@ -909,44 +950,28 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Target Audience Filter</label>
+            <label class="form-label">Target Audience Source</label>
             <select id="campTargetFilter" class="form-control" onchange="calculateCampaignCycles()">
-              <option value="demo">⭐ Quick 10-Prospect Partner Demo (2 Full Cycles)</option>
+              <option value="custom" selected>📋 Custom Dropped Numbers (from above)</option>
+              <option value="demo">⭐ Quick 10-Prospect Demo</option>
               <option value="new">Uncontacted Fresh Leads Only</option>
               <option value="ongoing">Follow-up with Ongoing Leads</option>
               <option value="all">All Pipeline Contacts</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Pacing Delay & Speed</label>
+            <label class="form-label">Pacing Delay Per Batch</label>
             <select id="campDelay" class="form-control">
-              <option value="3">⚡ Fast Partner Demo (3s - 5s delay — instant visual test)</option>
-              <option value="6">Fast Outreach (6s - 10s delay)</option>
-              <option value="15">Safe Mode (15s - 25s delay)</option>
-              <option value="30">Ultra-Safe (30s - 45s delay)</option>
+              <option value="3">⚡ Fast (3s - 5s between batches)</option>
+              <option value="6">Normal (6s - 10s between batches)</option>
+              <option value="15">Safe Mode (15s - 25s between batches)</option>
+              <option value="30">Ultra-Safe (30s - 45s between batches)</option>
             </select>
           </div>
         </div>
 
-        <!-- Dynamic Cycle Preview Card -->
-        <div id="campaignCalcPreviewCard" style="background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-            <div>
-              <div style="font-size: 13px; font-weight: 700; color: #38bdf8;">
-                📊 Round-Robin Cycle Calculation:
-              </div>
-              <div id="calcSummaryText" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-                Audience: <strong>10 contacts</strong> &bull; Connected Devices: <strong>5 WhatsApps</strong> &bull; Total: <strong>2 full cycles</strong>
-              </div>
-            </div>
-            <div id="calcOrderTag" style="font-size: 11.5px; font-weight: 700; background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 6px;">
-              Order: 1 ➔ 2 ➔ 3 ➔ 4 ➔ 5 (Repeat)
-            </div>
-          </div>
-        </div>
-
-        <button type="submit" id="btnLaunchCamp" class="btn btn-emerald" style="padding: 12px 28px; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-          <span>🚀</span> Dispatch Multi-Device Campaign (Round-Robin)
+        <button type="submit" id="btnLaunchCamp" class="btn btn-emerald" style="padding: 14px 32px; font-size: 15px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+          <span>🚀</span> Start Campaign — Send via All WhatsApps
         </button>
       </form>
     </div>
@@ -1997,10 +2022,11 @@ async function handleAdminTakeover(phone) {
   }
 }
 
-// --- Multi-Device Round-Robin Campaign Dispatcher Engine ---
+// --- Multi-Device Campaign Dispatcher Engine ---
 window.currentCampaignSenders = [];
 window.campaignPollTimer = null;
 window.isCampaignPollActive = false;
+window.campDroppedNumbers = [];
 
 function insertCampTag(tag) {
   const textarea = document.getElementById('campMessageText');
@@ -2013,6 +2039,72 @@ function insertCampTag(tag) {
   textarea.selectionStart = textarea.selectionEnd = start + tag.length;
 }
 
+// ═══ Drop Numbers Section Helpers ═══
+function parsePhoneNumbers(text) {
+  if (!text) return [];
+  const lines = text.split(/[\n\r,;]+/);
+  const numbers = [];
+  const seen = new Set();
+  for (let line of lines) {
+    let clean = line.replace(/[\s\-\(\)\+\t"']/g, '').trim();
+    if (!clean) continue;
+    // Normalize Pakistani numbers
+    if (clean.startsWith('0092')) clean = clean.slice(2);
+    else if (clean.startsWith('92')) { /* already good */ }
+    else if (clean.startsWith('03') && clean.length === 11) clean = '92' + clean.slice(1);
+    else if (clean.startsWith('3') && clean.length === 10) clean = '92' + clean;
+    // Must be at least 10 digits
+    if (clean.length < 10 || !/^\d+$/.test(clean)) continue;
+    if (!seen.has(clean)) {
+      seen.add(clean);
+      numbers.push(clean);
+    }
+  }
+  return numbers;
+}
+
+function updateDropNumberCount() {
+  const area = document.getElementById('campDropNumbersArea');
+  const countEl = document.getElementById('campDropNumberCount');
+  const nums = parsePhoneNumbers(area?.value || '');
+  window.campDroppedNumbers = nums;
+  if (countEl) countEl.textContent = nums.length;
+  calculateCampaignCycles();
+}
+
+// Live update as user types / pastes
+document.addEventListener('DOMContentLoaded', () => {
+  const area = document.getElementById('campDropNumbersArea');
+  if (area) {
+    area.addEventListener('input', updateDropNumberCount);
+    area.addEventListener('paste', () => setTimeout(updateDropNumberCount, 100));
+  }
+});
+
+function handleCampFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const area = document.getElementById('campDropNumbersArea');
+    if (area) {
+      const existing = area.value.trim();
+      area.value = existing ? (existing + '\n' + e.target.result) : e.target.result;
+      updateDropNumberCount();
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function clearDropNumbers() {
+  const area = document.getElementById('campDropNumbersArea');
+  if (area) area.value = '';
+  window.campDroppedNumbers = [];
+  updateDropNumberCount();
+}
+
+// ═══ Connected WhatsApps Loader ═══
 async function loadCampaignSenders() {
   const container = document.getElementById('campaignSendersPoolContainer');
   const badge = document.getElementById('campaignPoolCountBadge');
@@ -2023,32 +2115,34 @@ async function loadCampaignSenders() {
     const res = await fetch('api/tenant_manager.php?action=get_campaign_senders&company_id=<?php echo urlencode($activeCompany['id']); ?>');
     const data = await res.json();
     if (data.success && Array.isArray(data.senders)) {
-      window.currentCampaignSenders = data.senders;
-      const senders = data.senders;
+      // Filter out admins from senders — only TMs and TLs should be in the pool
+      const senders = data.senders.filter(s => s.roleType !== 'admin' && s.roleType !== 'superadmin');
+      window.currentCampaignSenders = senders;
 
       if (badge) {
-        badge.textContent = `${senders.length} WhatsApp ${senders.length === 1 ? 'Device' : 'Devices'} Connected`;
+        badge.textContent = `${senders.length} WhatsApp${senders.length !== 1 ? 's' : ''} Connected`;
+        badge.style.background = senders.length > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+        badge.style.color = senders.length > 0 ? '#10b981' : '#ef4444';
       }
 
       if (container) {
         if (!senders.length) {
-          container.innerHTML = `<div style="color:var(--text-muted); padding:16px;">No connected WhatsApp devices found. Scan QR on landing page to link devices.</div>`;
+          container.innerHTML = `<div style="color:var(--text-muted); padding:16px;">No TM/TL WhatsApp numbers found. Add Team Members or Team Leaders with valid phone numbers first.</div>`;
         } else {
-          container.innerHTML = senders.map((s, idx) => {
+          container.innerHTML = senders.map((s) => {
             const isTL = (s.roleType === 'lead');
-            const isAdmin = (s.roleType === 'admin');
-            const badgeBg = isTL ? 'linear-gradient(135deg, #10b981, #059669)' : (isAdmin ? 'linear-gradient(135deg, #8b5cf6, #6366f1)' : 'linear-gradient(135deg, #38bdf8, #0284c7)');
-            const roleTag = isTL ? 'Team Leader (TL)' : (isAdmin ? 'Admin' : 'TM Closer');
-            const roleColor = isTL ? '#34d399' : (isAdmin ? '#c084fc' : '#38bdf8');
+            const badgeBg = isTL ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #38bdf8, #0284c7)';
+            const roleTag = isTL ? 'Team Leader (TL)' : 'TM Closer';
+            const roleColor = isTL ? '#34d399' : '#38bdf8';
 
             return `
               <div style="background: rgba(255,255,255,0.03); border: 1.5px solid var(--border-subtle); border-radius: 12px; padding: 14px; position: relative;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px;">
                   <span style="font-size: 11px; font-weight: 800; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 6px; font-family: monospace; color: #fff;">
-                    Device #${s.index}
+                    #${s.index}
                   </span>
                   <span style="font-size: 10.5px; font-weight: 700; color: #10b981; display:flex; align-items:center; gap:4px;">
-                    <span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span> READY
+                    <span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span> CONNECTED
                   </span>
                 </div>
                 <div style="display:flex; align-items:center; gap:10px;">
@@ -2056,7 +2150,7 @@ async function loadCampaignSenders() {
                     ${(s.name || 'W').charAt(0).toUpperCase()}
                   </div>
                   <div style="min-width:0; flex:1;">
-                    <div style="font-weight:700; font-size:13.5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <div style="font-weight:700; font-size:13px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                       ${escapeHtml(s.name)}
                     </div>
                     <div style="font-size:11px; font-weight:700; color:${roleColor}; margin-top:1px;">
@@ -2065,8 +2159,8 @@ async function loadCampaignSenders() {
                   </div>
                 </div>
                 <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
-                  <span style="font-family:monospace; color:var(--text-secondary);">${escapeHtml(s.display || s.phone)}</span>
-                  <span style="color:var(--text-muted); font-size:11px;">${s.messages_sent || 0} sent</span>
+                  <span style="font-family:monospace; color:#38bdf8; font-weight:700;">${escapeHtml(s.display || s.phone)}</span>
+                  <span style="color:var(--text-muted); font-size:11px;">${s.messages_sent || 0} sent today</span>
                 </div>
               </div>
             `;
@@ -2074,22 +2168,22 @@ async function loadCampaignSenders() {
         }
       }
 
-      // Render Visual Rotation Breadcrumbs
+      // Visual flow preview
       if (preview) {
         if (!senders.length) {
-          preview.innerHTML = `<span style="color:var(--text-muted);">No devices connected</span>`;
+          preview.innerHTML = `<span style="color:var(--text-muted);">No WhatsApps connected</span>`;
         } else {
           const items = senders.map(s => {
-            const roleShort = s.roleType === 'lead' ? 'TL' : (s.roleType === 'admin' ? 'Admin' : 'TM');
-            return `<span style="background: rgba(16, 185, 129, 0.12); color: #34d399; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">📱 #${s.index} ${escapeHtml(s.name.split(' ')[0])} (${roleShort})</span>`;
+            const roleShort = s.roleType === 'lead' ? 'TL' : 'TM';
+            return `<span style="background: rgba(16, 185, 129, 0.12); color: #34d399; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25);">📱 ${escapeHtml(s.name.split(' ')[0])} (${roleShort})</span>`;
           });
-          items.push(`<span style="color: #fbbf24; font-weight: 700; padding: 4px 8px;">🔁 Repeat Cycle (1 ➔ ${senders.length})</span>`);
-          preview.innerHTML = items.join('<span style="color: var(--text-muted); font-size: 14px;"> ➔ </span>');
+          items.push(`<span style="color: #fbbf24; font-weight: 700; padding: 4px 8px;">⚡ All send simultaneously per batch</span>`);
+          preview.innerHTML = items.join('<span style="color: var(--text-muted); font-size: 14px;"> + </span>');
         }
       }
 
       if (mathInfo) {
-        mathInfo.innerHTML = `Round-robin order: 1-by-1 per message across all ${senders.length} devices &bull; Repeats until audience finishes.`;
+        mathInfo.innerHTML = `Each batch: all ${senders.length} WhatsApps send 1 message each simultaneously &bull; Repeats until all numbers done`;
       }
 
       calculateCampaignCycles();
@@ -2100,72 +2194,122 @@ async function loadCampaignSenders() {
 }
 
 function calculateCampaignCycles() {
-  const filter = document.getElementById('campTargetFilter')?.value || 'demo';
+  const filter = document.getElementById('campTargetFilter')?.value || 'custom';
   const poolSize = Math.max(1, (window.currentCampaignSenders || []).length);
-  let estContacts = 10;
-  if (filter === 'new') {
+  let estContacts = 0;
+
+  if (filter === 'custom') {
+    estContacts = (window.campDroppedNumbers || []).length;
+  } else if (filter === 'demo') {
+    estContacts = 10;
+  } else if (filter === 'new') {
     const uncontacted = (window.currentCompanyLeads || []).filter(l => l.leadState === 'fresh' || l.status === 'new');
-    estContacts = Math.max(1, uncontacted.length);
+    estContacts = Math.max(0, uncontacted.length);
   } else if (filter === 'ongoing') {
     const ongoing = (window.currentCompanyLeads || []).filter(l => l.leadState === 'ongoing');
-    estContacts = Math.max(1, ongoing.length);
+    estContacts = Math.max(0, ongoing.length);
   } else if (filter === 'all') {
-    estContacts = Math.max(1, (window.currentCompanyLeads || []).length);
+    estContacts = Math.max(0, (window.currentCompanyLeads || []).length);
   }
 
-  const totalCycles = Math.ceil(estContacts / poolSize);
+  const totalBatches = estContacts > 0 ? Math.ceil(estContacts / poolSize) : 0;
   const summaryEl = document.getElementById('calcSummaryText');
   const orderTag = document.getElementById('calcOrderTag');
 
   if (summaryEl) {
-    summaryEl.innerHTML = `Target Audience: <strong>${estContacts} contacts</strong> &bull; Connected Devices: <strong>${poolSize} WhatsApps</strong> &bull; Total: <strong>${totalCycles} Full ${totalCycles === 1 ? 'Cycle' : 'Cycles'}</strong>`;
+    if (estContacts === 0) {
+      summaryEl.innerHTML = filter === 'custom'
+        ? `<span style="color:#fbbf24;">📋 Drop receiver numbers above to see allocation</span>`
+        : `<span style="color:#fbbf24;">No contacts found for this filter</span>`;
+    } else {
+      summaryEl.innerHTML = `Receiver Numbers: <strong>${estContacts}</strong> &bull; Connected WhatsApps: <strong>${poolSize}</strong> &bull; Batches: <strong>${totalBatches}</strong> &bull; <span style="color:#10b981;font-weight:700;">${poolSize} messages sent per batch simultaneously</span>`;
+    }
   }
   if (orderTag) {
-    if (poolSize === 1) {
-      orderTag.textContent = 'Single Device Mode (All dispatches via Device #1)';
+    if (estContacts === 0) {
+      orderTag.textContent = 'Waiting for numbers...';
+    } else if (poolSize === 1) {
+      orderTag.textContent = `Single WhatsApp: ${totalBatches} messages sent one-by-one`;
     } else {
-      orderTag.textContent = `Order: 1 ➔ ${poolSize} (Repeats every ${poolSize} messages)`;
+      const perPerson = Math.floor(estContacts / poolSize);
+      const remainder = estContacts % poolSize;
+      orderTag.textContent = `${poolSize} WhatsApps × ${totalBatches} batches = ${estContacts} messages (${perPerson}${remainder ? '-' + (perPerson + 1) : ''} per WhatsApp)`;
     }
   }
 }
 
-// Launch Multi-Device Campaign
+// ═══ Launch Campaign ═══
 async function handleLaunchCampaign(e) {
   e.preventDefault();
   const btn = document.getElementById('btnLaunchCamp');
-  btn.disabled = true;
-  btn.textContent = '🚀 Dispatching Multi-Device Campaign…';
 
   let variation = 'text';
   if (document.getElementById('radioVarImage')?.checked) variation = 'text_image';
   if (document.getElementById('radioVarAudio')?.checked) variation = 'audio';
 
-  const filter = document.getElementById('campTargetFilter')?.value || 'demo';
+  const filter = document.getElementById('campTargetFilter')?.value || 'custom';
   const delaySec = parseInt(document.getElementById('campDelay')?.value, 10) || 3;
   const message = document.getElementById('campMessageText')?.value.trim();
   const imageUrl = document.getElementById('campImageUrl')?.value.trim();
   const audioUrl = document.getElementById('campAudioUrl')?.value.trim();
 
+  // Build custom audience from dropped numbers
+  let customAudience = [];
+  if (filter === 'custom') {
+    const nums = window.campDroppedNumbers || [];
+    if (!nums.length) {
+      alert('⚠️ Please drop/paste receiver phone numbers first, or select a different audience source.');
+      return;
+    }
+    customAudience = nums.map((phone, i) => ({
+      id: 'drop_' + i + '_' + phone,
+      phone: phone,
+      display: '+' + phone,
+      name: '',
+      city: 'Pakistan',
+      network: 'WhatsApp'
+    }));
+  }
+
+  if (!message) {
+    alert('⚠️ Please enter a campaign message.');
+    return;
+  }
+
+  const senders = window.currentCampaignSenders || [];
+  if (!senders.length) {
+    alert('⚠️ No connected WhatsApp numbers found. Add TMs/TLs with phone numbers and click Refresh.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '🚀 Sending via all WhatsApps…';
+
   try {
+    const payload = {
+      action: 'start_campaign',
+      company_id: '<?php echo $activeCompany['id']; ?>',
+      company_name: '<?php echo htmlspecialchars($activeCompany['name']); ?>',
+      variation: variation,
+      message: message,
+      image_url: imageUrl,
+      audio_url: audioUrl,
+      filter: filter === 'custom' ? 'custom' : filter,
+      delay: delaySec,
+      senders: senders
+    };
+
+    if (customAudience.length > 0) {
+      payload.audience = customAudience;
+    }
+
     const res = await fetch('api/direct_sender.php?action=start_campaign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'start_campaign',
-        company_id: '<?php echo $activeCompany['id']; ?>',
-        company_name: '<?php echo htmlspecialchars($activeCompany['name']); ?>',
-        variation: variation,
-        message: message,
-        image_url: imageUrl,
-        audio_url: audioUrl,
-        filter: filter,
-        delay: delaySec,
-        senders: window.currentCampaignSenders || []
-      })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (data.success) {
-      // Reveal monitor box immediately
       const monitorBox = document.getElementById('campaignLiveMonitorBox');
       if (monitorBox) {
         monitorBox.style.display = 'block';
@@ -2179,7 +2323,7 @@ async function handleLaunchCampaign(e) {
     alert('Network error launching campaign: ' + err.message);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<span>🚀</span> Dispatch Multi-Device Campaign (Round-Robin)';
+    btn.innerHTML = '<span>🚀</span> Start Campaign — Send via All WhatsApps';
   }
 }
 

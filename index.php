@@ -38,4 +38,18 @@ $runtime = "<script>\n" .
 
 header('Content-Type: text/html; charset=UTF-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
-echo str_replace('</head>', $runtime . "\n</head>", file_get_contents(__DIR__ . '/index.html'));
+
+$content = file_get_contents(__DIR__ . '/index.html');
+$content = str_replace('</head>', $runtime . "\n</head>", $content);
+
+// For TM and TL closer accounts, eliminate single-frame portal flash by pre-rendering the employee workspace
+$userRole = strtolower($user['role'] ?? 'member');
+$hasChat = !empty($_GET['chat']);
+$activeTab = $_GET['tab'] ?? '';
+if (!in_array($userRole, ['admin', 'superadmin'], true) && !$hasChat && $activeTab !== 'inbox') {
+    $content = str_replace('<html lang="en">', '<html lang="en" class="preload-agent-view">', $content);
+    $content = str_replace('<main class="inbox-view-container" id="viewInbox">', '<main class="inbox-view-container" id="viewInbox" style="display:none;">', $content);
+    $content = str_replace('<main class="employee-workspace" id="viewEmployee" style="display:none;">', '<main class="employee-workspace" id="viewEmployee" style="display:block;">', $content);
+}
+
+echo $content;

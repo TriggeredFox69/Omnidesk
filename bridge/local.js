@@ -755,12 +755,15 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               const uComp = u.company_id || 'COMP-001';
               const status = (u.status || 'active').toLowerCase();
               const phone = String(u.phone || '').replace(/\D/g, '');
-              return uComp === compId && status === 'active' && phone.length >= 10;
+              const role = (u.role || 'member').toLowerCase();
+              // Only TMs and TLs — exclude admins and superadmins
+              return uComp === compId && status === 'active' && phone.length >= 10
+                     && (role === 'member' || role === 'lead');
             });
 
-            // Sort: TM first, then TL, then Admin
+            // Sort: TM first, then TL
             matched.sort((a, b) => {
-              const order = { member: 1, lead: 2, admin: 3 };
+              const order = { member: 1, lead: 2 };
               return (order[a.role] || 99) - (order[b.role] || 99);
             });
 
@@ -844,12 +847,15 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
               const uComp = u.company_id || 'COMP-001';
               const status = (u.status || 'active').toLowerCase();
               const phone = String(u.phone || '').replace(/\D/g, '');
-              return uComp === compId && status === 'active' && phone.length >= 10;
+              const role = (u.role || 'member').toLowerCase();
+              // Only TMs and TLs — exclude admins and superadmins
+              return uComp === compId && status === 'active' && phone.length >= 10
+                     && (role === 'member' || role === 'lead');
             });
 
-            // Sort: TM first, then TL, then Admin
+            // Sort: TM first, then TL
             matched.sort((a, b) => {
-              const order = { member: 1, lead: 2, admin: 3 };
+              const order = { member: 1, lead: 2 };
               return (order[a.role] || 99) - (order[b.role] || 99);
             });
 

@@ -616,11 +616,9 @@ class BaileysClient extends EventEmitter {
 
             console.log(`[Baileys Auto-Heal] Socket retry receipt received for ${ids.length} msgs [${ids.join(', ')}] from ${participant} (count ${count})`);
 
-            // Only purge session when count >= 2 so the standard prekey negotiation is not wiped prematurely
-            if (count >= 2) {
-              console.log(`[Baileys Auto-Heal] Retry count >= 2 for ${participant}. Purging desynchronized session to force fresh prekey exchange...`);
-              this.resetContactSession(participant);
-            }
+            // Always purge desynchronized Signal ratchet on retry receipt so recipient phone gets fresh prekey exchange
+            console.log(`[Baileys Auto-Heal] Resetting desynchronized session for ${participant} to force fresh prekey exchange...`);
+            this.resetContactSession(participant);
 
             try {
               if (typeof this.sock.assertSessions === 'function') {
@@ -643,10 +641,17 @@ class BaileysClient extends EventEmitter {
 
               if (rawMsg) {
                 console.log(`[Baileys Auto-Heal] Re-encrypting & resending message ${id} to ${participant} (count ${count})`);
-                await this.sock.relayMessage(from, rawMsg, {
-                  messageId: id,
-                  participant: { jid: participant, count }
-                });
+                const isGroup = from.endsWith('@g.us');
+                const relayOptions = { messageId: id };
+                if (isGroup) {
+                  relayOptions.participant = { jid: participant, count };
+                } else {
+                  // CRITICAL FIX: For 1-on-1 chats, NEVER pass options.participant!
+                  // Passing participant on 1-on-1 chats corrupts WhatsApp XMPP stanza and causes
+                  // permanent "Waiting for this message, this may take a while" on recipient phones!
+                  relayOptions.additionalAttributes = { retry: String(count) };
+                }
+                await this.sock.relayMessage(from, rawMsg, relayOptions);
                 console.log(`[Baileys Auto-Heal] Re-relay completed successfully for msg ${id} to ${participant}`);
               } else {
                 console.warn(`[Baileys Auto-Heal] Message ${id} not found in store for re-relay to ${participant}`);

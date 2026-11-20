@@ -1359,17 +1359,17 @@ function toggleTLMode(mode) {
   if (formLogin) formLogin.style.display = 'block';
 }
 
-// 360 Spin Animation Trigger
+// 360 Spin Animation Trigger (Optimized for instant, snappy portal transitions)
 function triggerLoginAnimation(brandName, subtext, redirectUrl) {
   const overlay = document.getElementById('loginAnimOverlay');
   const txtBrand = document.getElementById('animBrandText');
   const txtSub = document.getElementById('animSubtext');
   if (txtBrand && brandName) txtBrand.textContent = brandName;
   if (txtSub && subtext) txtSub.textContent = subtext;
-  overlay.classList.add('active');
+  if (overlay) overlay.classList.add('active');
   setTimeout(() => {
     window.location.href = redirectUrl;
-  }, 1450);
+  }, 380);
 }
 
 // Live QR Code Poller & Auto-Pairing

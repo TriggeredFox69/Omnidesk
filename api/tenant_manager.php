@@ -444,16 +444,20 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
         if (!is_array($allUsers)) $allUsers = [];
 
+        // STRICT RULE: Only active TMs (member) and TLs (lead) with valid phone numbers
+        // Admins and Superadmins are excluded from the campaign sender pool
         $matched = array_values(array_filter($allUsers, function($u) use ($companyId) {
             $uComp = $u['company_id'] ?? 'COMP-001';
             $status = strtolower($u['status'] ?? 'active');
             $phone = preg_replace('/\D+/', '', $u['phone'] ?? '');
-            return $uComp === $companyId && $status === 'active' && strlen($phone) >= 10;
+            $role = strtolower($u['role'] ?? 'member');
+            return $uComp === $companyId && $status === 'active' && strlen($phone) >= 10
+                   && ($role === 'member' || $role === 'lead');
         }));
 
-        // Sort: member (TM) first, lead (TL) next, admin last
+        // Sort: member (TM) first, lead (TL) next
         usort($matched, function($a, $b) {
-            $order = ['member' => 1, 'lead' => 2, 'admin' => 3];
+            $order = ['member' => 1, 'lead' => 2];
             return ($order[$a['role'] ?? ''] ?? 99) <=> ($order[$b['role'] ?? ''] ?? 99);
         });
 
