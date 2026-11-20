@@ -8,6 +8,10 @@ function ensureBridgeCurrent(?array $status = null): void {
     static $checked = false;
     if ($checked) return;
     $checked = true;
+    if (!bridgePortOpen()) {
+        ensureBridgeRunning(false);
+        return;
+    }
     $status = $status ?? whatsappBridgeRequest('/status');
     if (empty($status['success']) || ($status['version'] ?? '') === EXPECTED_BRIDGE_VERSION) return;
     // Connection points at a PC tunnel? Then this server cannot restart it.
@@ -705,6 +709,13 @@ function findUserByWhatsApp(string $phone): ?array {
  * verified phone is stored in this PHP session so qr_login / tm_register can trust it.
  */
 function handleLoginQr(string $action): void {
+    if (!bridgePortOpen()) {
+        ensureBridgeRunning(false);
+        for ($i = 0; $i < 6; $i++) {
+            usleep(400000);
+            if (bridgePortOpen()) break;
+        }
+    }
     ensureBridgeCurrent();
     $loginId = $_SESSION['qr_login_id'] ?? '';
     // Already scanned in this browser a moment ago: stay on the "connected" card.

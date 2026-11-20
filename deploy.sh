@@ -41,3 +41,13 @@ for TARGET in "${TARGETS[@]}"; do
     echo "Successfully deployed to $TARGET"
   fi
 done
+
+# Restart WhatsApp bridge daemon with fresh code
+echo "Restarting WhatsApp bridge service..."
+pkill -f "bridge/server.js" 2>/dev/null || true
+pkill -f "run-daemon.sh" 2>/dev/null || true
+rm -f /home/dailygol/chatly.pk/data/whatsapp-bridge/daemon.pid /home/dailygol/chatly.pk/data/whatsapp-bridge/daemon.lock /home/dailygol/chatly.pk/data/whatsapp-bridge/upgrade.lock 2>/dev/null || true
+if [ -f "/home/dailygol/chatly.pk/bridge/run-daemon.sh" ]; then
+    nohup /bin/bash /home/dailygol/chatly.pk/bridge/run-daemon.sh >/dev/null 2>&1 &
+fi
+echo "Deployment complete!"
