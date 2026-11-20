@@ -1005,15 +1005,52 @@
        VIEW 2: CAMPAIGN STUDIO
   ════════════════════════════════════════════════════════ -->
   <div class="view-container" id="viewCampaign">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;display:flex;align-items:center;gap:10px;">
           <span style="font-size:22px;">🚀</span>
-          <span class="grad-text">Campaigns</span>
+          <span class="grad-text">Multi-Device Campaign Dispatcher</span>
         </h2>
-        <p class="text-xs text-muted" style="margin-top:4px;">Multi-Device Round-Robin: Dispatches through all connected TL &amp; TM WhatsApp numbers in sequence.</p>
+        <p class="text-xs text-muted" style="margin-top:4px;">Dispatches outreach using all connected TL &amp; TM WhatsApp numbers simultaneously in batches.</p>
       </div>
       <div id="campaignStatusBadge" class="panel-badge">⚪ Ready to Launch</div>
+    </div>
+
+    <!-- ═══════════════ STEP 1: Connected WhatsApps Widget (All Admin Portals) ═══════════════ -->
+    <div class="panel" id="campaignSendersPoolCard" style="margin-bottom: 20px; padding: 18px 20px; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.03);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+        <div>
+          <div style="font-weight:800; font-size:15px; color:#fff; display:flex; align-items:center; gap:8px;">
+            <span>📱</span> Connected WhatsApp Numbers (TMs &amp; TLs)
+          </div>
+          <p class="text-xs text-muted" style="margin:3px 0 0; line-height:1.45;">
+            All registered WhatsApp numbers of active Team Members and Team Leaders. All devices send <strong>simultaneously per batch</strong>. Click <strong>Refresh</strong> after onboarding new TMs or TLs.
+          </p>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="campaignPoolCountBadge" class="panel-badge" style="color:var(--emerald); background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.35); font-size:12px; font-weight:750; padding:5px 12px;">
+            Loading devices…
+          </span>
+          <button type="button" class="btn btn-emerald btn-xs" id="refreshCampaignSendersBtn" style="padding:7px 14px; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px;">
+            <span>🔄</span> Refresh WhatsApps
+          </button>
+        </div>
+      </div>
+
+      <!-- Senders Cards Grid -->
+      <div id="campaignSendersPoolContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:12px; margin-bottom:14px;">
+        <div class="text-xs text-muted" style="padding:12px;">Loading connected team WhatsApp numbers…</div>
+      </div>
+
+      <!-- Batch Send Explanation -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:rgba(16,185,129,0.06); border:1px dashed rgba(16,185,129,0.3); border-radius:8px; padding:10px 14px;">
+        <div id="campaignRotationFlowPreview" style="font-size:12px; color:var(--cyan); font-family:monospace; font-weight:600;">
+          ⚡ Batch Dispatch: All connected WhatsApps send simultaneously
+        </div>
+        <div id="campaignCycleMathInfo" style="font-size:11.5px; color:var(--text-muted);">
+          Each batch = 1 msg per connected device &bull; Repeats until all numbers are delivered
+        </div>
+      </div>
     </div>
 
     <div class="campaign-grid">
@@ -1102,30 +1139,6 @@
           </div>
         </div>
 
-        <div class="campaign-dispatch-card" id="campaignSendersPoolCard">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-            <div style="font-weight:700;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
-              <span>📱</span>
-              <span>Connected Team WhatsApp Devices (TLs &amp; TMs Pool)</span>
-            </div>
-            <span id="campaignPoolCountBadge" class="panel-badge" style="color:var(--emerald);background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.3);font-size:11px;">
-              Loading devices…
-            </span>
-          </div>
-          <p class="text-xs text-muted" style="margin:0 0 10px;line-height:1.45;">
-            No QR scan required. Campaigns dispatch automatically in round-robin order using the pre-connected WhatsApp numbers of your Team Leads and Closers. Each contacted lead is automatically assigned to that team member.
-          </p>
-          <div id="campaignSendersPoolContainer" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;padding-right:2px;margin-bottom:8px;">
-            <div class="text-xs text-muted" style="padding:8px;text-align:center;">Loading connected team devices…</div>
-          </div>
-          <div id="campaignRotationFlowPreview" style="font-size:11px;color:var(--cyan);background:rgba(6,182,212,0.08);border:1px dashed rgba(6,182,212,0.3);border-radius:6px;padding:6px 10px;margin-bottom:6px;line-height:1.4;">
-            Rotation: Device #1 ➔ Device #2 ➔ Device #3 ➔ …
-          </div>
-          <div id="campaignCycleMathInfo" style="font-size:10.5px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
-            <span>⚡ 3-6s delay = ~1 msg/min per device</span>
-            <span style="color:#10b981;font-weight:700;">🛡️ 0 Risk of Ban</span>
-          </div>
-        </div>
 
         <!-- 3 Campaign Starting Variations -->
         <div class="form-group" style="margin:0;">

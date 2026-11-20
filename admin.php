@@ -665,6 +665,32 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
         </div>
       </div>
 
+      <!-- ═══════════════ Connected WhatsApps Widget on Main Closer Dashboard ═══════════════ -->
+      <div style="background: rgba(16, 185, 129, 0.04); border: 1.5px solid rgba(16, 185, 129, 0.28); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom: 12px;">
+          <div>
+            <div style="font-weight: 800; font-size: 14.5px; color: #fff; display:flex; align-items:center; gap:8px;">
+              <span>📱</span> Connected WhatsApp Numbers (TMs &amp; TLs)
+              <span id="closerTabPoolBadge" class="badge" style="background:rgba(16,185,129,0.18); color:#10b981; font-size:11.5px; padding:3px 8px; border-radius:6px; font-weight:750;">Loading...</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 3px;">
+              All registered WhatsApp numbers of active Team Members and Team Leaders ready to send campaign outreach simultaneously in batches.
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button type="button" class="btn btn-emerald" onclick="loadCampaignSenders()" style="padding: 7px 14px; font-size: 11.5px; font-weight: 700; display:flex; align-items:center; gap:5px;">
+              <span>🔄</span> Refresh WhatsApps
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="switchDashboardTab('campaigns')" style="padding: 7px 14px; font-size: 11.5px; font-weight: 700;">
+              🚀 Open Campaign Dispatcher
+            </button>
+          </div>
+        </div>
+        <div id="closerTabSendersContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px;">
+          <div style="color:var(--text-muted); font-size:12px; padding:8px;">Loading company WhatsApp numbers...</div>
+        </div>
+      </div>
+
       <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:12px 18px; margin-bottom:18px; font-size:12px; color:#34d399; display:flex; align-items:center; justify-content:space-between;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span>ℹ️</span>
@@ -2123,6 +2149,42 @@ async function loadCampaignSenders() {
         badge.textContent = `${senders.length} WhatsApp${senders.length !== 1 ? 's' : ''} Connected`;
         badge.style.background = senders.length > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
         badge.style.color = senders.length > 0 ? '#10b981' : '#ef4444';
+      }
+
+      const closerBadge = document.getElementById('closerTabPoolBadge');
+      if (closerBadge) {
+        closerBadge.textContent = `${senders.length} Active`;
+        closerBadge.style.background = senders.length > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+        closerBadge.style.color = senders.length > 0 ? '#10b981' : '#ef4444';
+      }
+
+      const closerContainer = document.getElementById('closerTabSendersContainer');
+      if (closerContainer) {
+        if (!senders.length) {
+          closerContainer.innerHTML = `<div style="color:var(--text-muted); padding:10px;">No registered TM/TL WhatsApp numbers found.</div>`;
+        } else {
+          closerContainer.innerHTML = senders.map((s) => {
+            const isTL = (s.roleType === 'lead');
+            const badgeBg = isTL ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #38bdf8, #0284c7)';
+            const roleTag = isTL ? 'Team Leader (TL)' : 'TM Closer';
+            const roleColor = isTL ? '#34d399' : '#38bdf8';
+            return `
+              <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 12px; display:flex; align-items:center; gap:10px;">
+                <div style="width:32px; height:32px; border-radius:50%; background:${badgeBg}; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:12px; flex-shrink:0;">
+                  ${(s.name || 'W').charAt(0).toUpperCase()}
+                </div>
+                <div style="min-width:0; flex:1;">
+                  <div style="font-weight:700; font-size:12px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
+                  <div style="font-size:10.5px; color:${roleColor}; font-weight:600;">${roleTag}</div>
+                  <div style="font-family:monospace; color:#38bdf8; font-size:11px; font-weight:700; margin-top:1px;">${escapeHtml(s.display || s.phone)}</div>
+                </div>
+                <span style="font-size:9.5px; font-weight:700; color:#10b981; background:rgba(16,185,129,0.12); padding:2px 6px; border-radius:4px; flex-shrink:0;">
+                  ● Ready
+                </span>
+              </div>
+            `;
+          }).join('');
+        }
       }
 
       if (container) {

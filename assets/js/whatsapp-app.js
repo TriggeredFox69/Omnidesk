@@ -2892,6 +2892,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const tlCount = senders.filter(s => s.roleType === 'lead').length;
         if (badge) {
           badge.textContent = `${senders.length} WhatsApp Devices (${tmCount} TMs · ${tlCount} TLs)`;
+          badge.style.background = senders.length > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+          badge.style.color = senders.length > 0 ? '#10b981' : '#ef4444';
         }
 
         if (container) {
@@ -2900,23 +2902,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const isAdmin = (s.roleType === 'admin');
             const roleTag = isTL ? 'Team Leader (TL)' : (isAdmin ? 'Admin' : 'TM Closer');
             const roleColor = isTL ? '#34d399' : (isAdmin ? '#c084fc' : '#38bdf8');
+            const badgeBg = isTL ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #38bdf8, #0284c7)';
 
             return `
-              <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span style="font-size:10.5px;font-weight:800;background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-family:monospace;color:#fff;">
+              <div style="background:rgba(255,255,255,0.03);border:1.5px solid var(--border-subtle);border-radius:10px;padding:12px 14px;position:relative;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <span style="font-size:10.5px;font-weight:800;background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:5px;font-family:monospace;color:#fff;">
                     #${s.index}
                   </span>
-                  <div>
-                    <div style="font-size:12px;font-weight:700;color:#fff;">${escapeHtml(s.name)}</div>
-                    <div style="font-size:10.5px;color:${roleColor};font-weight:600;">${roleTag} · <span class="mono" style="color:var(--text-secondary);">${escapeHtml(s.display || s.phone)}</span></div>
-                  </div>
-                </div>
-                <div style="text-align:right;">
-                  <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#10b981;background:rgba(16,185,129,0.12);padding:2px 6px;border-radius:4px;">
-                    <span style="width:5px;height:5px;background:#10b981;border-radius:50%;"></span> Active
+                  <span style="font-size:10px;font-weight:700;color:#10b981;display:flex;align-items:center;gap:4px;">
+                    <span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span> CONNECTED
                   </span>
-                  <div style="font-size:9.5px;color:var(--text-muted);margin-top:1px;">${s.messages_sent || 0} sent today</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="width:34px;height:34px;border-radius:50%;background:${badgeBg};display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px;flex-shrink:0;">
+                    ${(s.name || 'W').charAt(0).toUpperCase()}
+                  </div>
+                  <div style="min-width:0;flex:1;">
+                    <div style="font-weight:700;font-size:12.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
+                    <div style="font-size:11px;color:${roleColor};font-weight:600;margin-top:1px;">${roleTag}</div>
+                    <div class="mono" style="font-size:11.5px;color:#38bdf8;margin-top:2px;font-weight:700;">${escapeHtml(s.display || s.phone)}</div>
+                  </div>
                 </div>
               </div>
             `;
@@ -2947,6 +2953,11 @@ document.addEventListener('DOMContentLoaded', () => {
       console.warn('loadCampaignSenders error:', err);
     }
   }
+
+  document.getElementById('refreshCampaignSendersBtn')?.addEventListener('click', () => {
+    showToast('🔄 Refreshing connected WhatsApp numbers...');
+    loadCampaignSenders();
+  });
 
   let campaignPollTimer = null;
 
