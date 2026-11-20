@@ -3233,6 +3233,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data && data.success) {
         applyServerCampaignState(data);
         startCampaignStatusPolling();
+        fetchServerLeads(true);
       } else {
         showToast('⚠️ Could not start campaign: ' + (data?.message || 'Server error'));
       }

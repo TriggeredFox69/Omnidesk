@@ -284,6 +284,111 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     ];
   }
 
+  function syncAudienceToCrm(audience, companyId, messageTemplate, campaignName) {
+    try {
+      const cleanId = String(companyId || 'COMP-001').replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
+      const tenantPath = path.resolve(__dirname, `../data/tenants/${cleanId}/leads.json`);
+      const globalPath = path.resolve(__dirname, '../data/leads.json');
+      const targetPaths = [tenantPath];
+      if (cleanId === 'COMP-001' && globalPath !== tenantPath) {
+        targetPaths.push(globalPath);
+      }
+
+      let leads = [];
+      let sourceFile = fs.existsSync(tenantPath) ? tenantPath : (fs.existsSync(globalPath) ? globalPath : null);
+      if (sourceFile) {
+        try {
+          leads = JSON.parse(fs.readFileSync(sourceFile, 'utf8'));
+        } catch (_) {}
+      }
+      if (!Array.isArray(leads)) leads = [];
+
+      let modified = false;
+      const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      for (const contact of audience) {
+        const cleanPhone = String(contact.phone || '').replace(/\D/g, '');
+        if (!cleanPhone || cleanPhone.length < 8) continue;
+
+        let existing = leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone);
+        const ownerId = contact.assignedOwnerId || 'EMP-TM-MWMK43N9';
+        const ownerName = contact.assignedOwnerName || 'TM Closer';
+        const ownerUsername = contact.assignedOwnerUsername || 'closer';
+        const personalizedMsg = personalizeMessage(messageTemplate, contact, state.companyName);
+
+        const initialMsg = {
+          id: `msg_c_${Date.now()}_${cleanPhone.slice(-4)}`,
+          waMessageId: contact.messageId || `msg_camp_${Date.now()}_${cleanPhone.slice(-4)}`,
+          deliveryStatus: 'accepted',
+          sender: 'agent',
+          agentName: ownerName,
+          senderPhone: contact.senderPhone || contact.phone,
+          senderRole: contact.assignedOwnerRole || 'TM Closer',
+          cycle: 1,
+          text: personalizedMsg || 'Outreach dispatched',
+          time: nowStr
+        };
+
+        if (existing) {
+          existing.ownerId = ownerId;
+          existing.ownerName = ownerName;
+          existing.ownerUsername = ownerUsername;
+          if (existing.leadState !== 'paid' && existing.leadState !== 'pending_verification') {
+            existing.leadState = 'ongoing';
+          }
+          existing.status = 'sent';
+          existing.lastActive = 'Just now';
+          existing.messages = existing.messages || [];
+          if (!existing.messages.some(m => m.text === personalizedMsg)) {
+            existing.messages.push(initialMsg);
+          }
+          modified = true;
+        } else {
+          const newLead = {
+            id: `lead_${Date.now()}_${cleanPhone}`,
+            company_id: cleanId,
+            name: contact.name || contact.display || `+${cleanPhone}`,
+            phone: cleanPhone,
+            display: contact.display || `+${cleanPhone}`,
+            city: contact.city || 'Pakistan',
+            network: contact.network || 'WhatsApp',
+            ownerId: ownerId,
+            ownerName: ownerName,
+            ownerUsername: ownerUsername,
+            sender_id: ownerId,
+            sender_name: ownerName,
+            sender_phone: contact.senderPhone || null,
+            leadState: 'ongoing',
+            status: 'sent',
+            unreadCount: 0,
+            interest: 'Campaign Outreach',
+            lastActive: 'Just now',
+            notes: `Outreach dispatched via campaign "${campaignName}". Allocated Closer: ${ownerName}.`,
+            messages: [initialMsg]
+          };
+          leads.unshift(newLead);
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        for (const targetFile of targetPaths) {
+          try {
+            const dir = path.dirname(targetFile);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            const tmp = targetFile + '.tmp.' + Date.now();
+            fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8');
+            fs.renameSync(tmp, targetFile);
+          } catch (e) {
+            console.warn('[Campaign syncAudienceToCrm warning]:', e.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Campaign syncAudienceToCrm error]:', err.message);
+    }
+  }
+
   function updateCrmLead(contact, crmMessage, assignMode, activeSender) {
     try {
       const companyId = state.companyId || 'COMP-001';
@@ -498,6 +603,22 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
       contact.error = err.message;
       state.totalFailed++;
       log(`❌ [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] Failed for ${contact.display || contact.phone}: ${err.message}`, 'error');
+      try {
+        const failCrmMsg = {
+          id: `msg_c_${Date.now()}`,
+          waMessageId: contact.messageId || `fail_${Date.now()}`,
+          deliveryStatus: 'failed',
+          deliveryError: err.message,
+          sender: 'agent',
+          agentName: activeSender.name,
+          senderPhone: activeSender.phone,
+          senderRole: activeSender.role,
+          cycle: currentCycle,
+          text: personalizedMsg,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        updateCrmLead(contact, failCrmMsg, state.assignMode, activeSender);
+      } catch (_) {}
     } finally {
       inFlight = false;
       state.currentIndex++;
@@ -654,6 +775,9 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         error: null
       };
     });
+
+    // Immediately register and allocate all audience leads in CRM so closer & admin portals show them instantly
+    syncAudienceToCrm(state.audience, state.companyId, state.messageTemplate, state.name);
 
     state.currentIndex = 0;
     state.totalSent = 0;
