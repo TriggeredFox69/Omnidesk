@@ -286,31 +286,42 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
 
   function updateCrmLead(contact, crmMessage, assignMode, activeSender) {
     try {
-      const leadsFile = typeof getLeadsPath === 'function' ? getLeadsPath(state.companyId) : null;
-      if (!leadsFile || !fs.existsSync(leadsFile)) return;
-      let leads = JSON.parse(fs.readFileSync(leadsFile, 'utf8'));
-      if (!Array.isArray(leads)) return;
+      const companyId = state.companyId || 'COMP-001';
+      const cleanId = String(companyId).replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
+
+      // Always resolve target files to update both tenant file and global mirror
+      const tenantPath = path.resolve(__dirname, `../data/tenants/${cleanId}/leads.json`);
+      const globalPath = path.resolve(__dirname, '../data/leads.json');
+      const targetPaths = [tenantPath];
+      if (cleanId === 'COMP-001' && globalPath !== tenantPath) {
+        targetPaths.push(globalPath);
+      }
+
+      // Read current leads from tenant file (or global file if tenant not initialized)
+      let leads = [];
+      let sourceFile = fs.existsSync(tenantPath) ? tenantPath : (fs.existsSync(globalPath) ? globalPath : null);
+      if (sourceFile) {
+        try {
+          const raw = fs.readFileSync(sourceFile, 'utf8');
+          leads = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(leads)) leads = [];
 
       const cleanPhone = String(contact.phone || '').replace(/\D/g, '');
       let existingLead = leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone);
 
       // STRICT LEAD ALLOCATION RULE:
-      // Lead ownership MUST go to the allocated closer (TM or TL), NEVER the admin!
-      let ownerId = contact.assignedOwnerId;
-      let ownerName = contact.assignedOwnerName;
-      let ownerUsername = contact.assignedOwnerUsername;
+      // Lead ownership MUST go to the active closer (TM or TL) whose device sent the message!
+      let ownerId = (activeSender && activeSender.roleType !== 'admin') ? activeSender.id : contact.assignedOwnerId;
+      let ownerName = (activeSender && activeSender.roleType !== 'admin') ? activeSender.name : contact.assignedOwnerName;
+      let ownerUsername = (activeSender && activeSender.roleType !== 'admin') ? (activeSender.username || activeSender.name) : contact.assignedOwnerUsername;
 
-      if (!ownerId) {
-        if (activeSender && activeSender.roleType !== 'admin' && !String(activeSender.id).includes('ADMIN')) {
-          ownerId = activeSender.id;
-          ownerName = activeSender.name;
-          ownerUsername = activeSender.username || '';
-        } else if (state.closersPool && state.closersPool.length > 0) {
-          const fallbackCloser = state.closersPool[0];
-          ownerId = fallbackCloser.id;
-          ownerName = fallbackCloser.name;
-          ownerUsername = fallbackCloser.username || '';
-        }
+      if (!ownerId && state.closersPool && state.closersPool.length > 0) {
+        const fallbackCloser = state.closersPool[0];
+        ownerId = fallbackCloser.id;
+        ownerName = fallbackCloser.name;
+        ownerUsername = fallbackCloser.username || '';
       }
 
       if (existingLead) {
@@ -320,6 +331,9 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         }
         existingLead.lastActive = 'Just now';
         existingLead.status = 'sent';
+        if (existingLead.leadState !== 'paid' && existingLead.leadState !== 'pending_verification') {
+          existingLead.leadState = 'ongoing';
+        }
         // Auto-fix / allocate if previously unowned, fallback, or locked to admin
         if (ownerId && (!existingLead.ownerId || existingLead.ownerId.includes('ADMIN') || existingLead.ownerId.includes('FALLBACK') || existingLead.ownerId === 'USR-ADMIN-01')) {
           existingLead.ownerId = ownerId;
@@ -330,8 +344,8 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         existingLead.lastSenderName = activeSender ? activeSender.name : null;
       } else {
         const newLead = {
-          id: `lead_${Date.now()}_${contact.phone}`,
-          company_id: state.companyId || 'COMP-001',
+          id: `lead_${Date.now()}_${cleanPhone}`,
+          company_id: cleanId,
           name: contact.name || contact.display || `+${cleanPhone}`,
           phone: cleanPhone,
           display: contact.display || `+${cleanPhone}`,
@@ -343,28 +357,28 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
           sender_id: activeSender ? activeSender.id : ownerId,
           sender_name: activeSender ? activeSender.name : ownerName,
           sender_phone: activeSender ? activeSender.phone : null,
-          leadState: 'fresh',
+          leadState: 'ongoing',
           status: 'sent',
           unreadCount: 0,
           interest: 'Campaign Outreach',
           lastActive: 'Just now',
-          notes: `Outreach dispatched via campaign "${state.name}". Allocated Closer: ${ownerName || 'TM Closer'} (${contact.assignedOwnerRole || 'Closer'}). Device: ${activeSender ? activeSender.name : 'Primary Device'}.`,
+          notes: `Outreach dispatched via campaign "${state.name}". Allocated Closer: ${ownerName || 'TM Closer'} (${activeSender?.role || contact.assignedOwnerRole || 'Closer'}). Device: ${activeSender ? activeSender.name : 'Primary Device'}.`,
           messages: [crmMessage]
         };
         leads.unshift(newLead);
       }
 
-      const tmp = leadsFile + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8');
-      fs.renameSync(tmp, leadsFile);
-
-      if (state.companyId === 'COMP-001') {
+      // Write atomically to all target files
+      for (const targetFile of targetPaths) {
         try {
-          const globalLeads = path.resolve(__dirname, '../data/leads.json');
-          if (fs.existsSync(globalLeads) && path.resolve(leadsFile) !== globalLeads) {
-            fs.writeFileSync(globalLeads, JSON.stringify(leads, null, 2), 'utf8');
-          }
-        } catch (_) {}
+          const dir = path.dirname(targetFile);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          const tmp = targetFile + '.tmp.' + Date.now();
+          fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8');
+          fs.renameSync(tmp, targetFile);
+        } catch (fErr) {
+          console.warn(`[Campaign] Failed writing leads to ${targetFile}:`, fErr.message);
+        }
       }
     } catch (err) {
       console.warn('[Campaign CRM Sync Error]:', err.message);
@@ -408,6 +422,12 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     contact.senderName = activeSender.name;
     contact.senderRole = activeSender.role;
     contact.senderPhone = activeSender.phone;
+    if (activeSender.roleType !== 'admin') {
+      contact.assignedOwnerId = activeSender.id;
+      contact.assignedOwnerName = activeSender.name;
+      contact.assignedOwnerUsername = activeSender.username || activeSender.name;
+      contact.assignedOwnerRole = activeSender.role || 'TM Closer';
+    }
     contact.cycle = currentCycle;
     contact.senderIndex = senderIndex + 1;
 
@@ -572,6 +592,9 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     let closersPool = [];
     if (Array.isArray(params.closers) && params.closers.length > 0) {
       closersPool = params.closers.filter(c => c.roleType !== 'admin' && c.role !== 'Admin');
+    }
+    if (!closersPool.length && sendersPool.length > 0) {
+      closersPool = sendersPool.filter(s => s.roleType !== 'admin' && s.role !== 'Admin');
     }
     if (!closersPool.length) {
       closersPool = resolveCompanyClosers(companyId);

@@ -1,14 +1,8 @@
 <?php
-function ensureBridgeRunning(): bool {
+function ensureBridgeRunning(bool $force = false): bool {
     static $attempted = false;
-    if ($attempted) return false;
+    if ($attempted && !$force) return false;
     $attempted = true;
-
-    $lockFile = sys_get_temp_dir() . '/omnidesk_bridge_spawn.lock';
-    if (file_exists($lockFile) && (time() - filemtime($lockFile) < 4)) {
-        return false;
-    }
-    @touch($lockFile);
 
     $baseDir = realpath(__DIR__ . '/..');
     $dataDir = $baseDir . '/data/whatsapp-bridge';
@@ -21,6 +15,23 @@ function ensureBridgeRunning(): bool {
     }
     if (!file_exists($connFile)) {
         @file_put_contents($connFile, "<?php\nreturn ['url' => 'http://127.0.0.1:3210', 'token' => '" . addslashes($token) . "'];\n");
+    }
+
+    if ($force) {
+        $pids = @shell_exec('pgrep -f "server.js|dist/index.js" 2>/dev/null');
+        if ($pids) {
+            $pidList = array_filter(array_map('trim', explode("\n", trim($pids))), 'is_numeric');
+            foreach ($pidList as $p) {
+                @shell_exec("kill -9 $p 2>/dev/null");
+            }
+        }
+        usleep(400000);
+    } else {
+        $lockFile = sys_get_temp_dir() . '/omnidesk_bridge_spawn.lock';
+        if (file_exists($lockFile) && (time() - filemtime($lockFile) < 4)) {
+            return false;
+        }
+        @touch($lockFile);
     }
 
     $nodePath = '/opt/alt/alt-nodejs22/root/usr/bin/node';
@@ -205,7 +216,15 @@ function handleWhatsAppBridge(string $action, array $input): void {
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
             $result = ['success' => true];
         }
+    } elseif ($action === 'restart_bridge' || $action === 'restart_daemon') {
+        ensureBridgeRunning(true);
+        $result = ['success' => true, 'message' => 'WhatsApp bridge supervisor restarted with latest v15.0 Baileys engine.'];
     } elseif ($action === 'start_campaign') {
+        // Verify bridge process is active and running latest v15.0 engine
+        $check = whatsappBridgeRequest('/status');
+        if (empty($check['version']) || $check['version'] !== '15.0') {
+            ensureBridgeRunning(true);
+        }
         $result = whatsappBridgeRequest('/campaign/start', $input);
     } elseif ($action === 'pause_campaign') {
         $result = whatsappBridgeRequest('/campaign/pause', $input);

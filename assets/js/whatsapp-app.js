@@ -571,8 +571,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Update global counters
-    const unreadCount = state.leads.filter(l => l.status === 'unread').length;
-    if (els.unreadGlobalBadge) els.unreadGlobalBadge.textContent = unreadCount;
+    const unreadCount = state.leads.filter(l => l.status === 'unread' || (l.unreadCount && l.unreadCount > 0)).length;
+    if (els.unreadGlobalBadge) {
+      els.unreadGlobalBadge.textContent = unreadCount > 0 ? unreadCount : state.leads.length;
+      els.unreadGlobalBadge.title = unreadCount > 0 ? `${unreadCount} unread message(s)` : `${state.leads.length} conversation(s)`;
+    }
 
     const activeId = user ? user.id : state.currentAgent.id;
     const myLeads = state.leads.filter(l => l.ownerId === activeId).length;
@@ -941,7 +944,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.NUNNO_SYNC_LEAD = syncLeadToServer;
 
   // Fetch Centralized Leads on cPanel (Tenant Isolated per Company)
-  function fetchServerLeads() {
+  function fetchServerLeads(silent = false) {
     if (window.NUNNO_LOCAL_LIVE) return;
     const urlParams = new URLSearchParams(window.location.search);
     const compParam = urlParams.get('company_id') || state.currentCompanyId || '';
@@ -973,8 +976,13 @@ document.addEventListener('DOMContentLoaded', () => {
               state.activeLeadId = state.leads.length ? state.leads[0].id : null;
             }
             renderConversationsList();
-            renderActiveChat();
+            if (!silent || (document.activeElement !== els.chatInput)) {
+              renderActiveChat();
+            }
             renderAgentProfile();
+            if (els.viewEmployee && els.viewEmployee.style.display !== 'none') {
+              renderEmployeeWorkspace();
+            }
           }
         }
       })
@@ -3063,6 +3071,10 @@ document.addEventListener('DOMContentLoaded', () => {
           els.campaignStatusBadge.innerHTML = `🟢 Server Sending (${sent}/${total})`;
         }
       }
+      if (sent !== campaignState.lastSyncedSent) {
+        campaignState.lastSyncedSent = sent;
+        fetchServerLeads(true);
+      }
     } else if (isCompleted) {
       if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
       if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
@@ -3082,6 +3094,7 @@ document.addEventListener('DOMContentLoaded', () => {
         els.campaignStatusBadge.style.borderColor = failed > 0 ? '#fbbf24' : '#00a884';
         els.campaignStatusBadge.innerHTML = `✅ Finished: ${sent} Sent${failed > 0 ? `, ${failed} Failed` : ''} of ${total}`;
       }
+      fetchServerLeads(true);
     } else if (isStopped) {
       if (els.startCampaignBtn) els.startCampaignBtn.style.display = 'inline-flex';
       if (els.pauseCampaignBtn) els.pauseCampaignBtn.style.display = 'none';
@@ -3101,6 +3114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         els.campaignStatusBadge.style.borderColor = '#ef4444';
         els.campaignStatusBadge.innerHTML = `⏹️ Stopped (${sent} Sent${failed > 0 ? `, ${failed} Failed` : ''})`;
       }
+      fetchServerLeads(true);
     }
 
     if (data.logs && data.logs.length > 0 && els.campaignTerminalLog) {
@@ -3211,6 +3225,7 @@ document.addEventListener('DOMContentLoaded', () => {
           maxDelay: maxD,
           assignMode,
           closer: state.currentUser,
+          closers: sendersPool,
           senders: sendersPool
         })
       });
@@ -3304,6 +3319,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logCampaignTerminal(`🎉 WhatsApp accepted all ${campaignState.totalSent} campaign messages. All leads registered in CRM.`, 'success');
     showToast(`🎉 Campaign completed! WhatsApp accepted ${campaignState.totalSent} messages.`);
+    fetchServerLeads(true);
   }
 
   function watchCampaignDelivery(contact, attempt) {
@@ -3998,6 +4014,7 @@ document.addEventListener('DOMContentLoaded', () => {
         els.viewInbox.style.removeProperty('display');
         els.viewInbox.style.display = 'flex';
       }
+      fetchServerLeads(true);
       renderConversationsList();
       renderActiveChat();
     } else if (tabName === 'campaign') {
@@ -4009,6 +4026,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (tabName === 'employee') {
       if (els.tabEmployee) els.tabEmployee.classList.add('active', 'tab-wa');
       if (els.viewEmployee) els.viewEmployee.style.display = 'block';
+      fetchServerLeads(true);
       renderEmployeeWorkspace();
     }
   }
@@ -8575,6 +8593,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   }, 10000);
+
+  // 24/7 Real-Time Lead Sync across team devices
+  setInterval(() => {
+    if (state.currentUser && !document.hidden) {
+      fetchServerLeads(true);
+    }
+  }, 5000);
+
   renderConversationsList();
   renderActiveChat();
   syncDossierUiState();

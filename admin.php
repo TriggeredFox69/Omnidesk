@@ -2358,6 +2358,7 @@ async function handleLaunchCampaign(e) {
       audio_url: audioUrl,
       filter: filter === 'custom' ? 'custom' : filter,
       delay: delaySec,
+      closers: senders,
       senders: senders
     };
 

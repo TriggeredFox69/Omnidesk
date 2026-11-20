@@ -43,11 +43,6 @@
       const itemPhone = cleanDigits(item.phone);
       let lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
       if (!lead) {
-        if (shouldFilterNonCampaignMessages()) {
-          // Outbound/outside non-campaign message arriving on TM's personal WhatsApp -> strictly ignore!
-          return null;
-        }
-
         const isTM = isTMUser();
         const isTL = isTLUser();
         const ownerId = (isTL || isTM) ? (state.currentUser?.id || null) : null;
@@ -69,8 +64,8 @@
           leadState: leadState,
           status: 'unread',
           unreadCount: 0,
-          interest: isTL ? 'TL Cold Outreach' : '',
-          notes: isTL ? 'External conversation synced from WhatsApp' : '',
+          interest: isTL ? 'TL Cold Outreach' : (isTM ? 'TM Closer Chat' : ''),
+          notes: 'Conversation synced from connected WhatsApp',
           messages: []
         };
         state.leads.unshift(lead);
