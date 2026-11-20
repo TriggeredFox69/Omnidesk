@@ -771,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     if (els.waConnectionStatus) els.waConnectionStatus.textContent = result.message || labels[result.state] || (state.senderConfigured ? 'WhatsApp connected.' : 'WhatsApp is not connected.');
     if (els.waQrImage) {
-      const validQr = typeof result.qr === 'string' && result.qr.startsWith('data:image/png;base64,');
+      const validQr = typeof result.qr === 'string' && (result.qr.startsWith('data:image/') || result.qr.startsWith('http://') || result.qr.startsWith('https://'));
       els.waQrImage.hidden = !validQr;
       if (validQr) els.waQrImage.src = result.qr;
       else els.waQrImage.removeAttribute('src');
@@ -827,6 +827,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.connectWaModal) els.connectWaModal.classList.add('open');
     if (els.waPendingCampaign) els.waPendingCampaign.hidden = !pendingCampaignStart;
     clearTimeout(waPollTimer);
+    if (!state.senderConfigured) {
+      fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'connect_whatsapp' })
+      }).then(r => r.json()).then(renderSenderConnection).catch(() => {});
+    }
     pollWhatsAppConnection(++waModalGeneration);
   }
   window.openConnectWaModal = openConnectWaModal;
