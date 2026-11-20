@@ -157,23 +157,32 @@ function syncCampaignAudienceToCrm(array $input): void {
     $audience = $input['audience'] ?? [];
     if (!is_array($audience) || empty($audience)) return;
 
-    $closers = $input['closers'] ?? $input['senders'] ?? [];
-    if (!is_array($closers) || empty($closers)) {
+    $rawClosers = $input['closers'] ?? $input['senders'] ?? [];
+    $closers = [];
+    if (is_array($rawClosers) && !empty($rawClosers)) {
+        $closers = array_values(array_filter($rawClosers, function($c) {
+            $r = strtolower($c['role'] ?? $c['roleType'] ?? '');
+            return !in_array($r, ['admin', 'superadmin', 'system administrator'], true);
+        }));
+    }
+    if (empty($closers)) {
         $usersFile = __DIR__ . '/../data/users.json';
         $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
         if (is_array($users)) {
             $closers = array_values(array_filter($users, function($u) use ($companyId) {
+                $status = strtolower($u['status'] ?? 'active');
+                $role = strtolower($u['role'] ?? '');
                 return ($u['company_id'] ?? 'COMP-001') === $companyId &&
-                       strtolower($u['status'] ?? 'active') === 'active' &&
-                       in_array(strtolower($u['role'] ?? ''), ['member', 'lead'], true);
+                       $status === 'active' &&
+                       in_array($role, ['member', 'lead', 'closer', 'tm closer', 'tl'], true);
             }));
         }
     }
     if (empty($closers)) {
         $closers = [[
-            'id' => 'EMP-TM-MWMK43N9',
-            'name' => 'Askari Raza',
-            'username' => 'askari',
+            'id' => 'EMP-TM-1795103817',
+            'name' => 'askariraza',
+            'username' => 'askariraza',
             'role' => 'TM Closer'
         ]];
     }
@@ -182,6 +191,7 @@ function syncCampaignAudienceToCrm(array $input): void {
     $template = $input['message'] ?? 'Hello from Nunno';
     $campName = $input['name'] ?? 'Outreach Campaign';
     $timeNow = date('h:i A');
+    $timestampNow = time();
     $modified = false;
 
     foreach ($audience as $idx => $contact) {
@@ -194,8 +204,8 @@ function syncCampaignAudienceToCrm(array $input): void {
         if (strlen($cleanPhone) < 8) continue;
 
         $assignedCloser = $closers[$idx % $closerCount];
-        $ownerId = $assignedCloser['id'] ?? 'EMP-TM-MWMK43N9';
-        $ownerName = $assignedCloser['name'] ?? 'TM Closer';
+        $ownerId = $assignedCloser['id'] ?? 'EMP-TM-1795103817';
+        $ownerName = $assignedCloser['name'] ?? 'askariraza';
         $ownerUsername = $assignedCloser['username'] ?? $ownerName;
 
         $msgText = str_replace(
@@ -205,7 +215,7 @@ function syncCampaignAudienceToCrm(array $input): void {
         );
 
         $initialMessage = [
-            'id' => 'msg_c_' . (time() * 1000 + $idx),
+            'id' => 'msg_c_' . ($timestampNow * 1000 + $idx),
             'waMessageId' => $contact['messageId'] ?? ('msg_out_' . bin2hex(random_bytes(6))),
             'deliveryStatus' => 'accepted',
             'sender' => 'agent',
@@ -214,6 +224,7 @@ function syncCampaignAudienceToCrm(array $input): void {
             'senderRole' => $assignedCloser['role'] ?? 'TM Closer',
             'cycle' => 1,
             'text' => $msgText,
+            'timestamp' => $timestampNow,
             'time' => $timeNow
         ];
 
@@ -229,6 +240,7 @@ function syncCampaignAudienceToCrm(array $input): void {
                 }
                 $lead['status'] = 'sent';
                 $lead['lastActive'] = 'Just now';
+                $lead['lastMessageAt'] = $timestampNow;
                 if (!isset($lead['messages']) || !is_array($lead['messages'])) {
                     $lead['messages'] = [];
                 }
@@ -248,7 +260,7 @@ function syncCampaignAudienceToCrm(array $input): void {
 
         if (!$found) {
             $newLead = [
-                'id' => 'lead_' . (time() * 1000 + $idx) . '_' . $cleanPhone,
+                'id' => 'lead_' . ($timestampNow * 1000 + $idx) . '_' . $cleanPhone,
                 'company_id' => $companyId,
                 'name' => !empty($contact['name']) ? $contact['name'] : ('+' . $cleanPhone),
                 'phone' => $cleanPhone,
@@ -266,6 +278,7 @@ function syncCampaignAudienceToCrm(array $input): void {
                 'unreadCount' => 0,
                 'interest' => 'Campaign Outreach',
                 'lastActive' => 'Just now',
+                'lastMessageAt' => $timestampNow,
                 'notes' => "Outreach dispatched via campaign \"{$campName}\". Allocated Closer: {$ownerName}.",
                 'messages' => [$initialMessage]
             ];
@@ -275,12 +288,20 @@ function syncCampaignAudienceToCrm(array $input): void {
     }
 
     if ($modified) {
+        $json = json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         $tempFile = $dataFile . '.tmp.' . uniqid();
-        file_put_contents($tempFile, json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        rename($tempFile, $dataFile);
+        $ok = @file_put_contents($tempFile, $json);
+        if ($ok !== false) {
+            if (!@rename($tempFile, $dataFile)) {
+                @file_put_contents($dataFile, $json);
+                @unlink($tempFile);
+            }
+        } else {
+            @file_put_contents($dataFile, $json);
+        }
 
         if ($companyId === 'COMP-001') {
-            @file_put_contents(__DIR__ . '/../data/leads.json', json_encode($leads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            @file_put_contents(__DIR__ . '/../data/leads.json', $json);
         }
     }
 }
@@ -369,6 +390,11 @@ function handleWhatsAppBridge(string $action, array $input): void {
         $check = whatsappBridgeRequest('/status');
         if (empty($check['version']) || $check['version'] !== '15.0') {
             ensureBridgeRunning(true);
+            for ($attempt = 0; $attempt < 6; $attempt++) {
+                usleep(400000);
+                $check = whatsappBridgeRequest('/status');
+                if (!empty($check['success'])) break;
+            }
         }
         $result = whatsappBridgeRequest('/campaign/start', $input);
         if (empty($result['success'])) {

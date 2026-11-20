@@ -578,7 +578,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const activeId = user ? user.id : state.currentAgent.id;
-    const myLeads = state.leads.filter(l => l.ownerId === activeId).length;
+    const activeUsername = (user?.username || '').toLowerCase();
+    const myLeads = (user?.role === 'admin')
+      ? state.leads.length
+      : state.leads.filter(l => l.ownerId === activeId || (activeUsername && (l.ownerUsername || '').toLowerCase() === activeUsername)).length;
     if (els.myLeadsCountBadge) els.myLeadsCountBadge.textContent = myLeads;
   }
 
@@ -3234,6 +3237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyServerCampaignState(data);
         startCampaignStatusPolling();
         fetchServerLeads(true);
+        setTimeout(() => fetchServerLeads(true), 1200);
       } else {
         showToast('⚠️ Could not start campaign: ' + (data?.message || 'Server error'));
       }

@@ -305,15 +305,16 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
 
       let modified = false;
       const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const nowTs = Math.floor(Date.now() / 1000);
 
       for (const contact of audience) {
         const cleanPhone = String(contact.phone || '').replace(/\D/g, '');
         if (!cleanPhone || cleanPhone.length < 8) continue;
 
         let existing = leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone);
-        const ownerId = contact.assignedOwnerId || 'EMP-TM-MWMK43N9';
-        const ownerName = contact.assignedOwnerName || 'TM Closer';
-        const ownerUsername = contact.assignedOwnerUsername || 'closer';
+        const ownerId = contact.assignedOwnerId || 'EMP-TM-1795103817';
+        const ownerName = contact.assignedOwnerName || 'askariraza';
+        const ownerUsername = contact.assignedOwnerUsername || ownerName;
         const personalizedMsg = personalizeMessage(messageTemplate, contact, state.companyName);
 
         const initialMsg = {
@@ -326,6 +327,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
           senderRole: contact.assignedOwnerRole || 'TM Closer',
           cycle: 1,
           text: personalizedMsg || 'Outreach dispatched',
+          timestamp: nowTs,
           time: nowStr
         };
 
@@ -338,6 +340,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
           }
           existing.status = 'sent';
           existing.lastActive = 'Just now';
+          existing.lastMessageAt = nowTs;
           existing.messages = existing.messages || [];
           if (!existing.messages.some(m => m.text === personalizedMsg)) {
             existing.messages.push(initialMsg);
@@ -363,6 +366,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
             unreadCount: 0,
             interest: 'Campaign Outreach',
             lastActive: 'Just now',
+            lastMessageAt: nowTs,
             notes: `Outreach dispatched via campaign "${campaignName}". Allocated Closer: ${ownerName}.`,
             messages: [initialMsg]
           };
@@ -378,7 +382,12 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
             const tmp = targetFile + '.tmp.' + Date.now();
             fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8');
-            fs.renameSync(tmp, targetFile);
+            try {
+              fs.renameSync(tmp, targetFile);
+            } catch (_) {
+              fs.writeFileSync(targetFile, JSON.stringify(leads, null, 2), 'utf8');
+              try { fs.unlinkSync(tmp); } catch (_) {}
+            }
           } catch (e) {
             console.warn('[Campaign syncAudienceToCrm warning]:', e.message);
           }
@@ -473,14 +482,19 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         leads.unshift(newLead);
       }
 
-      // Write atomically to all target files
+      // Write atomically to all target files with fallback
       for (const targetFile of targetPaths) {
         try {
           const dir = path.dirname(targetFile);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
           const tmp = targetFile + '.tmp.' + Date.now();
           fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8');
-          fs.renameSync(tmp, targetFile);
+          try {
+            fs.renameSync(tmp, targetFile);
+          } catch (_) {
+            fs.writeFileSync(targetFile, JSON.stringify(leads, null, 2), 'utf8');
+            try { fs.unlinkSync(tmp); } catch (_) {}
+          }
         } catch (fErr) {
           console.warn(`[Campaign] Failed writing leads to ${targetFile}:`, fErr.message);
         }
