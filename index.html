@@ -32,8 +32,9 @@
     })();
   </script>
   <style>
-    html.preload-agent-view #viewInbox { display: none !important; }
-    html.preload-agent-view #viewEmployee { display: block !important; }
+    html.preload-agent-view:not(.tabs-active) #viewInbox { display: none !important; }
+    html.preload-agent-view:not(.tabs-active) #viewEmployee { display: block !important; }
+    html.tabs-active #viewInbox { display: flex; }
   </style>
   <script>
     window.NUNNO_TEMPLATES = {

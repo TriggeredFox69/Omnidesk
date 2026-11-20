@@ -3909,18 +3909,30 @@ document.addEventListener('DOMContentLoaded', () => {
   function isNunnoPlanLocked(user = state.currentUser || window.NUNNO_ACTIVE_USER) {
     if (!user) return false;
     const uname = String(user.username || '').toLowerCase();
-    // Askari is permanently exempt
-    if (uname === 'askari' || user.id === 'EMP-TM-MWMK43N9' || user.id === 'EMP-TM-ASKARI') return false;
-    if (user.role === 'admin' || user.role === 'superadmin' || user.role === 'lead') return false;
-    // Strictly applies ONLY to other Nunno Official (COMP-001) TMs (role: 'member')
-    const isNunno = (user.company_id === 'COMP-001');
-    const isTM = (user.role === 'member');
-    const hasPlan = Boolean(user.has_nunno_plan);
-    return (isNunno && isTM && !hasPlan);
+    const name = String(user.name || '').toLowerCase();
+    const id = String(user.id || '').toUpperCase();
+
+    // Askari Raza / Admin / Nunno management is permanently exempt
+    if (uname.includes('askari') || name.includes('askari') || uname.includes('nunno') || id.includes('ASKARI') || id === 'EMP-TM-MWMK43N9' || id === 'EMP-TM-ASKARI') {
+      return false;
+    }
+    if (user.role === 'admin' || user.role === 'superadmin' || user.role === 'lead') {
+      return false;
+    }
+    // Active team members must ALWAYS have full access to Team Inbox to chat with assigned leads
+    if (user.status === 'active' || user.has_nunno_plan) {
+      return false;
+    }
+    return Boolean(user.plan_locked);
   }
   window.isNunnoPlanLocked = isNunnoPlanLocked;
 
   function switchTab(tabName) {
+    // Strip initial preload lock class immediately so tab switching works reliably
+    document.documentElement.classList.remove('preload-agent-view');
+    document.documentElement.classList.add('tabs-active');
+    document.body.classList.remove('preload-agent-view');
+
     if (isNunnoPlanLocked() && (tabName === 'inbox' || tabName === 'campaign')) {
       showToast('🔒 Nunno Special Plan (Rs. 1,000) required to access Team Inbox and close leads.');
       tabName = 'employee';
@@ -3952,7 +3964,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (tabName === 'inbox') {
       if (els.tabInbox) els.tabInbox.classList.add('active', 'tab-wa');
-      if (els.viewInbox) els.viewInbox.style.display = '';
+      if (els.viewInbox) {
+        els.viewInbox.style.removeProperty('display');
+        els.viewInbox.style.display = 'flex';
+      }
       renderConversationsList();
       renderActiveChat();
     } else if (tabName === 'campaign') {
@@ -3980,6 +3995,31 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     switchTab('inbox');
+  });
+
+  // Allow clicking Bento Metric Cards on Employee Workspace to navigate directly to filtered inbox
+  ['kpiCardOngoing', 'kpiCardClosed', 'kpiCardReview', 'kpiCardDropped'].forEach(id => {
+    const cardEl = document.getElementById(id);
+    if (cardEl) {
+      cardEl.style.cursor = 'pointer';
+      cardEl.setAttribute('title', 'Click to view matching chats in Team Inbox');
+    }
+  });
+  document.getElementById('kpiCardOngoing')?.addEventListener('click', () => {
+    switchTab('inbox');
+    document.querySelector('.inbox-filter-btn[data-filter="ongoing"]')?.click();
+  });
+  document.getElementById('kpiCardClosed')?.addEventListener('click', () => {
+    switchTab('inbox');
+    document.querySelector('.inbox-filter-btn[data-filter="paid"]')?.click();
+  });
+  document.getElementById('kpiCardReview')?.addEventListener('click', () => {
+    switchTab('inbox');
+    document.querySelector('.inbox-filter-btn[data-filter="pending_verification"]')?.click();
+  });
+  document.getElementById('kpiCardDropped')?.addEventListener('click', () => {
+    switchTab('inbox');
+    document.querySelector('.inbox-filter-btn[data-filter="useless"]')?.click();
   });
 
   async function handleNunnoPlanVerifySubmit(e) {
