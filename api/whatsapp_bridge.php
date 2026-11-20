@@ -1,4 +1,26 @@
 <?php
+// Bump together with `version` in bridge/service.js. After a deploy, the first
+// request that sees the bridge still running the OLD code restarts it once, so the
+// person updating cPanel never has to restart anything by hand.
+const EXPECTED_BRIDGE_VERSION = '16.0';
+
+function ensureBridgeCurrent(?array $status = null): void {
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+    $status = $status ?? whatsappBridgeRequest('/status');
+    if (empty($status['success']) || ($status['version'] ?? '') === EXPECTED_BRIDGE_VERSION) return;
+    // Connection points at a PC tunnel? Then this server cannot restart it.
+    $conn = @include __DIR__ . '/../data/whatsapp-bridge/connection.php';
+    $host = is_array($conn) ? (parse_url((string) ($conn['url'] ?? ''), PHP_URL_HOST) ?: '127.0.0.1') : '127.0.0.1';
+    if (!in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) return;
+    $lock = __DIR__ . '/../data/whatsapp-bridge/upgrade.lock';
+    if (is_file($lock) && time() - filemtime($lock) < 600) return;   // at most once per 10 minutes
+    @touch($lock);
+    error_log('[Bridge] Running ' . ($status['version'] ?? '?') . ', expected ' . EXPECTED_BRIDGE_VERSION . ': restarting with the new code.');
+    ensureBridgeRunning(true);
+}
+
 function bridgePortOpen(): bool {
     $fp = @fsockopen('127.0.0.1', 3210, $errno, $errstr, 0.5);
     if ($fp) { fclose($fp); return true; }
@@ -419,6 +441,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
         }
         // Verify bridge process is active and running latest v15.0 engine
         $check = whatsappBridgeRequest('/status');
+        ensureBridgeCurrent($check);
         if (empty($check['success']) && !bridgePortOpen()) {
             ensureBridgeRunning(false);
             for ($attempt = 0; $attempt < 6; $attempt++) {
@@ -645,6 +668,7 @@ function handleCampaignDevice(string $action, array $input): void {
 
 /** Map of userId => connected device number, from the bridge. Empty when the bridge is down. */
 function campaignConnectedDevices(array $users = []): array {
+    ensureBridgeCurrent();
     $res = whatsappBridgeRequest('/devices');
     $out = [];
     foreach (($res['devices'] ?? []) as $d) {
@@ -681,6 +705,7 @@ function findUserByWhatsApp(string $phone): ?array {
  * verified phone is stored in this PHP session so qr_login / tm_register can trust it.
  */
 function handleLoginQr(string $action): void {
+    ensureBridgeCurrent();
     $loginId = $_SESSION['qr_login_id'] ?? '';
     // Already scanned in this browser a moment ago: stay on the "connected" card.
     if ($action === 'login_qr_status' && !$loginId && !empty($_SESSION['qr_verified_phone']) && time() - (int) ($_SESSION['qr_verified_at'] ?? 0) < 900) {

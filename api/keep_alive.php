@@ -36,6 +36,7 @@ if (isset($_GET['deploy'])) {
 require_once __DIR__ . '/whatsapp_bridge.php';
 
 $bridgeStatus = whatsappBridgeRequest('/status');
+ensureBridgeCurrent($bridgeStatus);
 
 $started = false;
 // Port open = the bridge is alive (maybe just busy). Never start a second copy then.
