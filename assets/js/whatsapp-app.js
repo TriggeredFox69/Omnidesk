@@ -254,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
     batchSelectedCount: document.getElementById('batchSelectedCount'),
     batchDeleteBtn: document.getElementById('batchDeleteBtn'),
     batchCancelBtn: document.getElementById('batchCancelBtn'),
+    deleteCurrentChatBtn: document.getElementById('deleteCurrentChatBtn'),
     myOngoingsBtn: document.getElementById('myOngoingsBtn'),
     myOngoingCountBadge: document.getElementById('myOngoingCountBadge'),
     convSearchInput: document.getElementById('convSearchInput'),
@@ -528,10 +529,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = state.currentUser;
     const isAdmin = user ? (user.role === 'admin' || user.role === 'master admin') : false;
 
-    // Strict Role Restrictions: Hide Campaigns, Employees & Delete for Normal Users
+    // Strict Role Restrictions: Hide Campaigns & Employees for Normal Users
     if (els.tabCampaign) els.tabCampaign.style.display = isAdmin ? 'inline-flex' : 'none';
     if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-    if (els.adminDeleteToggleBtn) els.adminDeleteToggleBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (els.adminDeleteToggleBtn) els.adminDeleteToggleBtn.style.display = 'inline-flex';
 
     if (els.tabEmployeeLabel) {
       els.tabEmployeeLabel.textContent = isAdmin ? '📊 Team Stats' : '📊 My Stats';
@@ -1444,12 +1445,16 @@ document.addEventListener('DOMContentLoaded', () => {
     state.leads = state.leads.filter(l => !ids.includes(l.id));
     ids.forEach(id => selectedLeadIds.delete(id));
     if (ids.includes(state.activeLeadId)) {
+      try { localStorage.removeItem('omnidesk_active_chat_phone'); } catch (e) {}
       state.activeLeadId = state.leads[0]?.id || null;
     }
     if (!state.leads.length) {
       adminDeleteMode = false;
       if (els.adminBatchBar) els.adminBatchBar.style.display = 'none';
-      if (els.adminDeleteToggleBtn) els.adminDeleteToggleBtn.classList.remove('active');
+      if (els.adminDeleteToggleBtn) {
+        els.adminDeleteToggleBtn.classList.remove('active');
+        els.adminDeleteToggleBtn.innerHTML = '🗑️ Delete';
+      }
     }
     updateBatchBarCount();
     renderConversationsList();
@@ -1688,11 +1693,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const assignedTm = getLeadAssignedTm(lead);
       const isCompanyAdmin = state.currentUser ? ['admin', 'superadmin'].includes(state.currentUser.role) : false;
       const canImpersonateThisTm = isCompanyAdmin && !assignedTm.isUnassigned && assignedTm.username && assignedTm.username !== state.currentUser?.username;
+      const isLeadChecked = selectedLeadIds.has(lead.id);
 
       const item = document.createElement('div');
-      item.className = `conv-item state-${leadState} ${isSelected ? 'active' : ''}`;
+      item.className = `conv-item state-${leadState} ${isSelected ? 'active' : ''} ${isLeadChecked ? 'batch-selected' : ''}`;
       item.dataset.leadPhone = normalizePhone(lead.phone);
       item.onclick = async (e) => {
+        if (adminDeleteMode) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (selectedLeadIds.has(lead.id)) {
+            selectedLeadIds.delete(lead.id);
+          } else {
+            selectedLeadIds.add(lead.id);
+          }
+          updateBatchBarCount();
+          renderConversationsList();
+          return;
+        }
         if (canImpersonateThisTm) {
           e.preventDefault();
           await handleAdminDirectSwitchToTm(lead, assignedTm);
@@ -1702,6 +1720,11 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       item.innerHTML = `
+        ${adminDeleteMode ? `
+          <div class="conv-select-wrap" style="display:flex;align-items:center;padding:0 8px 0 2px;" onclick="event.stopPropagation();">
+            <input type="checkbox" class="conv-select-checkbox" data-lead-id="${lead.id}" ${isLeadChecked ? 'checked' : ''} style="accent-color:#ef4444;width:18px;height:18px;cursor:pointer;">
+          </div>
+        ` : ''}
         <div class="conv-avatar-wrap">
           <span class="avatar-initials">${initials}</span>
           <div class="lead-status-dot status-${leadState}" title="${leadState === 'fresh' ? '🔴 Fresh (No one claimed)' : leadState === 'ongoing' ? '🟡 Ongoing (In Progress)' : leadState === 'pending_verification' ? '⚪ In Review (Awaiting Admin Verification)' : leadState === 'paid' ? '🟢 Closed (Client Paid)' : '🔵 Won\'t Pay'}"></div>
@@ -1731,6 +1754,22 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `;
+
+      if (adminDeleteMode) {
+        const cb = item.querySelector('.conv-select-checkbox');
+        if (cb) {
+          cb.addEventListener('change', (e) => {
+            if (e.target.checked) {
+              selectedLeadIds.add(lead.id);
+            } else {
+              selectedLeadIds.delete(lead.id);
+            }
+            updateBatchBarCount();
+            item.classList.toggle('batch-selected', e.target.checked);
+          });
+        }
+      }
+
       els.conversationsScroll.appendChild(item);
     });
   }
@@ -2768,6 +2807,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function parseContactsFromText(text) {
     if (!text) return 0;
+    campaignState.audienceCleared = false;
     const lines = text.split(/[\r\n]+/);
     let added = 0;
     lines.forEach((line, idx) => {
@@ -3011,10 +3051,10 @@ document.addEventListener('DOMContentLoaded', () => {
       els.campaignNameInput.value = data.name;
     }
 
-    if (data.audience && data.audience.length > 0 && campaignState.audience.length === 0) {
+    if (data.audience && data.audience.length > 0 && campaignState.audience.length === 0 && (isRunning || isPaused) && !campaignState.audienceCleared) {
       campaignState.audience = data.audience;
       renderCampaignAudienceUI();
-    } else if (data.audience && data.audience.length > 0) {
+    } else if (data.audience && data.audience.length > 0 && !campaignState.audienceCleared) {
       for (const sa of data.audience) {
         const local = campaignState.audience.find(c => c.phone === sa.phone);
         if (local) {
@@ -3823,7 +3863,34 @@ document.addEventListener('DOMContentLoaded', () => {
       campaignState.audience = [];
       campaignState.currentIndex = 0;
       campaignState.totalSent = 0;
+      campaignState.totalFailed = 0;
+      campaignState.audienceCleared = true;
+
+      if (els.campaignPasteArea) els.campaignPasteArea.value = '';
+      if (els.campaignAudienceSummary) els.campaignAudienceSummary.style.display = 'none';
+      if (els.campaignAudienceList) {
+        els.campaignAudienceList.innerHTML = '';
+        els.campaignAudienceList.style.display = 'none';
+      }
+      if (els.campaignLoadedCountText) els.campaignLoadedCountText.textContent = '0 Numbers';
+      if (els.campaignAudienceBadge) els.campaignAudienceBadge.textContent = '0 Contacts';
+      if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'none';
+      if (els.campaignStatusBadge) {
+        els.campaignStatusBadge.style.color = '#8696a0';
+        els.campaignStatusBadge.style.background = 'transparent';
+        els.campaignStatusBadge.style.borderColor = 'var(--border-subtle)';
+        els.campaignStatusBadge.innerHTML = '⚪ Ready to Launch';
+      }
+
       renderCampaignAudienceUI();
+
+      // Tell backend bridge to clear campaign queue as well
+      fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear_campaign' })
+      }).catch(() => {});
+
       logCampaignTerminal('🗑️ Target audience list cleared by operator.', 'info');
       showToast('Audience list cleared.');
     });
@@ -3831,6 +3898,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (els.quickAddMyNumberBtn) {
     els.quickAddMyNumberBtn.addEventListener('click', () => {
+      campaignState.audienceCleared = false;
       const userPhone = (state.currentUser?.phone || state.connectedWaNumber || '923001234567').replace(/\D/g, '');
       const userDisplay = '+' + userPhone;
       const userName = state.currentUser?.name || 'My Linked Number';
@@ -8500,6 +8568,22 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.batchCancelBtn) {
     els.batchCancelBtn.addEventListener('click', () => {
       toggleAdminDeleteMode();
+    });
+  }
+
+  // Single Chat Delete Button in Chat Header
+  if (els.deleteCurrentChatBtn) {
+    els.deleteCurrentChatBtn.addEventListener('click', async () => {
+      if (!state.activeLeadId) {
+        showToast('⚠️ No active conversation selected.');
+        return;
+      }
+      const lead = getLead(state.activeLeadId);
+      const name = lead ? (lead.name || lead.display || lead.phone) : 'this conversation';
+      if (!confirm(`Permanently delete conversation with ${name}? This will free storage and remove message history.`)) {
+        return;
+      }
+      await deleteLeads([state.activeLeadId]);
     });
   }
 

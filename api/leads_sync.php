@@ -180,7 +180,7 @@ if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
     exit;
 }
 
-// Permanently delete single or multiple conversations (Admin Only)
+// Permanently delete single or multiple conversations
 if ($action === 'delete_leads' || $action === 'delete_lead') {
     $leadIds = $input['ids'] ?? [];
     if (empty($leadIds) && !empty($input['id'])) {
@@ -192,20 +192,44 @@ if ($action === 'delete_leads' || $action === 'delete_lead') {
         exit;
     }
 
+    // Extract all phone numbers associated with the targeted leads
+    $phonesToDelete = [];
+    foreach ($currentLeads as $l) {
+        if (in_array($l['id'], $leadIds)) {
+            $clean = preg_replace('/\D/', '', $l['phone'] ?? '');
+            if ($clean) $phonesToDelete[] = $clean;
+        }
+    }
+    foreach ($leadIds as $id) {
+        $clean = preg_replace('/\D/', '', $id);
+        if (strlen($clean) >= 9) {
+            $phonesToDelete[] = $clean;
+        }
+    }
+    $phonesToDelete = array_values(array_unique($phonesToDelete));
+
     $initialCount = count($currentLeads);
-    $currentLeads = array_values(array_filter($currentLeads, function($l) use ($leadIds) {
-        return !in_array($l['id'], $leadIds);
+    $currentLeads = array_values(array_filter($currentLeads, function($l) use ($leadIds, $phonesToDelete) {
+        if (in_array($l['id'], $leadIds)) return false;
+        $clean = preg_replace('/\D/', '', $l['phone'] ?? '');
+        if ($clean && in_array($clean, $phonesToDelete)) return false;
+        return true;
     }));
     $deletedCount = $initialCount - count($currentLeads);
     saveStoredLeads($dataFile, $currentLeads);
 
-    // Also purge deleted numbers from bridge inbox.json so they don't resurrect
-    $dataDir = dirname(__DIR__) . '/data/whatsapp-bridge';
-    $inboxFiles = [$dataDir . '/inbox.json', $dataDir . '/whatsapp-bridge/inbox.json'];
+    // Also purge deleted numbers from all bridge & cloud inbox files so they never resurrect
+    $dataRoot = dirname(__DIR__) . '/data';
+    $inboxFiles = [
+        $dataRoot . '/whatsapp-bridge/inbox.json',
+        $dataRoot . '/whatsapp-bridge/whatsapp-bridge/inbox.json',
+        $dataRoot . '/whatsapp-bridge/local/inbox.json',
+        $dataRoot . '/whatsapp-cloud/inbox.json',
+        $dataRoot . '/inbox.json'
+    ];
     foreach ($inboxFiles as $inboxFile) {
         if (file_exists($inboxFile)) {
             $inbox = json_decode(@file_get_contents($inboxFile), true) ?: [];
-            $phonesToDelete = array_map(function($id) { return preg_replace('/\D/', '', $id); }, $leadIds);
             $newInbox = array_values(array_filter($inbox, function($m) use ($phonesToDelete) {
                 $sender = preg_replace('/\D/', '', $m['from'] ?? $m['sender'] ?? '');
                 return !in_array($sender, $phonesToDelete);

@@ -406,6 +406,28 @@ function handleWhatsAppBridge(string $action, array $input): void {
         $result = whatsappBridgeRequest('/campaign/resume', $input);
     } elseif ($action === 'stop_campaign') {
         $result = whatsappBridgeRequest('/campaign/stop', $input);
+    } elseif ($action === 'clear_campaign') {
+        $result = whatsappBridgeRequest('/campaign/clear', $input);
+        if (empty($result['success'])) {
+            $result = ['success' => true, 'message' => 'Campaign cleared.'];
+        }
+        $stateFiles = [
+            __DIR__ . '/../data/whatsapp-bridge/campaign_state.json',
+            __DIR__ . '/../data/campaign_state.json'
+        ];
+        foreach ($stateFiles as $sf) {
+            if (file_exists($sf)) {
+                $cur = json_decode(@file_get_contents($sf), true) ?: [];
+                $cur['audience'] = [];
+                $cur['status'] = 'idle';
+                $cur['currentIndex'] = 0;
+                $cur['totalSent'] = 0;
+                $cur['totalFailed'] = 0;
+                $cur['remainingSeconds'] = 0;
+                $cur['logs'] = [];
+                @file_put_contents($sf, json_encode($cur, JSON_PRETTY_PRINT));
+            }
+        }
     } elseif ($action === 'get_campaign_status') {
         $result = whatsappBridgeRequest('/campaign/status');
     } else {

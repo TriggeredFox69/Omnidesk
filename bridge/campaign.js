@@ -855,6 +855,21 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     return getStatus();
   }
 
+  function clear() {
+    clearTimeout(loopTimer);
+    clearInterval(countdownTimer);
+    inFlight = false;
+    state.status = 'idle';
+    state.audience = [];
+    state.currentIndex = 0;
+    state.totalSent = 0;
+    state.totalFailed = 0;
+    state.remainingSeconds = 0;
+    state.logs = [];
+    saveState();
+    return getStatus();
+  }
+
   function getStatus() {
     const poolSize = Math.max(1, state.sendersPool.length);
     const activeIndex = state.currentIndex % poolSize;
@@ -911,6 +926,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     pause,
     resume,
     stop,
+    clear,
     getStatus
   };
 }

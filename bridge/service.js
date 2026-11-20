@@ -284,6 +284,10 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         reply(200, campaignManager.stop());
         return;
       }
+      if (url.pathname === '/campaign/clear') {
+        reply(200, campaignManager.clear ? campaignManager.clear() : campaignManager.stop());
+        return;
+      }
       if (url.pathname === '/send') { reply(200, await send(body)); return; }
       reply(404, { success: false, message: 'Unknown route.' });
     } catch (err) { reply(err.status || 502, { success: false, message: err.message }); }
