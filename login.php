@@ -2325,11 +2325,6 @@ async function handleTMRegisterSubmit(e) {
     const data = await res.json();
     if (data.success) {
       closeTMRegisterModal();
-      if (company_id === 'COMP-001' && !isTL) {
-        // Nunno TM: redirect directly to their stats page with the 1,000 RS Nunno plan lock
-        triggerLoginAnimation(fullName || username, 'Nunno Official Collab • Opening Closer Stats Desk...', data.redirect || 'index.php?tab=employee');
-        return;
-      }
       const compSelect = document.getElementById('regTMCompany');
       const compName = compSelect.options[compSelect.selectedIndex]?.text || 'Company';
       const successTitle = document.getElementById('successModalTitle');

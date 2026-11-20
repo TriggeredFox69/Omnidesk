@@ -216,6 +216,23 @@ function getUsers($usersFile) {
         saveUsers($usersFile, $users);
     }
 
+    // Revert unapproved signups (e.g., erij) that were previously auto-approved back to pending so the company admin can review and approve them
+    $dirty = false;
+    foreach ($users as &$u) {
+        $uName = strtolower($u['username'] ?? '');
+        $uFull = strtolower($u['name'] ?? '');
+        if ((strpos($uName, 'erij') !== false || strpos($uFull, 'erij') !== false) && empty($u['approved_by'])) {
+            if (($u['status'] ?? '') === 'active') {
+                $u['status'] = 'pending';
+                $dirty = true;
+            }
+        }
+    }
+    unset($u);
+    if ($dirty) {
+        saveUsers($usersFile, $users);
+    }
+
     return $users;
 }
 
@@ -437,35 +454,13 @@ switch ($action) {
             $newAccount['joined_via_tl'] = $referredByTL;
         }
 
-        $isNunnoTM = ($companyId === 'COMP-001' && !$isTL);
-        if ($isNunnoTM) {
-            $newAccount['status'] = 'active'; // Immediate access to Closer Stats Desk
-            $newAccount['has_nunno_plan'] = false; // Locked behind Rs. 1,000 Special Plan
-            $newAccount['nunno_plan_status'] = 'unpaid';
-            $newAccount['nunno_plan_price'] = 1000;
-            $newAccount['nunno_plan_official_price'] = 1700;
-        }
-
         $users[] = $newAccount;
         saveUsers($usersFile, $users);
-
-        if ($isNunnoTM) {
-            $sanitizedTM = sanitizeUser($newAccount);
-            $_SESSION['omnidesk_user'] = $sanitizedTM;
-            $_SESSION['current_user'] = $sanitizedTM;
-            echo json_encode([
-                'success'     => true,
-                'message'     => 'Welcome to Nunno Official! Redirecting to closer desk...',
-                'redirect'    => 'index.php?tab=employee',
-                'is_nunno_tm' => true,
-                'user'        => $sanitizedTM
-            ]);
-            exit;
-        }
 
         echo json_encode([
             'success' => true,
             'message' => 'Application submitted successfully! Your account is pending manual approval by company administration.',
+            'pending' => true,
             'user'    => sanitizeUser($newAccount)
         ]);
         exit;
@@ -541,7 +536,7 @@ switch ($action) {
                     }
                 }
                 $u['approved_at'] = date('Y-m-d H:i:s');
-                $u['approved_by'] = $currentUser['username'];
+                $u['approved_by'] = $authAdmin['username'] ?? ($currentUser['username'] ?? 'admin');
                 $found = true;
                 $approvedUser = $u;
                 break;
@@ -910,29 +905,28 @@ switch ($action) {
             'email'                 => $email,
             'password_hash'         => password_hash($password, PASSWORD_BCRYPT),
             'role'                  => 'lead',
-            'designation'           => 'Commission Team Lead',
+            'designation'           => 'Commission Team Lead (Applicant)',
             'gender'                => 'male',
             'phone'                 => $phone,
-            'status'                => 'active',
+            'status'                => 'pending',
             'company_id'            => $companyId,
             'message_limit'         => 500,
             'messages_sent_today'   => 0,
             'quota_reset_date'      => date('Y-m-d'),
             'tl_commission_balance' => 0,
-            'created_at'            => date('Y-m-d H:i:s'),
-            'last_login'            => date('Y-m-d H:i:s')
+            'applied_at'            => date('Y-m-d H:i:s'),
+            'created_at'            => date('Y-m-d H:i:s')
         ];
 
         $users[] = $newTL;
         saveUsers($usersFile, $users);
 
         $safeUser = sanitizeUser($newTL);
-        session_regenerate_id(true);
-        $_SESSION['omnidesk_user'] = $safeUser;
 
         echo json_encode([
             'success' => true,
-            'message' => 'Team Leader account registered! Welcome to the commission portal.',
+            'message' => 'Team Leader application submitted! Your account is pending company administration approval.',
+            'pending' => true,
             'user'    => $safeUser
         ]);
         exit;
@@ -1048,38 +1042,25 @@ switch ($action) {
         $isNunnoTM = (($matchedUser['company_id'] ?? '') === 'COMP-001' && ($matchedUser['role'] ?? '') === 'member' && !$isAskari);
 
         if (($matchedUser['status'] ?? 'active') === 'pending') {
-            if ($isNunnoTM) {
-                // Nunno TMs are allowed into their Stats desk where the 1,000 RS plan lock is displayed
-                $matchedUser['status'] = 'active';
-                if (!isset($matchedUser['has_nunno_plan'])) {
-                    $matchedUser['has_nunno_plan'] = false;
-                    $matchedUser['nunno_plan_status'] = 'unpaid';
-                    $matchedUser['nunno_plan_price'] = 1000;
-                    $matchedUser['nunno_plan_official_price'] = 1700;
-                }
-                $users[$userIndex] = $matchedUser;
-                saveUsers($usersFile, $users);
-            } else {
-                http_response_code(403);
-                $compName = 'Company';
-                $compsFile = __DIR__ . '/../data/companies.json';
-                if (file_exists($compsFile)) {
-                    $comps = json_decode(file_get_contents($compsFile), true);
-                    if (is_array($comps)) {
-                        foreach ($comps as $c) {
-                            if ($c['id'] === ($matchedUser['company_id'] ?? '')) {
-                                $compName = $c['name'];
-                                break;
-                            }
+            http_response_code(403);
+            $compName = 'Company';
+            $compsFile = __DIR__ . '/../data/companies.json';
+            if (file_exists($compsFile)) {
+                $comps = json_decode(file_get_contents($compsFile), true);
+                if (is_array($comps)) {
+                    foreach ($comps as $c) {
+                        if ($c['id'] === ($matchedUser['company_id'] ?? '')) {
+                            $compName = $c['name'];
+                            break;
                         }
                     }
                 }
-                echo json_encode([
-                    'success' => false,
-                    'error'   => "⏳ Your account is pending manual approval by {$compName} administration. Please contact your company administrator or wait for approval."
-                ]);
-                exit;
             }
+            echo json_encode([
+                'success' => false,
+                'error'   => "⏳ Your account is pending manual approval by {$compName} administration. Please contact your company administrator or wait for approval."
+            ]);
+            exit;
         }
 
         if (($matchedUser['status'] ?? 'active') === 'suspended') {
