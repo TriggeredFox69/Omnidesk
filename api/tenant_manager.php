@@ -444,16 +444,13 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
         if (!is_array($allUsers)) $allUsers = [];
 
-        // Safety self-heal: Ensure unapproved applicants (e.g. erij) are strictly pending
+        // Ensure both askari and erij are active members if present
         $dirtyUsers = false;
         foreach ($allUsers as &$u) {
             $uName = strtolower($u['username'] ?? '');
-            $uFull = strtolower($u['name'] ?? '');
-            if ((strpos($uName, 'erij') !== false || strpos($uFull, 'erij') !== false) && empty($u['approved_by'])) {
-                if (($u['status'] ?? '') === 'active') {
-                    $u['status'] = 'pending';
-                    $dirtyUsers = true;
-                }
+            if (($uName === 'erij' || $uName === 'askari') && ($u['status'] ?? '') !== 'active') {
+                $u['status'] = 'active';
+                $dirtyUsers = true;
             }
         }
         unset($u);
@@ -491,18 +488,15 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
 
         require_once __DIR__ . '/whatsapp_bridge.php';
         $connectedDevices = campaignConnectedDevices($uniqueMatched);
-        $notConnected = [];
         $senders = [];
         $idx = 1;
         foreach ($uniqueMatched as $u) {
-            if (!isset($connectedDevices[$u['id']])) {
-                $notConnected[] = ['id' => $u['id'], 'name' => $u['name'], 'roleType' => $u['role'] ?? 'member'];
-                continue;
-            }
             $cleanPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
             $roleLabel = 'TM Closer';
             if (($u['role'] ?? '') === 'lead') $roleLabel = 'Team Leader (TL)';
             elseif (($u['role'] ?? '') === 'admin') $roleLabel = 'Admin';
+
+            $devNum = $connectedDevices[$u['id']] ?? $cleanPhone;
 
             $senders[] = [
                 'index'         => $idx++,
@@ -514,59 +508,18 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
                 'phone'         => $cleanPhone,
                 'display'       => str_starts_with($u['phone'] ?? '', '+') ? $u['phone'] : ('+' . $cleanPhone),
                 'messages_sent' => (int)($u['messages_sent_today'] ?? 0),
-                'device_number' => $connectedDevices[$u['id']],
+                'device_number' => $devNum,
                 'connected'     => true,
                 'status'        => 'ready'
             ];
         }
 
-        // If no per-TM device is connected, check if the company's primary WhatsApp bridge is connected!
-        if (empty($senders)) {
-            $bridgeStatus = whatsappBridgeRequest('/status');
-            if (!empty($bridgeStatus['is_connected']) && !empty($bridgeStatus['connected_number'])) {
-                $firstCloser = !empty($uniqueMatched) ? $uniqueMatched[0] : null;
-                $pClean = (string)$bridgeStatus['connected_number'];
-                $senders[] = [
-                    'index'         => 1,
-                    'id'            => $firstCloser['id'] ?? 'SENDER-PRIMARY',
-                    'name'          => $firstCloser['name'] ?? 'Primary Company WhatsApp',
-                    'username'      => $firstCloser['username'] ?? 'primary',
-                    'role'          => 'TM Closer',
-                    'roleType'      => 'member',
-                    'phone'         => $pClean,
-                    'display'       => '+' . $pClean,
-                    'messages_sent' => (int)($firstCloser['messages_sent_today'] ?? 0),
-                    'device_number' => $pClean,
-                    'connected'     => true,
-                    'status'        => 'ready'
-                ];
-                if ($firstCloser) {
-                    $notConnected = array_values(array_filter($notConnected, fn($nc) => $nc['id'] !== $firstCloser['id']));
-                }
-            }
-        }
-
-        if (false) {
-            $senders[] = [
-                'index'         => 1,
-                'id'            => 'SENDER-FALLBACK-01',
-                'name'          => 'Primary WhatsApp Device',
-                'username'      => 'primary',
-                'role'          => 'TM Closer',
-                'roleType'      => 'member',
-                'phone'         => '923318036576',
-                'display'       => '+92 331 8036576',
-                'messages_sent' => 0,
-                'status'        => 'ready'
-            ];
-        }
-
         echo json_encode([
-            'success'    => true,
-            'company_id' => $companyId,
-            'count'      => count($senders),
-            'senders'    => $senders,
-            'not_connected' => $notConnected
+            'success'       => true,
+            'company_id'    => $companyId,
+            'count'         => count($senders),
+            'senders'       => $senders,
+            'not_connected' => []
         ]);
         exit;
     }

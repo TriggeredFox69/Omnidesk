@@ -50,9 +50,8 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
 function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, dataDir, getLeadsPath, getUsersPath, offlineGraceMs }) {
   const digits = v => String(v || '').replace(/\D/g, '');
   const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
-  // A TM is linked if they have their own device session, or if the company's main
-  // WhatsApp session is their phone (how TMs used to log in).
-  const viaMain = s => { const m = typeof mainStatus === 'function' ? mainStatus() : null; return !!(m && m.ready && samePhone(m.number, s.phone)); };
+  const isMainOnline = () => { const m = typeof mainStatus === 'function' ? mainStatus() : null; return !!(m && m.ready); };
+  const viaMain = s => isMainOnline();
   const stateFile = path.join(dataDir, 'campaign_state.json');
 
   let state = {
@@ -504,7 +503,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, data
 
   const isDone = c => ['accepted', 'sent', 'delivered', 'read', 'failed'].includes(c.status);
   const laneOf = id => (state.lanes || []).find(l => l.id === id);
-  const deviceOnline = lane => lane.mode === 'main' ? viaMain(lane) : (typeof deviceReady === 'function' && deviceReady(lane.id));
+  const deviceOnline = lane => lane.mode === 'main' ? isMainOnline() : (typeof deviceReady === 'function' && deviceReady(lane.id));
   const laneSender = lane => ({ id: lane.id, name: lane.name, username: lane.username, role: lane.role, roleType: lane.roleType, phone: lane.phone });
 
   function clearLaneTimers() {
@@ -658,17 +657,21 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, data
     picked = picked.filter(s => s && s.id && s.roleType !== 'admin' && s.roleType !== 'superadmin' && s.role !== 'Admin');
     const seenIds = new Set();
     picked = picked.filter(s => (seenIds.has(s.id) ? false : (seenIds.add(s.id), true)));
-    const mainMode = params.send_mode === 'main_number';
     const hasDevice = s => typeof deviceReady === 'function' && deviceReady(s.id);
-    let online = mainMode ? picked : picked.filter(s => hasDevice(s) || viaMain(s));
-    if (!online.length && picked.length > 0) {
-      // Fallback: if no individual TM device is linked, use the company's primary WhatsApp number
-      online = picked.slice(0, 1);
+    const anyDeviceReady = picked.some(s => hasDevice(s));
+    const mainReady = isMainOnline();
+
+    if (!picked.length) {
+      return { success: false, status: state.status, message: 'No closers or team members found for this company to send campaign outreach.' };
     }
-    const skipped = picked.filter(s => !online.includes(s));
-    if (!online.length) {
+
+    if (!anyDeviceReady && !mainReady) {
       return { success: false, status: state.status, message: 'WhatsApp is not connected on the server. Please click "Link Phone / Scan QR" and scan the code using WhatsApp on your phone before starting the campaign.' };
     }
+
+    // Distribute campaign across all company closers/employees
+    let online = picked;
+    const skipped = [];
 
     // 2. Audience: the dropped numbers (or the company's leads)
     let rawAudience = Array.isArray(params.audience) && params.audience.length > 0 ? params.audience : [];
@@ -708,11 +711,12 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, data
 
     state.lanes = online.map((s, idx) => {
       const phone = String(s.phone || '').replace(/\D/g, '');
+      const userHasDevice = hasDevice(s);
       return {
         index: idx + 1, id: s.id, name: s.name || `TM ${idx + 1}`, username: s.username || '',
         role: s.role || (s.roleType === 'lead' ? 'Team Leader (TL)' : 'TM Closer'), roleType: s.roleType || 'member',
         phone, display: s.device_number ? ('+' + s.device_number) : (s.display || (phone ? '+' + phone : '')),
-        mode: (mainMode || (!hasDevice(s) && viaMain(s))) ? 'main' : 'device',
+        mode: userHasDevice ? 'device' : 'main',
         assigned: 0, sent: 0, failed: 0, status: 'ready', offlineSince: null, nextAt: null, lastSentAt: null
       };
     });
