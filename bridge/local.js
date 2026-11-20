@@ -93,6 +93,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
     bridge.server.listen(bridgePort, '127.0.0.1', resolve);
   });
   bridge.connect();
+  try { bridge.devicePool.restoreAll(); } catch (err) { console.error('Device restore:', err.message); }
   const bridgeUrl = `http://127.0.0.1:${bridge.server.address().port}`;
   const usersPath = path.join(root, 'data/users.json');
   function loadLocalUsers() {
@@ -796,7 +797,15 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
                 status: 'ready'
               };
             });
-            if (!senders.length) {
+            // Only Team Members whose own WhatsApp is linked for campaigns take part.
+            const devPool = bridge && bridge.devicePool;
+            const notConnected = devPool ? senders.filter(s => !devPool.isReady(s.id)).map(s => ({ id: s.id, name: s.name, roleType: s.roleType })) : [];
+            if (devPool) {
+              const devs = Object.fromEntries(devPool.list().map(d => [d.user_id, d.connected_number]));
+              senders = senders.filter(s => devPool.isReady(s.id)).map((s, i) => ({ ...s, index: i + 1, device_number: devs[s.id] || '', connected: true }));
+            }
+
+            if (false) {
               senders = [{
                 index: 1,
                 id: 'SENDER-FALLBACK-01',
@@ -810,7 +819,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
                 status: 'ready'
               }];
             }
-            json(200, { success: true, company_id: compId, count: senders.length, senders });
+            json(200, { success: true, company_id: compId, count: senders.length, senders, not_connected: notConnected });
             return;
           }
         }
@@ -888,7 +897,15 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
                 status: 'ready'
               };
             });
-            if (!senders.length) {
+            // Only Team Members whose own WhatsApp is linked for campaigns take part.
+            const devPool = bridge && bridge.devicePool;
+            const notConnected = devPool ? senders.filter(s => !devPool.isReady(s.id)).map(s => ({ id: s.id, name: s.name, roleType: s.roleType })) : [];
+            if (devPool) {
+              const devs = Object.fromEntries(devPool.list().map(d => [d.user_id, d.connected_number]));
+              senders = senders.filter(s => devPool.isReady(s.id)).map((s, i) => ({ ...s, index: i + 1, device_number: devs[s.id] || '', connected: true }));
+            }
+
+            if (false) {
               senders = [{
                 index: 1,
                 id: 'SENDER-FALLBACK-01',
@@ -902,7 +919,7 @@ async function startLocal({ createClient, qrImage, port = 8080, openBrowser = tr
                 status: 'ready'
               }];
             }
-            json(200, { success: true, company_id: compId, count: senders.length, senders });
+            json(200, { success: true, company_id: compId, count: senders.length, senders, not_connected: notConnected });
             return;
           }
           if (action === 'update_message_limit') {

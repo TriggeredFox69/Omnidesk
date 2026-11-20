@@ -1,8 +1,18 @@
 <?php
+function bridgePortOpen(): bool {
+    $fp = @fsockopen('127.0.0.1', 3210, $errno, $errstr, 0.5);
+    if ($fp) { fclose($fp); return true; }
+    return false;
+}
+
 function ensureBridgeRunning(bool $force = false): bool {
     static $attempted = false;
     if ($attempted && !$force) return false;
     $attempted = true;
+    // A slow bridge is still a running bridge. Starting another copy used to pile up
+    // duplicate processes (cPanel then killed them all) and made two copies of the
+    // same WhatsApp login kick each other off.
+    if (!$force && bridgePortOpen()) return true;
 
     $baseDir = realpath(__DIR__ . '/..');
     $dataDir = $baseDir . '/data/whatsapp-bridge';
@@ -18,7 +28,9 @@ function ensureBridgeRunning(bool $force = false): bool {
     }
 
     if ($force) {
-        $pids = @shell_exec('pgrep -f "server.js|dist/index.js" 2>/dev/null');
+        // Stop only THIS bridge (its supervisor and its node process), never every "server.js" on the account.
+        @unlink($dataDir . '/daemon.pid');
+        $pids = @shell_exec('pgrep -f ' . escapeshellarg($baseDir . '/bridge/') . ' 2>/dev/null');
         if ($pids) {
             $pidList = array_filter(array_map('trim', explode("\n", trim($pids))), 'is_numeric');
             foreach ($pidList as $p) {
@@ -28,7 +40,7 @@ function ensureBridgeRunning(bool $force = false): bool {
         usleep(400000);
     } else {
         $lockFile = sys_get_temp_dir() . '/omnidesk_bridge_spawn.lock';
-        if (file_exists($lockFile) && (time() - filemtime($lockFile) < 4)) {
+        if (file_exists($lockFile) && (time() - filemtime($lockFile) < 30)) {
             return false;
         }
         @touch($lockFile);
@@ -112,9 +124,11 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
     $raw = curl_exec($curl);
     $code = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
     $curlErr = curl_error($curl);
+    $curlErrNo = curl_errno($curl);
     curl_close($curl);
     $result = json_decode((string) $raw, true);
-    if (($raw === false || !is_array($result)) && $local) {
+    // Only restart when nothing is listening (refused / could not connect). A timeout means busy, not dead.
+    if (($raw === false || !is_array($result)) && $local && in_array($curlErrNo, [7, 52], true) && !bridgePortOpen()) {
         if (ensureBridgeRunning()) {
             $curl2 = curl_init($base . $path);
             curl_setopt_array($curl2, [
@@ -242,7 +256,7 @@ function syncCampaignAudienceToCrm(array $input): void {
 
         if (strlen($cleanPhone) < 8) continue;
 
-        $assignedCloser = $closers[$idx % $closerCount];
+        $assignedCloser = !empty($input['closer_per_contact']) ? ($closers[$idx] ?? $closers[0]) : $closers[$idx % $closerCount];
         $ownerId = $assignedCloser['id'] ?? 'EMP-TM-1795103817';
         $ownerName = $assignedCloser['name'] ?? 'askariraza';
         $ownerUsername = $assignedCloser['username'] ?? $ownerName;
@@ -319,6 +333,9 @@ function handleWhatsAppBridge(string $action, array $input): void {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
+    if (in_array($action, ['campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'list_campaign_devices'], true)) {
+        handleCampaignDevice($action, $input);
+    }
     // Auto-authenticate default administrator if no session exists (matching the local app)
     if (empty($_SESSION['omnidesk_user'])) {
         $_SESSION['omnidesk_user'] = [
@@ -329,7 +346,8 @@ function handleWhatsAppBridge(string $action, array $input): void {
             'role'        => 'admin',
             'designation' => 'Admin',
             'phone'       => '',
-            'status'      => 'active'
+            'status'      => 'active',
+            'auto'        => true
         ];
     }
     $user = $_SESSION['omnidesk_user'];
@@ -385,20 +403,20 @@ function handleWhatsAppBridge(string $action, array $input): void {
             $result = ['success' => true];
         }
     } elseif ($action === 'restart_bridge' || $action === 'restart_daemon') {
+        require_once __DIR__ . '/admin_guard.php';
+        requireBridgeAdmin();
         ensureBridgeRunning(true);
         $result = ['success' => true, 'message' => 'WhatsApp bridge supervisor restarted with latest v15.0 Baileys engine.'];
     } elseif ($action === 'start_campaign') {
-        // 1. Immediately register and allocate audience leads in CRM with status queued
-        try {
-            syncCampaignAudienceToCrm($input);
-        } catch (Throwable $e) {
-            error_log('[CRM Campaign Lead Sync Error]: ' . $e->getMessage());
+        if (!$admin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Only company administrators can launch campaigns.']);
+            exit;
         }
-
-        // 2. Verify bridge process is active and running
+        // Verify bridge process is active and running latest v15.0 engine
         $check = whatsappBridgeRequest('/status');
-        if (empty($check['version']) || $check['version'] !== '15.0') {
-            ensureBridgeRunning(true);
+        if (empty($check['success']) && !bridgePortOpen()) {
+            ensureBridgeRunning(false);
             for ($attempt = 0; $attempt < 6; $attempt++) {
                 usleep(400000);
                 $check = whatsappBridgeRequest('/status');
@@ -406,26 +424,34 @@ function handleWhatsAppBridge(string $action, array $input): void {
             }
         }
 
-        // 3. Verify WhatsApp is actually connected and linked to a physical device
-        if (empty($check['is_connected']) || ($check['state'] ?? '') !== 'ready') {
-            http_response_code(400);
-            echo json_encode([
-                'success' => false,
-                'is_connected' => false,
-                'state' => $check['state'] ?? 'offline',
-                'message' => 'WhatsApp is not connected on the server. Please click "Link Phone / Scan QR" and scan the code using WhatsApp on your phone before starting the campaign.'
-            ]);
-            exit;
-        }
-
+        // Campaigns send from each Team Member's own linked WhatsApp, not the main number;
+        // the bridge refuses to start when none of the selected TMs is connected.
         $result = whatsappBridgeRequest('/campaign/start', $input);
-        if (empty($result['success'])) {
-            http_response_code(400);
-            echo json_encode([
-                'success' => false,
-                'message' => $result['message'] ?? 'Could not start campaign on WhatsApp bridge. Please verify your WhatsApp phone is linked.'
-            ]);
-            exit;
+        if (!empty($result['success'])) {
+            // Mirror the bridge's equal split into the CRM: each number belongs to the TM who messages it.
+            try {
+                $lanes = is_array($result['lanes'] ?? null) ? $result['lanes'] : [];
+                $byId = [];
+                foreach ($lanes as $l) $byId[$l['id'] ?? ''] = $l;
+                $audience = [];
+                foreach (($result['audience'] ?? []) as $c) {
+                    $l = $byId[$c['laneId'] ?? ''] ?? null;
+                    if (!$l) continue;
+                    $audience[] = ['phone' => $c['phone'], 'name' => $c['name'] ?? '', 'city' => $c['city'] ?? 'Pakistan', '_owner' => $l];
+                }
+                if ($audience) {
+                    $syncInput = $input;
+                    $syncInput['audience'] = array_map(fn($a) => array_diff_key($a, ['_owner' => 1]), $audience);
+                    $syncInput['closers'] = array_map(fn($a) => $a['_owner'], $audience);
+                    $syncInput['closer_per_contact'] = true;
+                    syncCampaignAudienceToCrm($syncInput);
+                }
+            } catch (Throwable $e) {
+                error_log('[CRM Campaign Lead Sync Error]: ' . $e->getMessage());
+            }
+            unset($result['allocations']);
+        } elseif (empty($result['message'])) {
+            $result['message'] = 'The WhatsApp bridge did not accept the campaign. Check that the bridge is online.';
         }
     } elseif ($action === 'pause_campaign') {
         $result = whatsappBridgeRequest('/campaign/pause', $input);
@@ -564,4 +590,51 @@ function handleWhatsAppBridge(string $action, array $input): void {
     if (empty($result['success'])) http_response_code(503);
     echo json_encode($result);
     exit;
+}
+
+/**
+ * Campaign devices: every Team Member links their own WhatsApp (QR in their
+ * workspace). Campaigns split the dropped numbers equally between the TMs whose
+ * WhatsApp is connected, and each TM's share is sent from that TM's number.
+ * A TM can only manage their own device; admins can see and reset all of them.
+ */
+function handleCampaignDevice(string $action, array $input): void {
+    $user = $_SESSION['omnidesk_user'] ?? null;
+    session_write_close();
+    if (!is_array($user) || empty($user['id'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Please sign in first.']);
+        exit;
+    }
+    $role = strtolower($user['role'] ?? '');
+    $isAdmin = in_array($role, ['admin', 'superadmin', 'master admin'], true);
+    $targetId = (string) ($input['user_id'] ?? $_GET['user_id'] ?? '');
+    if ($targetId === '' || !$isAdmin) $targetId = (string) $user['id'];
+
+    if ($action === 'list_campaign_devices') {
+        if (!$isAdmin) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Administrator access required.']); exit; }
+        $result = whatsappBridgeRequest('/devices');
+    } elseif ($action === 'campaign_device_status') {
+        $result = whatsappBridgeRequest('/device/status?id=' . rawurlencode($targetId));
+    } elseif ($action === 'campaign_device_connect') {
+        $result = whatsappBridgeRequest('/device/connect', ['id' => $targetId, 'name' => (string) ($user['name'] ?? $targetId), 'force' => !empty($input['force'])]);
+    } else {
+        $result = whatsappBridgeRequest('/device/reset', ['id' => $targetId, 'name' => (string) ($user['name'] ?? $targetId), 'relink' => !empty($input['relink'])]);
+    }
+    if (($result['state'] ?? '') === 'offline' && empty($result['user_id'])) {
+        $result = ['success' => false, 'state' => 'offline', 'is_connected' => false, 'message' => $result['message'] ?? 'The WhatsApp bridge is offline.'];
+    }
+    if (empty($result['success'])) http_response_code(503);
+    echo json_encode($result);
+    exit;
+}
+
+/** Map of userId => connected device number, from the bridge. Empty when the bridge is down. */
+function campaignConnectedDevices(): array {
+    $res = whatsappBridgeRequest('/devices');
+    $out = [];
+    foreach (($res['devices'] ?? []) as $d) {
+        if (!empty($d['is_connected']) && !empty($d['user_id'])) $out[$d['user_id']] = (string) ($d['connected_number'] ?? '');
+    }
+    return $out;
 }

@@ -64,7 +64,7 @@ if ($action === 'register_bridge') {
 
 // Regular WhatsApp via a linked device is the default. Cloud API remains opt-in.
 if ((getenv('WHATSAPP_SEND_MODE') ?: 'whatsapp_web') !== 'cloud_api' &&
-    in_array($action, ['get_sender_info', 'connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'get_send_status', 'get_events', 'get_media', 'get_presence', 'send_presence', 'sync_chat', 'start_campaign', 'pause_campaign', 'resume_campaign', 'stop_campaign', 'clear_campaign', 'get_campaign_status'], true)) {
+    in_array($action, ['get_sender_info', 'connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'get_send_status', 'get_events', 'get_media', 'get_presence', 'send_presence', 'sync_chat', 'start_campaign', 'pause_campaign', 'resume_campaign', 'stop_campaign', 'clear_campaign', 'get_campaign_status', 'campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'list_campaign_devices'], true)) {
     require_once __DIR__ . '/whatsapp_bridge.php';
     handleWhatsAppBridge($action, $input);
 }
@@ -169,7 +169,8 @@ if ($action === 'send_direct') {
             'role'        => 'admin',
             'designation' => 'Admin',
             'phone'       => '',
-            'status'      => 'active'
+            'status'      => 'active',
+            'auto'        => true
         ];
     }
     $user = $_SESSION['omnidesk_user'];

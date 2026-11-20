@@ -2141,9 +2141,25 @@ async function loadCampaignSenders() {
     const res = await fetch('api/tenant_manager.php?action=get_campaign_senders&company_id=<?php echo urlencode($activeCompany['id']); ?>');
     const data = await res.json();
     if (data.success && Array.isArray(data.senders)) {
-      // Filter out admins from senders — only TMs and TLs should be in the pool
+      // Only TMs/TLs whose own WhatsApp is linked for campaigns come back here.
       const senders = data.senders.filter(s => s.roleType !== 'admin' && s.roleType !== 'superadmin');
       window.currentCampaignSenders = senders;
+
+      // Team Members who have not linked their WhatsApp are left out of the split.
+      (function showNotConnected(list) {
+        let el = document.getElementById('campaignNotConnectedNote');
+        const host = document.getElementById('campaignSendersPoolContainer');
+        if (!host) return;
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'campaignNotConnectedNote';
+          el.style.cssText = 'margin-top:10px;font-size:12px;line-height:1.5;color:#fbbf24;';
+          host.parentNode.insertBefore(el, host.nextSibling);
+        }
+        el.innerHTML = list.length
+          ? `⚠️ Not in the campaign until they link their WhatsApp (My WhatsApp for Campaigns, in their workspace): <strong>${list.map(u => escapeHtml(u.name)).join(', ')}</strong>`
+          : '';
+      })(Array.isArray(data.not_connected) ? data.not_connected : []);
 
       if (badge) {
         badge.textContent = `${senders.length} WhatsApp${senders.length !== 1 ? 's' : ''} Connected`;
@@ -2189,7 +2205,7 @@ async function loadCampaignSenders() {
 
       if (container) {
         if (!senders.length) {
-          container.innerHTML = `<div style="color:var(--text-muted); padding:16px;">No TM/TL WhatsApp numbers found. Add Team Members or Team Leaders with valid phone numbers first.</div>`;
+          container.innerHTML = `<div style="color:var(--text-muted); padding:16px;">No Team Member has linked their WhatsApp yet. Each TM opens their workspace and taps <strong>Connect my WhatsApp</strong> under "My WhatsApp for Campaigns", then click Refresh.</div>`;
         } else {
           container.innerHTML = senders.map((s) => {
             const isTL = (s.roleType === 'lead');
@@ -2221,7 +2237,7 @@ async function loadCampaignSenders() {
                   </div>
                 </div>
                 <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center; font-size:11.5px;">
-                  <span style="font-family:monospace; color:#38bdf8; font-weight:700;">${escapeHtml(s.display || s.phone)}</span>
+                  <span style="font-family:monospace; color:#38bdf8; font-weight:700;">${escapeHtml(s.device_number ? '+' + s.device_number : (s.display || s.phone))}</span>
                   <span style="color:var(--text-muted); font-size:11px;">${s.messages_sent || 0} sent today</span>
                 </div>
               </div>
@@ -2284,7 +2300,8 @@ function calculateCampaignCycles() {
         ? `<span style="color:#fbbf24;">📋 Drop receiver numbers above to see allocation</span>`
         : `<span style="color:#fbbf24;">No contacts found for this filter</span>`;
     } else {
-      summaryEl.innerHTML = `Receiver Numbers: <strong>${estContacts}</strong> &bull; Connected WhatsApps: <strong>${poolSize}</strong> &bull; Batches: <strong>${totalBatches}</strong> &bull; <span style="color:#10b981;font-weight:700;">${poolSize} messages sent per batch simultaneously</span>`;
+      const each = Math.floor(estContacts / poolSize), extra = estContacts % poolSize;
+      summaryEl.innerHTML = `Receiver Numbers: <strong>${estContacts}</strong> &bull; Connected TMs: <strong>${poolSize}</strong> &bull; <span style="color:#10b981;font-weight:700;">Each TM gets ${each}${extra ? '–' + (each + 1) : ''} numbers and sends them from their own WhatsApp, all at the same time</span>`;
     }
   }
   if (orderTag) {

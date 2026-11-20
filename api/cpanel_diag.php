@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/admin_guard.php';
+requireBridgeAdmin();   // can kill the bridge and delete the WhatsApp login
 header('Content-Type: application/json');
 
 $baseDir = realpath(__DIR__ . '/..');

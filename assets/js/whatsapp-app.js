@@ -2943,6 +2943,23 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`api/tenant_manager.php?action=get_campaign_senders&company_id=${encodeURIComponent(compId)}`);
       const data = await res.json();
+      if (data && data.success) {
+        // Team Members who have not linked their WhatsApp are left out of the split.
+        (function showNotConnected(list) {
+          let el = document.getElementById('campaignNotConnectedNote');
+          const host = document.getElementById('campaignSendersPoolContainer');
+          if (!host) return;
+          if (!el) {
+            el = document.createElement('div');
+            el.id = 'campaignNotConnectedNote';
+            el.style.cssText = 'margin-top:10px;font-size:12px;line-height:1.5;color:#fbbf24;';
+            host.parentNode.insertBefore(el, host.nextSibling);
+          }
+          el.innerHTML = list.length
+            ? `⚠️ Not in the campaign until they link their WhatsApp (My WhatsApp for Campaigns, in their workspace): <strong>${list.map(u => escapeHtml(u.name)).join(', ')}</strong>`
+            : '';
+        })(Array.isArray(data.not_connected) ? data.not_connected : []);
+      }
       if (data && data.success && Array.isArray(data.senders) && data.senders.length > 0) {
         window.currentCampaignSenders = data.senders;
         const senders = data.senders;
@@ -2956,7 +2973,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (container) {
-          const isBridgeLive = Boolean(state.senderConfigured);
+          // Each card is a TM whose own WhatsApp is linked for campaigns (the server only returns those).
+          const isBridgeLive = s.connected !== false;
           container.innerHTML = senders.map(s => {
             const isTL = (s.roleType === 'lead');
             const isAdmin = (s.roleType === 'admin');
@@ -2986,7 +3004,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <div style="min-width:0;flex:1;">
                     <div style="font-weight:700;font-size:12.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
                     <div style="font-size:11px;color:${roleColor};font-weight:600;margin-top:1px;">${roleTag}</div>
-                    <div class="mono" style="font-size:11.5px;color:#38bdf8;margin-top:2px;font-weight:700;">${escapeHtml(s.display || s.phone)}</div>
+                    <div class="mono" style="font-size:11.5px;color:#38bdf8;margin-top:2px;font-weight:700;">${escapeHtml(s.device_number ? '+' + s.device_number : (s.display || s.phone))}</div>
                   </div>
                 </div>
               </div>
@@ -2995,8 +3013,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (preview) {
-          const flow = senders.map(s => `Lead ${s.index} ➔ <strong>Device #${s.index} (${escapeHtml(s.name.split(' ')[0])})</strong>`).join('  <span style="color:var(--text-muted);">|</span>  ');
-          preview.innerHTML = `<strong>🔄 Round-Robin Order:</strong> ${flow}`;
+          const flow = senders.map(s => `<strong>${escapeHtml(s.name.split(' ')[0])}</strong>`).join(' · ');
+          preview.innerHTML = `<strong>⚖️ Equal split:</strong> the numbers are divided equally between ${flow}; each sends their share from their own WhatsApp, in parallel.`;
         }
 
         if (mathInfo) {
@@ -3009,8 +3027,9 @@ document.addEventListener('DOMContentLoaded', () => {
           mathInfo.innerHTML = `<span>⚡ Pace: ${avgD}s avg · Team: ~${teamMsgsPerMin} msgs/min · Per device: 1 msg every ~${perDeviceSec}s</span><span style="color:#10b981;font-weight:700;">🛡️ 0 Risk of Ban</span>`;
         }
       } else {
+        window.currentCampaignSenders = [];
         if (container) {
-          container.innerHTML = `<div class="text-xs text-muted" style="padding:10px;text-align:center;">No active closer or TL devices found for this company.</div>`;
+          container.innerHTML = `<div class="text-xs text-muted" style="padding:10px;text-align:center;">No Team Member has linked their WhatsApp for campaigns yet. Each TM taps <strong>Connect my WhatsApp</strong> in their workspace.</div>`;
         }
         if (badge) badge.textContent = '0 Devices';
       }
@@ -3227,11 +3246,12 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (_) {}
     }
 
-    if (!state.senderConfigured && !window.NUNNO_OFFLINE_PREVIEW) {
+    // Campaigns send from each Team Member's own linked WhatsApp, so what matters is
+    // that at least one selected TM is connected, not the company's main number.
+    if (!(window.currentCampaignSenders || []).length && !window.NUNNO_OFFLINE_PREVIEW) {
       campaignState.isStarting = false;
       if (els.startCampaignBtn) els.startCampaignBtn.disabled = false;
-      showToast('⚠️ WhatsApp is not linked on server. Please scan the QR code to link your phone.');
-      openConnectWaModal();
+      showToast('⚠️ No Team Member has linked their WhatsApp for campaigns yet. Each TM taps "Connect my WhatsApp" in their workspace.');
       return;
     }
 

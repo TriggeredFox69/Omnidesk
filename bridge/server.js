@@ -41,8 +41,18 @@ const service = createService({
 });
 const port = Number(process.env.PORT || process.env.WHATSAPP_BRIDGE_PORT || 3210);
 const host = process.env.WHATSAPP_BRIDGE_HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
+service.server.on('error', err => {
+  if (err && err.code === 'EADDRINUSE') {
+    // Another bridge already owns the port. Leave quietly instead of lingering as a
+    // second copy that would open the same WhatsApp logins and kick the real one off.
+    console.error(`[Bridge] Port ${port} is already in use by a running bridge. This copy exits.`);
+    process.exit(0);
+  }
+  console.error('[Bridge] Server error:', err?.message || err);
+});
 service.server.listen(port, host, () => {
   console.log(`Nunno WhatsApp bridge listening on http://${host}:${port}.`);
+  try { service.devicePool.restoreAll(); } catch (err) { console.error('Device restore:', err.message); }
   
   // Auto-detect cloud host public URL (Render, Railway, or manual PUBLIC_BRIDGE_URL)
   const publicUrl = process.env.PUBLIC_BRIDGE_URL ||

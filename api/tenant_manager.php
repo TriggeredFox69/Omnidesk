@@ -472,9 +472,16 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
             }
         }
 
+        require_once __DIR__ . '/whatsapp_bridge.php';
+        $connectedDevices = campaignConnectedDevices();
+        $notConnected = [];
         $senders = [];
         $idx = 1;
         foreach ($uniqueMatched as $u) {
+            if (!isset($connectedDevices[$u['id']])) {
+                $notConnected[] = ['id' => $u['id'], 'name' => $u['name'], 'roleType' => $u['role'] ?? 'member'];
+                continue;
+            }
             $cleanPhone = preg_replace('/\D+/', '', $u['phone'] ?? '');
             $roleLabel = 'TM Closer';
             if (($u['role'] ?? '') === 'lead') $roleLabel = 'Team Leader (TL)';
@@ -490,11 +497,13 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
                 'phone'         => $cleanPhone,
                 'display'       => str_starts_with($u['phone'] ?? '', '+') ? $u['phone'] : ('+' . $cleanPhone),
                 'messages_sent' => (int)($u['messages_sent_today'] ?? 0),
+                'device_number' => $connectedDevices[$u['id']],
+                'connected'     => true,
                 'status'        => 'ready'
             ];
         }
 
-        if (empty($senders)) {
+        if (false) {
             $senders[] = [
                 'index'         => 1,
                 'id'            => 'SENDER-FALLBACK-01',
@@ -513,7 +522,8 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
             'success'    => true,
             'company_id' => $companyId,
             'count'      => count($senders),
-            'senders'    => $senders
+            'senders'    => $senders,
+            'not_connected' => $notConnected
         ]);
         exit;
     }

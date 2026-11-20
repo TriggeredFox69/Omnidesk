@@ -6,6 +6,11 @@
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
+require_once __DIR__ . '/admin_guard.php';
+if (isset($_GET['deploy']) || isset($_GET['restart'])) {
+    requireBridgeAdmin();   // these used to be open to anyone with the URL
+}
+
 if (isset($_GET['deploy'])) {
     $repoDir = '/home/dailygol/repositories/Omnidesk';
     $targets = [
@@ -33,7 +38,9 @@ require_once __DIR__ . '/whatsapp_bridge.php';
 $bridgeStatus = whatsappBridgeRequest('/status');
 
 $started = false;
-if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offline' || isset($_GET['restart'])) {
+// Port open = the bridge is alive (maybe just busy). Never start a second copy then.
+$portOpen = (bool) @fsockopen('127.0.0.1', 3210, $kaErr, $kaErrStr, 0.5);
+if ((!$portOpen && (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offline')) || isset($_GET['restart'])) {
     $baseDir = realpath(__DIR__ . '/..');
     $dataDir = $baseDir . '/data/whatsapp-bridge';
     $logFile = $dataDir . '/bridge.log';
@@ -52,7 +59,7 @@ if (empty($bridgeStatus['success']) || ($bridgeStatus['state'] ?? '') === 'offli
     // If restart requested, kill any running bridge processes first
     if (isset($_GET['restart'])) {
         @unlink($dataDir . '/daemon.pid');
-        $output = @shell_exec('pgrep -f "run-daemon.sh|dist/index.js|server.js" 2>&1');
+        $output = @shell_exec('pgrep -f ' . escapeshellarg($baseDir . '/bridge/') . ' 2>&1');
         if ($output) {
             $pids = array_filter(array_map('trim', explode("\n", trim($output))), 'is_numeric');
             foreach ($pids as $p) @shell_exec("kill -9 $p 2>&1");
@@ -103,6 +110,5 @@ echo json_encode([
     'success' => !empty($bridgeStatus['success']),
     'auto_started' => $started,
     'timestamp' => date('c'),
-    'files' => scandir(__DIR__),
     'bridge' => $bridgeStatus
 ], JSON_PRETTY_PRINT);

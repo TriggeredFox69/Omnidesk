@@ -6,19 +6,59 @@ const { installMessageIdCompatibility } = require('./compatibility');
 const { createInbox } = require('./inbox');
 const { readPresence } = require('./presence');
 const { createCampaignManager } = require('./campaign');
+const { createDevicePool } = require('./devices');
 
 // Dependency injection keeps tests independent of a real WhatsApp account.
-function createService({ createClient, qrImage, token, storageFile, makeMedia }) {
+function createService({ createClient, createDeviceClient, qrImage, token, storageFile, makeMedia }) {
   if (!token || token.length < 32) throw new Error('A private bridge token of at least 32 characters is required.');
   let client, starting, phase = 'idle', qr = null, number = '', error = '';
   let sendQueue = Promise.resolve();
   const receipts = new Map();
   const requests = new Map();
   const inbox = createInbox({ getClient: () => client, storageFile });
+  const bridgeDataDir = storageFile ? require('node:path').dirname(storageFile) : require('node:path').join(require('node:os').tmpdir(), 'omnidesk-bridge');
+
+  // Each Team Member's own WhatsApp, used to send their share of a campaign.
+  // Replies to those numbers land in the same inbox, tagged with the TM.
+  async function devicePhoneFor(devClient, id) {
+    if (!id || /@(g\.us|broadcast|newsletter)$/.test(id)) return null;
+    if (/@(c\.us|s\.whatsapp\.net)$/.test(id)) return id.split('@')[0].split(':')[0];
+    try {
+      if (typeof devClient.getContactLidAndPhone === 'function') {
+        const pn = (await devClient.getContactLidAndPhone([id]))?.[0]?.pn;
+        if (pn) return String(pn).split('@')[0].split(':')[0];
+      }
+      if (typeof devClient.resolveLid === 'function') {
+        const r = await devClient.resolveLid(id);
+        if (r) return r;
+      }
+    } catch (_) {}
+    return null;
+  }
+  const devicePool = createDevicePool({
+    dataDir: bridgeDataDir,
+    qrImage,
+    createClient: createDeviceClient || ((authPath, deviceName) => {
+      const { BaileysClient } = require('./baileys-client');
+      return new BaileysClient({ authPath, deviceName });
+    }),
+    onMessage: (device, devClient, message, knownPhone) => {
+      (async () => {
+        if (!message?.id?._serialized) return;
+        const fromMe = Boolean(message.fromMe || message.id.fromMe);
+        const remote = message.id?.remote?._serialized || message.id?.remote || (fromMe ? message.to : message.from);
+        const phone = knownPhone || await devicePhoneFor(devClient, remote);
+        if (!phone || !/^\d{10,18}$/.test(phone)) return;
+        await inbox.ingest(message, phone, { phone, agentName: device.name, viaUserId: device.id, viaNumber: device.number });
+      })().catch(err => console.error('Device inbox:', err.message));
+    }
+  });
 
   const campaignManager = createCampaignManager({
     send,
-    dataDir: storageFile ? require('node:path').dirname(storageFile) : process.cwd(),
+    deviceSend: (id, body) => devicePool.send(id, body),
+    deviceReady: id => devicePool.isReady(id),
+    dataDir: bridgeDataDir,
     getLeadsPath: (companyId = 'COMP-001') => {
       const cleanId = String(companyId || 'COMP-001').replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
       const tenantPath = require('node:path').resolve(__dirname, `../data/tenants/${cleanId}/leads.json`);
@@ -233,6 +273,8 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         }
         reply(200, { success: true, ...(receipt || { status: 'accepted' }) }); return;
       }
+      if (req.method === 'GET' && url.pathname === '/devices') { reply(200, { success: true, devices: devicePool.list() }); return; }
+      if (req.method === 'GET' && url.pathname === '/device/status') { reply(200, devicePool.get(url.searchParams.get('id') || '')); return; }
       if (url.pathname === '/campaign/status') {
         reply(200, campaignManager.getStatus());
         return;
@@ -268,6 +310,12 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
         reply(200, { success: true });
         return;
       }
+      if (url.pathname === '/device/connect') { reply(200, devicePool.connect(body.id, body.name, Boolean(body.force))); return; }
+      if (url.pathname === '/device/reset') {
+        await devicePool.disconnect(body.id, true);
+        reply(200, body.relink ? devicePool.connect(body.id, body.name, true) : { success: true, state: 'disconnected', is_connected: false });
+        return;
+      }
       if (url.pathname === '/campaign/start') {
         reply(200, campaignManager.start(body));
         return;
@@ -292,8 +340,9 @@ function createService({ createClient, qrImage, token, storageFile, makeMedia })
       reply(404, { success: false, message: 'Unknown route.' });
     } catch (err) { reply(err.status || 502, { success: false, message: err.message }); }
   });
-  return { server, connect, snapshot, campaignManager, close: async () => {
+  return { server, connect, snapshot, campaignManager, devicePool, close: async () => {
     if (client) { client.removeAllListeners(); await client.destroy().catch(() => {}); }
+    await devicePool.closeAll().catch(() => {});
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
   } };

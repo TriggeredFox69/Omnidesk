@@ -47,11 +47,8 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
+function createCampaignManager({ send, deviceSend, deviceReady, dataDir, getLeadsPath, getUsersPath, offlineGraceMs }) {
   const stateFile = path.join(dataDir, 'campaign_state.json');
-  let loopTimer = null;
-  let countdownTimer = null;
-  let inFlight = false;
 
   let state = {
     id: null,
@@ -81,7 +78,9 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     totalCycles: 1,
     activeSenderIndex: 0,
     // Closers Allocation Pool (TMs and TLs only, Admins strictly excluded)
-    closersPool: []
+    closersPool: [],
+    lanes: [],
+    activeLaneId: null
   };
 
   function log(message, type = 'info') {
@@ -107,6 +106,7 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
         const loaded = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
         if (loaded && typeof loaded === 'object') {
           state = { ...state, ...loaded };
+          (state.audience || []).forEach(c => { if (c.status === 'sending') c.status = 'pending'; });
           if (state.status === 'running') {
             state.status = 'paused';
             log('Campaign paused after server restart. Click Resume to continue.', 'warn');
@@ -487,178 +487,204 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     }
   }
 
-  async function step() {
-    if (state.status !== 'running' || inFlight) return;
+  // ───────────────────────── Equal-split, per-TM lanes ─────────────────────────
+  // Every TM in the campaign whose own WhatsApp is connected gets a lane. The
+  // dropped numbers are split equally (contact i -> lane i % n), and every lane
+  // sends from its TM's own number in parallel. If a TM's WhatsApp drops for more
+  // than OFFLINE_GRACE_MS, their unsent numbers move to the TMs still connected,
+  // so the campaign always runs until every number has been messaged.
+  const OFFLINE_GRACE_MS = offlineGraceMs || 45000;
+  const laneTimers = new Map();
+  const laneBusy = new Set();
 
-    while (state.currentIndex < state.audience.length &&
-           ['accepted', 'sent', 'delivered', 'read'].includes(state.audience[state.currentIndex].status)) {
-      state.currentIndex++;
-    }
+  const isDone = c => ['accepted', 'sent', 'delivered', 'read', 'failed'].includes(c.status);
+  const laneOf = id => (state.lanes || []).find(l => l.id === id);
+  const deviceOnline = lane => lane.mode === 'main' ? true : (typeof deviceReady === 'function' && deviceReady(lane.id));
+  const laneSender = lane => ({ id: lane.id, name: lane.name, username: lane.username, role: lane.role, roleType: lane.roleType, phone: lane.phone });
 
-    if (state.currentIndex >= state.audience.length) {
-      finish();
+  function clearLaneTimers() {
+    for (const t of laneTimers.values()) clearTimeout(t);
+    laneTimers.clear();
+  }
+
+  function scheduleLane(lane, ms) {
+    if (laneTimers.has(lane.id)) clearTimeout(laneTimers.get(lane.id));
+    laneTimers.set(lane.id, setTimeout(() => {
+      laneTimers.delete(lane.id);
+      runLane(lane.id).catch(err => log('Lane error: ' + err.message, 'error'));
+    }, ms));
+  }
+
+  function rebalanceFrom(lane) {
+    const pending = state.audience.filter(c => c.laneId === lane.id && c.status === 'pending');
+    const targets = state.lanes.filter(l => l.id !== lane.id && l.status !== 'offline' && deviceOnline(l));
+    if (!pending.length || !targets.length) return false;
+    pending.forEach((c, i) => {
+      const t = targets[i % targets.length];
+      c.laneId = t.id;
+      c.assignedOwnerId = t.id;
+      c.assignedOwnerName = t.name;
+      c.assignedOwnerUsername = t.username || t.name;
+      c.assignedOwnerRole = t.role;
+      t.assigned++;
+    });
+    lane.assigned -= pending.length;
+    log(`🔁 ${lane.name}'s WhatsApp is offline. Moved their ${pending.length} unsent numbers to ${targets.map(t => t.name).join(', ')}.`, 'warn');
+    targets.forEach(t => {
+      if (t.status === 'done') t.status = 'ready';
+      if (!laneTimers.has(t.id) && !laneBusy.has(t.id)) scheduleLane(t, 500);
+    });
+    saveState();
+    return true;
+  }
+
+  function checkFinish() {
+    if (state.status !== 'running') return;
+    if (state.audience.length && state.audience.every(isDone)) finish();
+  }
+
+  async function runLane(laneId) {
+    const lane = laneOf(laneId);
+    if (!lane || state.status !== 'running' || laneBusy.has(laneId)) return;
+    const contact = state.audience.find(c => c.laneId === laneId && c.status === 'pending');
+    if (!contact) { lane.status = 'done'; saveState(); checkFinish(); return; }
+
+    if (!deviceOnline(lane)) {
+      if (lane.status !== 'offline') {
+        lane.status = 'offline';
+        lane.offlineSince = Date.now();
+        log(`📴 ${lane.name}'s WhatsApp is not connected. Waiting for it to reconnect...`, 'warn');
+      } else if (Date.now() - (lane.offlineSince || 0) > OFFLINE_GRACE_MS) {
+        if (rebalanceFrom(lane)) { lane.status = 'done'; saveState(); return; }
+      }
+      saveState();
+      scheduleLane(lane, 5000);
       return;
     }
+    if (lane.status === 'offline') log(`📶 ${lane.name}'s WhatsApp is back. Resuming their numbers.`, 'info');
+    lane.status = 'sending';
+    lane.offlineSince = null;
 
-    const contact = state.audience[state.currentIndex];
-    const total = state.audience.length;
-    const currentNum = state.currentIndex + 1;
-
-    // Strict Round-Robin Algorithm:
-    // Senders: 1 to M. Contact i (0-based) goes to sender (i % M).
-    // Cycle: floor(i / M) + 1. Total Cycles: ceil(N / M).
-    const poolSize = Math.max(1, state.sendersPool.length);
-    const senderIndex = state.currentIndex % poolSize;
-    const currentCycle = Math.floor(state.currentIndex / poolSize) + 1;
-    const totalCycles = Math.ceil(total / poolSize);
-
-    state.activeSenderIndex = senderIndex;
-    state.currentCycle = currentCycle;
-    state.totalCycles = totalCycles;
-
-    const activeSender = state.sendersPool[senderIndex];
-
+    laneBusy.add(laneId);
     contact.status = 'sending';
     contact.requestId = contact.requestId || randomUUID();
-    contact.senderId = activeSender.id;
-    contact.senderName = activeSender.name;
-    contact.senderRole = activeSender.role;
-    contact.senderPhone = activeSender.phone;
-    if (activeSender.roleType !== 'admin') {
-      contact.assignedOwnerId = activeSender.id;
-      contact.assignedOwnerName = activeSender.name;
-      contact.assignedOwnerUsername = activeSender.username || activeSender.name;
-      contact.assignedOwnerRole = activeSender.role || 'TM Closer';
-    }
-    contact.cycle = currentCycle;
-    contact.senderIndex = senderIndex + 1;
-
+    contact.senderId = lane.id;
+    contact.senderName = lane.name;
+    contact.senderRole = lane.role;
+    contact.senderPhone = lane.phone;
     const personalizedMsg = personalizeMessage(state.messageTemplate, contact, state.companyName);
     contact.preparedMessage = personalizedMsg;
+    state.activeLaneId = lane.id;
     saveState();
 
-    inFlight = true;
     try {
-      const sendPayload = {
-        phone: contact.phone,
-        message: personalizedMsg,
-        request_id: contact.requestId,
-        sender_id: activeSender.id,
-        sender_phone: activeSender.phone,
-        sender_name: activeSender.name,
-        sender_role: activeSender.role,
-        cycle: currentCycle,
-        sender_index: senderIndex + 1,
-        simulate: false,
-        allow_simulation: false
-      };
-      if (state.media) {
-        sendPayload.media = state.media;
-      }
-
-      const result = await send(sendPayload);
-      if (result && result.simulated) {
-        throw new Error('WhatsApp device is not connected on server. Scan QR code to link your phone.');
-      }
+      const payload = { phone: contact.phone, message: personalizedMsg, request_id: contact.requestId, simulate: false, allow_simulation: false };
+      if (state.media) payload.media = state.media;
+      const result = lane.mode === 'main' ? await send(payload) : await deviceSend(lane.id, payload);
+      if (result && result.simulated) throw new Error('WhatsApp is not connected.');
 
       contact.status = 'accepted';
       contact.sentAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       contact.messageId = result?.message_id || ('msg_' + Date.now());
       state.totalSent++;
-
-      // Increment active sender's count
-      activeSender.messagesSent = (activeSender.messagesSent || 0) + 1;
-      activeSender.lastSentAt = contact.sentAt;
-
-      // Update user quota today in users.json
-      incrementUserMessageCount(activeSender.id);
-
-      const crmMessage = {
-        id: `msg_c_${Date.now()}`,
-        waMessageId: contact.messageId,
-        deliveryStatus: 'accepted',
-        sender: 'agent',
-        agentName: activeSender.name,
-        senderPhone: activeSender.phone,
-        senderRole: activeSender.role,
-        cycle: currentCycle,
-        text: personalizedMsg,
-        time: contact.sentAt
-      };
-
-      updateCrmLead(contact, crmMessage, state.assignMode, activeSender);
-
-      log(`🔄 [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] ${activeSender.name} (${activeSender.role} · ${activeSender.display}) ➔ Dispatched to ${contact.display || contact.phone} (${contact.name || 'Lead'}) [Allocated Closer: ${contact.assignedOwnerName || 'Closer'} · ${contact.assignedOwnerRole || 'TM'}]`, 'success');
-
-      // Check if a full round-robin cycle just completed
-      if (poolSize > 1 && (senderIndex + 1 === poolSize) && currentNum < total) {
-        log(`✨ [Cycle ${currentCycle}/${totalCycles} Finished] All ${poolSize} devices sent 1 message each. Starting Cycle ${currentCycle + 1}/${totalCycles}...`, 'info');
-      }
-
+      lane.sent++;
+      lane.lastSentAt = contact.sentAt;
+      incrementUserMessageCount(lane.id);
+      updateCrmLead(contact, {
+        id: `msg_c_${Date.now()}`, waMessageId: contact.messageId, deliveryStatus: 'accepted', sender: 'agent',
+        agentName: lane.name, senderPhone: lane.phone, senderRole: lane.role, text: personalizedMsg, time: contact.sentAt
+      }, state.assignMode, laneSender(lane));
+      log(`✅ ${lane.name} (${lane.display}) ➔ ${contact.display || contact.phone}  [${lane.sent + lane.failed}/${lane.assigned}]`, 'success');
     } catch (err) {
-      contact.status = 'failed';
-      contact.error = err.message;
-      state.totalFailed++;
-      log(`❌ [Cycle ${currentCycle}/${totalCycles} · Device ${senderIndex + 1}/${poolSize}] Failed for ${contact.display || contact.phone}: ${err.message}`, 'error');
-      
-      const isDisconnected = err.message && (err.message.includes('not connected') || err.message.includes('QR code') || err.message.includes('offline'));
-      if (isDisconnected) {
-        state.status = 'stopped';
-        log('🛑 Campaign stopped: WhatsApp phone is not linked on server. Please scan QR code in Settings/Topbar to link your device.', 'error');
+      if (err && err.deviceOffline) {
+        contact.status = 'pending';            // not sent: retry after reconnect, or move to another TM
+        lane.status = 'offline';
+        lane.offlineSince = lane.offlineSince || Date.now();
+        log(`📴 ${lane.name}'s WhatsApp dropped. ${contact.display || contact.phone} will be retried.`, 'warn');
+      } else {
+        contact.status = 'failed';
+        contact.error = err.message;
+        state.totalFailed++;
+        lane.failed++;
+        log(`❌ ${lane.name} ➔ ${contact.display || contact.phone}: ${err.message}`, 'error');
+        // No CRM message for a send that never happened.
       }
     } finally {
-      inFlight = false;
-      state.currentIndex++;
+      laneBusy.delete(laneId);
+      state.currentIndex = state.audience.filter(isDone).length;
       saveState();
     }
 
     if (state.status !== 'running') return;
-
-    if (state.currentIndex >= state.audience.length) {
-      finish();
-      return;
-    }
-
+    checkFinish();
+    if (state.status !== 'running') return;
+    if (lane.status === 'offline') { scheduleLane(lane, 5000); return; }
     const minSec = state.minDelay || 4;
-    const maxSec = state.maxDelay || 8;
-    const jitterSec = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
-    state.remainingSeconds = jitterSec;
+    const maxSec = Math.max(minSec, state.maxDelay || 8);
+    const jitter = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+    lane.nextAt = Date.now() + jitter * 1000;
+    lane.status = 'waiting';
     saveState();
+    scheduleLane(lane, jitter * 1000);
+  }
 
-    if (countdownTimer) clearInterval(countdownTimer);
-    countdownTimer = setInterval(() => {
-      if (state.status !== 'running') {
-        clearInterval(countdownTimer);
-        return;
-      }
-      state.remainingSeconds--;
-      if (state.remainingSeconds <= 0) {
-        clearInterval(countdownTimer);
-      }
-    }, 1000);
-
-    if (loopTimer) clearTimeout(loopTimer);
-    loopTimer = setTimeout(() => {
-      step();
-    }, jitterSec * 1000);
+  function kickAllLanes() {
+    (state.lanes || []).forEach((l, i) => scheduleLane(l, 150 + i * 400));   // small stagger between TMs
   }
 
   function finish() {
-    clearTimeout(loopTimer);
-    clearInterval(countdownTimer);
+    clearLaneTimers();
     state.status = 'completed';
     state.remainingSeconds = 0;
-    log(`🎉 Campaign completed! Total sent: ${state.totalSent}, Failed: ${state.totalFailed} across ${state.totalCycles} full cycles utilizing all ${state.poolSize} connected WhatsApp devices.`, 'success');
+    const per = (state.lanes || []).map(l => `${l.name}: ${l.sent}`).join(' · ');
+    log(`🎉 Campaign completed! ${state.totalSent} sent, ${state.totalFailed} failed. ${per}`, 'success');
     saveState();
   }
 
   function start(params = {}) {
-    clearTimeout(loopTimer);
-    clearInterval(countdownTimer);
-    inFlight = false;
+    clearLaneTimers();
+    laneBusy.clear();
 
     const companyId = params.company_id || params.companyId || 'COMP-001';
     const companyName = params.company_name || (companyId === 'COMP-004' ? 'Metalink' : (companyId === 'COMP-001' ? 'Nunno Official' : 'Chatly Partner'));
+
+    // 1. Lanes: the TMs/TLs picked for this campaign whose own WhatsApp is connected.
+    let picked = Array.isArray(params.senders) && params.senders.length ? params.senders : resolveCompanyClosers(companyId);
+    picked = picked.filter(s => s && s.id && s.roleType !== 'admin' && s.roleType !== 'superadmin' && s.role !== 'Admin');
+    const seenIds = new Set();
+    picked = picked.filter(s => (seenIds.has(s.id) ? false : (seenIds.add(s.id), true)));
+    const mainMode = params.send_mode === 'main_number';
+    const online = mainMode ? picked : picked.filter(s => typeof deviceReady === 'function' && deviceReady(s.id));
+    const skipped = picked.filter(s => !online.includes(s));
+    if (!online.length) {
+      return { success: false, status: state.status, message: 'None of the selected Team Members has connected their WhatsApp for campaigns yet. Ask them to open their workspace and scan the campaign QR, then refresh.' };
+    }
+
+    // 2. Audience: the dropped numbers (or the company's leads)
+    let rawAudience = Array.isArray(params.audience) && params.audience.length > 0 ? params.audience : [];
+    if (!rawAudience.length) {
+      try {
+        const leadsFile = typeof getLeadsPath === 'function' ? getLeadsPath(companyId) : null;
+        if (leadsFile && fs.existsSync(leadsFile)) {
+          const stored = JSON.parse(fs.readFileSync(leadsFile, 'utf8') || '[]');
+          if (Array.isArray(stored)) {
+            const filter = params.filter || 'all';
+            rawAudience = filter === 'new' ? stored.filter(l => l.leadState === 'fresh' || l.status === 'new' || (!l.messages || l.messages.length <= 1))
+              : filter === 'ongoing' ? stored.filter(l => l.leadState === 'ongoing') : stored;
+          }
+        }
+      } catch (_) {}
+    }
+    const seenPhones = new Set();
+    rawAudience = rawAudience.filter(c => {
+      const p = String(c.phone || '').replace(/\D/g, '');
+      if (p.length < 10 || seenPhones.has(p)) return false;
+      seenPhones.add(p);
+      return true;
+    });
+    if (!rawAudience.length) {
+      return { success: false, status: state.status, message: 'No valid receiver numbers to message.' };
+    }
 
     state.id = 'camp_' + Date.now();
     state.name = (params.name || '').trim() || `Outreach Campaign (${companyName})`;
@@ -667,142 +693,68 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
     state.messageTemplate = params.message || '';
     state.variation = params.variation || 'text';
     state.media = params.media || null;
-    if (params.image_url && !state.media) {
-      state.media = { mimetype: 'image/jpeg', filename: 'flyer.jpg', url: params.image_url };
-    }
-    if (params.audio_url && !state.media) {
-      state.media = { mimetype: 'audio/ogg', filename: 'voice_pitch.ogg', url: params.audio_url };
-    }
+    if (params.image_url && !state.media) state.media = { mimetype: 'image/jpeg', filename: 'flyer.jpg', url: params.image_url };
+    if (params.audio_url && !state.media) state.media = { mimetype: 'audio/ogg', filename: 'voice_pitch.ogg', url: params.audio_url };
 
-    // 1. Build Round-Robin Senders Pool
-    let sendersPool = [];
-    if (Array.isArray(params.senders) && params.senders.length > 0) {
-      sendersPool = params.senders.map((s, idx) => ({
-        index: idx + 1,
-        id: s.id || `sender_${idx + 1}`,
-        name: s.name || `Device ${idx + 1}`,
-        username: s.username || '',
-        role: s.role || 'TM Closer',
-        roleType: s.roleType || 'member',
-        phone: String(s.phone || '').replace(/\D/g, ''),
-        display: s.display || ('+' + String(s.phone || '').replace(/\D/g, '')),
-        messagesSent: 0,
-        status: 'ready'
-      }));
-    } else {
-      sendersPool = resolveCompanySenders(companyId);
-    }
+    state.lanes = online.map((s, idx) => {
+      const phone = String(s.phone || '').replace(/\D/g, '');
+      return {
+        index: idx + 1, id: s.id, name: s.name || `TM ${idx + 1}`, username: s.username || '',
+        role: s.role || (s.roleType === 'lead' ? 'Team Leader (TL)' : 'TM Closer'), roleType: s.roleType || 'member',
+        phone, display: s.device_number ? ('+' + s.device_number) : (s.display || (phone ? '+' + phone : '')),
+        mode: mainMode ? 'main' : 'device',
+        assigned: 0, sent: 0, failed: 0, status: 'ready', offlineSince: null, nextAt: null, lastSentAt: null
+      };
+    });
+    const n = state.lanes.length;
+    state.sendersPool = state.lanes;            // fields older UIs read
+    state.closersPool = state.lanes;
+    state.poolSize = n;
 
-    state.sendersPool = sendersPool;
-    state.poolSize = Math.max(1, sendersPool.length);
-
-    // 1b. Build Closers Pool (All active TMs and TLs, Admins strictly excluded)
-    let closersPool = [];
-    if (Array.isArray(params.closers) && params.closers.length > 0) {
-      closersPool = params.closers.filter(c => c.roleType !== 'admin' && c.role !== 'Admin');
-    }
-    if (!closersPool.length && sendersPool.length > 0) {
-      closersPool = sendersPool.filter(s => s.roleType !== 'admin' && s.role !== 'Admin');
-    }
-    if (!closersPool.length) {
-      closersPool = resolveCompanyClosers(companyId);
-    }
-    state.closersPool = closersPool;
-    const closerCount = Math.max(1, closersPool.length);
-
-    // 2. Build Audience (Target Leads)
-    let rawAudience = Array.isArray(params.audience) && params.audience.length > 0 ? params.audience : [];
-    if (!rawAudience.length) {
-      // Auto-load leads from company database
-      try {
-        const leadsFile = typeof getLeadsPath === 'function' ? getLeadsPath(companyId) : null;
-        if (leadsFile && fs.existsSync(leadsFile)) {
-          const stored = JSON.parse(fs.readFileSync(leadsFile, 'utf8') || '[]');
-          if (Array.isArray(stored) && stored.length > 0) {
-            const filter = params.filter || 'all';
-            if (filter === 'new') {
-              rawAudience = stored.filter(l => l.leadState === 'fresh' || l.status === 'new' || (!l.messages || l.messages.length <= 1));
-            } else if (filter === 'ongoing') {
-              rawAudience = stored.filter(l => l.leadState === 'ongoing');
-            } else {
-              rawAudience = stored;
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
-    // If still empty (e.g. fresh company or test mode), use 10 realistic prospects so round-robin can run
-    if (!rawAudience.length || params.filter === 'demo' || params.demo) {
-      rawAudience = generateDemoContacts(companyName);
-    }
-
-    // STRICT CLOSER ALLOCATION: Round-robin distribute every contact to company's active TMs and TLs
+    // 3. Equal split: contact i -> lane i % n  (30 numbers, 3 TMs -> 10 each)
     state.audience = rawAudience.map((c, idx) => {
-      const assignedCloser = closersPool[idx % closerCount];
+      const lane = state.lanes[idx % n];
+      lane.assigned++;
+      const phone = String(c.phone || '').replace(/\D/g, '');
       return {
         id: c.id || ('c_' + Math.random().toString(36).slice(2, 9)),
-        phone: String(c.phone || '').replace(/\D/g, ''),
-        display: c.display || ('+' + String(c.phone || '').replace(/\D/g, '')),
-        name: c.name || '',
-        city: c.city || 'Pakistan',
-        network: c.network || 'WhatsApp',
-        status: 'pending',
-        requestId: null,
-        senderId: null,
-        senderName: null,
-        senderRole: null,
-        senderPhone: null,
-        assignedOwnerId: assignedCloser ? assignedCloser.id : null,
-        assignedOwnerName: assignedCloser ? assignedCloser.name : null,
-        assignedOwnerUsername: assignedCloser ? (assignedCloser.username || '') : '',
-        assignedOwnerRole: assignedCloser ? assignedCloser.role : 'TM Closer',
-        cycle: 1,
-        sentAt: null,
-        error: null
+        phone, display: c.display || ('+' + phone), name: c.name || '', city: c.city || 'Pakistan', network: c.network || 'WhatsApp',
+        status: 'pending', requestId: null, laneId: lane.id,
+        senderId: null, senderName: null, senderRole: null, senderPhone: null,
+        assignedOwnerId: lane.id, assignedOwnerName: lane.name, assignedOwnerUsername: lane.username || lane.name, assignedOwnerRole: lane.role,
+        cycle: 1, sentAt: null, error: null
       };
     });
 
-    // Immediately register and allocate all audience leads in CRM so closer & admin portals show them instantly
     syncAudienceToCrm(state.audience, state.companyId, state.messageTemplate, state.name);
 
     state.currentIndex = 0;
     state.totalSent = 0;
     state.totalFailed = 0;
-    const requestedDelay = parseInt(params.delay, 10) || parseInt(params.minDelay, 10) || 5;
+    const requestedDelay = parseInt(params.minDelay, 10) || parseInt(params.delay, 10) || 5;
     state.minDelay = Math.max(2, requestedDelay);
     state.maxDelay = Math.max(state.minDelay, parseInt(params.maxDelay, 10) || (state.minDelay + 4));
     state.remainingSeconds = 0;
-    state.assignMode = params.assignMode || 'pool';
-    state.closer = params.closer || null;
+    state.assignMode = 'equal_split';
     state.status = 'running';
     state.startedAt = Date.now();
     state.logs = [];
-
-    state.totalCycles = Math.ceil(state.audience.length / state.poolSize);
+    state.totalCycles = Math.ceil(state.audience.length / n);
     state.currentCycle = 1;
-    state.activeSenderIndex = 0;
 
-    const deviceRosterSummary = state.sendersPool.map(s => `${s.index}. ${s.name} (${s.role} · ${s.display})`).join(' | ');
-
-    log(`🚀 Campaign "${state.name}" launched for ${companyName}!`, 'info');
-    log(`📱 Multi-Device Pool: ${state.poolSize} connected WhatsApps aligned for Round-Robin order: ${deviceRosterSummary}`, 'info');
-    log(`🎯 Target Audience: ${state.audience.length} prospects. Total Cycles: ${state.totalCycles} cycles of ${state.poolSize} devices (1 message/device per cycle). Cadence: ${state.minDelay}s - ${state.maxDelay}s.`, 'info');
+    log(`🚀 Campaign "${state.name}" launched for ${companyName}: ${state.audience.length} numbers split equally across ${n} Team Member${n > 1 ? 's' : ''}.`, 'info');
+    log(`📱 ${state.lanes.map(l => `${l.name} (${l.display}) → ${l.assigned} numbers`).join(' | ')}`, 'info');
+    if (skipped.length) log(`⚠️ Not included (WhatsApp not connected): ${skipped.map(s => s.name).join(', ')}`, 'warn');
     saveState();
-
-    setTimeout(() => {
-      step().catch(err => log('Step execution error: ' + err.message, 'error'));
-    }, 100);
-
-    return getStatus();
+    kickAllLanes();
+    return { ...getStatus(), allocations: state.audience.map(c => ({ phone: c.phone, ownerId: c.assignedOwnerId })) };
   }
 
   function pause() {
     if (state.status !== 'running') return getStatus();
-    clearTimeout(loopTimer);
-    clearInterval(countdownTimer);
+    clearLaneTimers();
     state.status = 'paused';
-    log(`⏸️ Campaign paused by operator at lead ${state.currentIndex + 1} of ${state.audience.length} (Cycle ${state.currentCycle}/${state.totalCycles}). Standing by.`, 'warn');
+    log(`⏸️ Campaign paused. ${state.audience.filter(isDone).length} of ${state.audience.length} done.`, 'warn');
     saveState();
     return getStatus();
   }
@@ -810,30 +762,29 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
   function resume() {
     if (state.status !== 'paused') return getStatus();
     state.status = 'running';
-    log(`▶️ Campaign resumed. Picking up round-robin sequence at Device ${state.activeSenderIndex + 1}/${state.poolSize}...`, 'info');
+    (state.lanes || []).forEach(l => { if (l.status !== 'done') { l.status = 'ready'; l.offlineSince = null; } });
+    state.audience.forEach(c => { if (c.status === 'sending') c.status = 'pending'; });
+    log('▶️ Campaign resumed on every connected Team Member.', 'info');
     saveState();
-    setTimeout(() => {
-      step().catch(err => log('Step execution error: ' + err.message, 'error'));
-    }, 100);
+    kickAllLanes();
     return getStatus();
   }
 
   function stop() {
-    clearTimeout(loopTimer);
-    clearInterval(countdownTimer);
+    clearLaneTimers();
     state.status = 'stopped';
     state.remainingSeconds = 0;
-    log(`⏹️ Campaign halted by operator. Dispatched ${state.totalSent} of ${state.audience.length} messages across ${state.currentCycle} cycles.`, 'warn');
+    log(`⏹️ Campaign halted. ${state.totalSent} of ${state.audience.length} messages sent.`, 'warn');
     saveState();
     return getStatus();
   }
 
   function clear() {
-    clearTimeout(loopTimer);
-    clearInterval(countdownTimer);
-    inFlight = false;
+    clearLaneTimers();
+    laneBusy.clear();
     state.status = 'idle';
     state.audience = [];
+    state.lanes = [];
     state.currentIndex = 0;
     state.totalSent = 0;
     state.totalFailed = 0;
@@ -844,50 +795,39 @@ function createCampaignManager({ send, dataDir, getLeadsPath, getUsersPath }) {
   }
 
   function getStatus() {
-    const poolSize = Math.max(1, state.sendersPool.length);
-    const activeIndex = state.currentIndex % poolSize;
-    const currentCycle = Math.min(state.totalCycles || 1, Math.floor(state.currentIndex / poolSize) + 1);
-
+    const lanes = (state.lanes || []).map(l => ({
+      ...l,
+      connected: deviceOnline(l),
+      remaining: state.audience.filter(c => c.laneId === l.id && !isDone(c)).length,
+      nextInSeconds: l.nextAt ? Math.max(0, Math.round((l.nextAt - Date.now()) / 1000)) : 0
+    }));
+    const poolSize = Math.max(1, lanes.length);
+    const done = state.audience.filter(isDone).length;
+    const active = lanes.find(l => l.id === state.activeLaneId) || lanes[0] || null;
+    const waiting = lanes.filter(l => l.status === 'waiting').map(l => l.nextInSeconds);
     return {
       success: true,
-      id: state.id,
-      name: state.name,
-      companyId: state.companyId,
-      companyName: state.companyName,
+      id: state.id, name: state.name, companyId: state.companyId, companyName: state.companyName,
       status: state.status,
       totalContacts: state.audience.length,
-      currentIndex: state.currentIndex,
-      totalSent: state.totalSent,
-      totalFailed: state.totalFailed,
-      poolSize: poolSize,
-      currentCycle: currentCycle,
+      currentIndex: done,
+      totalSent: state.totalSent, totalFailed: state.totalFailed,
+      poolSize,
+      currentCycle: Math.min(state.totalCycles || 1, Math.floor(done / poolSize) + 1),
       totalCycles: state.totalCycles || 1,
-      activeSenderIndex: activeIndex,
-      activeSender: state.sendersPool[activeIndex] || null,
-      sendersPool: state.sendersPool,
-      minDelay: state.minDelay,
-      maxDelay: state.maxDelay,
-      remainingSeconds: state.remainingSeconds,
+      activeSenderIndex: active ? lanes.indexOf(active) : 0,
+      activeSender: active,
+      sendersPool: lanes,
+      lanes,
+      minDelay: state.minDelay, maxDelay: state.maxDelay,
+      remainingSeconds: waiting.length ? Math.min(...waiting) : 0,
       assignMode: state.assignMode,
-      startedAt: state.startedAt,
-      updatedAt: state.updatedAt,
+      startedAt: state.startedAt, updatedAt: state.updatedAt,
       logs: state.logs.slice(-60),
       audience: state.audience.map(c => ({
-        id: c.id,
-        phone: c.phone,
-        display: c.display,
-        name: c.name,
-        city: c.city,
-        network: c.network,
-        status: c.status,
-        senderId: c.senderId,
-        senderName: c.senderName,
-        senderRole: c.senderRole,
-        senderPhone: c.senderPhone,
-        cycle: c.cycle,
-        senderIndex: c.senderIndex,
-        sentAt: c.sentAt,
-        error: c.error
+        id: c.id, phone: c.phone, display: c.display, name: c.name, city: c.city, network: c.network,
+        status: c.status, laneId: c.laneId, senderId: c.senderId, senderName: c.senderName || c.assignedOwnerName,
+        senderRole: c.senderRole, senderPhone: c.senderPhone, cycle: c.cycle, sentAt: c.sentAt, error: c.error
       }))
     };
   }

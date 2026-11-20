@@ -67,13 +67,13 @@ function createInbox({ getClient, storageFile }) {
     }
     return null;
   }
-  async function ingest(message, knownPhone) {
+  async function ingest(message, knownPhone, opts = {}) {
     const id = message.id?._serialized;
     if (!id) return;
     const fromMe = Boolean(message.fromMe || message.id.fromMe);
     const remote = message.id?.remote?._serialized || message.id?.remote || '';
     const resolvedRemotePhone = remote ? await phoneFor(remote) : null;
-    const phone = resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
+    const phone = opts.phone || resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
     if (!phone || !/^\d{10,18}$/.test(phone)) return;
     const previous = messages.get(id);
     const type = ['ptt', 'audio'].includes(message.type) ? 'audio' :
@@ -87,7 +87,8 @@ function createInbox({ getClient, storageFile }) {
     const contactName = message._data?.notifyName || previous?.name || phone;
     const value = { id: 'wa_' + createHash('sha256').update(id).digest('hex').slice(0,24), waMessageId: id,
       phone, name: contactName, sender: fromMe ? 'agent' : (previous?.sender || 'lead'),
-      agentName: fromMe ? 'WhatsApp' : undefined, type, text,
+      agentName: fromMe ? (opts.agentName || 'WhatsApp') : undefined, type, text,
+      ...(opts.viaUserId ? { viaUserId: opts.viaUserId, viaNumber: opts.viaNumber || '' } : {}),
       timestamp: Number(message.timestamp) || previous?.timestamp || Math.floor(Date.now()/1000), hasMedia,
       durationSeconds: Number(message._data?.duration) || previous?.durationSeconds || 0,
       deliveryStatus: fromMe ? statusOf(message.ack || 0) : undefined };

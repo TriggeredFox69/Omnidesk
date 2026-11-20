@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/admin_guard.php';
+requireBridgeAdmin();   // can kill the bridge and delete the WhatsApp login
 /**
  * cPanel Native WhatsApp Bridge Daemon Manager
  * Allows installing, launching, monitoring, and maintaining the bridge 24/7 on cPanel.

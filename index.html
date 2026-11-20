@@ -307,6 +307,97 @@
       </div>
     </section>
 
+    <!-- CAMPAIGN WHATSAPP: each TM links their own number; campaigns send this TM's share from it -->
+    <section id="campDeviceCard" style="margin:16px 0; padding:18px 20px; border-radius:16px; background:linear-gradient(135deg, rgba(16,185,129,0.08), rgba(56,189,248,0.05)); border:1px solid rgba(16,185,129,0.28);">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+        <div style="min-width:0; flex:1 1 280px;">
+          <div style="display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px; color:#fff;">
+            <span>📱</span> My WhatsApp for Campaigns
+            <span id="campDevBadge" style="font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:999px; background:rgba(148,163,184,0.15); color:#94a3b8;">CHECKING…</span>
+          </div>
+          <p id="campDevText" style="margin:6px 0 0; font-size:12.5px; line-height:1.55; color:var(--text-secondary, #9fb3ad);">
+            Link your own WhatsApp once. When the admin launches a campaign, the numbers are split equally between every connected Team Member and your share is sent from your number. Replies come to you.
+          </p>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" id="campDevConnectBtn" class="btn btn-emerald" style="padding:9px 16px; font-size:12.5px; font-weight:800; display:none;">🔗 Connect my WhatsApp</button>
+          <button type="button" id="campDevUnlinkBtn" class="btn btn-secondary" style="padding:8px 12px; font-size:12px; display:none; color:#f87171;">Unlink</button>
+        </div>
+      </div>
+      <div id="campDevQrBox" style="display:none; margin-top:14px; gap:18px; align-items:center; flex-wrap:wrap;">
+        <img id="campDevQrImg" alt="WhatsApp QR code" style="width:220px; height:220px; border-radius:12px; background:#fff; padding:8px;">
+        <ol style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.9; color:var(--text-secondary, #9fb3ad);">
+          <li>Open <strong>WhatsApp</strong> on your phone</li>
+          <li>Tap <strong>⋮ / Settings → Linked devices</strong></li>
+          <li>Tap <strong>Link a device</strong> and scan this code</li>
+          <li>Keep your phone online during campaigns</li>
+        </ol>
+      </div>
+    </section>
+    <script>
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      let timer = null, lastState = '';
+      async function call(action, body) {
+        const r = await fetch('api/direct_sender.php?action=' + action, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({ action }, body || {}))
+        });
+        return r.json().catch(() => ({ success: false }));
+      }
+      function paint(d) {
+        const badge = $('campDevBadge'), text = $('campDevText'), qrBox = $('campDevQrBox');
+        const connect = $('campDevConnectBtn'), unlink = $('campDevUnlinkBtn');
+        if (!badge) return;
+        const st = d && d.state || 'disconnected';
+        lastState = st;
+        const set = (label, bg, color) => { badge.textContent = label; badge.style.background = bg; badge.style.color = color; };
+        qrBox.style.display = 'none'; connect.style.display = 'none'; unlink.style.display = 'none';
+        if (d && d.is_connected) {
+          set('● CONNECTED', 'rgba(16,185,129,0.18)', '#34d399');
+          text.innerHTML = 'Linked to <strong style="color:#fff;font-family:monospace;">+' + (d.connected_number || '') + '</strong>. You are in the campaign pool: your equal share of every campaign is sent from this number' + (d.sent ? ' (' + d.sent + ' sent since the last restart)' : '') + '.';
+          unlink.style.display = 'inline-block';
+        } else if (st === 'qr' && d.qr) {
+          set('SCAN QR', 'rgba(251,191,36,0.18)', '#fbbf24');
+          $('campDevQrImg').src = d.qr;
+          qrBox.style.display = 'flex';
+          text.textContent = 'Scan the code with the WhatsApp you want campaigns to send from.';
+        } else if (['starting', 'authenticated'].includes(st)) {
+          set('CONNECTING…', 'rgba(56,189,248,0.18)', '#38bdf8');
+          text.textContent = d.message || 'Starting a secure WhatsApp session…';
+        } else if (st === 'offline') {
+          set('BRIDGE OFFLINE', 'rgba(239,68,68,0.15)', '#f87171');
+          text.textContent = (d && d.message) || 'The WhatsApp service is offline. Tell your admin.';
+        } else {
+          set('NOT CONNECTED', 'rgba(239,68,68,0.15)', '#f87171');
+          text.innerHTML = (d && d.message ? d.message + ' ' : '') + 'Link your own WhatsApp to take part in campaigns. Numbers are split equally between every connected Team Member.';
+          connect.style.display = 'inline-block';
+        }
+      }
+      async function refresh() {
+        try { paint(await call('campaign_device_status')); } catch (_) {}
+        clearTimeout(timer);
+        const fast = ['qr', 'starting', 'authenticated'].includes(lastState);
+        timer = setTimeout(refresh, fast ? 2500 : 20000);
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        if (!$('campDeviceCard')) return;
+        $('campDevConnectBtn').addEventListener('click', async () => {
+          $('campDevConnectBtn').disabled = true;
+          try { paint(await call('campaign_device_connect')); } finally { $('campDevConnectBtn').disabled = false; }
+          lastState = 'starting'; refresh();
+        });
+        $('campDevUnlinkBtn').addEventListener('click', async () => {
+          if (!confirm('Unlink this WhatsApp from campaigns? Your share of new campaigns will go to the other Team Members.')) return;
+          paint(await call('campaign_device_reset'));
+          refresh();
+        });
+        refresh();
+      });
+    })();
+    </script>
+
     <!-- 2. High-End Bento Performance Grid with Micro-Widgets & Animations -->
     <section class="profile-bento-grid" aria-label="Performance Bento Grid">
       

@@ -358,6 +358,17 @@ class BaileysClient extends EventEmitter {
           } catch (_) {}
           this.emit('auth_failure');
           this.emit('disconnected');
+        } else if (statusCode === DisconnectReason.connectionReplaced) {
+          // Another session took over this login (a second bridge copy, or the same
+          // creds on another PC). Reconnecting at once makes both kick each other in a
+          // loop, so wait a minute before trying again.
+          console.warn('[Baileys] Session replaced by another connection with the same login. Retrying in 60s.');
+          this.emit('disconnected');
+          if (!this._destroyed) {
+            if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+            this._reconnectAttempts = 8;
+            this._reconnectTimer = setTimeout(() => { this._reconnectTimer = null; this._scheduleReconnect(); }, 60000);
+          }
         } else {
           this.emit('disconnected');
           if (!this._destroyed) {
