@@ -589,11 +589,43 @@ document.addEventListener('DOMContentLoaded', () => {
   // Update Connected Direct WhatsApp Number in Subbar
   function renderConnectedNumber() {
     if (!els.connectedNumberText) return;
+    const userRole = (state.currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'company admin';
+
+    const pillCircle = document.querySelector('#connectedNumberPill .pulse-circle');
+    const senders = Array.isArray(window.currentCampaignSenders) ? window.currentCampaignSenders : [];
+    const teamCount = senders.length;
+
+    if (isAdmin) {
+      if (teamCount > 0) {
+        els.connectedNumberText.textContent = `${teamCount} Team WhatsApps Ready`;
+        els.connectedNumberText.style.color = '#10b981';
+        if (pillCircle) {
+          pillCircle.classList.remove('offline');
+          pillCircle.classList.add('online');
+        }
+        if (els.connectedNumberPill) {
+          els.connectedNumberPill.title = `${teamCount} connected closer WhatsApp devices ready for dispatch. Click to inspect team desk.`;
+        }
+      } else {
+        els.connectedNumberText.textContent = `Team WhatsApps (0 Connected)`;
+        els.connectedNumberText.style.color = '#f59e0b';
+        if (pillCircle) {
+          pillCircle.classList.remove('online');
+          pillCircle.classList.add('offline');
+        }
+        if (els.connectedNumberPill) {
+          els.connectedNumberPill.title = `Click to view Closer Team Desk and onboard closers.`;
+        }
+      }
+      return;
+    }
+
+    // Closer (TM / TL) personal status
     const userPhoneRaw = state.connectedWaNumber || state.currentUser?.phone || '';
     const cleanDigits = String(userPhoneRaw).replace(/\D/g, '');
     const userPhone = cleanDigits ? ('+' + cleanDigits) : '';
 
-    const pillCircle = document.querySelector('#connectedNumberPill .pulse-circle');
     if (state.senderConfigured) {
       els.connectedNumberText.textContent = userPhone ? `Connected (${userPhone})` : 'Connected';
       els.connectedNumberText.style.color = 'var(--c-wa)';
@@ -753,11 +785,18 @@ document.addEventListener('DOMContentLoaded', () => {
     state.connectedWaNumber = result.connected_number || '';
     renderConnectedNumber();
     if (els.campaignConnectionStatus) {
-      els.campaignConnectionStatus.textContent = window.NUNNO_OFFLINE_PREVIEW
-        ? '🧪 Offline simulation — no real sends'
-        : state.senderConfigured
-          ? `✓ WhatsApp connected${state.connectedWaNumber ? ' · +' + state.connectedWaNumber : ''} — ready to send`
-          : 'WhatsApp not connected · Click to link';
+      const senders = Array.isArray(window.currentCampaignSenders) ? window.currentCampaignSenders : [];
+      const userRole = (state.currentUser?.role || '').toLowerCase();
+      const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'company admin';
+      if (isAdmin && senders.length > 0) {
+        els.campaignConnectionStatus.textContent = `✓ Multi-Device Dispatch Ready (${senders.length} Team Devices)`;
+      } else {
+        els.campaignConnectionStatus.textContent = window.NUNNO_OFFLINE_PREVIEW
+          ? '🧪 Offline simulation — no real sends'
+          : state.senderConfigured
+            ? `✓ WhatsApp connected${state.connectedWaNumber ? ' · +' + state.connectedWaNumber : ''} — ready to send`
+            : (senders.length > 0 ? `✓ Multi-Device Dispatch Ready (${senders.length} Team Devices)` : 'WhatsApp not connected · Click to link');
+      }
     }
     if (!wasConnected && state.senderConfigured && !window.NUNNO_OFFLINE_PREVIEW) {
       showToast('✓ WhatsApp connected. Your campaign is ready; click Start your campaign to send.', 6000);
@@ -3028,6 +3067,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const perDeviceSec = avgD * poolSize;
           mathInfo.innerHTML = `<span>⚡ Pace: ${avgD}s avg · Team: ~${teamMsgsPerMin} msgs/min · Per device: 1 msg every ~${perDeviceSec}s</span><span style="color:#10b981;font-weight:700;">🛡️ 0 Risk of Ban</span>`;
         }
+
+        if (els.campaignConnectionStatus) {
+          els.campaignConnectionStatus.textContent = `✓ Multi-Device Dispatch Ready (${senders.length} Team Devices)`;
+        }
+        renderConnectedNumber();
       } else {
         window.currentCampaignSenders = [];
         if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, [], null);
@@ -3035,6 +3079,7 @@ document.addEventListener('DOMContentLoaded', () => {
           container.innerHTML = `<div class="text-xs text-muted" style="padding:10px;text-align:center;">No Team Member WhatsApp is linked yet.</div>`;
         }
         if (badge) badge.textContent = '0 Devices';
+        renderConnectedNumber();
       }
     } catch (err) {
       console.warn('loadCampaignSenders error:', err);
@@ -3344,7 +3389,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => fetchServerLeads(true), 1200);
       } else {
         showToast('⚠️ Could not start campaign: ' + (data?.message || 'Server error'));
-        if (data && data.is_connected === false) {
+        const userRole = (state.currentUser?.role || '').toLowerCase();
+        if (data && data.is_connected === false && userRole !== 'admin' && userRole !== 'superadmin') {
           openConnectWaModal();
         }
       }
@@ -6459,7 +6505,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Connect WhatsApp Number Modal Event Listeners
-  if (els.connectedNumberPill) els.connectedNumberPill.addEventListener('click', openConnectWaModal);
+  if (els.connectedNumberPill) {
+    els.connectedNumberPill.addEventListener('click', () => {
+      const userRole = (state.currentUser?.role || '').toLowerCase();
+      if (userRole === 'admin' || userRole === 'superadmin' || userRole === 'company admin') {
+        openTeamModal();
+      } else {
+        openConnectWaModal();
+      }
+    });
+  }
   if (els.closeConnectWaModalBtn) els.closeConnectWaModalBtn.addEventListener('click', closeConnectWaModal);
   if (els.cancelConnectWaBtn) els.cancelConnectWaBtn.addEventListener('click', closeConnectWaModal);
   if (els.saveConnectedWaBtn) els.saveConnectedWaBtn.addEventListener('click', saveConnectedWaNumber);
