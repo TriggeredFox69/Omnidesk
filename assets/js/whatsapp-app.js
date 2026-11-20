@@ -4725,6 +4725,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         if (data.success && Array.isArray(data.withdrawals)) {
           localWithdrawals = data.withdrawals;
+          window.serverEarnings = data.earnings || null;   // the only source of truth for balances
           localStorage.setItem('nunno_cached_withdrawals', JSON.stringify(localWithdrawals));
           return localWithdrawals;
         }
@@ -4756,23 +4757,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await loadWithdrawals(activeUserId);
 
-    // Calculate commissions & earnings for Team Lead (TL) & Team Member (TM)
-    const paidLeads = (mineLeads || []).filter(l => getLeadState(l) === 'paid');
-    let earnedCommission = 0;
-    if (paidLeads.length > 0) {
-      earnedCommission = paidLeads.reduce((sum, lead) => {
-        const amt = Number(lead.paidDetails?.amount) || (String(lead.interest || '').includes('Starter') ? 1700 : 5000);
-        if (amt >= 15000) return sum + 10000;
-        if (amt >= 5000) return sum + 2000;
-        if (amt >= 1700) return sum + 700;
-        return sum + Math.round(amt * 0.4);
-      }, 0);
-    }
-    
-    // For TL & TM: base payout pool with test allowance if 0 leads yet, plus commissions and TL bounties
-    const tlBounty = Number(user.tl_commission_balance || 0);
-    const totalEarned = earnedCommission + tlBounty;
-    const basePayoutPool = Math.max(totalEarned, paidLeads.length ? (5000 + tlBounty) : (7500 + tlBounty));
+    // Earnings and the payable balance are worked out on the server (api/earnings.php):
+    // verified sales only, the Nunno first-Rs.10,000 rule, minus paid and pending payouts.
+    const earn = window.serverEarnings || null;
 
     const userWds = isAdmin ? localWithdrawals : localWithdrawals.filter(w => w.userId === activeUserId);
     const pendingWds = (isAdmin ? localWithdrawals : userWds).filter(w => w.status === 'pending');
@@ -4781,7 +4768,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalPending = pendingWds.reduce((s, w) => s + (Number(w.amount) || 0), 0);
     const totalSettled = settledWds.reduce((s, w) => s + (Number(w.amount) || 0), 0);
 
-    withdrawalAvailableBalance = Math.max(0, basePayoutPool - totalSettled - totalPending);
+    withdrawalAvailableBalance = earn ? Number(earn.available) || 0 : 0;
 
     // Dynamic UI Elements
     const wdSectionEyebrow = document.getElementById('wdSectionEyebrow');
@@ -4860,7 +4847,16 @@ document.addEventListener('DOMContentLoaded', () => {
         wdCard1Badge.textContent = 'Ready';
         wdCard1Badge.className = 'wd-card-badge badge-green';
       }
-      if (wdCard1Footer) wdCard1Footer.textContent = 'Earned from verified closed deals';
+      if (wdCard1Footer) {
+        if (earn && earn.scheme === 'nunno_first_10k') {
+          const prog = Number(earn.full_pay_progress) || 0;
+          wdCard1Footer.textContent = prog < 10000
+            ? `Earned Rs. ${Number(earn.total_earned).toLocaleString()} · first Rs. 10,000 paid in full (${Math.round(prog / 100)}% done)`
+            : `Earned Rs. ${Number(earn.total_earned).toLocaleString()} · now on plan commission (700 / 2,000 / 10,000)`;
+        } else {
+          wdCard1Footer.textContent = earn ? `Earned Rs. ${Number(earn.total_earned).toLocaleString()} from verified sales` : 'Earned from verified closed deals';
+        }
+      }
 
       if (wdCard2Label) wdCard2Label.textContent = 'Pending Clearance';
       if (wdCard2Badge) {
@@ -5033,32 +5029,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Update Withdrawal Status (Admin action)
   window.updateWithdrawalStatus = async function(wdId, newStatus) {
-    const txRef = newStatus === 'approved' ? prompt('Enter Bank / Transfer Transaction Reference (e.g. EP-8819024) or leave empty:', 'TX-' + Math.floor(100000 + Math.random() * 900000)) : '';
+    let txRef = '';
+    let reason = '';
+    if (newStatus === 'approved') {
+      txRef = (prompt('Send the money first, then enter the transaction ID / reference of that transfer:', '') || '').trim();
+      if (!txRef) { showToast('A payment reference is required to mark a payout as paid.'); return; }
+    } else if (newStatus === 'rejected') {
+      const r = prompt('Reason for rejecting (the amount returns to the closer\'s balance):', '');
+      if (r === null) return;
+      reason = r.trim();
+    }
     try {
       const res = await fetch('api/withdrawals.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_status', id: wdId, status: newStatus, txRef })
+        credentials: 'same-origin',
+        body: JSON.stringify({ action: 'update_status', id: wdId, status: newStatus, txRef, reason })
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.success) {
-        showToast(newStatus === 'approved' ? '🟢 Withdrawal approved & marked as sent!' : '🔴 Withdrawal request rejected.');
+        showToast(newStatus === 'approved' ? '🟢 Payout marked as paid.' : '🔴 Payout request rejected; the amount is back in their balance.');
         dispatchWithdrawalStatusEmail(wdId, newStatus, txRef);
         renderEmployeeWorkspace();
       } else {
-        showToast(data.error || 'Failed to update withdrawal status.');
+        showToast('⚠️ ' + (data.error || 'Failed to update the payout.'));
       }
     } catch (_) {
-      // Local fallback
-      const item = localWithdrawals.find(w => w.id === wdId);
-      if (item) {
-        item.status = newStatus;
-        if (txRef) item.txRef = txRef;
-        localStorage.setItem('nunno_cached_withdrawals', JSON.stringify(localWithdrawals));
-        showToast(newStatus === 'approved' ? '🟢 Withdrawal marked paid locally!' : '🔴 Withdrawal marked rejected locally.');
-        dispatchWithdrawalStatusEmail(wdId, newStatus, txRef);
-        renderEmployeeWorkspace();
-      }
+      showToast('⚠️ Could not reach the server. Nothing was changed.');
     }
   };
 
@@ -5363,28 +5360,7 @@ document.addEventListener('DOMContentLoaded', () => {
       note
     };
 
-    // Close modal immediately and show guarantee notification
     closeWithdrawModal();
-    showToast(`🟢 PKR ${amount.toLocaleString()} requested! Funds will be audited & disbursed within 24 hours.`);
-
-    // Dispatch withdrawal lodged email confirmation to closer
-    if (state.currentUser && state.currentUser.email) {
-      fetch('api/email_service.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'send_email',
-          target_type: 'custom',
-          target_custom_email: state.currentUser.email,
-          target_custom_name: state.currentUser.name,
-          template_id: 'withdrawal_lodged',
-          subject: `Withdrawal Lodged: PKR ${amount.toLocaleString()} Processing Notice`,
-          badge: 'Audit In Progress',
-          message_html: `<h3>Withdrawal Request Confirmed ⏱️</h3><p>Hello ${escapeHtml(state.currentUser.name)}, your withdrawal request of <strong>PKR ${amount.toLocaleString()}</strong> via <strong>${escapeHtml(institution)}</strong> has been lodged.</p><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Amount:</strong> PKR ${amount.toLocaleString()}<br><strong>Account:</strong> ${escapeHtml(accountTitle)} (${escapeHtml(accountNumber)})<br><strong>Destination:</strong> ${escapeHtml(institution)}<br><strong>Audit SLA:</strong> Within 24 Hours Guaranteed</div><p>Our accounts team will verify and transfer your funds within 24 hours.</p>`,
-          variables: { name: state.currentUser.name, amount: amount.toLocaleString(), method: institution }
-        })
-      }).catch(() => {});
-    }
 
     try {
       const res = await fetch('api/withdrawals.php', {
@@ -5396,34 +5372,39 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
+          showToast(`🟢 PKR ${amount.toLocaleString()} requested. Your admin will transfer it and mark it paid.`);
+      // Dispatch withdrawal lodged email confirmation to closer
+      if (state.currentUser && state.currentUser.email) {
+        fetch('api/email_service.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'send_email',
+            target_type: 'custom',
+            target_custom_email: state.currentUser.email,
+            target_custom_name: state.currentUser.name,
+            template_id: 'withdrawal_lodged',
+            subject: `Withdrawal Lodged: PKR ${amount.toLocaleString()} Processing Notice`,
+            badge: 'Audit In Progress',
+            message_html: `<h3>Withdrawal Request Confirmed ⏱️</h3><p>Hello ${escapeHtml(state.currentUser.name)}, your withdrawal request of <strong>PKR ${amount.toLocaleString()}</strong> via <strong>${escapeHtml(institution)}</strong> has been lodged.</p><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Amount:</strong> PKR ${amount.toLocaleString()}<br><strong>Account:</strong> ${escapeHtml(accountTitle)} (${escapeHtml(accountNumber)})<br><strong>Destination:</strong> ${escapeHtml(institution)}<br><strong>Audit SLA:</strong> Within 24 Hours Guaranteed</div><p>Our accounts team will verify and transfer your funds within 24 hours.</p>`,
+            variables: { name: state.currentUser.name, amount: amount.toLocaleString(), method: institution }
+          })
+        }).catch(() => {});
+      }
           await loadWithdrawals(payload.userId);
           renderEmployeeWorkspace();
           return;
-        } else {
-          showToast(`⚠️ Server notice: ${data.error || 'Failed to submit.'}`);
         }
+        showToast(`⚠️ ${data.error || 'The payout request was not accepted.'}`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(`⚠️ ${data.error || 'The payout request was not accepted.'}`);
       }
     } catch (err) {
-      console.warn('API submission error, using local fallback:', err);
+      showToast('⚠️ Could not reach the server. Your payout was NOT requested; please try again.');
     }
-
-    // Local fallback persistence
-    const newWd = {
-      id: 'WD-' + Date.now().toString().slice(-5) + Math.floor(Math.random() * 90 + 10),
-      userId: payload.userId,
-      userName: payload.userName,
-      userRole: payload.userRole,
-      amount: payload.amount,
-      method: payload.method,
-      institution: payload.institution,
-      accountTitle: payload.accountTitle,
-      accountNumber: payload.accountNumber,
-      note: payload.note,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    };
-    localWithdrawals.unshift(newWd);
-    localStorage.setItem('nunno_cached_withdrawals', JSON.stringify(localWithdrawals));
+    // Nothing is recorded locally: reload the real balance.
+    await loadWithdrawals(payload.userId);
     renderEmployeeWorkspace();
   }
 
@@ -7377,118 +7358,80 @@ document.addEventListener('DOMContentLoaded', () => {
     return 'Team Member';
   }
 
-  // Helper: Post-target task commission calculator
-  // On Rs. 1,700 sale -> Rs. 700 commission
-  // On Rs. 5,000 sale -> Rs. 2,000 commission
-  // On Rs. 15,000 sale -> Rs. 10,000 commission
-  function getDealCommission(amt, planName = '') {
+  // Commission rules (must match api/earnings.php, which decides real payouts).
+  // Nunno: the first Rs. 10,000 of verified sales is paid to the closer in full;
+  // after that each plan pays 700 (Rs. 1,700), 2,000 (Rs. 5,000) or 10,000 (Rs. 15,000).
+  const NUNNO_FULL_PAY_LIMIT = 10000;
+  function getDealCommission(amt) {
     const num = Number(amt) || 0;
-    if (num >= 15000 || (planName && planName.toLowerCase().includes('whale'))) return 10000;
-    if (num >= 5000 || (planName && planName.toLowerCase().includes('pro'))) return 2000;
-    if (num >= 1700 || (planName && planName.toLowerCase().includes('starter'))) return 700;
-    return 0;
+    const tiers = [[15000, 10000], [5000, 2000], [1700, 700]];
+    for (const [price, comm] of tiers) if (Math.abs(num - price) < 1) return comm;
+    let rate = 700 / 1700;
+    for (const [price, comm] of tiers) { if (num >= price) { rate = comm / price; break; } }
+    return Math.round(num * rate);
   }
 
-  // Core Calculator: Computes 10k target eligibility, Base Salary, and Post-Target Commissions
   function calculateCloserPerformance(closerId) {
-    // Only VERIFIED deals count towards company revenue, 10k target, and commissions
-    // CRITICAL: Closer commission protection ensures deals closed after Admin Takeover still count!
-    const paidLeads = state.leads.filter(l => 
-      (l.leadState === 'paid' || l.status === 'paid') && 
-      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId || ((closerId === 'EMP-TM-MWMK43N9' || closerId === 'askari') && l.ownerUsername === 'askari'))
-    );
+    // Only VERIFIED deals count. A deal closed after an admin takeover still credits the original closer.
+    const ownsDeal = l => (l.paidDetails?.closedById || l.originalOwnerId || l.ownerId) === closerId;
+    const isNunno = ((state.currentUser && state.currentUser.company_id) || 'COMP-001') === 'COMP-001';
+    const saleAmount = l => l.paidDetails?.amount ? Number(l.paidDetails.amount)
+      : (l.interest && l.interest.includes('Starter') ? 1700 : (l.interest && l.interest.includes('Whale') ? 15000 : 5000));
+    const saleTime = l => new Date(l.paidDetails?.closedAt || l.verifiedAt || 0).getTime() || 0;
 
-    // Pending deals undergoing Admin verification
-    const pendingLeads = state.leads.filter(l => 
-      (l.leadState === 'pending_verification' || l.status === 'pending_verification') && 
-      (l.paidDetails?.closedById === closerId || l.originalOwnerId === closerId || l.ownerId === closerId || ((closerId === 'EMP-TM-MWMK43N9' || closerId === 'askari') && l.ownerUsername === 'askari'))
-    );
-
-    const TARGET = 10000;
-    const BASE_SALARY_AMOUNT = 10000;
+    const paidLeads = state.leads.filter(l => (l.leadState === 'paid' || l.status === 'paid') && ownsDeal(l))
+      .sort((a, b) => saleTime(a) - saleTime(b));
+    const pendingLeads = state.leads.filter(l => (l.leadState === 'pending_verification' || l.status === 'pending_verification') && ownsDeal(l));
 
     let runningSales = 0;
-    let commissionsEarned = 0;
+    let fullPayEarned = 0;       // the first Rs. 10,000, paid 100%
+    let commissionsEarned = 0;   // plan commission after that
 
     const dealLedger = paidLeads.map(l => {
-      const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : (l.interest && l.interest.includes('Starter') ? 1700 : (l.interest && l.interest.includes('Whale') ? 15000 : 5000));
+      const amt = saleAmount(l);
       const plan = l.paidDetails?.plan || l.interest || 'Nunno Pro';
-      const method = l.paidDetails?.method || 'EasyPaisa';
-      const email = l.paidDetails?.email || l.email || '';
-      const closedAt = l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive;
-
-      const salesBeforeDeal = runningSales;
+      const before = runningSales;
       runningSales += amt;
-
       let dealCommission = 0;
       let dealTag = '';
-
-      if (salesBeforeDeal >= TARGET) {
-        // Post-target sale: awards task commission
-        dealCommission = getDealCommission(amt, plan);
+      if (isNunno) {
+        const fullPart = Math.max(0, Math.min(amt, NUNNO_FULL_PAY_LIMIT - before));
+        const rest = amt - fullPart;
+        const restComm = rest > 0 ? Math.round(getDealCommission(amt) * (rest / amt)) : 0;
+        fullPayEarned += fullPart;
+        commissionsEarned += restComm;
+        dealCommission = fullPart + restComm;
+        dealTag = rest <= 0 ? `🎯 Paid in full: +Rs. ${fullPart.toLocaleString()} (first Rs. 10,000)`
+          : fullPart > 0 ? `🎯 Crossed Rs. 10,000: +Rs. ${dealCommission.toLocaleString()}`
+          : `💰 Commission: +Rs. ${restComm.toLocaleString()}`;
+      } else {
+        dealCommission = Number(l.paidDetails?.commission) || 0;
         commissionsEarned += dealCommission;
         dealTag = `💰 Commission: +Rs. ${dealCommission.toLocaleString()}`;
-      } else if (runningSales >= TARGET) {
-        // Milestone deal that passed the 10,000 sales target
-        dealTag = `🎯 10k Target Met (Unlocked Rs. 10k Salary!)`;
-      } else {
-        const pct = Math.round((runningSales / TARGET) * 100);
-        dealTag = `🎯 Funded 10k Target (${pct}%)`;
       }
-
       return {
-        id: l.id,
-        name: l.name,
-        display: l.display || l.phone,
-        email,
-        plan,
-        amt,
-        method,
-        closedAt,
-        dealCommission,
-        dealTag,
-        isPending: false
+        id: l.id, name: l.name, display: l.display || l.phone, email: l.paidDetails?.email || l.email || '',
+        plan, amt, method: l.paidDetails?.method || 'EasyPaisa',
+        closedAt: l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive,
+        dealCommission, dealTag, isPending: false
       };
-    });
+    }).reverse();
 
-    // Show pending deals in closer's ledger
     pendingLeads.forEach(l => {
-      const amt = l.paidDetails?.amount ? Number(l.paidDetails.amount) : 5000;
-      const plan = l.paidDetails?.plan || l.interest || 'Nunno Pro';
-      const method = l.paidDetails?.method || 'EasyPaisa';
-      const email = l.paidDetails?.email || l.email || '';
-      const closedAt = l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive;
-
       dealLedger.unshift({
-        id: l.id,
-        name: l.name,
-        display: l.display || l.phone,
-        email,
-        plan,
-        amt,
-        method,
-        closedAt,
-        dealCommission: 0,
-        dealTag: `⚪ In Review (Awaiting Admin Audit)`,
-        isPending: true
+        id: l.id, name: l.name, display: l.display || l.phone, email: l.paidDetails?.email || l.email || '',
+        plan: l.paidDetails?.plan || l.interest || 'Nunno Pro', amt: saleAmount(l), method: l.paidDetails?.method || 'EasyPaisa',
+        closedAt: l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive,
+        dealCommission: 0, dealTag: '⚪ In Review (Awaiting Admin Audit)', isPending: true
       });
     });
 
     const totalSales = runningSales;
-    const isTargetAchieved = totalSales >= TARGET;
-    const baseSalary = isTargetAchieved ? BASE_SALARY_AMOUNT : 0;
+    const isTargetAchieved = totalSales >= NUNNO_FULL_PAY_LIMIT;
+    // "baseSalary" keeps its old field name for the existing widgets: it is the first-10k part.
+    const baseSalary = fullPayEarned;
     const totalPayout = baseSalary + commissionsEarned;
-
-    return {
-      paidLeads,
-      pendingLeads,
-      dealLedger,
-      totalSales,
-      isTargetAchieved,
-      baseSalary,
-      commissionsEarned,
-      totalPayout
-    };
+    return { paidLeads, pendingLeads, dealLedger, totalSales, isTargetAchieved, baseSalary, commissionsEarned, totalPayout };
   }
 
   function renderScoreData(activeTab = 'my') {
@@ -7556,11 +7499,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (myPerf.isTargetAchieved) {
         els.milestoneStatusBadge.className = 'milestone-status-badge unlocked';
         if (els.targetBadgeIcon) els.targetBadgeIcon.textContent = '✅';
-        if (els.targetBadgeText) els.targetBadgeText.textContent = '10k Target Achieved (Unlocked)';
+        if (els.targetBadgeText) els.targetBadgeText.textContent = 'First Rs. 10,000 fully earned';
       } else {
         els.milestoneStatusBadge.className = 'milestone-status-badge';
         if (els.targetBadgeIcon) els.targetBadgeIcon.textContent = '⏳';
-        if (els.targetBadgeText) els.targetBadgeText.textContent = `Target In Progress (${pct}%)`;
+        if (els.targetBadgeText) els.targetBadgeText.textContent = `First Rs. 10,000: ${pct}% earned`;
       }
     }
 
@@ -7568,17 +7511,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.milestoneFeedback) {
       if (myPerf.isTargetAchieved) {
         els.milestoneFeedback.className = 'milestone-feedback unlocked';
-        els.milestoneFeedback.innerHTML = `🎉 <strong>Milestone Achieved!</strong> You have successfully passed the PKR 10,000 monthly sales target. Your <strong>Rs. 10,000 Base Salary</strong> is fully unlocked, and task commissions are actively paid on every additional sale!`;
+        els.milestoneFeedback.innerHTML = `🎉 <strong>First Rs. 10,000 fully earned!</strong> Every sale from now on pays plan commission: <strong>Rs. 700</strong> on Rs. 1,700 · <strong>Rs. 2,000</strong> on Rs. 5,000 · <strong>Rs. 10,000</strong> on Rs. 15,000.`;
       } else {
         els.milestoneFeedback.className = 'milestone-feedback';
         const remaining = 10000 - myRevenue;
-        els.milestoneFeedback.innerHTML = `Close <strong>Rs. ${remaining.toLocaleString()}</strong> more in customer sales to pass your milestone and unlock your <strong>Rs. 10,000 Base Salary</strong>.`;
+        els.milestoneFeedback.innerHTML = `Every rupee of your first Rs. 10,000 in sales is yours. <strong>Rs. ${remaining.toLocaleString()}</strong> to go, then plan commission on each sale.`;
       }
     }
 
     // Financial Breakdown Cards
     if (els.myBaseSalary) els.myBaseSalary.textContent = `Rs. ${myPerf.baseSalary.toLocaleString()}`;
-    if (els.myBaseSalarySub) els.myBaseSalarySub.textContent = myPerf.isTargetAchieved ? '✅ Target Passed (Qualified)' : 'Requires 10k Target';
+    if (els.myBaseSalarySub) els.myBaseSalarySub.textContent = myPerf.isTargetAchieved ? '✅ First Rs. 10,000 complete' : 'Paid 100% on your first Rs. 10,000';
     if (els.myCommissionsEarned) els.myCommissionsEarned.textContent = `Rs. ${myPerf.commissionsEarned.toLocaleString()}`;
     if (els.myTotalPayout) els.myTotalPayout.textContent = `Rs. ${myPerf.totalPayout.toLocaleString()}`;
     if (els.myTotalRevenue) els.myTotalRevenue.textContent = `Rs. ${myRevenue.toLocaleString()}`;
@@ -7816,7 +7759,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Export Leaderboard CSV Audit
   function exportLeaderboardCsv() {
-    let csv = 'Rank,Employee ID,Employee Name,Role,Deals Won,Total Sales (PKR),10k Target Status,Base Salary (PKR),Commissions (PKR),Total Take-Home Pay (PKR)\n';
+    let csv = 'Rank,Employee ID,Employee Name,Role,Deals Won,Total Sales (PKR),First 10k Status,First Rs. 10k Earned (PKR),Commissions (PKR),Total Take-Home Pay (PKR)\n';
     const closersMap = new Map();
 
     defaultAgents.forEach(a => { closersMap.set(a.id, { id: a.id, name: a.name, role: normalizeRole(a.role) }); });

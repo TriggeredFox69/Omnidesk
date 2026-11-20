@@ -508,6 +508,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     <button class="sadmin-tab-btn" id="tabBtnBrandInquiries" onclick="switchSadminTab('brandInquiries')">
       <span>📢</span> 9. Brand Product Inquiries <span id="sadminBrandBadge" style="display:none; background:#10b981; color:#03130c; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:800; margin-left:4px;">0</span>
     </button>
+    <button class="sadmin-tab-btn" id="tabBtnDataFilter" onclick="switchSadminTab('dataFilter')">
+      <span>🎯</span> 10. Number Intelligence
+    </button>
   </div>
 
   <!-- TAB 1: COMPANY DIRECTORY & COMPLETE STATS -->
@@ -845,17 +848,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             <div style="font-size:18px;">📈</div>
           </div>
           <div class="metric-val" id="nunnoConfirmedRev" style="color:#34d399;">Rs. 0</div>
-          <div class="metric-sub" id="nunnoConfirmedRevSub">0 confirmed plans sold (@ Rs. 1,700)</div>
+          <div class="metric-sub" id="nunnoConfirmedRevSub">0 verified sales</div>
         </div>
 
         <!-- Card 2: Amount Payable by Nunno to Chatly (Prominent Highlight) -->
         <div class="metric-card" style="border: 2px solid #10b981; background: linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.03) 100%); box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);">
           <div class="metric-header">
-            <span class="metric-label" style="color:#6ee7b7; font-weight:800; letter-spacing:0.04em;">AMOUNT PAYABLE BY NUNNO</span>
+            <span class="metric-label" style="color:#6ee7b7; font-weight:800; letter-spacing:0.04em;">EARNED BY CLOSERS (NUNNO PAYS)</span>
             <div style="font-size:18px;">🏦</div>
           </div>
           <div class="metric-val" id="nunnoPayableToChatly" style="color:#10b981; font-weight:900; font-size:28px;">Rs. 0</div>
-          <div class="metric-sub" style="color:#a7f3d0;">Total Nunno owes Chatly for TM task salaries &amp; commissions</div>
+          <div class="metric-sub" style="color:#a7f3d0;" id="nunnoPayableSub">First Rs. 10,000 per closer at 100% + plan commission</div>
         </div>
 
         <!-- Card 3: Nunno Retained Profits -->
@@ -865,7 +868,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             <div style="font-size:18px;">💰</div>
           </div>
           <div class="metric-val" id="nunnoRetainedProfit" style="color:#fbbf24;">Rs. 0</div>
-          <div class="metric-sub" id="nunnoRetainedProfitSub">Rs. 1,000 kept by Nunno per surplus plan beyond 6</div>
+          <div class="metric-sub" id="nunnoRetainedProfitSub">Sales minus closer earnings</div>
         </div>
 
         <!-- Card 4: Active Nunno Closers -->
@@ -875,25 +878,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             <div style="font-size:18px;">👥</div>
           </div>
           <div class="metric-val" id="nunnoActiveTMs" style="color:#60a5fa;">0 Closers</div>
-          <div class="metric-sub">Base Target: 6 plans (Rs. 10,200) · Rs. 700/plan surplus</div>
+          <div class="metric-sub" id="nunnoPayoutsSub">Payouts: Rs. 0 paid · Rs. 0 pending</div>
         </div>
       </div>
 
       <!-- Policy & Calculation Formula Explainer Callout -->
       <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 14px 18px; margin-bottom: 22px; font-size: 12px; line-height: 1.6;">
         <div style="font-weight: 800; color: #10b981; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-          <span>📌</span> Nunno Settlement Policy &amp; Disbursement Logic (Applied Exclusively to Nunno):
+          <span>📌</span> Nunno closer commission (applies only to Nunno):
         </div>
         <div style="color: var(--text-secondary); display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px;">
           <div>
-            <strong style="color:var(--text-primary);">1. Initial Base Task Target (Plans 1 to 6):</strong>
+            <strong style="color:var(--text-primary);">1. First Rs. 10,000 of sales = 100% to the closer</strong>
             <br>
-            Each plan is worth Rs. 1,700. When a TM sells up to 6 plans (worth Rs. 10,200), Chatly pays the TM their Rs. 10,000 target earnings. Nunno owes <strong>100% of the sales (Rs. 1,700 / plan = Rs. 10,200)</strong> to Chatly.
+            A closer who sells Rs. 10,000 earns Rs. 10,000. It is counted rupee by rupee across their verified sales, so a sale that crosses Rs. 10,000 pays 100% up to the line and plan commission on the rest.
           </div>
           <div>
-            <strong style="color:var(--text-primary);">2. Surplus Sales Commission Tier (Plans 7+):</strong>
+            <strong style="color:var(--text-primary);">2. After that, commission per plan</strong>
             <br>
-            For each additional sale beyond 6 plans, Nunno owes Chatly <strong>only Rs. 700</strong> (paid to TM as commission). Nunno retains the remaining <strong>Rs. 1,000 per sale</strong> as company profit.
+            Rs. 1,700 plan &rarr; <strong>Rs. 700</strong> &nbsp;·&nbsp; Rs. 5,000 plan &rarr; <strong>Rs. 2,000</strong> &nbsp;·&nbsp; Rs. 15,000 plan &rarr; <strong>Rs. 10,000</strong>.
+            Only admin-verified sales count. The same numbers drive each closer's wallet and withdrawals.
           </div>
         </div>
       </div>
@@ -913,22 +917,121 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
           <thead>
             <tr>
               <th>Nunno Closer</th>
-              <th>Confirmed Plans Sold</th>
-              <th>Gross Sales Revenue</th>
-              <th>Task Target &amp; Commission Tier</th>
-              <th style="color:#10b981;">Payable by Nunno to Chatly</th>
-              <th style="color:#fbbf24;">Nunno Retained Profit</th>
+              <th>Verified Sales</th>
+              <th>Sales Revenue</th>
+              <th>First Rs. 10,000 (100%)</th>
+              <th style="color:#10b981;">Earned by Closer</th>
+              <th style="color:#fbbf24;">Nunno Keeps</th>
+              <th>Payouts</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="tableNunnoSettlementBody">
             <tr>
-              <td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">
+              <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">
                 Loading Nunno settlement data...
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 10: NUMBER INTELLIGENCE (filter every number across every company) -->
+  <div class="sadmin-pane" id="paneDataFilter">
+    <style>
+      .nx-chips { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 12px; }
+      .nx-chip { display:inline-flex; align-items:center; gap:7px; padding:8px 13px; border-radius:999px; border:1px solid var(--border-subtle); background:rgba(255,255,255,0.03); color:var(--text-secondary); font-size:12.5px; font-weight:700; cursor:pointer; transition:all .15s ease; }
+      .nx-chip:hover { border-color:rgba(31,224,138,0.45); color:var(--text-primary); }
+      .nx-chip b { font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:1px 7px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--text-primary); }
+      .nx-chip.active { background:rgba(31,224,138,0.16); border-color:#1fe08a; color:#fff; }
+      .nx-chip.active b { background:#1fe08a; color:#03130c; }
+      .nx-filters { display:grid; grid-template-columns: 2fr repeat(6, minmax(120px,1fr)); gap:8px; }
+      .nx-filters .form-control { padding:8px 10px; font-size:12.5px; }
+      .nx-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:14px 0 10px; padding:10px 14px; border-radius:12px; background:rgba(31,224,138,0.06); border:1px solid rgba(31,224,138,0.22); }
+      .nx-stats { display:flex; gap:18px; flex-wrap:wrap; font-size:12.5px; color:var(--text-secondary); }
+      .nx-stats strong { color:var(--text-primary); font-size:14px; }
+      .nx-pill { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
+      .nx-fresh { background:rgba(239,68,68,0.14); color:#f87171; }
+      .nx-ongoing { background:rgba(234,179,8,0.15); color:#fde047; }
+      .nx-pending_verification { background:rgba(148,163,184,0.18); color:#cbd5e1; }
+      .nx-paid { background:rgba(16,185,129,0.16); color:#34d399; }
+      .nx-useless { background:rgba(59,130,246,0.15); color:#93c5fd; }
+      .nx-dead { background:rgba(100,116,139,0.25); color:#e2e8f0; }
+      #nxTable td { font-size:12.5px; vertical-align:middle; }
+      #nxTable .mono { font-family:'JetBrains Mono',monospace; }
+      @media (max-width: 1100px) { .nx-filters { grid-template-columns: 1fr 1fr 1fr; } }
+    </style>
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>🎯</span> Number Intelligence: Every Number, Every Company</div>
+          <div class="box-desc">Slice every number by outcome, replies, delivery, closer, company and recency. Export exactly the list you need (for example, "replied in the last 7 days but never paid") straight into a new campaign.</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary" onclick="nxLoad(true)" style="padding:8px 14px; font-size:12.5px;">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div class="nx-chips" id="nxChips"></div>
+
+      <div class="nx-filters">
+        <input id="nxSearch" class="form-control" placeholder="Search number, name, city, plan…" oninput="nxRender()">
+        <select id="nxCompany" class="form-control" onchange="nxRender()"><option value="">All companies</option></select>
+        <select id="nxOwner" class="form-control" onchange="nxRender()"><option value="">All closers</option></select>
+        <select id="nxReplied" class="form-control" onchange="nxRender()">
+          <option value="">Replies: any</option>
+          <option value="yes">Replied at least once</option>
+          <option value="no">Never replied</option>
+          <option value="3">Replied 3+ times</option>
+          <option value="10">Replied 10+ times</option>
+        </select>
+        <select id="nxActive" class="form-control" onchange="nxRender()">
+          <option value="">Last activity: any</option>
+          <option value="1">Last 24 hours</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="-30">Quiet for 30+ days</option>
+          <option value="-90">Quiet for 90+ days</option>
+        </select>
+        <select id="nxDelivery" class="form-control" onchange="nxRender()">
+          <option value="">Delivery: any</option>
+          <option value="delivered">Delivered / read</option>
+          <option value="failed">Had a failed message</option>
+          <option value="unsent">Never messaged</option>
+        </select>
+        <select id="nxSort" class="form-control" onchange="nxRender()">
+          <option value="la">Sort: latest activity</option>
+          <option value="r">Sort: most replies</option>
+          <option value="amt">Sort: highest sale</option>
+          <option value="lr">Sort: latest reply</option>
+          <option value="old">Sort: oldest activity</option>
+        </select>
+      </div>
+
+      <div class="nx-bar">
+        <div class="nx-stats" id="nxStats">Loading…</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-secondary" onclick="nxCopy()" style="padding:7px 12px; font-size:12px;">📋 Copy numbers</button>
+          <button class="btn btn-secondary" onclick="nxDownload('txt')" style="padding:7px 12px; font-size:12px;">⬇ Numbers .txt (for campaigns)</button>
+          <button class="btn btn-primary" onclick="nxDownload('csv')" style="padding:7px 12px; font-size:12px;">⬇ Full .csv</button>
+          <button class="btn btn-secondary" onclick="nxReset()" style="padding:7px 12px; font-size:12px;">Reset</button>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table id="nxTable">
+          <thead>
+            <tr>
+              <th>Number</th><th>Name</th><th>Company</th><th>Status</th><th>Replies / Sent</th><th>Delivery</th><th>Closer</th><th>Last activity</th><th>Sale</th>
+            </tr>
+          </thead>
+          <tbody id="nxBody"><tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">Open this tab to load numbers…</td></tr></tbody>
+        </table>
+      </div>
+      <div style="text-align:center; margin-top:12px;">
+        <button class="btn btn-secondary" id="nxMore" onclick="nxShowMore()" style="display:none; padding:8px 16px; font-size:12.5px;">Show more</button>
       </div>
     </div>
   </div>
@@ -1158,7 +1261,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
       <div>
         <div class="modal-title">Record Confirmed Plan Sale (Nunno)</div>
-        <div style="font-size:12px; color:var(--text-secondary);">Add confirmed paid plan sales for a Nunno closer.</div>
+        <div style="font-size:12px; color:var(--text-secondary);">Counts toward the closer's earnings and wallet.</div>
       </div>
       <button class="btn btn-secondary" onclick="closeRecordNunnoSaleModal()" style="padding:4px 8px; cursor:pointer;">✕</button>
     </div>
@@ -1168,10 +1271,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         <select id="recordNunnoSaleTMSelect" class="form-control" required style="cursor:pointer;"></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Number of Plans Sold (Rs. 1,700 each)</label>
-        <input type="number" id="recordNunnoSalePlansInput" class="form-control" value="1" min="1" max="1000" required>
+        <label class="form-label">Plan sold</label>
+        <select id="recordNunnoSalePriceSelect" class="form-control" style="cursor:pointer;">
+          <option value="1700">Rs. 1,700 plan (Rs. 700 commission after the first 10k)</option>
+          <option value="5000">Rs. 5,000 plan (Rs. 2,000 commission after the first 10k)</option>
+          <option value="15000">Rs. 15,000 plan (Rs. 10,000 commission after the first 10k)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">How many of this plan</label>
+        <input type="number" id="recordNunnoSalePlansInput" class="form-control" value="1" min="1" max="50" required>
         <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
-          Note: Plans 1-6 = Rs. 1,700 payable to Chatly each. Plans 7+ = Rs. 700 payable to Chatly + Rs. 1,000 kept by Nunno.
+          Use this only for sales that did not go through the Chatly inbox. Inbox sales count automatically once an admin verifies them.
         </div>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
@@ -1211,7 +1322,7 @@ setInterval(() => {
 }, 10);
 
 function switchSadminTab(tabName) {
-  const tabs = ['companies', 'chatter', 'logins', 'masterPending', 'numbers', 'provision', 'audit', 'financials', 'brandInquiries'];
+  const tabs = ['companies', 'chatter', 'logins', 'masterPending', 'numbers', 'provision', 'audit', 'financials', 'brandInquiries', 'dataFilter'];
   tabs.forEach((t) => {
     const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
     const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1225,7 +1336,201 @@ function switchSadminTab(tabName) {
   if (tabName === 'audit') loadAuditLogs();
   if (tabName === 'brandInquiries') loadBrandInquiries();
   if (tabName === 'financials') loadNunnoSettlement();
+  if (tabName === 'dataFilter') nxLoad(false);
 }
+// HTML-escape helper. It was called across this page but never defined, so tables
+// that used it (e.g. the commission ledger) threw as soon as they had rows.
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+// ═══ Number Intelligence (tab 10) ═══
+let nxRows = [];
+let nxCompanies = {};
+let nxSegment = 'all';
+let nxLimit = 300;
+let nxFiltered = [];
+let nxLoadedAt = 0;
+
+const NX_STATE_LABEL = { fresh: '🔴 Fresh', ongoing: '🟡 Lead (ongoing)', pending_verification: '⚪ In review', paid: '🟢 Paid', useless: "🔵 Won't pay" };
+const NX_SEGMENTS = [
+  ['all', 'All numbers', () => true],
+  ['fresh', '🔴 Fresh', r => r.s === 'fresh'],
+  ['ongoing', '🟡 Leads', r => r.s === 'ongoing'],
+  ['pending_verification', '⚪ In review', r => r.s === 'pending_verification'],
+  ['paid', '🟢 Paid', r => r.s === 'paid'],
+  ['useless', "🔵 Won't pay", r => r.s === 'useless'],
+  ['dead', '☠️ Dead (undeliverable)', r => r.dead === 1],
+  ['replied', '💬 Replied', r => r.r > 0],
+  ['silent', '🤐 Never replied', r => r.r === 0 && r.sn > 0],
+  ['hot', '🔥 Replied, not paid', r => r.r > 0 && r.s !== 'paid' && r.s !== 'useless'],
+  ['hot48', '⚡ Replied in 48h, not paid', r => r.r > 0 && r.s !== 'paid' && r.lr && (Date.now() / 1000 - r.lr) < 172800],
+];
+
+async function nxLoad(force) {
+  if (!force && nxRows.length && Date.now() - nxLoadedAt < 60000) { nxRender(); return; }
+  const body = document.getElementById('nxBody');
+  if (body) body.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">Loading every number…</td></tr>`;
+  try {
+    const res = await fetch('api/companies.php?action=sadmin_numbers', { credentials: 'same-origin' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Could not load numbers.');
+    nxRows = data.rows || [];
+    nxCompanies = {};
+    (data.companies || []).forEach(c => { nxCompanies[c.id] = c.name; });
+    nxLoadedAt = Date.now();
+    const compSel = document.getElementById('nxCompany');
+    if (compSel) compSel.innerHTML = '<option value="">All companies</option>' + (data.companies || []).map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+    const owners = {};
+    nxRows.forEach(r => { if (r.o) owners[r.o] = r.on || r.o; });
+    const ownSel = document.getElementById('nxOwner');
+    if (ownSel) ownSel.innerHTML = '<option value="">All closers</option><option value="__none">Unassigned</option>' +
+      Object.entries(owners).sort((a, b) => a[1].localeCompare(b[1])).map(([id, n]) => `<option value="${escapeHtml(id)}">${escapeHtml(n)}</option>`).join('');
+    nxRender();
+  } catch (err) {
+    if (body) body.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:#f87171;">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function nxBaseFilter(r) {
+  const comp = document.getElementById('nxCompany')?.value || '';
+  const owner = document.getElementById('nxOwner')?.value || '';
+  const replied = document.getElementById('nxReplied')?.value || '';
+  const active = parseInt(document.getElementById('nxActive')?.value || '0', 10);
+  const delivery = document.getElementById('nxDelivery')?.value || '';
+  const q = (document.getElementById('nxSearch')?.value || '').trim().toLowerCase();
+  const now = Date.now() / 1000;
+  if (comp && r.c !== comp) return false;
+  if (owner === '__none' && r.o) return false;
+  if (owner && owner !== '__none' && r.o !== owner) return false;
+  if (replied === 'yes' && r.r < 1) return false;
+  if (replied === 'no' && r.r > 0) return false;
+  if (/^\d+$/.test(replied) && r.r < parseInt(replied, 10)) return false;
+  if (active > 0 && (!r.la || now - r.la > active * 86400)) return false;
+  if (active < 0 && r.la && now - r.la < -active * 86400) return false;
+  if (delivery === 'delivered' && r.d < 1) return false;
+  if (delivery === 'failed' && r.f < 1) return false;
+  if (delivery === 'unsent' && r.sn > 0) return false;
+  if (q) {
+    const hay = (r.p + ' ' + r.n + ' ' + r.ci + ' ' + r.pl + ' ' + r.it + ' ' + r.on).toLowerCase();
+    if (!hay.includes(q.replace(/^\+/, ''))) return false;
+  }
+  return true;
+}
+
+function nxRender() {
+  const base = nxRows.filter(nxBaseFilter);
+  // chips show counts inside the other filters, so they always add up
+  const chips = document.getElementById('nxChips');
+  if (chips) chips.innerHTML = NX_SEGMENTS.map(([key, label, fn]) =>
+    `<span class="nx-chip ${key === nxSegment ? 'active' : ''}" onclick="nxSetSegment('${key}')">${label} <b>${base.filter(fn).length.toLocaleString()}</b></span>`).join('');
+  const seg = NX_SEGMENTS.find(s => s[0] === nxSegment) || NX_SEGMENTS[0];
+  nxFiltered = base.filter(seg[2]);
+  const sort = document.getElementById('nxSort')?.value || 'la';
+  const cmp = {
+    la: (a, b) => (b.la || 0) - (a.la || 0),
+    r: (a, b) => b.r - a.r || (b.la || 0) - (a.la || 0),
+    amt: (a, b) => b.amt - a.amt,
+    lr: (a, b) => (b.lr || 0) - (a.lr || 0),
+    old: (a, b) => (a.la || 0) - (b.la || 0),
+  }[sort];
+  nxFiltered.sort(cmp);
+
+  const replied = nxFiltered.filter(r => r.r > 0).length;
+  const paid = nxFiltered.filter(r => r.s === 'paid');
+  const revenue = paid.reduce((s, r) => s + (r.amt || 0), 0);
+  const stats = document.getElementById('nxStats');
+  if (stats) stats.innerHTML = `
+    <span><strong>${nxFiltered.length.toLocaleString()}</strong> numbers</span>
+    <span>Reply rate <strong>${nxFiltered.length ? Math.round(replied / nxFiltered.length * 100) : 0}%</strong></span>
+    <span>Paid <strong>${paid.length.toLocaleString()}</strong></span>
+    <span>Revenue <strong>Rs. ${revenue.toLocaleString()}</strong></span>
+    <span>Dead <strong>${nxFiltered.filter(r => r.dead).length.toLocaleString()}</strong></span>`;
+  nxLimit = 300;
+  nxPaint();
+}
+
+function nxAgo(ts) {
+  if (!ts) return '<span style="color:var(--text-muted)">—</span>';
+  const s = Date.now() / 1000 - ts;
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + 'm ago';
+  if (s < 86400) return Math.round(s / 3600) + 'h ago';
+  if (s < 86400 * 60) return Math.round(s / 86400) + 'd ago';
+  return new Date(ts * 1000).toLocaleDateString();
+}
+
+function nxPaint() {
+  const body = document.getElementById('nxBody');
+  if (!body) return;
+  if (!nxFiltered.length) {
+    body.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">No numbers match these filters.</td></tr>`;
+  } else {
+    body.innerHTML = nxFiltered.slice(0, nxLimit).map(r => {
+      const delivery = r.dead ? '<span class="nx-pill nx-dead">☠️ Undeliverable</span>'
+        : r.f ? `<span class="nx-pill nx-fresh">${r.f} failed</span>`
+        : r.d ? '<span class="nx-pill nx-paid">✓ Delivered</span>'
+        : r.sn ? '<span class="nx-pill nx-pending_verification">Sent</span>' : '<span style="color:var(--text-muted)">Not messaged</span>';
+      return `<tr>
+        <td class="mono" style="font-weight:700; color:#38bdf8;">+${escapeHtml(r.p)}</td>
+        <td>${escapeHtml(r.n && !r.n.startsWith('+') ? r.n : '')}${r.ci ? `<div style="font-size:10.5px; color:var(--text-muted);">${escapeHtml(r.ci)}</div>` : ''}</td>
+        <td>${escapeHtml(nxCompanies[r.c] || r.c)}</td>
+        <td><span class="nx-pill nx-${r.s}">${NX_STATE_LABEL[r.s] || r.s}</span></td>
+        <td class="mono">${r.r} / ${r.sn}</td>
+        <td>${delivery}</td>
+        <td>${escapeHtml(r.on || '—')}</td>
+        <td>${nxAgo(r.la)}${r.lr ? `<div style="font-size:10.5px; color:var(--text-muted);">reply ${nxAgo(r.lr)}</div>` : ''}</td>
+        <td class="mono">${r.amt ? 'Rs. ' + Number(r.amt).toLocaleString() : ''}${r.pl ? `<div style="font-size:10.5px; color:var(--text-muted);">${escapeHtml(r.pl)}</div>` : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+  const more = document.getElementById('nxMore');
+  if (more) {
+    const left = nxFiltered.length - nxLimit;
+    more.style.display = left > 0 ? 'inline-block' : 'none';
+    more.textContent = `Show ${Math.min(300, left).toLocaleString()} more (${left.toLocaleString()} hidden)`;
+  }
+}
+
+function nxShowMore() { nxLimit += 300; nxPaint(); }
+function nxSetSegment(key) { nxSegment = key; nxRender(); }
+function nxReset() {
+  ['nxSearch', 'nxCompany', 'nxOwner', 'nxReplied', 'nxActive', 'nxDelivery'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const sort = document.getElementById('nxSort'); if (sort) sort.value = 'la';
+  nxSegment = 'all';
+  nxRender();
+}
+
+function nxCopy() {
+  const text = nxFiltered.map(r => r.p).join('\n');
+  if (!text) { alert('No numbers to copy.'); return; }
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+    .then(() => alert(`Copied ${nxFiltered.length.toLocaleString()} numbers.`))
+    .catch(() => { prompt('Copy these numbers:', text); });
+}
+
+function nxDownload(kind) {
+  if (!nxFiltered.length) { alert('No numbers to export.'); return; }
+  const seg = (NX_SEGMENTS.find(s => s[0] === nxSegment) || NX_SEGMENTS[0])[0];
+  let content, type;
+  if (kind === 'txt') {
+    content = nxFiltered.map(r => r.p).join('\n');
+    type = 'text/plain';
+  } else {
+    const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const iso = ts => ts ? new Date(ts * 1000).toISOString() : '';
+    content = 'Number,Name,Company,Status,Replies,Messages Sent,Delivered,Failed,Dead,Closer,City,Last Activity,Last Reply,Sale Amount,Plan\n' +
+      nxFiltered.map(r => [r.p, r.n, nxCompanies[r.c] || r.c, NX_STATE_LABEL[r.s] || r.s, r.r, r.sn, r.d, r.f, r.dead ? 'yes' : '', r.on, r.ci, iso(r.la), iso(r.lr), r.amt || '', r.pl].map(esc).join(',')).join('\n');
+    type = 'text/csv';
+  }
+  const blob = new Blob([content], { type: type + ';charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `chatly-numbers-${seg}-${new Date().toISOString().slice(0, 10)}.${kind}`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
 
 function openProvisionModal() { switchSadminTab('provision'); }
 function closeDeepStatsModal() { document.getElementById('deepStatsModal').style.display = 'none'; }
@@ -2271,12 +2576,14 @@ function renderNunnoSettlement(data) {
   const tmsEl = document.getElementById('nunnoActiveTMs');
 
   if (revEl) revEl.textContent = 'Rs. ' + Number(s.total_confirmed_revenue || 0).toLocaleString();
-  if (revSubEl) revSubEl.textContent = `${Number(s.total_plans_sold || 0).toLocaleString()} confirmed plans sold (@ Rs. 1,700)`;
+  if (revSubEl) revSubEl.textContent = `${Number(s.total_plans_sold || 0).toLocaleString()} verified sales`;
+  const paySub = document.getElementById('nunnoPayoutsSub');
+  if (paySub) paySub.textContent = `Payouts: Rs. ${Number(s.total_paid_out || 0).toLocaleString()} paid · Rs. ${Number(s.total_pending_payouts || 0).toLocaleString()} pending`;
   
   if (payableEl) payableEl.textContent = 'Rs. ' + Number(s.total_payable_by_nunno || 0).toLocaleString();
   
   if (profitEl) profitEl.textContent = 'Rs. ' + Number(s.total_nunno_profit || 0).toLocaleString();
-  if (profitSubEl) profitSubEl.textContent = `Rs. 1,000 kept by Nunno per surplus plan beyond initial 6`;
+  if (profitSubEl) profitSubEl.textContent = `Sales minus what closers earned`;
 
   if (tmsEl) tmsEl.textContent = `${s.total_tms || closers.length} Closers`;
 
@@ -2285,73 +2592,49 @@ function renderNunnoSettlement(data) {
   if (!tbody) return;
 
   if (closers.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No closers currently assigned to Nunno.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">No closers currently assigned to Nunno.</td></tr>`;
     return;
   }
 
+  const rs = n => 'Rs. ' + Number(n || 0).toLocaleString();
   tbody.innerHTML = closers.map(c => {
-    let tierBadge = '';
-    if (c.plans_sold < 6) {
-      const remaining = 6 - c.plans_sold;
-      tierBadge = `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(234, 179, 8, 0.15); color:#fde047; border:1px solid rgba(234, 179, 8, 0.3);">
-        🎯 Target in Progress (${c.plans_sold}/6 plans · ${remaining} to unlock)
-      </span>`;
-    } else if (c.plans_sold === 6) {
-      tierBadge = `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(16, 185, 129, 0.15); color:#34d399; border:1px solid rgba(16, 185, 129, 0.3);">
-        ✅ Base Target Met (6/6 · Full 10,200 Unlocked)
-      </span>`;
-    } else {
-      tierBadge = `<span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(99, 102, 241, 0.15); color:#a5b4fc; border:1px solid rgba(99, 102, 241, 0.3);">
-        🚀 Surplus Tier (6 Base + ${c.surplus_plans} Extra @ Rs. 700)
-      </span>`;
-    }
-
+    const prog = Number(c.full_pay_progress || 0);
+    const pct = Math.min(100, Math.round(prog / 100));
+    const progCell = prog >= 10000
+      ? `<span style="display:inline-flex; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);">✅ Done · now on plan commission</span>`
+      : `<div style="font-size:11.5px; color:#fde047; font-weight:700;">${rs(prog)} / Rs. 10,000</div>
+         <div style="height:6px; width:140px; background:rgba(255,255,255,0.08); border-radius:99px; margin-top:4px; overflow:hidden;"><div style="height:100%; width:${pct}%; background:linear-gradient(90deg,#fbbf24,#10b981);"></div></div>`;
     return `
       <tr>
         <td>
           <div style="display:flex; align-items:center; gap:10px;">
             <div style="width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg, #10b981, #059669); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">
-              ${(c.name || 'TM').charAt(0).toUpperCase()}
+              ${escapeHtml((c.name || 'TM').charAt(0).toUpperCase())}
             </div>
             <div>
               <div style="font-weight:700; color:var(--text-primary); font-size:13px;">${escapeHtml(c.name || 'Closer')}</div>
               <div style="font-size:11px; color:var(--text-muted); display:flex; gap:6px;">
-                <span>@${escapeHtml(c.username)}</span>
+                <span>@${escapeHtml(c.username || '')}</span>
                 ${c.phone ? `<span>· ${escapeHtml(c.phone)}</span>` : ''}
               </div>
             </div>
           </div>
         </td>
         <td style="font-weight:800; font-size:14px; color:var(--text-primary);">
-          <span style="display:inline-block; padding:3px 10px; border-radius:6px; background:rgba(255,255,255,0.06); border:1px solid var(--border-subtle);">
-            ${c.plans_sold} plans
-          </span>
+          <span style="display:inline-block; padding:3px 10px; border-radius:6px; background:rgba(255,255,255,0.06); border:1px solid var(--border-subtle);">${Number(c.deals || 0)}</span>
+          ${c.in_review_count ? `<div style="font-size:10.5px; color:#94a3b8; margin-top:3px;">+${c.in_review_count} in review</div>` : ''}
         </td>
-        <td style="font-weight:700; color:#34d399;">
-          Rs. ${Number(c.gross_revenue).toLocaleString()}
-        </td>
-        <td>
-          ${tierBadge}
-          <div style="font-size:10.5px; color:var(--text-secondary); margin-top:3px;">
-            ${c.plans_sold <= 6 ? `Base: ${c.plans_sold} × Rs. 1,700` : `Base: 6 × 1,700 (=10,200) + ${c.surplus_plans} × 700`}
-          </div>
-        </td>
-        <td style="font-weight:800; font-size:14px; color:#10b981;">
-          Rs. ${Number(c.amount_payable_by_nunno).toLocaleString()}
-        </td>
-        <td style="font-weight:700; color:#fbbf24;">
-          Rs. ${Number(c.nunno_retained_profit).toLocaleString()}
-          <span style="font-size:10px; color:var(--text-secondary); display:block;">(${c.surplus_plans} × Rs. 1,000)</span>
+        <td style="font-weight:700; color:#34d399;">${rs(c.gross_revenue)}</td>
+        <td>${progCell}</td>
+        <td style="font-weight:800; font-size:14px; color:#10b981;">${rs(c.amount_payable_by_nunno)}</td>
+        <td style="font-weight:700; color:#fbbf24;">${rs(c.nunno_retained_profit)}</td>
+        <td style="font-size:11.5px; line-height:1.6;">
+          <div style="color:#34d399;">Paid ${rs(c.paid_out)}</div>
+          <div style="color:#fbbf24;">Pending ${rs(c.pending_withdrawals)}</div>
+          <div style="color:var(--text-secondary);">Available ${rs(c.available)}</div>
         </td>
         <td>
-          <div style="display:flex; gap:6px;">
-            <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; border-color:rgba(16, 185, 129, 0.4); color:#34d399;" onclick="quickAddNunnoSale('${c.id}', '${escapeHtml(c.name)}')">
-              +1 Sale
-            </button>
-            <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="promptSetNunnoSales('${c.id}', '${escapeHtml(c.name)}', ${c.plans_sold})">
-              Adjust
-            </button>
-          </div>
+          <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; border-color:rgba(16, 185, 129, 0.4); color:#34d399;" onclick="quickAddNunnoSale('${escapeHtml(c.id)}', '${escapeHtml(c.name || '')}')">+ Sale</button>
         </td>
       </tr>
     `;
@@ -2359,46 +2642,21 @@ function renderNunnoSettlement(data) {
 }
 
 async function quickAddNunnoSale(userId, name) {
-  if (!confirm(`Confirm recording 1 additional plan sale (Rs. 1,700) for ${name}?`)) return;
+  const pick = prompt(`Record a verified sale for ${name}.\nWhich plan? Type 1700, 5000 or 15000:`, '1700');
+  if (pick === null) return;
+  const price = parseInt(pick.replace(/[^0-9]/g, ''), 10);
+  if (![1700, 5000, 15000].includes(price)) { alert('Please type 1700, 5000 or 15000.'); return; }
   try {
     const res = await fetch('api/companies.php?action=record_nunno_sale', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, plans: 1 })
+      body: JSON.stringify({ user_id: userId, plans: 1, plan_price: price })
     });
     const d = await res.json();
-    if (d.success) {
-      loadNunnoSettlement();
-    } else {
-      alert('⚠️ ' + (d.error || 'Failed to record sale.'));
-    }
+    if (d.success) loadNunnoSettlement();
+    else alert('⚠️ ' + (d.error || 'Failed to record sale.'));
   } catch (e) {
     alert('Error recording sale.');
-  }
-}
-
-async function promptSetNunnoSales(userId, name, currentPlans) {
-  const input = prompt(`Enter total confirmed plans sold for ${name}:`, currentPlans);
-  if (input === null) return;
-  const plans = parseInt(input, 10);
-  if (isNaN(plans) || plans < 0) {
-    alert('Please enter a valid non-negative number of plans.');
-    return;
-  }
-  try {
-    const res = await fetch('api/companies.php?action=set_nunno_tm_sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, plans_sold: plans })
-    });
-    const d = await res.json();
-    if (d.success) {
-      loadNunnoSettlement();
-    } else {
-      alert('⚠️ ' + (d.error || 'Failed to update sales.'));
-    }
-  } catch (e) {
-    alert('Error updating sales.');
   }
 }
 
@@ -2406,7 +2664,7 @@ function openRecordNunnoSaleModal() {
   const select = document.getElementById('recordNunnoSaleTMSelect');
   if (select && nunnoSettlementData && nunnoSettlementData.closers) {
     select.innerHTML = nunnoSettlementData.closers.map(c => `
-      <option value="${c.id}">${escapeHtml(c.name)} (@${escapeHtml(c.username)}) — Current: ${c.plans_sold} plans</option>
+      <option value="${escapeHtml(c.id)}">${escapeHtml(c.name)} (@${escapeHtml(c.username || '')}) · ${Number(c.deals || 0)} sales</option>
     `).join('');
   }
   document.getElementById('recordNunnoSaleModal').style.display = 'flex';
@@ -2429,7 +2687,7 @@ async function submitRecordNunnoSale(e) {
     const res = await fetch('api/companies.php?action=record_nunno_sale', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, plans: plans })
+      body: JSON.stringify({ user_id: userId, plans: plans, plan_price: parseInt(document.getElementById('recordNunnoSalePriceSelect').value, 10) || 1700 })
     });
     const d = await res.json();
     if (d.success) {

@@ -1066,7 +1066,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           <input type="checkbox" id="keepSignedIn" checked>
           <span style="font-size:12px;">Keep me signed in</span>
         </label>
-        <a href="javascript:void(0)" onclick="refreshQRCode(true)" class="footer-link" style="font-size:11.5px;">🔄 Refresh</a>
+        <a href="javascript:void(0)" onclick="refreshQRCode(false)" class="footer-link" style="font-size:11.5px;">🔄 Refresh</a>
       </div>
 
       <!-- Connected WhatsApp Closer Card -->
@@ -1288,7 +1288,8 @@ function switchPasswordRole(role) {
 
 function focusHeroQR() {
   toggleHeroLoginMode('qr');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (typeof openQrFocus === 'function') openQrFocus();
+  else window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function scrollToAccess(role) {
@@ -1601,6 +1602,7 @@ async function loginAsConnectedCloser(phone) {
 }
 
 async function disconnectWhatsAppBridge() {
+  if (!confirm('Disconnect this WhatsApp from Chatly? It will need to scan the QR again.')) return;
   const statusTxt = document.getElementById('qrStatusText');
   if (statusTxt) statusTxt.textContent = '🔄 Disconnecting WhatsApp & generating fresh QR code...';
   const box = document.getElementById('connectedPhoneActionsBox');
@@ -1808,127 +1810,161 @@ async function handleSadminLogin(e) {
   </div>
 </div>
 
-<!-- MODAL: New TM / TL Closer Registration Wizard -->
-<div id="modalTMRegister" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px); overflow-y:auto; padding:20px 0;">
-  <div style="background:var(--wa-card-bg); border:1px solid rgba(31, 224, 138,0.4); border-radius:20px; padding:30px; max-width:540px; width:92%; box-shadow:0 25px 60px rgba(0,0,0,0.6); position:relative;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <div>
-        <div style="font-size:11px; font-weight:800; text-transform:uppercase; color:var(--wa-accent); letter-spacing:0.05em;">Step-by-Step Onboarding</div>
-        <h3 id="regModalTitle" style="font-size:20px; font-weight:800; color:var(--wa-text-primary);">🚀 Account Setup &amp; Role</h3>
+<!-- MODAL: New TM / TL Closer Registration (shown right after the QR scan) -->
+<style>
+  #modalTMRegister { display:none; position:fixed; inset:0; z-index:999999; align-items:flex-start; justify-content:center; overflow-y:auto; padding:32px 16px; background:radial-gradient(1200px 600px at 50% -10%, rgba(31,224,138,0.18), transparent 60%), rgba(3,10,7,0.86); backdrop-filter:blur(10px); }
+  .reg-card { width:100%; max-width:560px; background:var(--wa-card-bg); border:1px solid rgba(31,224,138,0.28); border-radius:24px; box-shadow:0 30px 80px rgba(0,0,0,0.55); overflow:hidden; animation:regIn .28s cubic-bezier(.2,.8,.2,1); }
+  @keyframes regIn { from { opacity:0; transform:translateY(14px) scale(.98); } to { opacity:1; transform:none; } }
+  .reg-head { position:relative; padding:24px 26px 18px; background:linear-gradient(180deg, rgba(31,224,138,0.12), transparent); border-bottom:1px solid rgba(255,255,255,0.06); }
+  .reg-head-top { display:flex; align-items:center; gap:12px; }
+  .reg-logo { width:44px; height:44px; border-radius:12px; background:#07140f; border:1px solid rgba(31,224,138,0.4); padding:4px; object-fit:contain; flex-shrink:0; }
+  .reg-eyebrow { font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--wa-accent); }
+  .reg-title { margin:2px 0 0; font-size:21px; font-weight:800; color:var(--wa-text-primary); letter-spacing:-.01em; }
+  .reg-close { position:absolute; top:16px; right:16px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--wa-text-muted); font-size:20px; line-height:1; cursor:pointer; }
+  .reg-close:hover { color:var(--wa-text-primary); border-color:rgba(255,255,255,0.25); }
+  .reg-verified { margin-top:14px; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.25); font-size:12.5px; color:var(--wa-text-secondary); }
+  .reg-verified strong { color:var(--wa-text-primary); font-family:'JetBrains Mono',monospace; }
+  .reg-verified .tick { margin-left:auto; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; background:var(--wa-accent); color:#03130c; }
+  .reg-body { padding:20px 26px 24px; }
+  .reg-section { margin-bottom:18px; }
+  .reg-label { display:block; font-size:12px; font-weight:750; color:var(--wa-text-secondary); margin-bottom:7px; }
+  .reg-label .opt { font-weight:600; color:var(--wa-text-muted); }
+  .reg-roles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .reg-role { position:relative; padding:14px; border-radius:14px; border:1.5px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.025); cursor:pointer; transition:all .15s ease; }
+  .reg-role:hover { border-color:rgba(31,224,138,0.45); }
+  .reg-role .ico { font-size:20px; }
+  .reg-role .t { margin-top:6px; font-size:13.5px; font-weight:800; color:var(--wa-text-primary); }
+  .reg-role .d { margin-top:3px; font-size:11.5px; line-height:1.45; color:var(--wa-text-muted); }
+  .reg-role .dot { position:absolute; top:12px; right:12px; width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,0.25); }
+  .reg-role.is-active { border-color:var(--wa-accent); background:rgba(31,224,138,0.1); box-shadow:0 0 0 3px rgba(31,224,138,0.12); }
+  .reg-role.is-active .dot { border-color:var(--wa-accent); background:radial-gradient(circle, var(--wa-accent) 45%, transparent 50%); }
+  .reg-role.is-tl.is-active { border-color:#a855f7; background:rgba(168,85,247,0.12); box-shadow:0 0 0 3px rgba(168,85,247,0.15); }
+  .reg-role.is-tl.is-active .dot { border-color:#a855f7; background:radial-gradient(circle, #a855f7 45%, transparent 50%); }
+  .reg-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .reg-input { width:100%; box-sizing:border-box; padding:12px 13px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(0,0,0,0.25); color:var(--wa-text-primary); font-size:14px; outline:none; transition:border-color .15s ease, box-shadow .15s ease; }
+  .reg-input:focus { border-color:var(--wa-accent); box-shadow:0 0 0 3px rgba(31,224,138,0.15); }
+  html.theme-light .reg-input, body.light .reg-input { background:#fff; }
+  .reg-pass { position:relative; }
+  .reg-pass button { position:absolute; right:8px; top:50%; transform:translateY(-50%); border:none; background:none; color:var(--wa-text-muted); font-size:12px; font-weight:700; cursor:pointer; padding:6px; }
+  .reg-hint { margin-top:5px; font-size:11px; color:var(--wa-text-muted); }
+  .reg-company { margin-top:10px; display:flex; align-items:center; gap:12px; padding:11px 13px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); }
+  .reg-company img { width:40px; height:40px; border-radius:10px; object-fit:contain; background:#07140f; border:1px solid rgba(255,255,255,0.14); padding:3px; flex-shrink:0; }
+  .reg-tl-note { display:none; margin-bottom:18px; padding:11px 13px; border-radius:12px; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.3); font-size:12px; line-height:1.5; color:#d8b4fe; }
+  .reg-optional summary { cursor:pointer; list-style:none; font-size:12.5px; font-weight:750; color:var(--wa-text-secondary); padding:10px 0; }
+  .reg-optional summary::-webkit-details-marker { display:none; }
+  .reg-optional summary::after { content:' ▾'; color:var(--wa-text-muted); }
+  .reg-optional[open] summary::after { content:' ▴'; }
+  .reg-submit { width:100%; margin-top:6px; padding:15px; border:none; border-radius:14px; background:linear-gradient(135deg, #2de89a, #0fa968); color:#03130c; font-size:15px; font-weight:850; cursor:pointer; box-shadow:0 10px 30px rgba(31,224,138,0.28); transition:transform .12s ease, filter .12s ease; }
+  .reg-submit:hover { filter:brightness(1.05); transform:translateY(-1px); }
+  .reg-submit:disabled { opacity:.6; cursor:wait; transform:none; }
+  .reg-foot { margin-top:10px; text-align:center; font-size:11.5px; line-height:1.5; color:var(--wa-text-muted); }
+  @media (max-width: 560px) {
+    #modalTMRegister { padding:0; }
+    .reg-card { border-radius:0; min-height:100vh; border:none; }
+    .reg-head, .reg-body { padding-left:18px; padding-right:18px; }
+    .reg-roles, .reg-grid { grid-template-columns:1fr; }
+  }
+</style>
+<div id="modalTMRegister">
+  <div class="reg-card" role="dialog" aria-modal="true" aria-labelledby="regModalTitle">
+    <div class="reg-head">
+      <button type="button" class="reg-close" onclick="closeTMRegisterModal()" aria-label="Close">&times;</button>
+      <div class="reg-head-top">
+        <img class="reg-logo" src="assets/images/chatly-icon.png" alt="Chatly">
+        <div>
+          <div class="reg-eyebrow">Last step &middot; takes 1 minute</div>
+          <h3 class="reg-title" id="regModalTitle">Create your closer account</h3>
+        </div>
       </div>
-      <button type="button" onclick="closeTMRegisterModal()" style="background:none; border:none; color:var(--wa-text-muted); font-size:24px; cursor:pointer;">&times;</button>
+      <div class="reg-verified">
+        <span>📱</span>
+        <span>WhatsApp <strong id="regDisplayPhone">+92 300 1234567</strong></span>
+        <span class="tick">✓ VERIFIED</span>
+      </div>
     </div>
 
-    <div style="background:rgba(31, 224, 138,0.1); border:1px solid rgba(31, 224, 138,0.25); border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:12px; color:var(--wa-accent); display:flex; align-items:center; gap:8px;">
-      <span>📱</span>
-      <span>WhatsApp Number: <strong id="regDisplayPhone">+92 300 1234567</strong></span>
-      <span style="margin-left:auto; background:var(--wa-accent); color:#03130c; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">VERIFIED</span>
-    </div>
-
-    <form id="formTMRegisterSubmit" onsubmit="handleTMRegisterSubmit(event)">
-      <!-- Role Selector Toggle: Sales Closer (TM) vs Team Leader (TL) -->
-      <div style="margin-bottom:14px;">
-        <label class="input-label" style="margin-bottom:6px; font-weight:700;">Choose Your Role *</label>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <div id="roleCardTM" onclick="selectOnboardingRole('member')" style="background:rgba(31,224,138,0.12); border:2px solid var(--wa-accent); border-radius:12px; padding:12px; cursor:pointer; transition:all 0.2s ease;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-              <span style="font-weight:800; font-size:13px; color:var(--wa-text-primary);">🎯 Sales Closer (TM)</span>
-              <span id="roleRadioTM" style="color:var(--wa-accent); font-size:14px; font-weight:900;">●</span>
-            </div>
-            <div style="font-size:11px; color:var(--wa-text-muted); line-height:1.4;">
-              Live WhatsApp sales desk. Pitch products and close customer deals.
-            </div>
+    <form id="formTMRegisterSubmit" class="reg-body" onsubmit="handleTMRegisterSubmit(event)">
+      <div class="reg-section">
+        <span class="reg-label">I want to join as</span>
+        <div class="reg-roles">
+          <div class="reg-role is-active" id="roleCardTM" onclick="selectOnboardingRole('member')" role="button" tabindex="0">
+            <span class="dot" id="roleRadioTM"></span>
+            <div class="ico">🎯</div>
+            <div class="t">Sales Closer (TM)</div>
+            <div class="d">Chat with customers on WhatsApp and close sales. Earn on every sale.</div>
           </div>
-          <div id="roleCardTL" onclick="selectOnboardingRole('lead')" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius:12px; padding:12px; cursor:pointer; transition:all 0.2s ease;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-              <span style="font-weight:800; font-size:13px; color:var(--wa-text-primary);">🚀 Team Leader (TL)</span>
-              <span id="roleRadioTL" style="color:var(--wa-text-muted); font-size:14px; font-weight:900;">○</span>
-            </div>
-            <div style="font-size:11px; color:var(--wa-text-muted); line-height:1.4;">
-              Cold outreach on external platforms to recruit TMs. Direct commission per TM!
-            </div>
+          <div class="reg-role is-tl" id="roleCardTL" onclick="selectOnboardingRole('lead')" role="button" tabindex="0">
+            <span class="dot" id="roleRadioTL"></span>
+            <div class="ico">🚀</div>
+            <div class="t">Team Leader (TL)</div>
+            <div class="d">Recruit closers to Chatly. Earn a bonus for every closer you bring.</div>
           </div>
         </div>
         <input type="hidden" id="regOnboardingRole" value="member">
       </div>
 
-      <!-- TL Specific Explainer Banner (Shows only when TL is selected) -->
-      <div id="tlRoleBanner" style="display:none; background:rgba(147, 51, 234, 0.12); border:1px solid rgba(147, 51, 234, 0.35); border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:11.5px; color:#d8b4fe; line-height:1.5;">
-        💼 <strong>Team Leader (TL) Note:</strong> There is no fixed salary. Your role is cold outreach on other platforms to invite TMs to Chatly and sell company products. You earn direct company commission bounty for each approved TM you recruit! Outbound &amp; inbound message sync is enabled on your desk.
+      <div class="reg-tl-note" id="tlRoleBanner">
+        💼 Team Leaders have no fixed salary. You find and invite closers from other platforms, and earn a commission for each one the company approves.
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-        <div class="input-group" style="margin:0;">
-          <label class="input-label">Set Desired Username *</label>
-          <input type="text" id="regTMUsername" class="input-field" placeholder="e.g. ali_closer" required style="font-size:13px;">
-        </div>
-        <div class="input-group" style="margin:0;">
-          <label class="input-label">Set Password *</label>
-          <input type="password" id="regTMPassword" class="input-field" placeholder="Min 6 chars" required style="font-size:13px;">
-        </div>
-      </div>
-
-      <div class="input-group" style="margin-bottom: 6px;">
-        <label class="input-label" id="regCompanyLabel">Select Company * (Where you are applying as Closer)</label>
-        <select id="regTMCompany" class="input-field" required style="cursor:pointer; font-weight:600;" onchange="updateSelectedCompanyPreview()">
-          <option value="COMP-001">Nunno Official — Scalper Alpha &amp; SaaS</option>
-          <option value="COMP-002">Apex Crypto Signals — Institutional Trading</option>
-          <option value="COMP-003">Pak Trade Academy — Mentorship &amp; Signals</option>
-        </select>
-      </div>
-
-      <!-- Live Company Brand & Logo Preview Card -->
-      <div id="companyBrandPreviewCard" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(31, 224, 138,0.3); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease;">
-        <img id="previewCompLogo" src="assets/images/nunno-logo.png" alt="Company Logo" style="width: 42px; height: 42px; border-radius: 10px; object-fit: contain; background: #07140f; border: 1px solid rgba(255,255,255,0.15); padding: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); flex-shrink: 0;">
-        <div style="flex: 1; min-width: 0;">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-            <strong id="previewCompName" style="color: var(--wa-text-primary); font-size: 13.5px; font-weight: 800;">Nunno Official</strong>
-            <span id="previewCompBadge" style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(31, 224, 138, 0.2); color: #4cecab; border: 1px solid rgba(31, 224, 138, 0.4);">Enterprise Billion</span>
-          </div>
-          <div id="previewCompTagline" style="font-size: 11px; color: var(--wa-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Scalper Alpha &amp; SaaS</div>
-        </div>
-      </div>
-
-      <!-- Optional TL Referral Attribution (Only for TMs) -->
-      <div class="input-group" id="groupTMReferredByTL" style="margin-bottom:12px;">
-        <label class="input-label">Referred by Team Leader (TL) Username (Optional)</label>
-        <input type="text" id="regTMReferredByTL" class="input-field" placeholder="e.g. ali or leave blank if none" style="font-size:13px;">
-        <div style="font-size:10.5px; color:var(--wa-text-muted); margin-top:3px;">If a Chatly Team Leader recruited you, enter their username so they receive commission bounty.</div>
-      </div>
-
-      <div class="input-group">
-        <label class="input-label">Full Name *</label>
-        <input type="text" id="regTMFullName" class="input-field" placeholder="e.g. Ali Ahmed" required>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-        <div class="input-group" style="margin:0;">
-          <label class="input-label">City *</label>
-          <input type="text" id="regTMCity" class="input-field" placeholder="e.g. Lahore / Karachi" required>
-        </div>
-        <div class="input-group" style="margin:0;">
-          <label class="input-label">Gender</label>
-          <select id="regTMGender" class="input-field">
+      <div class="reg-section">
+        <span class="reg-label">About you</span>
+        <input type="text" id="regTMFullName" class="reg-input" placeholder="Full name (e.g. Ali Ahmed)" required autocomplete="name">
+        <div class="reg-grid" style="margin-top:12px;">
+          <input type="text" id="regTMCity" class="reg-input" placeholder="City (e.g. Lahore)" required autocomplete="address-level2">
+          <select id="regTMGender" class="reg-input" style="cursor:pointer;">
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
         </div>
       </div>
 
-      <div class="input-group">
-        <label class="input-label">Profile Picture (PFP Avatar URL - Optional)</label>
-        <input type="text" id="regTMPfp" class="input-field" placeholder="https://... (or leave default avatar)">
+      <div class="reg-section">
+        <span class="reg-label">Your login</span>
+        <div class="reg-grid">
+          <input type="text" id="regTMUsername" class="reg-input" placeholder="Username" required autocomplete="username" autocapitalize="off" spellcheck="false">
+          <div class="reg-pass">
+            <input type="password" id="regTMPassword" class="reg-input" placeholder="Password (6+ characters)" required minlength="6" autocomplete="new-password">
+            <button type="button" onclick="const i=document.getElementById('regTMPassword'); i.type = i.type === 'password' ? 'text' : 'password'; this.textContent = i.type === 'password' ? 'Show' : 'Hide';">Show</button>
+          </div>
+        </div>
+        <div class="reg-hint">You'll use these to sign in next time, without scanning the QR.</div>
       </div>
+
+      <div class="reg-section">
+        <label class="reg-label" id="regCompanyLabel" for="regTMCompany">Company you're applying to</label>
+        <select id="regTMCompany" class="reg-input" required style="cursor:pointer; font-weight:650;" onchange="updateSelectedCompanyPreview()">
+          <option value="COMP-001">Nunno Official</option>
+        </select>
+        <div class="reg-company" id="companyBrandPreviewCard">
+          <img id="previewCompLogo" src="assets/images/nunno-logo.png" alt="">
+          <div style="min-width:0; flex:1;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <strong id="previewCompName" style="color:var(--wa-text-primary); font-size:13.5px;">Nunno Official</strong>
+              <span id="previewCompBadge" style="font-size:10px; font-weight:750; padding:2px 7px; border-radius:999px; background:rgba(31,224,138,0.16); color:#4cecab;">Verified</span>
+            </div>
+            <div id="previewCompTagline" style="font-size:11.5px; color:var(--wa-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          </div>
+        </div>
+      </div>
+
+      <details class="reg-optional">
+        <summary>Optional: referral and profile photo</summary>
+        <div class="reg-section" id="groupTMReferredByTL" style="margin-top:4px;">
+          <label class="reg-label" for="regTMReferredByTL">Referred by a Team Leader? <span class="opt">(their username)</span></label>
+          <input type="text" id="regTMReferredByTL" class="reg-input" placeholder="e.g. ali" autocapitalize="off">
+          <div class="reg-hint">They get a bonus when you're approved.</div>
+        </div>
+        <div class="reg-section">
+          <label class="reg-label" for="regTMPfp">Profile photo link <span class="opt">(optional)</span></label>
+          <input type="text" id="regTMPfp" class="reg-input" placeholder="https://…">
+        </div>
+      </details>
 
       <div class="error-box" id="tmRegModalError"></div>
 
-      <button type="submit" id="btnSubmitTMReg" class="btn-action-primary" style="background:linear-gradient(135deg, #2de89a, #0fa968); margin-top:8px;">
-        Submit Closer Application for Company Approval ⏳
-      </button>
-      
-      <div id="regFooterNotice" style="font-size:11px; color:var(--wa-text-muted); text-align:center; margin-top:10px;">
-        ℹ️ Once submitted, company administration reviews and approves your account with a custom daily message quota.
-      </div>
+      <button type="submit" id="btnSubmitTMReg" class="reg-submit">Submit application</button>
+      <div class="reg-foot" id="regFooterNotice">The company reviews your application. Once approved, sign in with your username and password.</div>
     </form>
   </div>
 </div>
@@ -2164,7 +2200,7 @@ function openTMRegisterModal(phone) {
   selectOnboardingRole('member');
   const refInp = document.getElementById('regTMReferredByTL');
   if (refInp) refInp.value = '';
-  document.getElementById('regTMUsername').focus();
+  setTimeout(() => document.getElementById('regTMFullName')?.focus(), 60);
   loadCompaniesForRegister();
 }
 
@@ -2172,65 +2208,20 @@ function selectOnboardingRole(role) {
   const isTL = (role === 'lead');
   const hiddenRole = document.getElementById('regOnboardingRole');
   if (hiddenRole) hiddenRole.value = isTL ? 'lead' : 'member';
-
-  const cardTM = document.getElementById('roleCardTM');
-  const cardTL = document.getElementById('roleCardTL');
-  const radioTM = document.getElementById('roleRadioTM');
-  const radioTL = document.getElementById('roleRadioTL');
+  document.getElementById('roleCardTM')?.classList.toggle('is-active', !isTL);
+  document.getElementById('roleCardTL')?.classList.toggle('is-active', isTL);
   const bannerTL = document.getElementById('tlRoleBanner');
+  if (bannerTL) bannerTL.style.display = isTL ? 'block' : 'none';
   const refGroup = document.getElementById('groupTMReferredByTL');
+  if (refGroup) refGroup.style.display = isTL ? 'none' : 'block';
   const modalTitle = document.getElementById('regModalTitle');
-  const compLabel = document.getElementById('regCompanyLabel');
+  if (modalTitle) modalTitle.textContent = isTL ? 'Create your Team Leader account' : 'Create your closer account';
   const btn = document.getElementById('btnSubmitTMReg');
+  if (btn) btn.textContent = isTL ? 'Submit Team Leader application' : 'Submit application';
   const footerNotice = document.getElementById('regFooterNotice');
-
-  if (isTL) {
-    if (cardTL) {
-      cardTL.style.background = 'rgba(147, 51, 234, 0.18)';
-      cardTL.style.border = '2px solid #a855f7';
-    }
-    if (radioTL) {
-      radioTL.style.color = '#c084fc';
-      radioTL.textContent = '●';
-    }
-    if (cardTM) {
-      cardTM.style.background = 'rgba(255,255,255,0.03)';
-      cardTM.style.border = '1px solid rgba(255,255,255,0.12)';
-    }
-    if (radioTM) {
-      radioTM.style.color = 'var(--wa-text-muted)';
-      radioTM.textContent = '○';
-    }
-    if (bannerTL) bannerTL.style.display = 'block';
-    if (refGroup) refGroup.style.display = 'none';
-    if (compLabel) compLabel.textContent = 'Select Company * (Where you are applying as Team Leader)';
-    if (modalTitle) modalTitle.textContent = '🚀 New Team Leader (TL) Setup';
-    if (btn) btn.textContent = 'Submit Team Leader (TL) Application for Approval ⏳';
-    if (footerNotice) footerNotice.textContent = 'ℹ️ Once approved, you can cold outreach prospects & earn commission bounty for each verified TM brought to this company!';
-  } else {
-    if (cardTM) {
-      cardTM.style.background = 'rgba(31,224,138,0.12)';
-      cardTM.style.border = '2px solid var(--wa-accent)';
-    }
-    if (radioTM) {
-      radioTM.style.color = 'var(--wa-accent)';
-      radioTM.textContent = '●';
-    }
-    if (cardTL) {
-      cardTL.style.background = 'rgba(255,255,255,0.03)';
-      cardTL.style.border = '1px solid rgba(255,255,255,0.12)';
-    }
-    if (radioTL) {
-      radioTL.style.color = 'var(--wa-text-muted)';
-      radioTL.textContent = '○';
-    }
-    if (bannerTL) bannerTL.style.display = 'none';
-    if (refGroup) refGroup.style.display = 'block';
-    if (compLabel) compLabel.textContent = 'Select Company * (Where you are applying as Closer)';
-    if (modalTitle) modalTitle.textContent = '🚀 New Closer WhatsApp Setup';
-    if (btn) btn.textContent = 'Submit Closer Application for Company Approval ⏳';
-    if (footerNotice) footerNotice.textContent = 'ℹ️ Once submitted, company administration reviews and approves your account with a custom daily message quota.';
-  }
+  if (footerNotice) footerNotice.textContent = isTL
+    ? 'Once approved, invite closers and earn a bonus for each one the company approves.'
+    : 'The company reviews your application. Once approved, sign in with your username and password.';
 }
 
 function closeTMRegisterModal() {
@@ -2255,7 +2246,7 @@ async function loadCompaniesForRegister() {
       data.companies.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = `${c.name} (${c.plan || 'Enterprise'})`;
+        opt.textContent = c.name;
         sel.appendChild(opt);
       });
       updateSelectedCompanyPreview();
@@ -2289,7 +2280,7 @@ async function handleTMRegisterSubmit(e) {
   const btn = document.getElementById('btnSubmitTMReg');
   const errBox = document.getElementById('tmRegModalError');
   btn.disabled = true;
-  btn.textContent = 'Submitting Application…';
+  btn.textContent = 'Submitting…';
   errBox.style.display = 'none';
 
   const role = document.getElementById('regOnboardingRole')?.value || 'member';
@@ -2356,7 +2347,7 @@ async function handleTMRegisterSubmit(e) {
     errBox.style.display = 'block';
   } finally {
     btn.disabled = false;
-    btn.textContent = isTL ? 'Submit Team Leader (TL) Application for Approval ⏳' : 'Submit Closer Application for Company Approval ⏳';
+    btn.textContent = isTL ? 'Submit Team Leader application' : 'Submit application';
   }
 }
 
@@ -2504,5 +2495,105 @@ function toggleTheme() {
   try { localStorage.setItem('nunno_theme', isLight ? 'light' : 'dark'); } catch(_) {}
 }
 </script>
+<!-- FOCUSED QR: "Workspace Login" opens one big, easy-to-scan code -->
+<style>
+  #qrFocusOverlay { position:fixed; inset:0; z-index:999990; display:none; align-items:center; justify-content:center; padding:20px; background:radial-gradient(900px 500px at 50% 0%, rgba(31,224,138,0.2), transparent 60%), rgba(2,8,5,0.92); backdrop-filter:blur(12px); }
+  #qrFocusOverlay.open { display:flex; animation:qfIn .25s ease-out; }
+  @keyframes qfIn { from { opacity:0; } to { opacity:1; } }
+  .qf-card { position:relative; width:100%; max-width:860px; display:grid; grid-template-columns:auto 1fr; gap:36px; align-items:center; padding:34px; border-radius:28px; background:var(--wa-card-bg); border:1px solid rgba(31,224,138,0.3); box-shadow:0 30px 90px rgba(0,0,0,0.6); }
+  .qf-close { position:absolute; top:14px; right:14px; width:38px; height:38px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:var(--wa-text-muted); font-size:22px; cursor:pointer; }
+  .qf-close:hover { color:var(--wa-text-primary); }
+  .qf-qr { position:relative; width:min(380px, 78vw); aspect-ratio:1/1; padding:16px; border-radius:22px; background:#fff; box-shadow:0 0 0 6px rgba(31,224,138,0.25), 0 20px 60px rgba(31,224,138,0.25); }
+  .qf-qr img { width:100%; height:100%; object-fit:contain; display:block; image-rendering:pixelated; }
+  .qf-qr .qf-logo { position:absolute; left:50%; top:50%; width:54px; height:54px; transform:translate(-50%,-50%); border-radius:14px; background:#07140f; border:3px solid #fff; padding:3px; box-shadow:0 4px 14px rgba(0,0,0,0.3); }
+  .qf-qr .qf-logo img { border-radius:9px; image-rendering:auto; }
+  .qf-qr .qf-scan { position:absolute; left:16px; right:16px; height:3px; top:16px; border-radius:3px; background:linear-gradient(90deg, transparent, #1fe08a, transparent); animation:qfScan 2.4s ease-in-out infinite; }
+  @keyframes qfScan { 0%,100% { top:18px; } 50% { top:calc(100% - 20px); } }
+  .qf-badge { display:inline-flex; align-items:center; gap:7px; padding:5px 11px; border-radius:999px; background:rgba(31,224,138,0.12); border:1px solid rgba(31,224,138,0.3); color:var(--wa-accent); font-size:11.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+  .qf-badge i { width:7px; height:7px; border-radius:50%; background:var(--wa-accent); box-shadow:0 0 10px var(--wa-accent); animation:qfPulse 1.2s ease-in-out infinite alternate; }
+  @keyframes qfPulse { from { opacity:.4; } to { opacity:1; } }
+  .qf-title { margin:12px 0 6px; font-size:30px; line-height:1.15; font-weight:850; letter-spacing:-.02em; color:var(--wa-text-primary); }
+  .qf-sub { margin:0 0 18px; font-size:14px; line-height:1.55; color:var(--wa-text-secondary); }
+  .qf-steps { list-style:none; margin:0 0 20px; padding:0; display:grid; gap:10px; }
+  .qf-steps li { display:flex; align-items:center; gap:12px; font-size:14px; color:var(--wa-text-primary); }
+  .qf-steps b { flex-shrink:0; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(31,224,138,0.14); color:var(--wa-accent); font-size:13px; }
+  .qf-status { font-size:12.5px; color:var(--wa-text-muted); margin-bottom:16px; min-height:18px; }
+  .qf-alt { border:none; background:none; padding:0; color:var(--wa-accent); font-size:13px; font-weight:750; cursor:pointer; }
+  @media (max-width: 760px) {
+    #qrFocusOverlay { padding:0; align-items:stretch; }
+    .qf-card { grid-template-columns:1fr; gap:18px; padding:58px 18px 24px; border-radius:0; border:none; justify-items:center; text-align:center; overflow-y:auto; }
+    .qf-qr { width:min(340px, 86vw); }
+    .qf-title { font-size:24px; }
+    .qf-steps { justify-items:start; text-align:left; }
+  }
+</style>
+<div id="qrFocusOverlay" role="dialog" aria-modal="true" aria-label="Scan to log in" onclick="if (event.target === this) closeQrFocus()">
+  <div class="qf-card">
+    <button type="button" class="qf-close" onclick="closeQrFocus()" aria-label="Close">&times;</button>
+    <div class="qf-qr">
+      <div class="qf-scan"></div>
+      <img id="qrFocusImg" alt="WhatsApp QR code" src="">
+      <div class="qf-logo"><img src="assets/images/chatly-icon.png" alt=""></div>
+    </div>
+    <div>
+      <span class="qf-badge"><i></i> Workspace login</span>
+      <h2 class="qf-title">Scan with WhatsApp<br>to open your desk</h2>
+      <p class="qf-sub">Use the phone with the WhatsApp number you sell from.</p>
+      <ol class="qf-steps">
+        <li><b>1</b> Open WhatsApp on your phone</li>
+        <li><b>2</b> Tap <strong>&nbsp;⋮ / Settings → Linked devices</strong></li>
+        <li><b>3</b> Tap <strong>&nbsp;Link a device</strong> and point at this code</li>
+      </ol>
+      <div class="qf-status" id="qrFocusStatus">Getting a fresh code…</div>
+      <button type="button" class="qf-alt" onclick="closeQrFocus(); toggleHeroLoginMode('password');">Have an account? Sign in with username &amp; password →</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  const PLACEHOLDER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><rect width='300' height='300' fill='%23f1f5f9'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='15' fill='%2364748b' font-weight='700'>Generating code…</text></svg>";
+  let observer = null;
+  function sync() {
+    const src = document.getElementById('landingQrImage')?.getAttribute('src') || '';
+    const big = document.getElementById('qrFocusImg');
+    if (!big) return;
+    const isReal = src && !src.startsWith('data:image/svg+xml');
+    big.src = isReal ? src : PLACEHOLDER;
+    const logo = document.querySelector('#qrFocusOverlay .qf-logo');
+    if (logo) logo.style.display = isReal ? '' : 'none';
+    const st = document.getElementById('qrFocusStatus');
+    if (st) st.textContent = isReal ? 'Code refreshes automatically. Keep this screen open while you scan.' : 'Getting a fresh code…';
+    // Scanned: the page shows the connected card or the signup form, so step aside.
+    const box = document.getElementById('connectedPhoneActionsBox');
+    const reg = document.getElementById('modalTMRegister');
+    if ((box && box.style.display && box.style.display !== 'none') || (reg && reg.style.display === 'flex')) closeQrFocus();
+  }
+  window.openQrFocus = function () {
+    const ov = document.getElementById('qrFocusOverlay');
+    if (!ov) return;
+    ov.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    sync();
+    if (typeof refreshQRCode === 'function') refreshQRCode();
+    if (!observer) {
+      observer = new MutationObserver(sync);
+      const img = document.getElementById('landingQrImage');
+      if (img) observer.observe(img, { attributes: true, attributeFilter: ['src'] });
+      ['connectedPhoneActionsBox', 'modalTMRegister'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) observer.observe(el, { attributes: true, attributeFilter: ['style'] });
+      });
+    }
+  };
+  window.closeQrFocus = function () {
+    const ov = document.getElementById('qrFocusOverlay');
+    if (!ov || !ov.classList.contains('open')) return;
+    ov.classList.remove('open');
+    document.body.style.overflow = '';
+  };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQrFocus(); });
+})();
+</script>
+
 </body>
 </html>

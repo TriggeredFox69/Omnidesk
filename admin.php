@@ -2883,8 +2883,9 @@ function renderCompanyWithdrawals(wds) {
 }
 
 async function settleCompanyWithdrawal(wdId, closerName, amount) {
-  const txRef = prompt(`Disbursing PKR ${Number(amount).toLocaleString()} to ${closerName}.\nEnter Bank / Digital Wallet Transaction Reference (e.g. EP-992104 or Meezan-TX-8812):`, 'TX-' + Math.floor(100000 + Math.random() * 900000));
+  const txRef = prompt(`Paying PKR ${Number(amount).toLocaleString()} to ${closerName}.\nSend the money first, then enter the transaction ID / reference of that transfer:`, '');
   if (txRef === null) return;
+  if (!txRef.trim()) { alert('A payment reference is required to mark a payout as paid.'); return; }
 
   try {
     const res = await fetch('api/withdrawals.php', {
@@ -2894,7 +2895,7 @@ async function settleCompanyWithdrawal(wdId, closerName, amount) {
     });
     const d = await res.json();
     if (d.success) {
-      alert(`✅ Payout of PKR ${Number(amount).toLocaleString()} marked as settled! Notification sent.`);
+      alert(`✅ Payout of PKR ${Number(amount).toLocaleString()} marked as paid.`);
       loadCompanyWithdrawals();
     } else {
       alert('⚠️ ' + (d.error || 'Failed to update withdrawal status.'));
@@ -2905,13 +2906,14 @@ async function settleCompanyWithdrawal(wdId, closerName, amount) {
 }
 
 async function rejectCompanyWithdrawal(wdId, closerName) {
-  if (!confirm(`Are you sure you want to reject the payout request for ${closerName}? Their available balance will be restored.`)) return;
+  const reason = prompt(`Reject the payout request for ${closerName}? The amount goes back to their balance.\nReason (shown to them):`, '');
+  if (reason === null) return;
 
   try {
     const res = await fetch('api/withdrawals.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update_status', id: wdId, status: 'rejected' })
+      body: JSON.stringify({ action: 'update_status', id: wdId, status: 'rejected', reason: reason.trim() })
     });
     const d = await res.json();
     if (d.success) {

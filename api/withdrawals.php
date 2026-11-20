@@ -1,173 +1,120 @@
 <?php
 /**
- * Nunno WhatsApp — Centralized Withdrawal & Payout Management
- * Handles payout requests for Team Leads (TL) and Team Members (TM)
+ * Withdrawals: Team Members / Team Leaders cash out what they have EARNED.
+ *
+ * Rules (all enforced here, not in the browser):
+ *  - You must be signed in; you can only request for yourself.
+ *  - The amount must be at least Rs. 500 and no more than your available balance
+ *    (earned − paid out − pending), worked out by api/earnings.php.
+ *  - Only an admin of your company (or the super admin) can mark a request
+ *    Paid (with the payment reference) or Rejected (with a reason). A rejected
+ *    request's amount returns to the balance. Paid requests cannot be changed.
+ *  - Members see only their own requests; company admins see their company.
  */
 
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
-session_start();
+require_once __DIR__ . '/earnings.php';
 
 $wdFile = __DIR__ . '/../data/withdrawals.json';
 
-function getStoredWithdrawals($file) {
-    if (file_exists($file) && filesize($file) > 10) {
-        $content = file_get_contents($file);
-        $decoded = json_decode($content, true);
-        if (is_array($decoded)) return $decoded;
-    }
-    // Auto-seed initial state if file is empty or missing
-    $seed = [
-        [
-            'id' => 'WD-META-001',
-            'userId' => 'EMP-TM-META01',
-            'userName' => 'Farhan Ali',
-            'userRole' => 'member',
-            'company_id' => 'COMP-004',
-            'company_name' => 'Metalink',
-            'amount' => 3000,
-            'method' => 'EasyPaisa',
-            'institution' => 'EasyPaisa',
-            'accountTitle' => 'Farhan Ali',
-            'accountNumber' => '03019887766',
-            'note' => 'Enterprise node closed deal commission',
-            'status' => 'pending',
-            'created_at' => date('c', time() - 3600)
-        ],
-        [
-            'id' => 'WD-MWMVDDS5',
-            'userId' => 'EMP-101',
-            'userName' => 'Hamza Khan',
-            'userRole' => 'member',
-            'company_id' => 'COMP-001',
-            'company_name' => 'Nunno Official',
-            'amount' => 2500,
-            'method' => 'EasyPaisa',
-            'institution' => 'Telenor Microfinance Bank (EasyPaisa)',
-            'accountTitle' => 'Hamza Khan',
-            'accountNumber' => '03001234567',
-            'note' => 'Verified deal commissions payout',
-            'status' => 'approved',
-            'txRef' => 'EP-TX-998822',
-            'created_at' => date('c', time() - 86400)
-        ]
-    ];
-    saveStoredWithdrawals($file, $seed);
-    return $seed;
+function readWithdrawalsLocked($file, &$handle) {
+    $handle = fopen($file, 'c+');
+    if (!$handle) return [];
+    flock($handle, LOCK_EX);
+    $raw = stream_get_contents($handle);
+    $data = json_decode($raw ?: '[]', true);
+    return is_array($data) ? $data : [];
 }
 
-function saveStoredWithdrawals($file, $data) {
-    $temp = $file . '.tmp.' . uniqid();
-    file_put_contents($temp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    rename($temp, $file);
-
+function writeWithdrawalsLocked($file, $handle, array $data) {
+    $json = json_encode(array_values($data), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    rewind($handle);
+    ftruncate($handle, 0);
+    fwrite($handle, $json);
+    fflush($handle);
+    flock($handle, LOCK_UN);
+    fclose($handle);
     try {
         $backupDir = dirname($file) . '/backups';
-        if (!is_dir($backupDir)) {
-            @mkdir($backupDir, 0755, true);
-        }
+        if (!is_dir($backupDir)) @mkdir($backupDir, 0755, true);
         $todayBackup = $backupDir . '/withdrawals_' . date('Y-m-d') . '.json';
-        if (!file_exists($todayBackup) || (time() - filemtime($todayBackup) > 3600)) {
-            @copy($file, $todayBackup);
-        }
-    } catch (Exception $e) {}
+        if (!file_exists($todayBackup) || (time() - filemtime($todayBackup) > 3600)) @copy($file, $todayBackup);
+    } catch (Throwable $e) {}
 }
 
-$rawInput = file_get_contents('php://input');
-$data = json_decode($rawInput, true) ?: [];
-$action = isset($_GET['action']) ? $_GET['action'] : (isset($data['action']) ? $data['action'] : 'get_withdrawals');
-
-$currentUser = $_SESSION['omnidesk_user'] ?? $_SESSION['user'] ?? null;
-$isAdmin = $currentUser && isset($currentUser['role']) && in_array($currentUser['role'], ['admin', 'superadmin'], true);
-
-// Guard: Suspended closer cannot perform withdrawal transactions
-if ($currentUser && isset($currentUser['status']) && $currentUser['status'] === 'suspended') {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Account access suspended. Payout transactions are locked.']);
+function wdFail(int $code, string $msg) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'error' => $msg]);
     exit;
 }
 
-if ($action === 'get_withdrawals') {
-    $withdrawals = getStoredWithdrawals($wdFile);
-    $targetUser = isset($_GET['user_id']) ? $_GET['user_id'] : (isset($data['user_id']) ? $data['user_id'] : null);
-    $filterComp = isset($_GET['company_id']) ? $_GET['company_id'] : (isset($data['company_id']) ? $data['company_id'] : ($currentUser['company_id'] ?? null));
-    
-    // Filter by company if requested and not GLOBAL
-    if ($filterComp && $filterComp !== 'GLOBAL') {
-        $withdrawals = array_values(array_filter($withdrawals, function($w) use ($filterComp) {
-            $wComp = $w['company_id'] ?? 'COMP-001';
-            return $wComp === $filterComp;
-        }));
-    }
+$data = json_decode(file_get_contents('php://input'), true) ?: [];
+$action = $_GET['action'] ?? ($data['action'] ?? 'get_withdrawals');
 
-    // If not admin, restrict to their own requests
-    if (!$isAdmin && $targetUser) {
-        $withdrawals = array_values(array_filter($withdrawals, function($w) use ($targetUser) {
-            return isset($w['userId']) && $w['userId'] === $targetUser;
-        }));
+$me = earningsSessionUser();
+if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+if (!$me) wdFail(401, 'Please sign in to manage payouts.');
+if (($me['status'] ?? '') === 'suspended') wdFail(403, 'Account access suspended. Payout transactions are locked.');
+
+$myRole = strtolower((string) ($me['role'] ?? 'member'));
+$isSuper = $myRole === 'superadmin';
+$isCompanyAdmin = $myRole === 'admin';
+$myCompany = (string) ($me['company_id'] ?? NUNNO_COMPANY_ID);
+
+if ($action === 'get_withdrawals') {
+    $all = earningsReadJson($wdFile);
+    if ($isSuper) {
+        $comp = $_GET['company_id'] ?? ($data['company_id'] ?? null);
+        $rows = ($comp && $comp !== 'GLOBAL') ? array_filter($all, fn($w) => ($w['company_id'] ?? NUNNO_COMPANY_ID) === $comp) : $all;
+    } elseif ($isCompanyAdmin) {
+        $rows = array_filter($all, fn($w) => ($w['company_id'] ?? NUNNO_COMPANY_ID) === $myCompany);
+    } else {
+        $rows = array_filter($all, fn($w) => ($w['userId'] ?? '') === $me['id']);
     }
-    
-    echo json_encode([
-        'success' => true,
-        'withdrawals' => $withdrawals
-    ]);
+    $out = ['success' => true, 'withdrawals' => array_values($rows)];
+    if (!$isSuper && !$isCompanyAdmin) $out['earnings'] = array_diff_key(computeEarnings($me['id']), ['deals' => 1]);
+    echo json_encode($out);
     exit;
 }
 
 if ($action === 'request_withdrawal') {
-    $amount = isset($data['amount']) ? floatval($data['amount']) : 0;
-    if ($amount <= 0) {
-        echo json_encode(['success' => false, 'error' => 'Please enter a valid withdrawal amount.']);
-        exit;
-    }
-    
-    $method = isset($data['method']) ? trim($data['method']) : 'EasyPaisa';
-    $institution = isset($data['institution']) ? trim($data['institution']) : $method;
-    $accountTitle = isset($data['accountTitle']) ? trim($data['accountTitle']) : '';
-    $accountNumber = isset($data['accountNumber']) ? trim($data['accountNumber']) : '';
-    $note = isset($data['note']) ? trim($data['note']) : '';
-    $companyId = isset($data['company_id']) ? trim($data['company_id']) : ($currentUser['company_id'] ?? 'COMP-001');
-    $companyName = isset($data['company_name']) ? trim($data['company_name']) : 'Company';
-    
-    if (empty($accountTitle) || empty($accountNumber)) {
-        echo json_encode(['success' => false, 'error' => 'Account title and account number are required.']);
-        exit;
+    if ($isSuper || $isCompanyAdmin) wdFail(400, 'Admins do not request payouts here.');
+    $amount = round((float) ($data['amount'] ?? 0));
+    $method = trim((string) ($data['method'] ?? 'EasyPaisa'));
+    $institution = trim((string) ($data['institution'] ?? $method));
+    $accountTitle = trim((string) ($data['accountTitle'] ?? ''));
+    $accountNumber = trim((string) ($data['accountNumber'] ?? ''));
+    $note = substr(trim((string) ($data['note'] ?? '')), 0, 300);
+
+    if ($amount < MIN_WITHDRAWAL) wdFail(400, 'The minimum withdrawal is Rs. ' . number_format(MIN_WITHDRAWAL) . '.');
+    if ($accountTitle === '' || $accountNumber === '') wdFail(400, 'Account title and account number are required.');
+
+    $walletKeys = ['easypaisa', 'jazzcash', 'sadapay', 'nayapay', 'upaisa', 'zindigi', 'digital wallet'];
+    if (in_array(strtolower($method), $walletKeys, true) || in_array(strtolower($institution), $walletKeys, true)) {
+        $clean = preg_replace('/[^\d\+]/', '', $accountNumber);
+        if (!preg_match('/^0[0-9]{10}$/', $clean) && !preg_match('/^\+?92[0-9]{10}$/', $clean)) {
+            wdFail(400, 'For mobile wallets enter 11 digits starting with 0 (e.g. 03001234567) or +92 followed by 10 digits.');
+        }
+        $accountNumber = $clean;
     }
 
-    // Pakistani Digital Wallet validation (11 digits starting with 0, or 12 digits with +92)
-    $walletKeys = ['easypaisa', 'jazzcash', 'sadapay', 'nayapay', 'upaisa', 'zindigi', 'digital wallet'];
-    $isWallet = in_array(strtolower($method), $walletKeys) || in_array(strtolower($institution), $walletKeys);
-    if ($isWallet) {
-        $cleanPhone = preg_replace('/[^\d\+]/', '', $accountNumber);
-        $isValidWallet = false;
-        if (preg_match('/^0[0-9]{10}$/', $cleanPhone)) {
-            $isValidWallet = true;
-        } elseif (preg_match('/^\+?92[0-9]{10}$/', $cleanPhone)) {
-            $isValidWallet = true;
-        }
-        if (!$isValidWallet) {
-            echo json_encode([
-                'success' => false,
-                'error' => 'Technical Validation Error: For digital wallets (' . htmlspecialchars($institution) . '), enter 11 digits starting with 0 (e.g. 03001234567) or 12 digits with country code (+923001234567).'
-            ]);
-            exit;
-        }
-        $accountNumber = $cleanPhone;
+    $all = readWithdrawalsLocked($wdFile, $h);
+    $earn = computeEarnings($me['id'], null, null, $all);   // balance checked against the locked file
+    if ($amount > $earn['available']) {
+        flock($h, LOCK_UN); fclose($h);
+        wdFail(400, 'You can withdraw up to Rs. ' . number_format($earn['available']) . ' right now (earned Rs. ' . number_format($earn['total_earned']) . ', already paid Rs. ' . number_format($earn['paid_out']) . ', pending Rs. ' . number_format($earn['pending_withdrawals']) . ').');
     }
-    
-    $userId = isset($data['userId']) ? $data['userId'] : ($currentUser ? $currentUser['id'] : 'EMP-TL-01');
-    $userName = isset($data['userName']) ? $data['userName'] : ($currentUser ? $currentUser['name'] : 'Team Member');
-    $userRole = isset($data['userRole']) ? $data['userRole'] : ($currentUser ? $currentUser['role'] : 'member');
-    
-    $withdrawals = getStoredWithdrawals($wdFile);
-    
-    $newWd = [
-        'id' => 'WD-' . substr(strval(time()), -5) . rand(10, 99),
-        'userId' => $userId,
-        'userName' => $userName,
-        'userRole' => $userRole,
-        'company_id' => $companyId,
+    $companyName = 'Company';
+    foreach (earningsReadJson(__DIR__ . '/../data/companies.json') as $c) if (($c['id'] ?? '') === $myCompany) $companyName = $c['name'] ?? $companyName;
+
+    $new = [
+        'id' => 'WD-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3))),
+        'userId' => $me['id'],
+        'userName' => $me['name'] ?? '',
+        'userRole' => $me['role'] ?? 'member',
+        'company_id' => $myCompany,
         'company_name' => $companyName,
         'amount' => $amount,
         'method' => $method,
@@ -176,53 +123,48 @@ if ($action === 'request_withdrawal') {
         'accountNumber' => $accountNumber,
         'note' => $note,
         'status' => 'pending',
-        'created_at' => date('c')
+        'balance_at_request' => $earn['available'],
+        'created_at' => date('c'),
     ];
-    
-    array_unshift($withdrawals, $newWd);
-    saveStoredWithdrawals($wdFile, $withdrawals);
-    
-    echo json_encode([
-        'success' => true,
-        'withdrawal' => $newWd,
-        'withdrawals' => $withdrawals
-    ]);
+    array_unshift($all, $new);
+    writeWithdrawalsLocked($wdFile, $h, $all);
+    $after = computeEarnings($me['id']);
+    unset($after['deals']);
+    echo json_encode(['success' => true, 'withdrawal' => $new, 'earnings' => $after,
+        'withdrawals' => array_values(array_filter($all, fn($w) => ($w['userId'] ?? '') === $me['id']))]);
     exit;
 }
 
 if ($action === 'update_status') {
-    $id = isset($data['id']) ? $data['id'] : '';
-    $status = isset($data['status']) ? $data['status'] : '';
-    $txRef = isset($data['txRef']) ? trim($data['txRef']) : '';
-    
-    if (empty($id) || !in_array($status, ['approved', 'rejected', 'pending'])) {
-        echo json_encode(['success' => false, 'error' => 'Invalid parameters.']);
-        exit;
-    }
-    
-    $withdrawals = getStoredWithdrawals($wdFile);
+    if (!$isSuper && !$isCompanyAdmin) wdFail(403, 'Only company administrators can process payouts.');
+    $id = (string) ($data['id'] ?? '');
+    $status = (string) ($data['status'] ?? '');
+    $txRef = trim((string) ($data['txRef'] ?? ''));
+    $reason = substr(trim((string) ($data['reason'] ?? '')), 0, 300);
+    if ($id === '' || !in_array($status, ['approved', 'rejected'], true)) wdFail(400, 'Invalid parameters.');
+    if ($status === 'approved' && $txRef === '') wdFail(400, 'Enter the payment reference (transaction ID) you sent the money with.');
+
+    $all = readWithdrawalsLocked($wdFile, $h);
     $found = false;
-    
-    foreach ($withdrawals as &$w) {
-        if (isset($w['id']) && $w['id'] === $id) {
-            $w['status'] = $status;
-            if (!empty($txRef)) {
-                $w['txRef'] = $txRef;
-            }
-            $w['updated_at'] = date('c');
-            $found = true;
-            break;
-        }
+    foreach ($all as &$w) {
+        if (($w['id'] ?? '') !== $id) continue;
+        $found = true;
+        if (!$isSuper && ($w['company_id'] ?? NUNNO_COMPANY_ID) !== $myCompany) { flock($h, LOCK_UN); fclose($h); wdFail(403, 'This request belongs to another company.'); }
+        if (($w['status'] ?? '') !== 'pending') { flock($h, LOCK_UN); fclose($h); wdFail(409, 'This request was already ' . ($w['status'] === 'approved' ? 'paid' : $w['status']) . '.'); }
+        $w['status'] = $status;
+        if ($txRef !== '') $w['txRef'] = $txRef;
+        if ($reason !== '') $w['reason'] = $reason;
+        $w['processed_by'] = $me['name'] ?? $me['id'];
+        $w['processed_at'] = date('c');
+        $w['updated_at'] = date('c');
+        break;
     }
-    
-    if ($found) {
-        saveStoredWithdrawals($wdFile, $withdrawals);
-        echo json_encode(['success' => true, 'withdrawals' => $withdrawals]);
-    } else {
-        echo json_encode(['success' => false, 'error' => 'Withdrawal request not found.']);
-    }
+    unset($w);
+    if (!$found) { flock($h, LOCK_UN); fclose($h); wdFail(404, 'Withdrawal request not found.'); }
+    writeWithdrawalsLocked($wdFile, $h, $all);
+    $visible = $isSuper ? $all : array_values(array_filter($all, fn($w) => ($w['company_id'] ?? NUNNO_COMPANY_ID) === $myCompany));
+    echo json_encode(['success' => true, 'withdrawals' => $visible]);
     exit;
 }
 
-echo json_encode(['success' => false, 'error' => 'Invalid action.']);
-
+wdFail(400, 'Invalid action.');
