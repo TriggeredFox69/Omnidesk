@@ -312,7 +312,7 @@ class BaileysClient extends EventEmitter {
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
       browser: Browsers.ubuntu('Chrome'),
-      syncFullHistory: false,
+      syncFullHistory: true,
       keepAliveIntervalMs: 25000,
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
@@ -621,50 +621,6 @@ class BaileysClient extends EventEmitter {
       }
     });
 
-    // Socket fail-safe: answer retry receipts by querying WhatsApp for fresh prekeys and re-relaying message
-    if (this.sock.ws) {
-      this.sock.ws.on('CB:receipt', async (node) => {
-        try {
-          if (node?.attrs?.type === 'retry') {
-            const id = node.attrs?.id;
-            const remoteJid = node.attrs?.from;
-            const participant = node.attrs?.participant || remoteJid;
-            const retryChild = Array.isArray(node.content) ? node.content.find(c => c?.tag === 'retry') : null;
-            const count = +(retryChild?.attrs?.count || 1);
-            if (!id || !remoteJid) return;
-
-            const cacheKey = `${id}:${participant}`;
-            const retried = this._msgRetryCache.get(cacheKey) || 0;
-            if (retried > 4) return;
-            this._msgRetryCache.set(cacheKey, retried + 1);
-
-            console.log(`[Baileys Auto-Heal] Socket retry receipt received for msg ${id} from ${participant} (count ${count})`);
-
-            if (typeof this.sock.assertSessions === 'function') {
-              await this.sock.assertSessions([participant], true).catch(() => {});
-            }
-
-            const rawMsg = await this.getMessage({ remoteJid, id, fromMe: true });
-            if (rawMsg) {
-              const isGroup = remoteJid?.endsWith('@g.us');
-              const relayOpts = { messageId: id };
-              if (!isGroup) {
-                const device = participant.split(':')[1]?.split('@')[0];
-                if (device) relayOpts.participant = { jid: participant, count };
-                else relayOpts.useUserDevicesCache = false;
-              } else {
-                relayOpts.participant = { jid: participant, count };
-              }
-              await this.sock.relayMessage(remoteJid, rawMsg, relayOpts);
-              console.log(`[Baileys Auto-Heal] Socket retry re-relay completed for msg ${id} to ${participant}`);
-            }
-          }
-        } catch (err) {
-          console.warn('[Baileys Auto-Heal] Socket retry notice:', err?.message || err);
-        }
-      });
-    }
-
   }
 
   _normalizeJid(jidOrPhone) {
@@ -914,16 +870,6 @@ class BaileysClient extends EventEmitter {
     const isVoice = Boolean(options.sendAudioAsVoice || (content?.mimetype?.startsWith('audio/') && options.voice));
 
     console.log(`[Baileys] Sending to ${jid}: ${typeof content === 'string' ? content.slice(0, 40) : (isVoice ? 'Voice Note' : (content?.mimetype || 'media'))}`);
-
-    // Assert and verify active Signal ratchet session exists before encryption
-    try {
-      if (typeof this.sock.assertSessions === 'function') {
-        const assertTargets = [jid];
-        const myJid = this.sock.user?.id ? (this.sock.user.id.split(':')[0].split('@')[0] + '@s.whatsapp.net') : '';
-        if (myJid && myJid !== jid) assertTargets.push(myJid);
-        await this.sock.assertSessions(assertTargets, false).catch(() => {});
-      }
-    } catch (_) {}
 
     if (typeof content === 'string') {
       sent = await this.sock.sendMessage(jid, { text: content });

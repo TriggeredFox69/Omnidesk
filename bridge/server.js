@@ -1,9 +1,4 @@
 'use strict';
-// Auto-patch Baileys Signal Protocol retry handling on boot
-try {
-  const { patchBaileys } = require('./patch-baileys');
-  patchBaileys(__dirname);
-} catch (_) {}
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomBytes } = require('node:crypto');
