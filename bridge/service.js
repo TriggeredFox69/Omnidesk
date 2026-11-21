@@ -51,7 +51,8 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         if (!phone || !/^\d{10,18}$/.test(phone)) return;
         await inbox.ingest(message, phone, { phone, agentName: device.name, viaUserId: device.id, viaNumber: device.number });
       })().catch(err => console.error('Device inbox:', err.message));
-    }
+    },
+    onAck: (_device, _devClient, message, ack) => inbox.ack(message, ack)
   });
 
   const campaignManager = createCampaignManager({

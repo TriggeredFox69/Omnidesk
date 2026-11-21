@@ -7,6 +7,8 @@ const statusOf = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'de
 function createInbox({ getClient, storageFile }) {
   const messages = new Map();
   const aliases = new Map();
+  const pendingAcks = new Map();
+  const statusRank = { accepted: 0, sent: 1, delivered: 2, read: 3, failed: -1 };
   let revision = 0, saveTimer;
   const epoch = require('node:crypto').randomUUID();
   if (storageFile && fs.existsSync(storageFile)) {
@@ -76,6 +78,8 @@ function createInbox({ getClient, storageFile }) {
     const phone = opts.phone || resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
     if (!phone || !/^\d{10,18}$/.test(phone)) return;
     const previous = messages.get(id);
+    const pendingAck = pendingAcks.get(id);
+    if (pendingAck !== undefined) pendingAcks.delete(id);
     const type = ['ptt', 'audio'].includes(message.type) ? 'audio' :
       message.type === 'image' ? 'image' : message.type === 'video' ? 'video' :
         (message.type === 'document' ? 'document' : (previous?.type || 'text'));
@@ -91,7 +95,7 @@ function createInbox({ getClient, storageFile }) {
       ...(opts.viaUserId ? { viaUserId: opts.viaUserId, viaNumber: opts.viaNumber || '' } : {}),
       timestamp: Number(message.timestamp) || previous?.timestamp || Math.floor(Date.now()/1000), hasMedia,
       durationSeconds: Number(message._data?.duration) || previous?.durationSeconds || 0,
-      deliveryStatus: fromMe ? statusOf(message.ack || 0) : undefined };
+      deliveryStatus: fromMe ? (pendingAck !== undefined ? statusOf(pendingAck) : statusOf(message.ack || 0)) : undefined };
     if (previous && ['delivered','read'].includes(previous.deliveryStatus) && ['accepted','sent'].includes(value.deliveryStatus)) value.deliveryStatus = previous.deliveryStatus;
     if (previous && JSON.stringify({ ...previous, revision: 0 }) === JSON.stringify({ ...value, revision: 0 })) return;
     messages.set(id, { ...value, revision: ++revision });
@@ -99,8 +103,22 @@ function createInbox({ getClient, storageFile }) {
     save();
   }
   function ack(message, value) {
-    const item = messages.get(message.id?._serialized);
-    if (item && item.deliveryStatus !== statusOf(value)) { item.deliveryStatus = statusOf(value); item.revision = ++revision; save(); }
+    const id = message.id?._serialized;
+    const item = messages.get(id);
+    if (!item) {
+      if (id) {
+        const current = pendingAcks.get(id);
+        if (current === undefined || Number(value) === -1 || Number(value) > current) pendingAcks.set(id, Number(value));
+        if (pendingAcks.size > 2000) pendingAcks.delete(pendingAcks.keys().next().value);
+      }
+      return;
+    }
+    const nextStatus = statusOf(value);
+    const currentRank = statusRank[item.deliveryStatus] ?? -1;
+    const nextRank = statusRank[nextStatus] ?? -1;
+    if (item.deliveryStatus !== nextStatus && (nextRank > currentRank || (nextStatus === 'failed' && currentRank < 2))) {
+      item.deliveryStatus = nextStatus; item.revision = ++revision; save();
+    }
   }
   async function syncChat(phone) {
     if (!/^\d{10,18}$/.test(phone)) throw new Error('Invalid phone number.');

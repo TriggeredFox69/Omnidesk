@@ -31,7 +31,7 @@ const samePhone = (a, b) => {
   return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9)));
 };
 
-function createDevicePool({ dataDir, createClient, qrImage, onMessage }) {
+function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) {
   const root = path.join(dataDir, 'devices');
   fs.mkdirSync(root, { recursive: true, mode: 0o700 });
   const devices = new Map();   // owner id (user id, or login_… while unclaimed) -> device
@@ -102,6 +102,9 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage }) {
       });
       client.on('message_create', message => {
         if (typeof onMessage === 'function') onMessage(d, client, message);
+      });
+      client.on('message_ack', (message, ack) => {
+        if (typeof onAck === 'function') onAck(d, client, message, ack);
       });
       await client.initialize();
     })().catch(err => {

@@ -33,17 +33,6 @@ try {
 }
 const { ensureOggOpus, isOgg } = require('./audio');
 
-function hasOpenSignalSession(sess) {
-  if (!sess || typeof sess !== 'object') return false;
-  const entries = sess._sessions ? Object.values(sess._sessions) : [sess];
-  for (const entry of entries) {
-    if (entry && entry.indexInfo && entry.indexInfo.closed === -1) {
-      return true;
-    }
-  }
-  return false;
-}
-
 class BaileysClient extends EventEmitter {
   constructor({ authPath, deviceName = 'Omnidesk Cloud' } = {}) {
     super();
@@ -233,28 +222,6 @@ class BaileysClient extends EventEmitter {
       const v = await fetchLatestBaileysVersion();
       if (v?.version) version = v.version;
     } catch (_) {}
-
-    // Auto-heal Signal Protocol Sessions:
-    // Intercept state.keys.get for 'session' to ensure Baileys never encrypts with a closed/broken session.
-    // If a session has no open ratchet (indexInfo.closed !== -1), returning null triggers Baileys to
-    // query WhatsApp for a fresh prekey bundle and establish a brand new Signal session (pkmsg).
-    const originalGet = state.keys.get;
-    state.keys.get = async (type, ids) => {
-      const data = await originalGet(type, ids);
-      if (type === 'session') {
-        for (const id of ids) {
-          const sess = data[id];
-          if (sess && !hasOpenSignalSession(sess)) {
-            console.log(`[Baileys Auto-Heal] Pruning closed/dead session for ${id} to trigger fresh prekey handshake`);
-            data[id] = null;
-            const safeId = String(id).replace(/\//g, '__').replace(/:/g, '-');
-            const filePath = path.join(this.authPath, `session-${safeId}.json`);
-            try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) {}
-          }
-        }
-      }
-      return data;
-    };
 
     this.sock = makeWASocket({
       version,
@@ -585,7 +552,9 @@ class BaileysClient extends EventEmitter {
         }
       }
       this._saveRawStore();
-      // Do not emit historical messages into live event inbox to avoid polluting the CRM with personal phone history
+      // Backfill the same supported 1:1 conversations used by live sync. The
+      // inbox filters groups/broadcasts and deduplicates messages by WhatsApp ID.
+      emitMessages(messages);
     });
 
     // Handle delivery / read receipts
@@ -593,7 +562,8 @@ class BaileysClient extends EventEmitter {
       for (const update of updates || []) {
         if (update.update?.status) {
           const status = update.update.status;
-          const ack = status >= 4 ? 3 : (status === 3 ? 2 : 1);
+          // Baileys status values: SERVER_ACK=2, DELIVERY_ACK=3, READ=4, PLAYED=5.
+          const ack = status >= 4 ? 3 : (status === 3 ? 2 : (status === 2 ? 1 : 0));
           const remoteJid = update.key?.remoteJid || '';
           this.emit('message_ack', {
             id: { _serialized: update.key.id, fromMe: update.key.fromMe, remote: remoteJid },
@@ -605,80 +575,6 @@ class BaileysClient extends EventEmitter {
       }
     });
 
-    // Intercept retry receipts directly from the socket to eliminate "Waiting for this message"
-    if (this.sock.ws) {
-      this.sock.ws.on('CB:receipt', async (node) => {
-        try {
-          if (node?.attrs?.type === 'retry' && (node?.attrs?.id || node?.content)) {
-            const ids = [];
-            if (node.attrs.id) ids.push(node.attrs.id);
-            if (Array.isArray(node.content)) {
-              for (const child of node.content) {
-                if (child?.tag === 'item' && child?.attrs?.id) {
-                  ids.push(child.attrs.id);
-                }
-              }
-            }
-
-            const from = node.attrs.from || '';
-            const participant = node.attrs.participant || from;
-            const retryChild = Array.isArray(node.content) ? node.content.find(c => c?.tag === 'retry') : null;
-            const count = +(retryChild?.attrs?.count || 1);
-
-            console.log(`[Baileys Auto-Heal] Socket retry receipt received for ${ids.length} msgs [${ids.join(', ')}] from ${participant} (count ${count})`);
-
-            // When retry count >= 2, the ratchet is definitely out of sync; purge stale session to force fresh prekey bundle
-            if (count >= 2) {
-              console.log(`[Baileys Auto-Heal] Retry count >= 2 for ${participant}. Purging desynchronized session to force fresh prekey exchange...`);
-              this.resetContactSession(participant);
-            }
-
-            try {
-              if (typeof this.sock.assertSessions === 'function') {
-                await this.sock.assertSessions([participant], true);
-              }
-            } catch (e) {
-              console.warn('[Baileys Auto-Heal] assertSessions error during retry:', e?.message || e);
-            }
-
-            for (const id of ids) {
-              let rawMsg = null;
-              if (this._rawMessageStore.has(id)) {
-                rawMsg = this._rawMessageStore.get(id);
-              } else if (from && this._rawMessageStore.has(`${from}_${id}`)) {
-                rawMsg = this._rawMessageStore.get(`${from}_${id}`);
-              } else {
-                const cleanPhone = from.split('@')[0].split(':')[0].replace(/\D/g, '');
-                if (cleanPhone && this._rawMessageStore.has(`${cleanPhone}_${id}`)) {
-                  rawMsg = this._rawMessageStore.get(`${cleanPhone}_${id}`);
-                } else if (this._messageCache.has(id)) {
-                  const c = this._messageCache.get(id);
-                  if (c?.body) rawMsg = { conversation: c.body };
-                }
-              }
-
-              if (rawMsg) {
-                console.log(`[Baileys Auto-Heal] Re-encrypting & resending message ${id} to ${participant} (count ${count})`);
-                const isGroup = from.endsWith('@g.us');
-                const relayOptions = { messageId: id };
-                if (isGroup) {
-                  relayOptions.participant = { jid: participant, count };
-                } else {
-                  // For 1-on-1 chats, WhatsApp stanza takes additionalAttributes with retry count
-                  relayOptions.additionalAttributes = { retry: String(count) };
-                }
-                await this.sock.relayMessage(from, rawMsg, relayOptions);
-                console.log(`[Baileys Auto-Heal] Re-relay completed successfully for msg ${id} to ${participant}`);
-              } else {
-                console.warn(`[Baileys Auto-Heal] Message ${id} not found in store for re-relay to ${participant}`);
-              }
-            }
-          }
-        } catch (err) {
-          console.error('[Baileys Auto-Heal] Error in socket retry receipt handler:', err?.message || err);
-        }
-      });
-    }
   }
 
   _normalizeJid(jidOrPhone) {
@@ -807,32 +703,9 @@ class BaileysClient extends EventEmitter {
     return null;
   }
 
-  resetContactSession(contactJidOrPhone) {
-    if (!contactJidOrPhone) return false;
-    const clean = String(contactJidOrPhone).split('@')[0].split(':')[0].replace(/\D/g, '');
-    if (!clean) return false;
-    try {
-      const lid = this._phoneToLid.get(clean);
-      const phone = this._lidToPhone.get(clean);
-      if (fs.existsSync(this.authPath)) {
-        const files = fs.readdirSync(this.authPath);
-        for (const file of files) {
-          if (file.startsWith('session-') && (
-            file.includes(clean) ||
-            (lid && file.includes(lid)) ||
-            (phone && file.includes(phone))
-          )) {
-            try {
-              fs.unlinkSync(path.join(this.authPath, file));
-              console.log(`[Baileys Auto-Heal] Purged stale session file: ${file}`);
-            } catch (_) {}
-          }
-        }
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
+  resetContactSession() {
+    // Keep the Signal ratchet intact; Baileys handles retry handshakes natively.
+    return false;
   }
 
   async getContactLidAndPhone(ids) {
