@@ -3013,8 +3013,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (container) {
           // Each card is a TM whose own WhatsApp is linked for campaigns (the server only returns those).
-          const isBridgeLive = s.connected !== false;
           container.innerHTML = senders.map(s => {
+            const isBridgeLive = s.connected !== false;
             const isTL = (s.roleType === 'lead');
             const isAdmin = (s.roleType === 'admin');
             const roleTag = isTL ? 'Team Leader (TL)' : (isAdmin ? 'Admin' : 'TM Closer');
