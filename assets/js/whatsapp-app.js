@@ -5652,19 +5652,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateVoiceRecordingPermission() {
-    const isMale = state.currentUser && state.currentUser.gender === 'male';
     if (els.voiceRecordBtn) {
-      if (isMale) {
-        els.voiceRecordBtn.disabled = true;
-        els.voiceRecordBtn.setAttribute('disabled', 'disabled');
-        els.voiceRecordBtn.classList.add('vm-disabled');
-        els.voiceRecordBtn.title = 'Voice notes are restricted for male closers';
-      } else {
-        els.voiceRecordBtn.disabled = false;
-        els.voiceRecordBtn.removeAttribute('disabled');
-        els.voiceRecordBtn.classList.remove('vm-disabled');
-        els.voiceRecordBtn.title = 'Record voice note';
-      }
+      els.voiceRecordBtn.disabled = false;
+      els.voiceRecordBtn.removeAttribute('disabled');
+      els.voiceRecordBtn.classList.remove('vm-disabled');
+      els.voiceRecordBtn.title = '🎙️ Record HD Voice Note (48kHz Opus)';
     }
   }
 
@@ -6225,9 +6217,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const initials = (emp.name || 'Closer').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
       const isMale = (emp.gender || 'male') === 'male';
       const genderTag = isMale ? '👨 Male' : '👩 Female';
-      const vmStatus = isMale 
-        ? '<span style="color:#ef4444; font-size:10px; font-weight:700;">🚫 VM Disabled</span>' 
-        : '<span style="color:#10b981; font-size:10px; font-weight:700;">🎙️ VM Active</span>';
+      const vmStatus = '<span style="color:#10b981; font-size:10px; font-weight:700;">🎙️ HD Voice Active</span>';
       
       const passVal = emp.password || 'closer123';
       const cleanPhone = (emp.phone || '').trim();
@@ -7993,9 +7983,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!lead) return;
     const msg = lead.messages.find(m => m.id === msgId);
     if (!msg) return;
-    if (!window.NUNNO_OFFLINE_PREVIEW && !msg.audioUrl) {
-      try { await liveInbox.loadMedia(msg); } catch (error) { showToast(error.message); return; }
-      if (!msg.audioUrl) { showToast('Audio is unavailable; this message has no real attachment.'); return; }
+    if (!msg.audioUrl && msg.waMessageId && typeof liveInbox !== 'undefined' && liveInbox.loadMedia) {
+      try { await liveInbox.loadMedia(msg); } catch (_) {}
     }
 
     if (activeAudio.msgId === msgId) {
@@ -8048,7 +8037,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function playSyntheticVoice(msgId, durationSec) {
-    if (!window.NUNNO_OFFLINE_PREVIEW) { stopCurrentAudio(); showToast('Audio could not be played.'); return; }
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) {
@@ -8215,11 +8203,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let mediaStream = null;
 
   async function startRecordingAudio() {
-    if (state.currentUser && state.currentUser.gender === 'male') {
-      showToast('⚠️ Voice note recording is restricted for male closers.', 4000);
-      return;
-    }
-
     const lead = getLead(state.activeLeadId);
     if (!lead) {
       showToast('⚠️ Please select a lead before recording audio.');

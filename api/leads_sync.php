@@ -247,6 +247,200 @@ if ($action === 'delete_leads' || $action === 'delete_lead') {
     exit;
 }
 
+// Seed Demo Campaign Leads with Voice Notes & Real-Time Sync Structure
+if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
+    $targetCloserId = $sessionUser['id'] ?? 'EMP-TM-MWMK43N9';
+    $targetCloserName = $sessionUser['name'] ?? 'Askari Raza';
+    $targetCloserUser = $sessionUser['username'] ?? 'askari';
+
+    $demoLeads = [
+        [
+            'id' => 'lead_wa_923245678910',
+            'company_id' => $activeCompanyId,
+            'name' => 'Faisal Raza (+923245678910)',
+            'phone' => '923245678910',
+            'display' => '+92 324 5678910',
+            'city' => 'Multan',
+            'network' => 'WhatsApp',
+            'ownerId' => $targetCloserId,
+            'ownerName' => $targetCloserName,
+            'ownerUsername' => $targetCloserUser,
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Nunno Cloud Scalper Pro',
+            'lastActive' => 'Just now',
+            'lastMessageAt' => time() - 60,
+            'dealAmount' => 5000,
+            'notes' => 'Outreach Campaign lead. High intent buyer.',
+            'messages' => [
+                [
+                    'id' => 'msg_demo_c1',
+                    'waMessageId' => 'true_923245678910@s.whatsapp.net_C1',
+                    'deliveryStatus' => 'read',
+                    'sender' => 'agent',
+                    'agentName' => $targetCloserName,
+                    'text' => 'Hello Faisal Raza, welcome to Nunno Cloud automated Forex & Crypto desk! Let me know if you would like to test our signals.',
+                    'type' => 'text',
+                    'timestamp' => time() - 1800,
+                    'time' => date('H:i', time() - 1800)
+                ],
+                [
+                    'id' => 'msg_demo_c2',
+                    'waMessageId' => 'false_923245678910@s.whatsapp.net_C2',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'lead',
+                    'text' => 'AoA Askari bro, I want to subscribe to Nunno Pro. Please share payment details.',
+                    'type' => 'text',
+                    'timestamp' => time() - 1200,
+                    'time' => date('H:i', time() - 1200)
+                ],
+                [
+                    'id' => 'msg_demo_c3',
+                    'waMessageId' => 'true_923245678910@s.whatsapp.net_C3',
+                    'deliveryStatus' => 'read',
+                    'sender' => 'agent',
+                    'agentName' => $targetCloserName,
+                    'text' => 'Walaikum Assalam Faisal bhai! EasyPaisa / JazzCash account: 0331-8036576 (Title: Nunno Official). Share screenshot once done.',
+                    'type' => 'text',
+                    'timestamp' => time() - 600,
+                    'time' => date('H:i', time() - 600)
+                ],
+                [
+                    'id' => 'msg_demo_vn1',
+                    'waMessageId' => 'false_923245678910@s.whatsapp.net_VN1',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'lead',
+                    'text' => '🎙️ Voice note (0:18): Bhai EasyPaisa pe 5,000 PKR bhej diya hai, receipt check karein',
+                    'type' => 'audio',
+                    'duration' => '0:18',
+                    'durationSeconds' => 18,
+                    'hasMedia' => true,
+                    'timestamp' => time() - 120,
+                    'time' => date('H:i', time() - 120)
+                ],
+                [
+                    'id' => 'msg_demo_vn2',
+                    'waMessageId' => 'true_923245678910@s.whatsapp.net_VN2',
+                    'deliveryStatus' => 'read',
+                    'sender' => 'agent',
+                    'agentName' => $targetCloserName,
+                    'text' => '🎙️ Voice note (0:14): Payment verified brother, your account is activated! Welcome aboard.',
+                    'type' => 'audio',
+                    'duration' => '0:14',
+                    'durationSeconds' => 14,
+                    'hasMedia' => true,
+                    'timestamp' => time() - 30,
+                    'time' => date('H:i', time() - 30)
+                ]
+            ]
+        ],
+        [
+            'id' => 'lead_wa_923122759900',
+            'company_id' => $activeCompanyId,
+            'name' => 'Naveed Sheikh (+923122759900)',
+            'phone' => '923122759900',
+            'display' => '+92 312 2759900',
+            'city' => 'Karachi',
+            'network' => 'WhatsApp',
+            'ownerId' => $targetCloserId,
+            'ownerName' => $targetCloserName,
+            'ownerUsername' => $targetCloserUser,
+            'leadState' => 'ongoing',
+            'status' => 'unread',
+            'unreadCount' => 1,
+            'interest' => 'Forex VIP Lifetime',
+            'lastActive' => '2m ago',
+            'lastMessageAt' => time() - 120,
+            'dealAmount' => 15000,
+            'notes' => 'Hot prospect interested in VIP lifetime signals.',
+            'messages' => [
+                [
+                    'id' => 'msg_nav_1',
+                    'waMessageId' => 'true_923122759900@s.whatsapp.net_1',
+                    'deliveryStatus' => 'read',
+                    'sender' => 'agent',
+                    'agentName' => $targetCloserName,
+                    'text' => 'Assalam o Alaikum Naveed bhai, special 30% discount on Whale Lifetime package ending tonight!',
+                    'type' => 'text',
+                    'timestamp' => time() - 900,
+                    'time' => date('H:i', time() - 900)
+                ],
+                [
+                    'id' => 'msg_nav_vn1',
+                    'waMessageId' => 'false_923122759900@s.whatsapp.net_VN1',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'lead',
+                    'text' => '🎙️ Voice note (0:24): Assalam o Alaikum, live proofs aur accuracy stats share kar dein',
+                    'type' => 'audio',
+                    'duration' => '0:24',
+                    'durationSeconds' => 24,
+                    'hasMedia' => true,
+                    'timestamp' => time() - 120,
+                    'time' => date('H:i', time() - 120)
+                ]
+            ]
+        ],
+        [
+            'id' => 'lead_wa_923332190847',
+            'company_id' => $activeCompanyId,
+            'name' => 'Tariq Enterprise (+923332190847)',
+            'phone' => '923332190847',
+            'display' => '+92 333 2190847',
+            'city' => 'Lahore',
+            'network' => 'WhatsApp',
+            'ownerId' => $targetCloserId,
+            'ownerName' => $targetCloserName,
+            'ownerUsername' => $targetCloserUser,
+            'leadState' => 'fresh',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Campaign Outreach',
+            'lastActive' => '10m ago',
+            'lastMessageAt' => time() - 600,
+            'notes' => 'New lead from Nunno Multi-Device Campaign.',
+            'messages' => [
+                [
+                    'id' => 'msg_tar_1',
+                    'waMessageId' => 'true_923332190847@s.whatsapp.net_1',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'agent',
+                    'agentName' => $targetCloserName,
+                    'text' => 'Exclusive trade signals and automated bot copy trading available now. Interested in free trial?',
+                    'type' => 'text',
+                    'timestamp' => time() - 600,
+                    'time' => date('H:i', time() - 600)
+                ]
+            ]
+        ]
+    ];
+
+    // Merge or prepend demo leads
+    $existingIds = array_column($currentLeads, 'id');
+    foreach ($demoLeads as $dl) {
+        $found = false;
+        foreach ($currentLeads as &$cl) {
+            if ($cl['id'] === $dl['id'] || ($cl['phone'] ?? '') === $dl['phone']) {
+                $cl = array_merge($cl, $dl);
+                $found = true;
+                break;
+            }
+        }
+        unset($cl);
+        if (!$found) {
+            array_unshift($currentLeads, $dl);
+        }
+    }
+
+    saveStoredLeads($dataFile, $currentLeads);
+    echo json_encode([
+        'success' => true,
+        'message' => 'Demo campaign leads seeded successfully with text, voice notes and live sync state.',
+        'leads_count' => count($currentLeads)
+    ]);
+    exit;
+}
+
 // 1. Get All Leads
 if ($action === 'get_leads') {
     $modified = false;
