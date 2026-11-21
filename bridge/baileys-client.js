@@ -2,15 +2,46 @@
 /**
  * Baileys WhatsApp Engine for Headless / CloudLinux / cPanel Environments
  * Zero Chromium or browser dependencies required.
- * Fully compliant with Signal Protocol retry-receipts & 100% full-duplex sync.
+ * Answers WhatsApp's resend requests from the saved message store, keeps the
+ * LID <-> phone map in step with Baileys, and writes keys atomically.
  */
 const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const fs = require('node:fs');
 // Baileys v7 is ESM-only. Load it dynamically from this CommonJS bridge.
+// (bridge.bundle.js has it built in, so the server needs no npm install.)
 let baileysApi;
-let makeWASocket, useMultiFileAuthState, DisconnectReason;
+let makeWASocket, DisconnectReason, makeCacheableSignalKeyStore, initAuthCreds, BufferJSON;
 let downloadMediaMessage, normalizeMessageContent, proto, Browsers, fetchLatestBaileysVersion;
+const { createAtomicAuthState } = require('./auth-state');
+
+async function loadBaileys() {
+  if (baileysApi) return baileysApi;
+  const mod = await import('@whiskeysockets/baileys');
+  // ESM build: named exports + default = makeWASocket. An old CommonJS build
+  // arrives wrapped as { default: module.exports }.
+  const api = typeof mod.makeWASocket === 'function' ? mod : (mod.default && typeof mod.default === 'object' ? mod.default : mod);
+  const make = typeof api.makeWASocket === 'function' ? api.makeWASocket : (typeof api.default === 'function' ? api.default : null);
+  if (!make) throw new Error('The installed @whiskeysockets/baileys package is not usable (makeWASocket missing).');
+  baileysApi = { ...api, makeWASocket: make };
+  return baileysApi;
+}
+
+// WhatsApp Web version: fetched once per process, never allowed to stall a connect.
+let waVersionPromise = null;
+function getWaVersion() {
+  if (!waVersionPromise) {
+    const fallback = [2, 3000, 1043857760];
+    waVersionPromise = Promise.race([
+      Promise.resolve().then(() => fetchLatestBaileysVersion()).then(v => (v && Array.isArray(v.version) ? v.version : fallback)).catch(() => fallback),
+      new Promise(resolve => setTimeout(() => resolve(fallback), 6000))
+    ]);
+  }
+  return waVersionPromise;
+}
+
+const RAW_STORE_LIMIT = 5000;
+const NUMBER_CACHE_MS = 6 * 60 * 60 * 1000;
 let pino;
 try {
   pino = require('pino');
@@ -30,6 +61,7 @@ const { ensureOggOpus, isOgg } = require('./audio');
 class BaileysClient extends EventEmitter {
   constructor({ authPath, deviceName = 'Omnidesk Cloud' } = {}) {
     super();
+    this.isBaileys = true;
     this.authPath = authPath || path.resolve(__dirname, '../data/whatsapp-bridge/baileys_auth');
     this.rawStorePath = path.resolve(this.authPath, '../raw_messages.json');
     this.lidMapPath = path.resolve(this.authPath, '../lid_map.json');
@@ -44,7 +76,8 @@ class BaileysClient extends EventEmitter {
     this._phoneToLid = new Map();
     this._presences = new Map();
     this._msgRetryCache = new NodeCache({ stdTTL: 3600, useClones: false });
-    this._loadRawStore();
+    this._numberCache = new Map();
+    this._rawStoreLoaded = false;
     this._loadLidMap();
   }
 
@@ -136,10 +169,14 @@ class BaileysClient extends EventEmitter {
 
   _saveRawStore() {
     clearTimeout(this._saveRawTimer);
-    this._saveRawTimer = setTimeout(() => {
+    this._saveRawTimer = setTimeout(() => { this._saveRawTimer = null; this._writeRawStoreNow(); }, 1000);
+  }
+
+  _writeRawStoreNow() {
+    {
       try {
         const obj = {};
-        const entries = [...this._rawMessageStore.entries()].slice(-2000);
+        const entries = [...this._rawMessageStore.entries()].slice(-RAW_STORE_LIMIT);
         for (const [k, v] of entries) {
           try {
             const buf = proto.Message.encode(proto.Message.fromObject(v)).finish();
@@ -153,13 +190,21 @@ class BaileysClient extends EventEmitter {
         fs.writeFileSync(tmp, JSON.stringify(obj), 'utf8');
         fs.renameSync(tmp, this.rawStorePath);
       } catch (_) {}
-    }, 1000);
+    }
   }
 
-  _scheduleReconnect() {
+  _rememberRaw(id, message) {
+    if (!id || !message) return;
+    this._rawMessageStore.delete(id);
+    this._rawMessageStore.set(id, message);
+    while (this._rawMessageStore.size > RAW_STORE_LIMIT) this._rawMessageStore.delete(this._rawMessageStore.keys().next().value);
+    this._saveRawStore();
+  }
+
+  _scheduleReconnect(delayOverride) {
     if (this._destroyed) return;
     if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
-    const delay = Math.min(25000, Math.max(3000, ((this._reconnectAttempts || 0) + 1) * 3000));
+    const delay = typeof delayOverride === 'number' ? delayOverride : Math.min(25000, Math.max(3000, ((this._reconnectAttempts || 0) + 1) * 3000));
     this._reconnectAttempts = (this._reconnectAttempts || 0) + 1;
     console.log(`[Baileys] Socket closed. Auto-reconnecting in ${delay / 1000}s (attempt ${this._reconnectAttempts})...`);
     this._reconnectTimer = setTimeout(async () => {
@@ -192,42 +237,43 @@ class BaileysClient extends EventEmitter {
     this._destroyed = false;
     fs.mkdirSync(this.authPath, { recursive: true, mode: 0o700 });
 
-    baileysApi ||= await import('@whiskeysockets/baileys');
+    await loadBaileys();
     ({
-      default: makeWASocket,
-      useMultiFileAuthState,
+      makeWASocket,
       DisconnectReason,
+      makeCacheableSignalKeyStore,
+      initAuthCreds,
+      BufferJSON,
       downloadMediaMessage,
       normalizeMessageContent,
       proto,
       Browsers,
       fetchLatestBaileysVersion
     } = baileysApi);
+    if (!this._rawStoreLoaded) { this._rawStoreLoaded = true; this._loadRawStore(); }
 
-    // Auto-restore credentials from backup ONLY if the backup contains a valid registered session
+    // Restore creds.json from the last good copy ONLY if the live file is damaged.
     const credsFile = path.join(this.authPath, 'creds.json');
     const backupFile = path.join(this.authPath, '../creds.json.bak');
     const altBackup = path.join(this.authPath + '.bak', 'creds.json');
-    if (!this._isValidCreds(credsFile)) {
-      if (this._isValidCreds(backupFile)) {
-        console.log('[Baileys] Restoring creds.json from automatic backup...');
-        try { fs.copyFileSync(backupFile, credsFile); } catch (_) {}
-      } else if (this._isValidCreds(altBackup)) {
-        console.log('[Baileys] Restoring creds.json from alternate backup...');
-        try { fs.copyFileSync(altBackup, credsFile); } catch (_) {}
-      } else {
-        // Stale or unauthenticated backup files - delete them to prevent infinite invalid auth loops
-        try { if (fs.existsSync(backupFile)) fs.unlinkSync(backupFile); } catch (_) {}
-        try { if (fs.existsSync(altBackup)) fs.rmSync(path.dirname(altBackup), { recursive: true, force: true }); } catch (_) {}
+    if (fs.existsSync(credsFile) && !this._isValidCreds(credsFile)) {
+      const good = [backupFile, altBackup].find(f => this._isValidCreds(f));
+      if (good) {
+        console.log('[Baileys] creds.json was damaged; restoring the last good copy.');
+        try { fs.copyFileSync(good, credsFile + '.restore'); fs.renameSync(credsFile + '.restore', credsFile); } catch (_) {}
       }
+    } else if (!fs.existsSync(credsFile)) {
+      // No login here (new device or a deliberate wipe): never resurrect an old one.
+      try { if (fs.existsSync(backupFile)) fs.unlinkSync(backupFile); } catch (_) {}
+      try { if (fs.existsSync(path.dirname(altBackup))) fs.rmSync(path.dirname(altBackup), { recursive: true, force: true }); } catch (_) {}
     }
 
-    const { state, saveCreds } = await useMultiFileAuthState(this.authPath);
-    let version = [2, 3000, 1043857760];
-    try {
-      const v = await fetchLatestBaileysVersion();
-      if (v?.version) version = v.version;
-    } catch (_) {}
+    this._auth = createAtomicAuthState(this.authPath, { proto, initAuthCreds, BufferJSON });
+    const { state, saveCreds } = this._auth;
+    const logger = pino({ level: process.env.WHATSAPP_BRIDGE_LOG_LEVEL || 'warn' });
+    this._logger = logger;
+    const version = await getWaVersion();
+    if (this._destroyed) return;
 
     const getMessageFn = async (key) => {
       const id = key?.id;
@@ -269,9 +315,10 @@ class BaileysClient extends EventEmitter {
 
     this.sock = makeWASocket({
       version,
-      auth: state,
+      // Signal keys are cached in memory and written to disk atomically.
+      auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
       printQRInTerminal: false,
-      logger: pino({ level: process.env.WHATSAPP_BRIDGE_LOG_LEVEL || 'warn' }),
+      logger,
       browser: Browsers.ubuntu('Chrome'),
       // Chatly keeps conversations created in Chatly and their live replies;
       // never import a linked phone's personal WhatsApp history.
@@ -282,19 +329,26 @@ class BaileysClient extends EventEmitter {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       retryRequestDelayMs: 250,
-      markOnlineOnConnect: true,
+      // false = the TM's own phone keeps getting WhatsApp notifications while Chatly is linked.
+      markOnlineOnConnect: false,
+      // Status updates and channels are never Chatly conversations; skipping them
+      // avoids decrypting (and retrying) thousands of broadcast messages.
+      shouldIgnoreJid: jid => typeof jid === 'string' && (jid.endsWith('@broadcast') || jid.endsWith('@newsletter')),
       msgRetryCounterCache: this._msgRetryCache,
       getMessage: getMessageFn
     });
+    const sock = this.sock;
 
     const safeSaveCreds = async () => {
       await saveCreds();
       try {
-        if (fs.existsSync(credsFile) && fs.statSync(credsFile).size > 100) {
-          fs.copyFileSync(credsFile, backupFile);
+        if (this._isValidCreds(credsFile)) {
+          fs.copyFileSync(credsFile, backupFile + '.tmp');
+          fs.renameSync(backupFile + '.tmp', backupFile);
           const altDir = path.dirname(altBackup);
           fs.mkdirSync(altDir, { recursive: true, mode: 0o700 });
-          fs.copyFileSync(credsFile, altBackup);
+          fs.copyFileSync(credsFile, altBackup + '.tmp');
+          fs.renameSync(altBackup + '.tmp', altBackup);
         }
       } catch (_) {}
     };
@@ -302,7 +356,7 @@ class BaileysClient extends EventEmitter {
     this.sock.ev.on('creds.update', safeSaveCreds);
 
     this.sock.ev.on('connection.update', async (update) => {
-      if (this._destroyed) return;
+      if (this._destroyed || this.sock !== sock) return;
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
@@ -336,6 +390,10 @@ class BaileysClient extends EventEmitter {
           } catch (_) {}
           this.emit('auth_failure');
           this.emit('disconnected');
+        } else if (statusCode === DisconnectReason.restartRequired) {
+          // Normal right after a QR scan: WhatsApp asks for a fresh socket. Do it at once.
+          console.log('[Baileys] Pairing complete; restarting the socket to finish login.');
+          this._scheduleReconnect(300);
         } else if (statusCode === DisconnectReason.connectionReplaced) {
           // Another session took over this login (a second bridge copy, or the same
           // creds on another PC). Reconnecting at once makes both kick each other in a
@@ -369,11 +427,11 @@ class BaileysClient extends EventEmitter {
         try {
           const credsFile = path.join(this.authPath, 'creds.json');
           const backupFile = path.join(this.authPath, '../creds.json.bak');
-          if (fs.existsSync(credsFile) && fs.statSync(credsFile).size > 100) {
-            fs.copyFileSync(credsFile, backupFile);
+          if (this._isValidCreds(credsFile)) {
+            fs.copyFileSync(credsFile, backupFile + '.tmp');
+            fs.renameSync(backupFile + '.tmp', backupFile);
           }
         } catch (_) {}
-        this._syncLeadsLids().catch(() => {});
         this.emit('authenticated');
         this.emit('ready');
       }
@@ -381,16 +439,17 @@ class BaileysClient extends EventEmitter {
 
     const registerContacts = (contactsList) => {
       for (const c of contactsList || []) {
-        if (!c) continue;
-        const phone = c.id ? c.id.split('@')[0].split(':')[0] : '';
+        if (!c || !c.id) continue;
+        const idIsLid = String(c.id).endsWith('@lid');
+        const pnJid = idIsLid ? (c.phoneNumber || c.jid || '') : c.id;
+        const lidJid = idIsLid ? c.id : (c.lid || '');
+        const phone = pnJid ? String(pnJid).split('@')[0].split(':')[0] : '';
         const name = c.name || c.notify || c.verifiedName || '';
         if (phone && name) {
           this._contacts.set(phone, name);
           this._contacts.set(c.id, name);
         }
-        if (c.lid && phone) {
-          this._recordLidPhone(c.lid, phone);
-        }
+        if (lidJid && phone) this._recordLidPhone(lidJid, phone);
       }
     };
 
@@ -398,6 +457,14 @@ class BaileysClient extends EventEmitter {
     this.sock.ev.on('contacts.update', registerContacts);
     this.sock.ev.on('chats.phoneNumberShare', ({ lid, jid }) => {
       if (lid && jid) this._recordLidPhone(lid, jid);
+    });
+    // Baileys 7 reports every LID <-> phone pair it learns (and moves the encryption
+    // session across). Keeping the same map here means replies from a LID land on
+    // the right lead, and our replies go to the right number.
+    this.sock.ev.on('lid-mapping.update', update => {
+      for (const m of (Array.isArray(update) ? update : [update])) {
+        if (m && m.lid && m.pn) this._recordLidPhone(m.lid, m.pn);
+      }
     });
 
     this.sock.ev.on('presence.update', ({ id, presences }) => {
@@ -459,7 +526,14 @@ class BaileysClient extends EventEmitter {
       // Normalize LID to real phone if known or if context links to our previous chat
       if (jid.endsWith('@lid')) {
         const lidClean = jid.split('@')[0].split(':')[0];
-        if (lidClean === myLid && myNum) {
+        const alt = msg.key?.remoteJidAlt || (!fromMe ? msg.key?.senderPn : '') || '';
+        if (alt && /@s\.whatsapp\.net$/.test(alt)) {
+          const altPhone = alt.split('@')[0].split(':')[0];
+          this._recordLidPhone(lidClean, altPhone);
+          jid = `${altPhone}@s.whatsapp.net`;
+        } else if (msg._resolvedPn) {
+          jid = `${msg._resolvedPn}@s.whatsapp.net`;
+        } else if (lidClean === myLid && myNum) {
           jid = `${myNum}@s.whatsapp.net`;
         } else if (this._lidToPhone.has(lidClean)) {
           jid = `${this._lidToPhone.get(lidClean)}@s.whatsapp.net`;
@@ -518,7 +592,7 @@ class BaileysClient extends EventEmitter {
         _data: { notifyName, duration: media?.seconds || 0 },
         downloadMedia: async () => {
           try {
-            const buffer = await downloadMediaMessage(msg, 'buffer', {});
+            const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: this._logger, reuploadRequest: m => this.sock.updateMediaMessage(m) });
             return { data: buffer.toString('base64'), mimetype: media?.mimetype || (content.stickerMessage ? 'image/webp' : 'application/octet-stream'), filename };
           } catch (err) {
             console.error('[Baileys] Media download failed:', err.message);
@@ -528,8 +602,22 @@ class BaileysClient extends EventEmitter {
       };
     };
 
-    const emitMessages = messages => {
+    const lidStorePn = async lidJid => {
+      try {
+        const pn = await sock.signalRepository?.lidMapping?.getPNForLID?.(lidJid);
+        return pn ? String(pn).split('@')[0].split(':')[0] : '';
+      } catch (_) { return ''; }
+    };
+    const emitMessages = async messages => {
       for (const msg of messages || []) {
+        const remote = msg?.key?.remoteJid || '';
+        if (remote.endsWith('@lid') && !msg.key.remoteJidAlt && !msg.key.senderPn) {
+          const lidClean = remote.split('@')[0].split(':')[0];
+          if (!this._lidToPhone.has(lidClean)) {
+            const pn = await lidStorePn(remote);
+            if (pn) { this._recordLidPhone(lidClean, pn); msg._resolvedPn = pn; }
+          }
+        }
         const adaptedMsg = adaptMessage(msg);
         if (!adaptedMsg) continue;
         this._messageCache.set(msg.key.id, adaptedMsg);
@@ -542,14 +630,11 @@ class BaileysClient extends EventEmitter {
 
     // Handle incoming and outgoing live messages
     this.sock.ev.on('messages.upsert', ({ messages }) => {
+      if (this.sock !== sock) return;
       for (const msg of messages || []) {
-        if (msg.key?.id && msg.message) {
-          this._rawMessageStore.set(msg.key.id, msg.message);
-          if (msg.key.remoteJid) this._rawMessageStore.set(`${msg.key.remoteJid}_${msg.key.id}`, msg.message);
-        }
+        if (msg.key?.id && msg.message) this._rememberRaw(msg.key.id, msg.message);
       }
-      this._saveRawStore();
-      emitMessages(messages);
+      emitMessages(messages).catch(err => console.error('[Baileys] Message handling failed:', err.message));
     });
 
     // Accept useful contact mappings, but never backfill old WhatsApp chats.
@@ -561,10 +646,14 @@ class BaileysClient extends EventEmitter {
     // Handle delivery / read receipts
     this.sock.ev.on('messages.update', updates => {
       for (const update of updates || []) {
-        if (update.update?.status) {
-          const status = update.update.status;
-          // Baileys status values: SERVER_ACK=2, DELIVERY_ACK=3, READ=4, PLAYED=5.
-          const ack = status >= 4 ? 3 : (status === 3 ? 2 : (status === 2 ? 1 : 0));
+        const status = update.update?.status;
+        if (typeof status === 'number' && update.key?.id) {
+          // Baileys status values: ERROR=0, PENDING=1, SERVER_ACK=2, DELIVERY_ACK=3, READ=4, PLAYED=5.
+          if (status === 0) {
+            const reason = (update.update.messageStubParameters || []).join(' ');
+            console.warn(`[Baileys] WhatsApp refused message ${update.key.id}${reason ? ': ' + reason : ''}`);
+          }
+          const ack = status === 0 ? -1 : (status >= 4 ? 3 : (status === 3 ? 2 : (status === 2 ? 1 : 0)));
           const remoteJid = update.key?.remoteJid || '';
           this.emit('message_ack', {
             id: { _serialized: update.key.id, fromMe: update.key.fromMe, remote: remoteJid },
@@ -584,12 +673,19 @@ class BaileysClient extends EventEmitter {
       return raw;
     }
     // If a LID is passed, map it to its registered phone number if known
-    if (raw.endsWith('@lid') || (raw.startsWith('2080') && raw.length >= 14)) {
+    if (raw.endsWith('@lid')) {
       const lidClean = raw.split('@')[0].split(':')[0].replace(/\D/g, '');
       if (this._lidToPhone.has(lidClean)) {
         return `${this._lidToPhone.get(lidClean)}@s.whatsapp.net`;
       }
-      return `${lidClean}@s.whatsapp.net`;
+      // Unknown LID: send to the LID itself. Turning its digits into a phone
+      // number reached nobody and left the message on a single tick forever.
+      return `${lidClean}@lid`;
+    }
+    {
+      // A bare LID stored as if it were a phone number (older inbox rows).
+      const digits = raw.split('@')[0].split(':')[0].replace(/\D/g, '');
+      if (digits.length >= 14 && this._lidToPhone.has(digits)) return `${this._lidToPhone.get(digits)}@s.whatsapp.net`;
     }
     if (raw.endsWith('@s.whatsapp.net') || raw.endsWith('@c.us')) {
       raw = raw.split('@')[0];
@@ -605,52 +701,6 @@ class BaileysClient extends EventEmitter {
     return `${raw}@s.whatsapp.net`;
   }
 
-  async _syncLeadsLids() {
-    if (!this.sock) return;
-    try {
-      const candidatePaths = [
-        path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
-        path.resolve(__dirname, '../data/leads.json'),
-        path.resolve(__dirname, '../../data/leads.json'),
-        path.resolve(this.authPath, '../../../data/leads.json'),
-        path.resolve(this.authPath, '../../leads.json')
-      ];
-      for (const leadsPath of candidatePaths) {
-        if (fs.existsSync(leadsPath)) {
-          const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
-          if (Array.isArray(leads)) {
-            for (const lead of leads) {
-              const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
-              if (!phone) continue;
-              // Check existing message IDs for embedded LID strings
-              if (Array.isArray(lead.messages)) {
-                for (const m of lead.messages) {
-                  const mId = String(m.waMessageId || m.id || '');
-                  if (mId.includes('@lid')) {
-                    const match = /([0-9]{10,25})@lid/.exec(mId);
-                    if (match && match[1]) {
-                      this._recordLidPhone(match[1], phone);
-                    }
-                  }
-                }
-              }
-              if (!this._phoneToLid.has(phone)) {
-                try {
-                  const [res] = await this.sock.onWhatsApp(phone);
-                  if (res?.lid) {
-                    const resLid = res.lid.split('@')[0].split(':')[0];
-                    this._recordLidPhone(resLid, phone);
-                  }
-                } catch (_) {}
-              }
-            }
-          }
-          break;
-        }
-      }
-    } catch (_) {}
-  }
-
   async getNumberId(phone) {
     if (!this.sock) return null;
     const cleanPhone = phone.replace(/\D/g, '');
@@ -659,6 +709,13 @@ class BaileysClient extends EventEmitter {
     else if (norm.startsWith('03') && norm.length === 11) norm = '92' + norm.slice(1);
     else if (norm.startsWith('3') && norm.length === 10) norm = '92' + norm;
 
+    // A LID that was stored as if it were a phone number: address the LID's real number.
+    if (norm.length >= 14 && this._lidToPhone.has(norm)) return { _serialized: `${this._lidToPhone.get(norm)}@s.whatsapp.net` };
+    if (!/^\d{8,15}$/.test(norm)) return null;
+    // A number we already chat with (known LID pair) needs no lookup.
+    if (this._phoneToLid.has(norm)) return { _serialized: `${norm}@s.whatsapp.net` };
+    const cached = this._numberCache.get(norm);
+    if (cached && Date.now() - cached.at < NUMBER_CACHE_MS) return cached.exists ? { _serialized: cached.jid } : null;
     try {
       const [result] = await this.sock.onWhatsApp(norm);
       if (result && result.exists) {
@@ -666,9 +723,14 @@ class BaileysClient extends EventEmitter {
           this._recordLidPhone(result.lid, result.jid || norm);
         }
         const targetJid = (result.jid && !result.jid.endsWith('@lid')) ? result.jid : `${norm}@s.whatsapp.net`;
+        this._numberCache.set(norm, { exists: true, jid: targetJid, at: Date.now() });
+        if (this._numberCache.size > 20000) this._numberCache.delete(this._numberCache.keys().next().value);
         return { _serialized: targetJid };
       }
-      if (result && result.exists === false) return null;
+      if (result && result.exists === false) {
+        this._numberCache.set(norm, { exists: false, at: Date.now() });
+        return null;
+      }
     } catch (_) {}
     return { _serialized: `${norm}@s.whatsapp.net` };
   }
@@ -685,45 +747,34 @@ class BaileysClient extends EventEmitter {
         return phone;
       }
     }
-    // Proactively query leads from leads.json
+    if (this.sock?.signalRepository?.lidMapping?.getPNForLID) {
+      try {
+        const pn = await this.sock.signalRepository.lidMapping.getPNForLID(`${lidClean}@lid`);
+        if (pn) {
+          const phone = String(pn).split('@')[0].split(':')[0];
+          this._recordLidPhone(lidClean, phone);
+          return phone;
+        }
+      } catch (_) {}
+    }
+    // A Chatly message id that embeds this LID tells us which lead it is (local file only).
     try {
       const candidatePaths = [
         path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
-        path.resolve(__dirname, '../data/leads.json'),
-        path.resolve(__dirname, '../../data/leads.json'),
-        path.resolve(this.authPath, '../../../data/leads.json'),
-        path.resolve(this.authPath, '../../leads.json')
+        path.resolve(__dirname, '../data/leads.json')
       ];
       for (const leadsPath of candidatePaths) {
-        if (fs.existsSync(leadsPath)) {
-          const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
-          if (Array.isArray(leads)) {
-            for (const lead of leads) {
-              const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
-              if (!phone) continue;
-              if (Array.isArray(lead.messages)) {
-                for (const m of lead.messages) {
-                  const mId = String(m.waMessageId || m.id || '');
-                  if (mId.includes(lidClean)) {
-                    this._recordLidPhone(lidClean, phone);
-                    return phone;
-                  }
-                }
-              }
-              if (this.sock && !this._phoneToLid.has(phone)) {
-                try {
-                  const [res] = await this.sock.onWhatsApp(phone);
-                  if (res?.lid) {
-                    const resLid = res.lid.split('@')[0].split(':')[0];
-                    this._recordLidPhone(resLid, phone);
-                    if (resLid === lidClean) return phone;
-                  }
-                } catch (_) {}
-              }
-            }
+        if (!fs.existsSync(leadsPath)) continue;
+        const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
+        for (const lead of Array.isArray(leads) ? leads : []) {
+          const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
+          if (!phone || !Array.isArray(lead.messages)) continue;
+          if (lead.messages.some(m => String(m.waMessageId || m.id || '').includes(lidClean + '@lid'))) {
+            this._recordLidPhone(lidClean, phone);
+            return phone;
           }
-          break;
         }
+        break;
       }
     } catch (_) {}
     return null;
@@ -898,16 +949,7 @@ class BaileysClient extends EventEmitter {
     const myNum = this.info?.wid?.user || '';
 
     // CRITICAL: Cache raw message proto so retry requests can decrypt and prevent "Waiting for this message"
-    if (sent?.key?.id && sent?.message) {
-      const rawId = sent.key.id;
-      this._rawMessageStore.set(rawId, sent.message);
-      if (jid) {
-        this._rawMessageStore.set(`${jid}_${rawId}`, sent.message);
-        const cleanPhone = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
-        if (cleanPhone) this._rawMessageStore.set(`${cleanPhone}_${rawId}`, sent.message);
-      }
-      this._saveRawStore();
-    }
+    if (sent?.key?.id && sent?.message) this._rememberRaw(sent.key.id, sent.message);
 
     console.log(`[Baileys] Message sent successfully! ID: ${id} to ${jid}`);
 
@@ -948,7 +990,7 @@ class BaileysClient extends EventEmitter {
         hasMedia: true,
         downloadMedia: async () => {
           try {
-            const buffer = await downloadMediaMessage(fakeMsg, 'buffer', {});
+            const buffer = await downloadMediaMessage(fakeMsg, 'buffer', {}, { logger: this._logger, reuploadRequest: m => this.sock.updateMediaMessage(m) });
             return { data: buffer.toString('base64'), mimetype: media.mimetype || (raw.stickerMessage ? 'image/webp' : 'application/octet-stream'), filename: media.fileName || '' };
           } catch (err) {
             console.error('[Baileys] Media download fallback failed:', err.message);
@@ -1091,6 +1133,17 @@ class BaileysClient extends EventEmitter {
       try { this.sock.ev.removeAllListeners(); } catch (_) {}
       try { this.sock.end(undefined); } catch (_) {}
       this.sock = null;
+    }
+    await this.flush();
+  }
+
+  // Wait for queued key/creds writes and the message store to reach the disk.
+  async flush() {
+    try { if (this._auth && this._auth.flush) await Promise.race([this._auth.flush(), new Promise(r => setTimeout(r, 3000))]); } catch (_) {}
+    if (this._saveRawTimer) {
+      clearTimeout(this._saveRawTimer);
+      this._saveRawTimer = null;
+      this._writeRawStoreNow();
     }
   }
 }

@@ -2,7 +2,7 @@
 // Bump together with `version` in bridge/service.js. After a deploy, the first
 // request that sees the bridge still running the OLD code restarts it once, so the
 // person updating cPanel never has to restart anything by hand.
-const EXPECTED_BRIDGE_VERSION = '17.0';
+const EXPECTED_BRIDGE_VERSION = '18.0';
 
 function ensureBridgeCurrent(?array $status = null): void {
     static $checked = false;
@@ -18,10 +18,35 @@ function ensureBridgeCurrent(?array $status = null): void {
     }
     $status = $status ?? whatsappBridgeRequest('/status');
     $unresponsive = empty($status['success']);
-    if (!$unresponsive && ($status['version'] ?? '') === EXPECTED_BRIDGE_VERSION) return;
+    $running = (string) ($status['version'] ?? '');
+    $health = __DIR__ . '/../data/whatsapp-bridge/health.json';
+    if (!$unresponsive) {
+        if (is_file($health)) @unlink($health);
+        if ($running === EXPECTED_BRIDGE_VERSION) return;
+    } else {
+        // One slow answer (a busy campaign) is not a dead bridge: restarting would drop
+        // every linked phone. Only restart if it has stayed unresponsive for 90 seconds.
+        $h = json_decode((string) @file_get_contents($health), true) ?: [];
+        if (empty($h['first_fail'])) { @file_put_contents($health, json_encode(['first_fail' => time()])); return; }
+        if (time() - (int) $h['first_fail'] < 90) return;
+        @unlink($health);
+    }
     $lock = __DIR__ . '/../data/whatsapp-bridge/upgrade.lock';
     if (is_file($lock) && time() - filemtime($lock) < 600) return;   // at most once per 10 minutes
-    @touch($lock);
+    $last = json_decode((string) @file_get_contents($lock), true) ?: [];
+    if (!$unresponsive) {
+        // Already restarted twice and it still reports the same version: the deployed
+        // bridge code itself is that version (bridge.bundle.js not rebuilt). Restarting
+        // again would only disconnect everyone every 10 minutes, so stop and log it.
+        $tries = (($last['from'] ?? null) === $running && ($last['expected'] ?? null) === EXPECTED_BRIDGE_VERSION) ? (int) ($last['tries'] ?? 0) : 0;
+        if ($tries >= 2) {
+            if (time() - filemtime($lock) > 3600) { @touch($lock); error_log('[Bridge] Deployed bridge reports ' . $running . ' but PHP expects ' . EXPECTED_BRIDGE_VERSION . '. Rebuild bridge/bridge.bundle.js (cd bridge && npm run build) and deploy again.'); }
+            return;
+        }
+        @file_put_contents($lock, json_encode(['from' => $running, 'expected' => EXPECTED_BRIDGE_VERSION, 'tries' => $tries + 1]));
+    } else {
+        @touch($lock);
+    }
     error_log($unresponsive
         ? '[Bridge] Local bridge accepted a connection but did not answer its health check; restarting it.'
         : '[Bridge] Running ' . ($status['version'] ?? '?') . ', expected ' . EXPECTED_BRIDGE_VERSION . ': restarting with the new code.');
@@ -62,9 +87,11 @@ function ensureBridgeRunning(bool $force = false): bool {
         $pids = @shell_exec('pgrep -f ' . escapeshellarg($baseDir . '/bridge/') . ' 2>/dev/null');
         if ($pids) {
             $pidList = array_filter(array_map('trim', explode("\n", trim($pids))), 'is_numeric');
-            foreach ($pidList as $p) {
-                @shell_exec("kill -9 $p 2>/dev/null");
-            }
+            // Ask nicely first: the bridge saves its WhatsApp keys on SIGTERM. A hard
+            // kill mid-write corrupts sessions ("Waiting for this message").
+            foreach ($pidList as $p) @shell_exec("kill -TERM $p 2>/dev/null");
+            for ($i = 0; $i < 20 && bridgePortOpen(); $i++) usleep(250000);
+            foreach ($pidList as $p) @shell_exec("kill -9 $p 2>/dev/null");
         }
         usleep(400000);
     } else {

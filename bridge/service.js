@@ -15,7 +15,8 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   let sendQueue = Promise.resolve();
   const receipts = new Map();
   const requests = new Map();
-  const inbox = createInbox({ getClient: () => client, storageFile });
+  let devicePoolRef = null;
+  const inbox = createInbox({ getClient: () => client, storageFile, getMediaClients: () => (devicePoolRef ? devicePoolRef.clients() : []) });
   const bridgeDataDir = storageFile ? require('node:path').dirname(storageFile) : require('node:path').join(require('node:os').tmpdir(), 'omnidesk-bridge');
 
   // Each Team Member's own WhatsApp, used to send their share of a campaign.
@@ -54,6 +55,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
     },
     onAck: (_device, _devClient, message, ack) => inbox.ack(message, ack)
   });
+  devicePoolRef = devicePool;
 
   const campaignManager = createCampaignManager({
     send,
@@ -86,7 +88,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   };
   const snapshot = () => ({ success: true, mode: 'whatsapp_web', state: phase,
     is_connected: phase === 'ready', is_configured: phase === 'ready',
-    connected_number: number, qr, message: error, version: '17.0', engine: 'baileys' });
+    connected_number: number, qr, message: error, version: '18.0', engine: 'baileys' });
 
   async function disconnect(wipe = false) {
     phase = 'disconnected'; qr = null; number = ''; error = '';

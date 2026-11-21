@@ -239,7 +239,9 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
     }
   }
 
-  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll };
+  const clients = () => [...devices.values()].filter(d => d.client && d.phase === 'ready').map(d => d.client);
+
+  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll, clients };
 }
 
 module.exports = { createDevicePool, normalizePhone, samePhone };

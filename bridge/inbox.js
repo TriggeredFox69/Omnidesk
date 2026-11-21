@@ -4,7 +4,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { downloadAttachment } = require('./media');
 const statusOf = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';
-function createInbox({ getClient, storageFile }) {
+function createInbox({ getClient, storageFile, getMediaClients }) {
   const messages = new Map();
   const aliases = new Map();
   const pendingAcks = new Map();
@@ -215,7 +215,10 @@ function createInbox({ getClient, storageFile }) {
         }
 
         if (modified) {
-          try { fs.writeFileSync(p, JSON.stringify(leads, null, 2), 'utf8'); } catch (_) {}
+          // Write-then-rename: PHP may read leads.json at any moment and must never see half a file.
+          const tmp = `${p}.bridge-${process.pid}.tmp`;
+          try { fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8'); fs.renameSync(tmp, p); }
+          catch (_) { try { fs.unlinkSync(tmp); } catch (__) {} }
         }
       }
     } catch (_) {}
@@ -259,9 +262,14 @@ function createInbox({ getClient, storageFile }) {
       } catch (_) { /* One unavailable chat must not stop inbox synchronization. */ }
     }
   }
+  // The company number, then every closer's linked WhatsApp: an attachment lives
+  // on whichever one received it.
+  function mediaClients() {
+    const list = [getClient(), ...(typeof getMediaClients === 'function' ? getMediaClients() : [])];
+    return list.filter((c, i) => c && typeof c.getMessageById === 'function' && list.indexOf(c) === i);
+  }
   async function media(id) {
-    const client = getClient();
-    if (!client || typeof client.getMessageById !== 'function') {
+    if (!mediaClients().length) {
       throw Object.assign(new Error('Reconnect WhatsApp to load this attachment.'), { status: 409 });
     }
     let timer;
@@ -269,9 +277,13 @@ function createInbox({ getClient, storageFile }) {
     finally { clearTimeout(timer); }
   }
   async function download(id) {
-    const message = await getClient().getMessageById(id);
-    if (!message?.hasMedia) throw new Error('Attachment is unavailable.');
-    const m = await downloadAttachment(getClient(), message);
+    let message = null, owner = null;
+    for (const c of mediaClients()) {
+      message = await c.getMessageById(id).catch(() => null);
+      if (message?.hasMedia) { owner = c; break; }
+    }
+    if (!owner) throw new Error('Attachment is unavailable.');
+    const m = await downloadAttachment(owner, message);
     if (!m?.data || m.data.length > 14*1024*1024) throw new Error('Attachment is unavailable or exceeds 10 MB.');
     return { success: true, data_url: `data:${m.mimetype || 'application/octet-stream'};base64,${m.data}`, filename: m.filename || '' };
   }

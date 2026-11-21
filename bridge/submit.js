@@ -4,6 +4,17 @@
 // and sometimes returns undefined despite submission. Observe both signals;
 // never send a second time just to obtain a message ID.
 async function submitOnce(client, recipient, text, timeoutMs = 30000, sendOptions = {}) {
+  if (client.isBaileys) {
+    // Baileys hands back the message it sent (with its id) as soon as WhatsApp's
+    // server accepts it. Re-reading chat history to confirm it only cost disk I/O.
+    let timer;
+    try {
+      return await Promise.race([
+        client.sendMessage(recipient, text, sendOptions),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Message submission is unconfirmed. It may already have been sent; check the chat before retrying.')), timeoutMs); })
+      ]);
+    } finally { clearTimeout(timer); }
+  }
   const mediaHash = typeof text === 'object' && text.data ? require('node:crypto').createHash('sha256').update(Buffer.from(text.data, 'base64')).digest('base64') : null;
   const matchesContent = message => mediaHash ? message.hasMedia && message._data?.filehash === mediaHash : message.body === text;
   const serialize = value => typeof value === 'string' ? value : value?._serialized;

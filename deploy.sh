@@ -64,14 +64,26 @@ if [ ! -x "$NODE_BIN" ]; then NODE_BIN="$(which node 2>/dev/null || echo node)";
 NODE_NPM="/opt/alt/alt-nodejs22/root/usr/bin/npm"
 if [ ! -x "$NODE_NPM" ]; then NODE_NPM="$(which npm 2>/dev/null || echo npm)"; fi
 
-if ! "$NODE_BIN" -e "if (require('./node_modules/@whiskeysockets/baileys/package.json').version !== '7.0.0-rc14') process.exit(1); import('@whiskeysockets/baileys').then(() => { require('qrcode'); require('pino'); }).catch(() => process.exit(1))" >/dev/null 2>&1; then
+if [ -f "bridge.bundle.js" ]; then
+    echo "Using bridge.bundle.js (all dependencies built in; no npm install needed)."
+elif ! "$NODE_BIN" -e "if (require('./node_modules/@whiskeysockets/baileys/package.json').version !== '7.0.0-rc14') process.exit(1); import('@whiskeysockets/baileys').then(() => { require('qrcode'); require('pino'); }).catch(() => process.exit(1))" >/dev/null 2>&1; then
     echo "Bridge dependencies missing or broken. Installing with --ignore-scripts..."
-    "$NODE_NPM" install --omit=dev --no-audit --no-fund --ignore-scripts
+    "$NODE_NPM" install --omit=dev --no-audit --no-fund --ignore-scripts || echo "npm install failed; the bridge cannot start without bridge.bundle.js."
 fi
 # Restart WhatsApp bridge daemon with fresh code
 echo "Restarting WhatsApp bridge service..."
-pkill -9 -f "bridge/server.js" 2>/dev/null || true
+# Stop the supervisor first (so it does not restart node), then let node save its
+# WhatsApp keys on SIGTERM before anything is forced.
+pkill -TERM -f "run-daemon.sh" 2>/dev/null || true
+pkill -TERM -f "bridge/server.js" 2>/dev/null || true
+pkill -TERM -f "bridge/bridge.bundle.js" 2>/dev/null || true
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    pgrep -f "bridge/(server|bridge\.bundle)\.js" >/dev/null 2>&1 || break
+    sleep 0.5
+done
 pkill -9 -f "run-daemon.sh" 2>/dev/null || true
+pkill -9 -f "bridge/server.js" 2>/dev/null || true
+pkill -9 -f "bridge/bridge.bundle.js" 2>/dev/null || true
 fuser -k 3210/tcp 2>/dev/null || true
 sleep 1
 if [ "${1:-}" = "--reset-closer-whatsapp" ]; then

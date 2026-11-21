@@ -16,7 +16,10 @@ if [ ! -x "$NODE" ]; then
     NODE="$(which node 2>/dev/null || echo node)"
 fi
 
-SCRIPT="$BASE_DIR/bridge/server.js"
+# bridge.bundle.js has Baileys and every dependency built in (no npm install on the
+# server). Fall back to server.js + node_modules only if the bundle is missing.
+SCRIPT="$BASE_DIR/bridge/bridge.bundle.js"
+if [ ! -f "$SCRIPT" ]; then SCRIPT="$BASE_DIR/bridge/server.js"; fi
 
 PIDFILE="$WHATSAPP_DATA_DIR/daemon.pid"
 LOGFILE="$WHATSAPP_DATA_DIR/bridge.log"
