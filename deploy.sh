@@ -30,6 +30,9 @@ for TARGET in "${TARGETS[@]}"; do
     /bin/cp -R bridge/dist "$TARGET/bridge/" 2>/dev/null || true
     /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json "$TARGET/bridge/" 2>/dev/null || true
     /bin/chmod +x "$TARGET/bridge/"*.sh 2>/dev/null || true
+    if [ -d "/home/dailygol/repositories/Omnidesk/bridge/node_modules" ] && [ ! -d "$TARGET/bridge/node_modules" ]; then
+        ln -sfn /home/dailygol/repositories/Omnidesk/bridge/node_modules "$TARGET/bridge/node_modules" 2>/dev/null || true
+    fi
 
     # Data files (preserve existing runtime json if present)
     /bin/cp -f data/.htaccess "$TARGET/data/" 2>/dev/null || true
