@@ -1393,6 +1393,16 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
 
 <script src="assets/js/wa-widget.js?v=1"></script>
 <script>
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 let currentEmployees = [];
 let currentCompanyLeads = [];
 let currentPendingTMs = [];
