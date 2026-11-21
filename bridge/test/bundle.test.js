@@ -15,6 +15,10 @@ test('bridge.bundle.js is rebuilt from the current bridge code', () => {
   const php = fs.readFileSync(path.join(dir, '../api/whatsapp_bridge.php'), 'utf8');
   assert.ok(php.includes(`EXPECTED_BRIDGE_VERSION = '${version}'`), 'api/whatsapp_bridge.php EXPECTED_BRIDGE_VERSION must equal the bridge version');
   // Every source module must be inside the bundle (spot-check new modules).
+  // Baileys retry-resend fix (scripts/patch-baileys.js): without it phones show "Waiting for this message".
+  assert.ok(bundle.includes('await assertSessions([participant.jid])') &&
+    bundle.includes('device_fanout:"false"}),await authState.keys.transaction'),
+    'bundle was built without scripts/patch-baileys.js (retry resend encrypted twice -> 479); run npm run build');
   for (const marker of ['createAtomicAuthState', 'lid-mapping.update', 'createDevicePool']) {
     assert.ok(bundle.includes(marker), `bundle is missing ${marker}; rebuild it`);
   }
