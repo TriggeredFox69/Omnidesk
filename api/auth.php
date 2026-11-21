@@ -259,7 +259,7 @@ function qrVerifiedPhoneMatches(string $phone): bool {
 
 function sanitizeUser($user) {
     if (!is_array($user)) return null;
-    unset($user['password_hash']);
+    unset($user['password_hash'], $user['password']);
     return $user;
 }
 
@@ -285,16 +285,10 @@ function getCurrentUser($usersFile) {
 }
 
 // Process request
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
-if (!$action) {
-    $rawInput = file_get_contents('php://input');
-    if ($rawInput) {
-        $json = json_decode($rawInput, true);
-        if (is_array($json)) {
-            $action = $json['action'] ?? '';
-        }
-    }
-}
+$rawInput = file_get_contents('php://input');
+$requestInput = json_decode($rawInput ?: '', true);
+if (!is_array($requestInput)) $requestInput = $_POST;
+$action = $_GET['action'] ?? $_POST['action'] ?? ($requestInput['action'] ?? '');
 
 $currentUser = getCurrentUser($usersFile);
 
@@ -1306,12 +1300,13 @@ switch ($action) {
     // 5b. Direct Login as Employee (ADMIN IMPERSONATION)
     case 'direct_login':
     case 'impersonate':
-        if (!$currentUser || !in_array($currentUser['role'], ['admin', 'superadmin'], true)) {
+        $actorRole = strtolower(str_replace('_', ' ', trim((string) ($currentUser['role'] ?? ''))));
+        if (!$currentUser || !in_array($actorRole, ['admin', 'superadmin', 'master admin', 'company admin'], true)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Admin authorization required.']);
             exit;
         }
-        $targetId = trim($input['username'] ?? ($input['id'] ?? ''));
+        $targetId = trim((string) ($requestInput['username'] ?? ($requestInput['id'] ?? '')));
         $users = getUsers($usersFile);
         $found = null;
         foreach ($users as $u) {
@@ -1325,9 +1320,51 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => 'Employee account not found.']);
             exit;
         }
+        if (in_array(strtolower((string) ($found['role'] ?? '')), ['admin', 'superadmin'], true) ||
+            ($actorRole !== 'superadmin' && ($found['company_id'] ?? 'COMP-001') !== ($currentUser['company_id'] ?? 'COMP-001'))) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'You can only open closer accounts in your company.']);
+            exit;
+        }
         $_SESSION['omnidesk_admin_original'] = $currentUser;
         $_SESSION['omnidesk_user'] = sanitizeUser($found);
         echo json_encode(['success' => true, 'message' => "Logged in directly as {$found['name']}", 'user' => sanitizeUser($found)]);
+        exit;
+
+    case 'reset_employee_password':
+        $actorRole = strtolower(str_replace('_', ' ', trim((string) ($currentUser['role'] ?? ''))));
+        if (!$currentUser || !in_array($actorRole, ['admin', 'superadmin', 'master admin', 'company admin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Admin authorization required.']);
+            exit;
+        }
+        $targetId = trim((string) ($requestInput['user_id'] ?? ($requestInput['username'] ?? '')));
+        $users = getUsers($usersFile);
+        $userIndex = null;
+        foreach ($users as $i => $u) {
+            if (strcasecmp((string) ($u['username'] ?? ''), $targetId) === 0 || (string) ($u['id'] ?? '') === $targetId) {
+                $userIndex = $i;
+                break;
+            }
+        }
+        if ($userIndex === null) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Closer account not found.']);
+            exit;
+        }
+        $targetRole = strtolower((string) ($users[$userIndex]['role'] ?? ''));
+        if (in_array($targetRole, ['admin', 'superadmin'], true) ||
+            ($actorRole !== 'superadmin' && ($users[$userIndex]['company_id'] ?? 'COMP-001') !== ($currentUser['company_id'] ?? 'COMP-001'))) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'You can only reset closer accounts in your company.']);
+            exit;
+        }
+        $temporaryPassword = 'Chatly-' . bin2hex(random_bytes(6)) . '!';
+        $users[$userIndex]['password_hash'] = password_hash($temporaryPassword, PASSWORD_BCRYPT);
+        unset($users[$userIndex]['password']);
+        saveUsers($usersFile, $users);
+        echo json_encode(['success' => true, 'temporary_password' => $temporaryPassword,
+            'username' => $users[$userIndex]['username'], 'message' => 'Password reset. Copy the new password now; it will not be shown again.']);
         exit;
 
     case 'return_to_admin':

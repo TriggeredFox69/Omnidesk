@@ -1753,7 +1753,7 @@ function renderEmployeeTable(employees) {
             </div>
             <div>
               <div class="user-name">${emp.name}</div>
-              <div class="user-meta">@${emp.username} &bull; Pass: <code style="color:#ec4899; font-weight:700; background:rgba(0,0,0,0.25); padding:1px 5px; border-radius:4px;">${emp.password || 'closer123'}</code> &bull; ${emp.email || ''}</div>
+              <div class="user-meta">@${emp.username} &bull; Password stored securely (not viewable) &bull; ${emp.email || ''}</div>
             </div>
           </div>
         </td>

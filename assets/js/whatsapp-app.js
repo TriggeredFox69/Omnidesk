@@ -6347,7 +6347,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const genderTag = isMale ? '👨 Male' : '👩 Female';
       const vmStatus = '<span style="color:#10b981; font-size:10px; font-weight:700;">🎙️ HD Voice Active</span>';
       
-      const passVal = emp.password || 'closer123';
       const cleanPhone = (emp.phone || '').trim();
       const formattedPhone = cleanPhone ? (cleanPhone.startsWith('+') ? cleanPhone : ('+' + cleanPhone)) : 'Not linked';
 
@@ -6383,8 +6382,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="emp-cred-chip" title="Closer Login Password">
               <span class="cred-label">PASS:</span>
-              <span class="cred-val" style="color:#ec4899;">${escapeHtml(passVal)}</span>
-              <button type="button" class="btn-cred-copy" onclick="window.OmnideskCopyCred('${escapeHtml(passVal)}', 'Password')" title="Copy Password">📋</button>
+              <span class="cred-val" style="color:#94a3b8;">not viewable</span>
             </div>
             <div class="emp-cred-chip" title="Linked WhatsApp Number" style="border-left:1px solid rgba(148,163,184,0.25); padding-left:8px;">
               <span class="cred-label">WA:</span>
@@ -6402,6 +6400,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <button type="button" class="btn-direct-login" onclick="window.OmnideskDirectLogin('${escapeHtml(emp.username)}')" title="Directly log into ${escapeHtml(emp.name)}'s closer desk">
                 <span>⚡ Direct Login</span>
               </button>
+              <button type="button" class="btn-emp-action" onclick="window.OmnideskResetEmployeePassword('${escapeHtml(emp.id)}', '${escapeHtml(emp.name)}')" title="Set a new one-time password">🔑 Reset password</button>
               <button type="button" class="btn-emp-action ${isSuspended ? 'reactivate' : 'suspend'}" onclick="window.OmnideskToggleStatus('${emp.id}')" title="${isSuspended ? 'Reactivate Access' : 'Suspend Access'}">
                 ${isSuspended ? '✅ Reactivate' : '🚫 Suspend'}
               </button>
@@ -6518,6 +6517,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       alert('Error during direct login: ' + err.message);
+    }
+  };
+
+  window.OmnideskResetEmployeePassword = async function(userId, name) {
+    if (!userId || !confirm(`Reset the Chatly password for ${name || 'this closer'}? Their current password will stop working.`)) return;
+    try {
+      const res = await fetch('api/auth.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_employee_password', user_id: userId })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.temporary_password) throw new Error(data.error || 'Password reset failed.');
+      window.prompt('Copy this new password now. It will only be shown once:', data.temporary_password);
+      showToast('Password reset. Give the new password to the closer securely.');
+    } catch (err) {
+      alert(err.message || 'Could not reset the closer password.');
     }
   };
 

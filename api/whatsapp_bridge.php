@@ -2,26 +2,29 @@
 // Bump together with `version` in bridge/service.js. After a deploy, the first
 // request that sees the bridge still running the OLD code restarts it once, so the
 // person updating cPanel never has to restart anything by hand.
-const EXPECTED_BRIDGE_VERSION = '16.0';
+const EXPECTED_BRIDGE_VERSION = '17.0';
 
 function ensureBridgeCurrent(?array $status = null): void {
     static $checked = false;
     if ($checked) return;
     $checked = true;
+    // A remote bridge cannot be restarted by this cPanel account.
+    $conn = @include __DIR__ . '/../data/whatsapp-bridge/connection.php';
+    $host = is_array($conn) ? (parse_url((string) ($conn['url'] ?? ''), PHP_URL_HOST) ?: '127.0.0.1') : '127.0.0.1';
+    if (!in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) return;
     if (!bridgePortOpen()) {
         ensureBridgeRunning(false);
         return;
     }
     $status = $status ?? whatsappBridgeRequest('/status');
-    if (empty($status['success']) || ($status['version'] ?? '') === EXPECTED_BRIDGE_VERSION) return;
-    // Connection points at a PC tunnel? Then this server cannot restart it.
-    $conn = @include __DIR__ . '/../data/whatsapp-bridge/connection.php';
-    $host = is_array($conn) ? (parse_url((string) ($conn['url'] ?? ''), PHP_URL_HOST) ?: '127.0.0.1') : '127.0.0.1';
-    if (!in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) return;
+    $unresponsive = empty($status['success']);
+    if (!$unresponsive && ($status['version'] ?? '') === EXPECTED_BRIDGE_VERSION) return;
     $lock = __DIR__ . '/../data/whatsapp-bridge/upgrade.lock';
     if (is_file($lock) && time() - filemtime($lock) < 600) return;   // at most once per 10 minutes
     @touch($lock);
-    error_log('[Bridge] Running ' . ($status['version'] ?? '?') . ', expected ' . EXPECTED_BRIDGE_VERSION . ': restarting with the new code.');
+    error_log($unresponsive
+        ? '[Bridge] Local bridge accepted a connection but did not answer its health check; restarting it.'
+        : '[Bridge] Running ' . ($status['version'] ?? '?') . ', expected ' . EXPECTED_BRIDGE_VERSION . ': restarting with the new code.');
     ensureBridgeRunning(true);
 }
 
@@ -436,14 +439,14 @@ function handleWhatsAppBridge(string $action, array $input): void {
         require_once __DIR__ . '/admin_guard.php';
         requireBridgeAdmin();
         ensureBridgeRunning(true);
-        $result = ['success' => true, 'message' => 'WhatsApp bridge supervisor restarted with latest v15.0 Baileys engine.'];
+        $result = ['success' => true, 'message' => 'WhatsApp bridge supervisor restarted with the latest Baileys engine.'];
     } elseif ($action === 'start_campaign') {
         if (!$admin) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Only company administrators can launch campaigns.']);
             exit;
         }
-        // Verify bridge process is active and running latest v15.0 engine
+        // Verify bridge process is active and running the current engine.
         $check = whatsappBridgeRequest('/status');
         ensureBridgeCurrent($check);
         if (empty($check['success']) && !bridgePortOpen()) {
@@ -647,6 +650,7 @@ function handleCampaignDevice(string $action, array $input): void {
         echo json_encode(['success' => false, 'message' => 'Please sign in first.']);
         exit;
     }
+    ensureBridgeCurrent();
     $role = strtolower($user['role'] ?? '');
     $isAdmin = in_array($role, ['admin', 'superadmin', 'master admin'], true);
     $targetId = (string) ($input['user_id'] ?? $_GET['user_id'] ?? '');
