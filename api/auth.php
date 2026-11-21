@@ -268,6 +268,13 @@ function getCurrentUser($usersFile) {
     $users = getUsers($usersFile);
     if (isset($_SESSION['omnidesk_user']) && is_array($_SESSION['omnidesk_user'])) {
         $sessUser = $_SESSION['omnidesk_user'];
+        // Automatic "System Administrator" sessions handed to anonymous visitors by the
+        // old WhatsApp endpoints are not a sign-in (matching their id would have turned
+        // any visitor into the real USR-ADMIN-01 account).
+        if (!empty($sessUser['auto']) || (($sessUser['id'] ?? '') === 'USR-ADMIN-01' && !isset($sessUser['created_at']) && empty($sessUser['last_login']))) {
+            unset($_SESSION['omnidesk_user']);
+            return null;
+        }
         $userId = $sessUser['id'] ?? '';
         $username = strtolower(trim($sessUser['username'] ?? ''));
         foreach ($users as $u) {
@@ -282,6 +289,17 @@ function getCurrentUser($usersFile) {
         }
     }
     return null;
+}
+
+/** A company admin may act only on their own company's people; the super admin on anyone. */
+function chatlyCanManage($admin, $target): bool {
+    if (!is_array($admin) || !is_array($target)) return false;
+    $role = strtolower((string) ($admin['role'] ?? ''));
+    if ($role === 'superadmin' || ($admin['company_id'] ?? '') === 'GLOBAL') return true;
+    if (!in_array($role, ['admin', 'master admin'], true)) return false;
+    $a = ($admin['company_id'] ?? '') ?: 'COMP-001';
+    $t = ($target['company_id'] ?? '') ?: 'COMP-001';
+    return $a === $t;
 }
 
 // Process request
@@ -396,7 +414,15 @@ switch ($action) {
         $name = trim($data['name'] ?? ($data['full_name'] ?? ''));
         $phone = trim($data['phone'] ?? '');
         $email = trim($data['email'] ?? ($username . '@closer.cloud'));
-        $companyId = trim($data['company_id'] ?? 'COMP-001');
+        $companyId = preg_replace('/[^A-Za-z0-9_-]/', '', trim($data['company_id'] ?? 'COMP-001')) ?: 'COMP-001';
+        $knownCompanies = json_decode((string) @file_get_contents(__DIR__ . '/../data/companies.json'), true);
+        $companyExists = false;
+        foreach ((is_array($knownCompanies) ? $knownCompanies : []) as $kc) if (($kc['id'] ?? '') === $companyId) $companyExists = true;
+        if (!$companyExists) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Please choose your company from the list.']);
+            exit;
+        }
         $city = trim($data['city'] ?? 'Pakistan');
         $gender = trim($data['gender'] ?? 'male');
         $pfp = trim($data['pfp'] ?? '');
@@ -486,21 +512,18 @@ switch ($action) {
 
     // 0c. List Pending TMs (Company Admin or Super Admin)
     case 'list_pending_tms':
-        $authAdmin = $_SESSION['omnidesk_user'] ?? $currentUser;
+        $authAdmin = $currentUser;
         if (!$authAdmin || !in_array(($authAdmin['role'] ?? ''), ['admin', 'superadmin'], true)) {
-            // Also allow if company_id parameter is supplied by admin portal view
-            $reqComp = trim($_GET['company_id'] ?? '');
-            if (empty($reqComp) && empty($_SESSION['omnidesk_user'])) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'error' => 'Access Denied.']);
-                exit;
-            }
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied.']);
+            exit;
         }
 
         $users = getUsers($usersFile);
         $pending = [];
         $isSuper = ($authAdmin && ($authAdmin['role'] ?? '') === 'superadmin');
-        $targetComp = !empty($_GET['company_id']) ? $_GET['company_id'] : ($authAdmin['company_id'] ?? null);
+        // A company admin sees only their own applicants; the super admin may pick a company.
+        $targetComp = $isSuper ? (!empty($_GET['company_id']) ? $_GET['company_id'] : null) : (($authAdmin['company_id'] ?? '') ?: 'COMP-001');
 
         foreach ($users as $u) {
             $uStatus = strtolower(trim($u['status'] ?? ''));
@@ -518,7 +541,7 @@ switch ($action) {
 
     // 0d. Approve Pending TM or TL (Set Status to Active, Limit & Credit Sponsoring TL)
     case 'approve_tm':
-        $authAdmin = $_SESSION['omnidesk_user'] ?? $currentUser;
+        $authAdmin = $currentUser;
         if (!$authAdmin || !in_array(($authAdmin['role'] ?? ''), ['admin', 'superadmin'], true)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Access Denied.']);
@@ -542,6 +565,11 @@ switch ($action) {
         $approvedUser = null;
         foreach ($users as &$u) {
             if ($u['id'] === $userId) {
+                if (!chatlyCanManage($authAdmin, $u)) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'This applicant belongs to another company.']);
+                    exit;
+                }
                 $u['status'] = 'active';
                 $isLead = (($u['role'] ?? '') === 'lead');
                 if ($isLead) {
@@ -619,6 +647,14 @@ switch ($action) {
         $found = false;
         foreach ($users as $u) {
             if ($u['id'] === $userId) {
+                // Only a pending applicant of the admin's own company can be rejected here
+                // (this used to delete ANY account, including other companies' admins).
+                $st = strtolower((string) ($u['status'] ?? ''));
+                if (!chatlyCanManage($currentUser, $u) || !in_array($st, ['pending', 'pending_approval'], true)) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'Only pending applicants of your company can be rejected.']);
+                    exit;
+                }
                 $found = true;
             } else {
                 $newUsers[] = $u;

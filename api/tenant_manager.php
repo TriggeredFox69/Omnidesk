@@ -10,11 +10,13 @@ function getTenantBaseDir(): string {
     return $dir;
 }
 
+require_once __DIR__ . '/session_user.php';
+
 function resolveActiveCompanyId(): string {
     if (session_status() === PHP_SESSION_NONE) {
         @session_start();
     }
-    $sessionUser = $_SESSION['omnidesk_user'] ?? null;
+    $sessionUser = chatlySessionUser();
     $comp = 'COMP-001';
 
     if (!empty($sessionUser['company_id']) && $sessionUser['company_id'] !== 'GLOBAL') {
@@ -38,7 +40,9 @@ function resolveActiveCompanyId(): string {
         if ($clean) {
             $isSuper = (!empty($sessionUser['role']) && $sessionUser['role'] === 'superadmin') ||
                        (!empty($sessionUser['company_id']) && $sessionUser['company_id'] === 'GLOBAL');
-            if ($isSuper || empty($sessionUser) || $clean === ($sessionUser['company_id'] ?? '')) {
+            // Only the super admin may look at another company. (Signed-out visitors
+            // used to be allowed to name any company and read its leads.)
+            if ($isSuper || $clean === ($sessionUser['company_id'] ?? '')) {
                 $comp = $clean;
             }
         }
@@ -59,14 +63,14 @@ function getTenantDir(string $companyId): string {
 function getTenantLeadsFile(string $companyId): string {
     $dir = getTenantDir($companyId);
     $file = $dir . '/leads.json';
-    if (!file_exists($file) || filesize($file) <= 10) {
+    // Only a MISSING file is created. An empty list is a real state (a company that
+    // cleared its chats for a new campaign) and must stay empty: this used to refill
+    // Metalink with demo leads every time its file was emptied.
+    if (!file_exists($file)) {
         // Migration safeguard: if COMP-001, load existing leads from root data/leads.json if it exists
         $legacy = __DIR__ . '/../data/leads.json';
         if ($companyId === 'COMP-001' && file_exists($legacy) && filesize($legacy) > 10) {
             @copy($legacy, $file);
-        } elseif ($companyId === 'COMP-004' || strtolower($companyId) === 'metalink') {
-            $metalinkLeads = getMetalinkDemoLeads();
-            file_put_contents($file, json_encode($metalinkLeads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         } else {
             file_put_contents($file, json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
@@ -422,6 +426,7 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
     header('Content-Type: application/json; charset=UTF-8');
     $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
     $action = $_GET['action'] ?? $input['action'] ?? '';
+    chatlyRequireUser();   // company data: sign-in required
     $companyId = resolveActiveCompanyId();
 
     if ($action === 'list_company_employees' || $action === 'get_employees' || $action === 'list_employees') {
@@ -444,19 +449,8 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
         if (!is_array($allUsers)) $allUsers = [];
 
-        // Ensure both askari and erij are active members if present
-        $dirtyUsers = false;
-        foreach ($allUsers as &$u) {
-            $uName = strtolower($u['username'] ?? '');
-            if (($uName === 'erij' || $uName === 'askari') && ($u['status'] ?? '') !== 'active') {
-                $u['status'] = 'active';
-                $dirtyUsers = true;
-            }
-        }
-        unset($u);
-        if ($dirtyUsers) {
-            @file_put_contents($usersFile, json_encode($allUsers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        }
+        // (Removed: a hack here re-activated "askari" and "erij" on every call, undoing
+        // the company admin's approve/suspend decisions. Approval is the admin's call.)
 
         // STRICT RULE: Only active TMs (member) and TLs (lead) with valid phone numbers
         // Admins and Superadmins are excluded from the campaign sender pool

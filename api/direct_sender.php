@@ -160,20 +160,8 @@ if ($action === 'set_sender_number') {
 
 // 3. Direct Message Dispatch Helper
 if ($action === 'send_direct') {
-    if (empty($_SESSION['omnidesk_user']) || !is_array($_SESSION['omnidesk_user'])) {
-        $_SESSION['omnidesk_user'] = [
-            'id'          => 'USR-ADMIN-01',
-            'name'        => 'System Administrator',
-            'username'    => 'admin',
-            'email'       => 'admin@nunno.cloud',
-            'role'        => 'admin',
-            'designation' => 'Admin',
-            'phone'       => '',
-            'status'      => 'active',
-            'auto'        => true
-        ];
-    }
-    $user = $_SESSION['omnidesk_user'];
+    require_once __DIR__ . '/session_user.php';
+    $user = chatlyRequireUser();
 
     if (isset($user['status']) && $user['status'] === 'suspended') {
         http_response_code(403);

@@ -17,7 +17,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$sessionUser = $_SESSION['omnidesk_user'] ?? null;
+// Leads are private company data: a real sign-in is required for every action.
+require_once __DIR__ . '/session_user.php';
+$sessionUser = chatlyRequireUser();
 if ($sessionUser && isset($sessionUser['status']) && $sessionUser['status'] === 'suspended') {
     $blockedActions = ['save_lead', 'claim_lead', 'update_lead_state', 'mark_paid', 'delete_leads', 'delete_lead', 'clear_demo_data'];
     $reqAction = $_GET['action'] ?? (json_decode(file_get_contents('php://input'), true)['action'] ?? '');
@@ -111,12 +113,26 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
         if ($p) $leadMap[$p] = $idx;
     }
 
+    // users.json id => company, to tell which company each closer's WhatsApp belongs to.
+    $userCompany = [];
+    $userRows = json_decode((string) @file_get_contents($dataRoot . '/users.json'), true);
+    foreach ((is_array($userRows) ? $userRows : []) as $u) {
+        if (!empty($u['id'])) $userCompany[(string) $u['id']] = chatlyUserCompany($u);
+    }
+
     $modified = false;
     foreach ($inboxMessages as $m) {
         $mPhone = $cleanDigits($m['phone'] ?? '');
         if (!$mPhone || strlen($mPhone) < 8) continue;
 
+        // The WhatsApp feed is shared by every company. A message belongs here only if
+        // it came through one of THIS company's closers, or is on one of its leads.
+        $via = (string) ($m['viaUserId'] ?? '');
+        if ($via !== '' && ($userCompany[$via] ?? 'COMP-001') !== $activeCompanyId) continue;
+
         $targetIdx = $leadMap[$mPhone] ?? null;
+        if ($targetIdx === null && $via === '') continue;   // main number: existing leads only
+        if ($targetIdx === null && ($m['sender'] ?? '') !== 'agent') continue;   // unknown inbound: personal chat
         if ($targetIdx === null) {
             $defaultDisplay = '+' . $mPhone;
             $newLead = [
@@ -127,9 +143,9 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
                 'display' => $defaultDisplay,
                 'city' => '',
                 'network' => 'WhatsApp',
-                'ownerId' => $m['viaUserId'] ?? 'EMP-TM-MWMK43N9',
-                'ownerName' => $m['agentName'] ?? 'Askari Raza',
-                'ownerUsername' => !empty($m['viaUserId']) ? strtolower(explode(' ', $m['agentName'] ?? 'askari')[0]) : 'askari',
+                'ownerId' => $via,
+                'ownerName' => $m['agentName'] ?? '',
+                'ownerUsername' => '',
                 'leadState' => 'ongoing',
                 'status' => ($m['sender'] === 'lead') ? 'unread' : 'replied',
                 'unreadCount' => ($m['sender'] === 'lead') ? 1 : 0,
@@ -243,6 +259,16 @@ $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 $action = $input['action'] ?? $_GET['action'] ?? 'get_leads';
 
 // Clear all demo data, wipe inboxes, and reset to 03318036576
+if (($action === 'clear_demo_data' || $action === 'wipe_demo') && !chatlyIsCompanyAdmin($sessionUser) && !chatlyIsSuperAdmin($sessionUser)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Only company administrators can clear data.']);
+    exit;
+}
+if (($action === 'seed_demo_campaign' || $action === 'seed_demo') && !chatlyIsSuperAdmin($sessionUser)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Demo data can only be seeded by the super admin.']);
+    exit;
+}
 if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
     $selfOnly = [
         [

@@ -2,7 +2,7 @@
 // Bump together with `version` in bridge/service.js. After a deploy, the first
 // request that sees the bridge still running the OLD code restarts it once, so the
 // person updating cPanel never has to restart anything by hand.
-const EXPECTED_BRIDGE_VERSION = '18.5';
+const EXPECTED_BRIDGE_VERSION = '18.6';
 
 function ensureBridgeCurrent(?array $status = null): void {
     static $checked = false;
@@ -51,6 +51,85 @@ function ensureBridgeCurrent(?array $status = null): void {
         ? '[Bridge] Local bridge accepted a connection but did not answer its health check; restarting it.'
         : '[Bridge] Running ' . ($status['version'] ?? '?') . ', expected ' . EXPECTED_BRIDGE_VERSION . ': restarting with the new code.');
     ensureBridgeRunning(true);
+}
+
+require_once __DIR__ . '/session_user.php';
+
+/** users.json as id => user. */
+function chatlyUsersById(): array {
+    static $map = null;
+    if ($map !== null) return $map;
+    $map = [];
+    $users = json_decode((string) @file_get_contents(__DIR__ . '/../data/users.json'), true);
+    foreach ((is_array($users) ? $users : []) as $u) if (!empty($u['id'])) $map[(string) $u['id']] = $u;
+    return $map;
+}
+
+/** A company's leads file (Nunno falls back to the legacy data/leads.json). */
+function chatlyCompanyLeads(string $companyId): array {
+    $id = preg_replace('/[^A-Za-z0-9_-]/', '', $companyId) ?: 'COMP-001';
+    $file = __DIR__ . '/../data/tenants/' . $id . '/leads.json';
+    if (!is_file($file) && $id === 'COMP-001') $file = __DIR__ . '/../data/leads.json';
+    $leads = json_decode((string) @file_get_contents($file), true);
+    return is_array($leads) ? $leads : [];
+}
+
+function chatlyLast9(string $p): string {
+    $d = preg_replace('/\D+/', '', $p);
+    return strlen($d) >= 9 ? substr($d, -9) : $d;
+}
+
+/**
+ * Live WhatsApp events a user may see. The bridge serves one feed for the whole
+ * platform; each page only gets its own company's conversations, and a closer only
+ * their own: messages from their linked WhatsApp, or on leads they own.
+ */
+function chatlyFilterEvents(array $messages, array $user): array {
+    if (chatlyIsSuperAdmin($user)) return $messages;
+    $company = chatlyUserCompany($user);
+    $isAdmin = chatlyIsCompanyAdmin($user);
+    $myId = (string) ($user['id'] ?? '');
+    $myUsername = strtolower((string) ($user['username'] ?? ''));
+    $users = chatlyUsersById();
+    $phones = [];
+    foreach (chatlyCompanyLeads($company) as $l) {
+        if (!$isAdmin) {
+            $owner = (string) ($l['ownerId'] ?? ($l['assignedOwnerId'] ?? ''));
+            $ownerUser = strtolower((string) ($l['ownerUsername'] ?? ''));
+            if ($owner !== $myId && !($myUsername && $ownerUser === $myUsername)) continue;
+        }
+        $k = chatlyLast9((string) ($l['phone'] ?? ''));
+        if ($k !== '') $phones[$k] = true;
+    }
+    $out = [];
+    foreach ($messages as $m) {
+        $via = (string) ($m['viaUserId'] ?? '');
+        if ($via !== '') {
+            $viaCompany = chatlyUserCompany($users[$via] ?? ['company_id' => '']);
+            if ($viaCompany !== $company) continue;
+            if (!$isAdmin && $via !== $myId && !isset($phones[chatlyLast9((string) ($m['phone'] ?? ''))])) continue;
+            $out[] = $m;
+            continue;
+        }
+        if (isset($phones[chatlyLast9((string) ($m['phone'] ?? ''))])) $out[] = $m;
+    }
+    return $out;
+}
+
+/** Active TMs/TLs of a company (the only people a campaign may send from). */
+function chatlyCompanySenderIds(string $companyId): array {
+    $ids = [];
+    foreach (chatlyUsersById() as $id => $u) {
+        $role = strtolower((string) ($u['role'] ?? 'member'));
+        if (chatlyUserCompany($u) === $companyId && strtolower((string) ($u['status'] ?? 'active')) === 'active' && in_array($role, ['member', 'lead'], true)) $ids[$id] = true;
+    }
+    return $ids;
+}
+
+function chatlyCompanyName(string $companyId): string {
+    $companies = json_decode((string) @file_get_contents(__DIR__ . '/../data/companies.json'), true);
+    foreach ((is_array($companies) ? $companies : []) as $c) if (($c['id'] ?? '') === $companyId) return (string) ($c['name'] ?? $companyId);
+    return $companyId;
 }
 
 function bridgePortOpen(): bool {
@@ -396,22 +475,37 @@ function handleWhatsAppBridge(string $action, array $input): void {
     if (in_array($action, ['login_qr_start', 'login_qr_status', 'login_qr_reset'], true)) {
         handleLoginQr($action);
     }
-    // Auto-authenticate default administrator if no session exists (matching the local app)
-    if (empty($_SESSION['omnidesk_user'])) {
-        $_SESSION['omnidesk_user'] = [
-            'id'          => 'USR-ADMIN-01',
-            'name'        => 'System Administrator',
-            'username'    => 'admin',
-            'email'       => 'admin@nunno.cloud',
-            'role'        => 'admin',
-            'designation' => 'Admin',
-            'phone'       => '',
-            'status'      => 'active',
-            'auto'        => true
-        ];
+    // Everything below needs a real sign-in. (Visitors used to get an automatic
+    // "System Administrator" here, which let anyone read every company's chats.)
+    $user = chatlySessionUser();
+    if (!$user) {
+        session_write_close();
+        if ($action === 'get_sender_info') {
+            $s = whatsappBridgeRequest('/status');
+            echo json_encode(['success' => true, 'mode' => 'whatsapp_web', 'state' => $s['state'] ?? 'offline',
+                'is_connected' => !empty($s['is_connected']), 'is_configured' => !empty($s['is_connected']),
+                'connected_number' => '', 'qr' => null, 'message' => 'Sign in to manage WhatsApp.']);
+            exit;
+        }
+        http_response_code(401);
+        echo json_encode(['success' => false, 'authenticated' => false, 'message' => 'Please sign in.']);
+        exit;
     }
-    $user = $_SESSION['omnidesk_user'];
-    $admin = in_array(strtolower($user['role'] ?? ''), ['admin', 'master admin'], true);
+    $admin = chatlyIsCompanyAdmin($user) || chatlyIsSuperAdmin($user);
+    $myCompany = chatlyUserCompany($user);
+    // Campaigns always run for the signed-in admin's own company (super admin may pick one).
+    $campaignCompany = (chatlyIsSuperAdmin($user) && !empty($input['company_id']))
+        ? (preg_replace('/[^A-Za-z0-9_-]/', '', (string) $input['company_id']) ?: $myCompany)
+        : $myCompany;
+    if (in_array($action, ['start_campaign', 'pause_campaign', 'resume_campaign', 'stop_campaign', 'clear_campaign', 'get_campaign_status'], true)) {
+        $input['company_id'] = $campaignCompany;
+        $input['company_name'] = chatlyCompanyName($campaignCompany);
+        if ($action !== 'get_campaign_status' && !$admin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Only company administrators can manage campaigns.']);
+            exit;
+        }
+    }
     // Allow landing page visitors and all closer TMs to connect and pair their WhatsApp
     session_write_close();
     if ($action === 'get_sender_info' || $action === 'connect_whatsapp' || $action === 'reconnect_whatsapp' || $action === 'reset_whatsapp') {
@@ -440,6 +534,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
             $result = ['success' => true, 'epoch' => 'online', 'cursor' => (int) ($input['after'] ?? 0), 'messages' => []];
         }
+        $result['messages'] = chatlyFilterEvents(is_array($result['messages'] ?? null) ? $result['messages'] : [], $user);
     } elseif ($action === 'get_media') {
         $result = whatsappBridgeRequest('/media?id=' . rawurlencode((string) ($input['message_id'] ?? '')));
     } elseif ($action === 'get_presence') {
@@ -487,6 +582,14 @@ function handleWhatsAppBridge(string $action, array $input): void {
 
         // Campaigns send from each Team Member's own linked WhatsApp, not the main number;
         // the bridge refuses to start when none of the selected TMs is connected.
+        // Only this company's active TMs/TLs may be senders.
+        $allowedSenders = chatlyCompanySenderIds($campaignCompany);
+        foreach (['senders', 'closers'] as $k) {
+            if (is_array($input[$k] ?? null)) {
+                $input[$k] = array_values(array_filter($input[$k], fn($s) => is_array($s) && isset($allowedSenders[(string) ($s['id'] ?? '')])));
+            }
+        }
+        unset($input['closer']);
         $result = whatsappBridgeRequest('/campaign/start', $input);
         if (!empty($result['success'])) {
             // Mirror the bridge's equal split into the CRM: each number belongs to the TM who messages it.
@@ -525,10 +628,9 @@ function handleWhatsAppBridge(string $action, array $input): void {
         if (empty($result['success'])) {
             $result = ['success' => true, 'message' => 'Campaign cleared.'];
         }
-        $stateFiles = [
-            __DIR__ . '/../data/whatsapp-bridge/campaign_state.json',
-            __DIR__ . '/../data/campaign_state.json'
-        ];
+        $stateFiles = $campaignCompany === 'COMP-001'
+            ? [__DIR__ . '/../data/whatsapp-bridge/campaign_state.json', __DIR__ . '/../data/campaign_state.json']
+            : [__DIR__ . '/../data/whatsapp-bridge/campaign_state_' . $campaignCompany . '.json'];
         foreach ($stateFiles as $sf) {
             if (file_exists($sf)) {
                 $cur = json_decode(@file_get_contents($sf), true) ?: [];
@@ -543,7 +645,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
             }
         }
     } elseif ($action === 'get_campaign_status') {
-        $result = whatsappBridgeRequest('/campaign/status');
+        $result = whatsappBridgeRequest('/campaign/status?company_id=' . rawurlencode($campaignCompany));
     } else {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
@@ -670,7 +772,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
  * A TM can only manage their own device; admins can see and reset all of them.
  */
 function handleCampaignDevice(string $action, array $input): void {
-    $user = $_SESSION['omnidesk_user'] ?? null;
+    $user = chatlySessionUser();
     session_write_close();
     if (!is_array($user) || empty($user['id'])) {
         http_response_code(401);
@@ -682,10 +784,25 @@ function handleCampaignDevice(string $action, array $input): void {
     $isAdmin = in_array($role, ['admin', 'superadmin', 'master admin'], true);
     $targetId = (string) ($input['user_id'] ?? $_GET['user_id'] ?? '');
     if ($targetId === '' || !$isAdmin) $targetId = (string) $user['id'];
+    // A company admin manages only their own company's closers.
+    if ($targetId !== (string) $user['id'] && !chatlyIsSuperAdmin($user)) {
+        $target = chatlyUsersById()[$targetId] ?? null;
+        if (!$target || chatlyUserCompany($target) !== chatlyUserCompany($user)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'That team member belongs to another company.']);
+            exit;
+        }
+    }
 
     if ($action === 'list_campaign_devices') {
         if (!$isAdmin) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Administrator access required.']); exit; }
         $result = whatsappBridgeRequest('/devices');
+        if (!chatlyIsSuperAdmin($user) && is_array($result['devices'] ?? null)) {
+            $users = chatlyUsersById();
+            $mine = chatlyUserCompany($user);
+            $result['devices'] = array_values(array_filter($result['devices'], fn($d) =>
+                isset($users[(string) ($d['user_id'] ?? '')]) && chatlyUserCompany($users[(string) $d['user_id']]) === $mine));
+        }
     } elseif ($action === 'campaign_device_status') {
         $result = whatsappBridgeRequest('/device/status?id=' . rawurlencode($targetId));
     } elseif ($action === 'campaign_device_connect') {

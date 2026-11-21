@@ -57,7 +57,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   });
   devicePoolRef = devicePool;
 
-  const campaignManager = createCampaignManager({
+  const campaignOptions = {
     send,
     deviceSend: (id, body) => devicePool.send(id, body),
     deviceReady: id => devicePool.isReady(id),
@@ -80,7 +80,27 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       return tenantPath;
     },
     getUsersPath: () => require('node:path').resolve(__dirname, '../data/users.json')
-  });
+  };
+  // Every company runs its own campaign: Metalink starting one never stops Nunno's.
+  // Nunno (COMP-001) keeps the original campaign_state.json.
+  const campaignManagers = new Map();
+  const cleanCompany = id => String(id || '').replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
+  function campaignFor(companyId) {
+    const id = cleanCompany(companyId);
+    if (!campaignManagers.has(id)) {
+      const stateFile = require('node:path').join(bridgeDataDir, id === 'COMP-001' ? 'campaign_state.json' : `campaign_state_${id}.json`);
+      campaignManagers.set(id, createCampaignManager({ ...campaignOptions, stateFile }));
+    }
+    return campaignManagers.get(id);
+  }
+  const campaignManager = campaignFor('COMP-001');
+  // Bring back other companies' campaigns after a restart (they come back paused).
+  try {
+    for (const f of require('node:fs').readdirSync(bridgeDataDir)) {
+      const m = /^campaign_state_([A-Za-z0-9_-]+)\.json$/.exec(f);
+      if (m) campaignFor(m[1]);
+    }
+  } catch (_) {}
   const ackStatus = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';
   const remember = (map, key, value) => {
     map.set(key, value);
@@ -88,7 +108,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   };
   const snapshot = () => ({ success: true, mode: 'whatsapp_web', state: phase,
     is_connected: phase === 'ready', is_configured: phase === 'ready',
-    connected_number: number, qr, message: error, version: '18.5', engine: 'baileys' });
+    connected_number: number, qr, message: error, version: '18.6', engine: 'baileys' });
 
   async function disconnect(wipe = false) {
     phase = 'disconnected'; qr = null; number = ''; error = '';
@@ -281,7 +301,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       if (req.method === 'GET' && url.pathname === '/devices') { reply(200, { success: true, devices: devicePool.list() }); return; }
       if (req.method === 'GET' && url.pathname === '/device/status') { reply(200, devicePool.get(url.searchParams.get('id') || '')); return; }
       if (url.pathname === '/campaign/status') {
-        reply(200, campaignManager.getStatus());
+        reply(200, campaignFor(url.searchParams.get('company_id')).getStatus());
         return;
       }
       if (req.method !== 'POST') { reply(404, { success: false, message: 'Unknown route.' }); return; }
@@ -325,25 +345,15 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         reply(200, body.relink ? devicePool.connect(body.id, body.name, true) : { success: true, state: 'disconnected', is_connected: false });
         return;
       }
-      if (url.pathname === '/campaign/start') {
-        reply(200, campaignManager.start(body));
-        return;
-      }
-      if (url.pathname === '/campaign/pause') {
-        reply(200, campaignManager.pause());
-        return;
-      }
-      if (url.pathname === '/campaign/resume') {
-        reply(200, campaignManager.resume());
-        return;
-      }
-      if (url.pathname === '/campaign/stop') {
-        reply(200, campaignManager.stop());
-        return;
-      }
-      if (url.pathname === '/campaign/clear') {
-        reply(200, campaignManager.clear ? campaignManager.clear() : campaignManager.stop());
-        return;
+      if (url.pathname.startsWith('/campaign/')) {
+        const company = body.company_id || body.companyId || url.searchParams.get('company_id');
+        const mgr = campaignFor(company);
+        const op = url.pathname.slice('/campaign/'.length);
+        if (op === 'start') { reply(200, mgr.start({ ...body, company_id: cleanCompany(company) })); return; }
+        if (op === 'pause') { reply(200, mgr.pause()); return; }
+        if (op === 'resume') { reply(200, mgr.resume()); return; }
+        if (op === 'stop') { reply(200, mgr.stop()); return; }
+        if (op === 'clear') { reply(200, mgr.clear ? mgr.clear() : mgr.stop()); return; }
       }
       if (url.pathname === '/send') { reply(200, await send(body)); return; }
       reply(404, { success: false, message: 'Unknown route.' });

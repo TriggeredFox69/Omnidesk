@@ -6,8 +6,10 @@ const { randomUUID } = require('node:crypto');
 function resolveSpintax(text) {
   if (!text) return '';
   return text.replace(/\{([^{}]+)\}/g, (match, contents) => {
-    const lower = contents.trim().toLowerCase();
-    if (['name', 'phone', 'city', 'plan', 'price', 'coupon', 'link', 'company'].includes(lower)) {
+    // {name|Bhai|Trader} is a placeholder with fallbacks, not a random choice: leave
+    // it for personalizeMessage (picking randomly sent people the literal word "name").
+    const head = contents.split('|')[0].trim().toLowerCase();
+    if (['name', 'phone', 'city', 'plan', 'price', 'coupon', 'link', 'company'].includes(head)) {
       return match;
     }
     if (contents.includes('|')) {
@@ -47,12 +49,13 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs }) {
+function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption }) {
   const digits = v => String(v || '').replace(/\D/g, '');
   const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
   const isMainOnline = () => { const m = typeof mainStatus === 'function' ? mainStatus() : null; return !!(m && m.ready); };
   const viaMain = s => isMainOnline();
-  const stateFile = path.join(dataDir, 'campaign_state.json');
+  // One manager per company, each with its own state file (see service.js).
+  const stateFile = stateFileOption || path.join(dataDir, 'campaign_state.json');
 
   let state = {
     id: null,
@@ -161,16 +164,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       console.warn('[Campaign] resolveCompanyClosers warning:', err.message);
     }
 
-    // Default fallback closer: Askari Raza
-    return [{
-      index: 1,
-      id: 'EMP-TM-MWMK43N9',
-      name: 'Askari Raza',
-      username: 'askari',
-      role: 'TM Closer',
-      roleType: 'member',
-      phone: '923318036576'
-    }];
+    // No invented closer: a company with no active TM/TL has nobody to send from.
+    return [];
   }
 
   function resolveCompanySenders(companyId) {
@@ -316,9 +311,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
         if (!cleanPhone || cleanPhone.length < 8) continue;
 
         let existing = leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone);
-        const ownerId = contact.assignedOwnerId || 'EMP-TM-1795103817';
-        const ownerName = contact.assignedOwnerName || 'askariraza';
-        const ownerUsername = contact.assignedOwnerUsername || ownerName;
+        const ownerId = contact.assignedOwnerId || null;
+        const ownerName = contact.assignedOwnerName || '';
+        const ownerUsername = contact.assignedOwnerUsername || '';
         const personalizedMsg = personalizeMessage(messageTemplate, contact, state.companyName);
 
         if (existing) {

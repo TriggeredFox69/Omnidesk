@@ -780,16 +780,12 @@ class BaileysClient extends EventEmitter {
         }
       } catch (_) {}
     }
-    // A Chatly message id that embeds this LID tells us which lead it is (local file only).
+    // A Chatly message id that embeds this LID tells us which lead it is (local files only).
     try {
-      const candidatePaths = [
-        path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
-        path.resolve(__dirname, '../data/leads.json')
-      ];
-      for (const leadsPath of candidatePaths) {
-        if (!fs.existsSync(leadsPath)) continue;
-        const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
-        for (const lead of Array.isArray(leads) ? leads : []) {
+      const tenants = require('./tenants');
+      for (const companyId of tenants.companyIds()) {
+        const leads = tenants.readLeads(companyId);
+        for (const lead of leads) {
           const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
           if (!phone || !Array.isArray(lead.messages)) continue;
           if (lead.messages.some(m => String(m.waMessageId || m.id || '').includes(lidClean + '@lid'))) {
@@ -797,7 +793,6 @@ class BaileysClient extends EventEmitter {
             return phone;
           }
         }
-        break;
       }
     } catch (_) {}
     return null;

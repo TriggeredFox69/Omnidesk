@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { downloadAttachment } = require('./media');
+const tenants = require('./tenants');
 const statusOf = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';
 function createInbox({ getClient, storageFile, getMediaClients }) {
   const messages = new Map();
@@ -69,22 +70,14 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     }
     return null;
   }
-  function isChatlyLead(phone) {
-    const wanted = String(phone || '').replace(/\D/g, '').slice(-9);
-    if (wanted.length < 9) return false;
-    const candidates = [
-      path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
-      path.resolve(__dirname, '../data/leads.json')
-    ];
-    for (const file of candidates) {
-      try {
-        if (!fs.existsSync(file)) continue;
-        const leads = JSON.parse(fs.readFileSync(file, 'utf8'));
-        if (Array.isArray(leads) && leads.some(lead => String(lead.phone || '').replace(/\D/g, '').slice(-9) === wanted)) return true;
-      } catch (_) {}
-    }
-    return false;
+  // Which company a message belongs to: the closer's company for their own WhatsApp,
+  // the main sender's company otherwise (see tenants.js).
+  const companyOfMessageId = new Map();   // waMessageId -> company (for later ticks)
+  function rememberCompany(id, companyId) {
+    companyOfMessageId.set(id, companyId);
+    if (companyOfMessageId.size > 5000) companyOfMessageId.delete(companyOfMessageId.keys().next().value);
   }
+
   async function ingest(message, knownPhone, opts = {}) {
     const id = message.id?._serialized;
     if (!id) return;
@@ -96,7 +89,10 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     if (!phone || !/^\d{10,18}$/.test(phone)) { debug('dropped: no phone number for this chat'); return; }
     // Keep the inbox limited to Chatly lead conversations. Inbound personal
     // chats from a linked phone are ignored unless Chatly already knows the lead.
-    if (!fromMe && !isChatlyLead(phone)) { debug('dropped: not a Chatly lead (personal chat)'); return; }
+    // A reply is kept only if it is a lead of the company that owns this WhatsApp;
+    // anything else on a closer's phone is a personal chat and stays private.
+    const companyId = tenants.companyOfDevice(opts.viaUserId);
+    if (!fromMe && !tenants.isLeadOf(companyId, phone)) { debug(`dropped: not a ${companyId} lead (personal chat)`); return; }
     debug(fromMe ? 'kept: sent by us' : 'kept: reply from a lead');
     const previous = messages.get(id);
     const pendingAck = pendingAcks.get(id);
@@ -122,32 +118,28 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     messages.set(id, { ...value, revision: ++revision });
     if (messages.size > 2000) messages.delete(messages.keys().next().value);
     save();
-    syncToLeadsFile(value, false);
+    rememberCompany(id, companyId);
+    syncToLeadsFile({ ...value, companyId }, false);
   }
 
+
+  // Save a message (or a tick) on the lead of the right company.
   function syncToLeadsFile(item, ackStatusOnly = false) {
     if (!item) return;
     try {
-      const candidates = [
-        path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
-        path.resolve(__dirname, '../data/leads.json')
-      ];
       const waId = item.waMessageId || item.id;
-      const cleanPhone = String(item.phone || '').replace(/\D/g, '');
+      const cleanPhone = tenants.digits(item.phone);
       if (!cleanPhone && !waId) return;
-
-      for (const p of candidates) {
-        if (!fs.existsSync(p)) continue;
-        let leads = [];
-        try { leads = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_) {}
-        if (!Array.isArray(leads)) continue;
-
-        let modified = false;
-        let targetLead = cleanPhone ? leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone) : null;
+      // Ticks: the company remembered for this message, else whichever company has it.
+      const companies = item.companyId ? [item.companyId]
+        : (companyOfMessageId.has(waId) ? [companyOfMessageId.get(waId)] : tenants.companyIds());
+      for (const companyId of companies) {
+        const leads = tenants.readLeads(companyId);
+        let targetLead = cleanPhone ? leads.find(l => tenants.samePhone(l.phone, cleanPhone)) : null;
         if (!targetLead && waId) {
           targetLead = leads.find(l => Array.isArray(l.messages) && l.messages.some(m => m.waMessageId === waId || m.id === waId));
         }
-
+        let modified = false;
         if (targetLead) {
           if (!Array.isArray(targetLead.messages)) targetLead.messages = [];
           const existing = targetLead.messages.find(m => (m.waMessageId === waId || m.id === waId));
@@ -157,19 +149,7 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
               modified = true;
             }
           } else if (!ackStatusOnly) {
-            targetLead.messages.push({
-              id: item.id || ('msg_inbox_' + Date.now()),
-              waMessageId: waId,
-              deliveryStatus: item.deliveryStatus || 'delivered',
-              sender: item.sender || 'agent',
-              agentName: item.agentName || (item.sender === 'agent' ? 'Askari Raza' : targetLead.name),
-              text: item.text || '',
-              time: new Date((item.timestamp || Math.floor(Date.now() / 1000)) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              timestamp: item.timestamp || Math.floor(Date.now() / 1000),
-              type: item.type || 'text',
-              hasMedia: Boolean(item.hasMedia),
-              durationSeconds: item.durationSeconds || 0
-            });
+            targetLead.messages.push(leadMessage(item, targetLead));
             targetLead.lastMessageAt = item.timestamp || Math.floor(Date.now() / 1000);
             if (item.sender === 'lead') {
               targetLead.status = 'unread';
@@ -179,52 +159,55 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
             }
             modified = true;
           }
-        } else if (!ackStatusOnly && cleanPhone && cleanPhone.length >= 10) {
-          const defaultDisplay = '+' + cleanPhone;
+        } else if (!ackStatusOnly && item.viaUserId && item.sender === 'agent' && cleanPhone.length >= 10) {
+          // A closer started a chat from their own phone: it becomes THEIR lead in
+          // THEIR company (cold outreach). Nothing is created for the main number.
+          const owner = tenants.usersById().get(String(item.viaUserId)) || {};
           leads.push({
             id: 'lead_wa_' + cleanPhone,
-            company_id: 'COMP-001',
-            name: item.name || defaultDisplay,
+            company_id: companyId,
+            name: item.name && item.name !== cleanPhone ? item.name : '+' + cleanPhone,
             phone: cleanPhone,
-            display: defaultDisplay,
+            display: '+' + cleanPhone,
             city: '',
             network: 'WhatsApp',
-            ownerId: item.viaUserId || 'EMP-TM-MWMK43N9',
-            ownerName: item.agentName || 'Askari Raza',
-            ownerUsername: 'askari',
+            ownerId: item.viaUserId,
+            ownerName: owner.name || item.agentName || '',
+            ownerUsername: owner.username || '',
             leadState: 'ongoing',
-            status: item.sender === 'lead' ? 'unread' : 'replied',
-            unreadCount: item.sender === 'lead' ? 1 : 0,
-            interest: 'WhatsApp Live Sync',
+            status: 'replied',
+            unreadCount: 0,
+            interest: 'WhatsApp outreach',
             lastActive: 'Just now',
             lastMessageAt: item.timestamp || Math.floor(Date.now() / 1000),
-            notes: 'Live synced from connected WhatsApp',
-            messages: [{
-              id: item.id || ('msg_inbox_' + Date.now()),
-              waMessageId: waId,
-              deliveryStatus: item.deliveryStatus || 'delivered',
-              sender: item.sender || 'agent',
-              agentName: item.agentName || 'Askari Raza',
-              text: item.text || '',
-              time: new Date((item.timestamp || Math.floor(Date.now() / 1000)) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              timestamp: item.timestamp || Math.floor(Date.now() / 1000),
-              type: item.type || 'text',
-              hasMedia: Boolean(item.hasMedia),
-              durationSeconds: item.durationSeconds || 0
-            }]
+            notes: 'Started from the closer’s connected WhatsApp',
+            messages: [leadMessage(item, null)]
           });
           modified = true;
         }
-
-        if (modified) {
-          // Write-then-rename: PHP may read leads.json at any moment and must never see half a file.
-          const tmp = `${p}.bridge-${process.pid}.tmp`;
-          try { fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8'); fs.renameSync(tmp, p); }
-          catch (_) { try { fs.unlinkSync(tmp); } catch (__) {} }
-        }
+        if (modified) tenants.writeLeads(companyId, leads);
+        if (targetLead || modified) break;
       }
     } catch (_) {}
   }
+
+  function leadMessage(item, lead) {
+    const ts = item.timestamp || Math.floor(Date.now() / 1000);
+    return {
+      id: item.id || ('msg_inbox_' + Date.now()),
+      waMessageId: item.waMessageId || item.id,
+      deliveryStatus: item.deliveryStatus || 'delivered',
+      sender: item.sender || 'agent',
+      agentName: item.agentName || (item.sender === 'agent' ? 'Agent' : (lead && lead.name) || ''),
+      text: item.text || '',
+      time: new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: ts,
+      type: item.type || 'text',
+      hasMedia: Boolean(item.hasMedia),
+      durationSeconds: item.durationSeconds || 0
+    };
+  }
+
 
   function ack(message, value) {
     const id = message.id?._serialized;

@@ -2750,8 +2750,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function resolveSpintax(text) {
     if (!text) return '';
     return text.replace(/\{([^{}]+)\}/g, (match, contents) => {
-      const lower = contents.trim().toLowerCase();
-      if (['name', 'phone', 'city', 'plan', 'price', 'coupon', 'link'].includes(lower)) {
+      // {name|Bhai|Trader} is a placeholder with fallbacks, not a random choice.
+      const head = contents.split('|')[0].trim().toLowerCase();
+      if (['name', 'phone', 'city', 'plan', 'price', 'coupon', 'link', 'company'].includes(head)) {
         return match;
       }
       if (contents.includes('|')) {
