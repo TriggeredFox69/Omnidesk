@@ -249,11 +249,21 @@ if ($action === 'delete_leads' || $action === 'delete_lead') {
 
 // Seed Demo Campaign Leads with Voice Notes & Real-Time Sync Structure
 if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
-    $targetCloserId = $sessionUser['id'] ?? 'EMP-TM-MWMK43N9';
-    $targetCloserName = $sessionUser['name'] ?? 'Askari Raza';
-    $targetCloserUser = $sessionUser['username'] ?? 'askari';
+    $shouldClear = !empty($_GET['clear']) || !empty($_GET['reset']) || !empty($_POST['clear']);
+    if ($shouldClear) {
+        $currentLeads = [];
+    }
+
+    $askariId = 'EMP-TM-MWMK43N9';
+    $askariName = 'Askari Raza';
+    $askariUser = 'askari';
+
+    $erijId = 'EMP-TM-ERIJ';
+    $erijName = 'Syeda Erij Fatima';
+    $erijUser = 'erij';
 
     $demoLeads = [
+        // 5 LEADS ALLOTTED TO ASKARI RAZA
         [
             'id' => 'lead_wa_923245678910',
             'company_id' => $activeCompanyId,
@@ -262,9 +272,9 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
             'display' => '+92 324 5678910',
             'city' => 'Multan',
             'network' => 'WhatsApp',
-            'ownerId' => $targetCloserId,
-            'ownerName' => $targetCloserName,
-            'ownerUsername' => $targetCloserUser,
+            'ownerId' => $askariId,
+            'ownerName' => $askariName,
+            'ownerUsername' => $askariUser,
             'leadState' => 'ongoing',
             'status' => 'replied',
             'unreadCount' => 0,
@@ -279,7 +289,7 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'waMessageId' => 'true_923245678910@s.whatsapp.net_C1',
                     'deliveryStatus' => 'read',
                     'sender' => 'agent',
-                    'agentName' => $targetCloserName,
+                    'agentName' => $askariName,
                     'text' => 'Hello Faisal Raza, welcome to Nunno Cloud automated Forex & Crypto desk! Let me know if you would like to test our signals.',
                     'type' => 'text',
                     'timestamp' => time() - 1800,
@@ -300,7 +310,7 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'waMessageId' => 'true_923245678910@s.whatsapp.net_C3',
                     'deliveryStatus' => 'read',
                     'sender' => 'agent',
-                    'agentName' => $targetCloserName,
+                    'agentName' => $askariName,
                     'text' => 'Walaikum Assalam Faisal bhai! EasyPaisa / JazzCash account: 0331-8036576 (Title: Nunno Official). Share screenshot once done.',
                     'type' => 'text',
                     'timestamp' => time() - 600,
@@ -318,20 +328,6 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'hasMedia' => true,
                     'timestamp' => time() - 120,
                     'time' => date('H:i', time() - 120)
-                ],
-                [
-                    'id' => 'msg_demo_vn2',
-                    'waMessageId' => 'true_923245678910@s.whatsapp.net_VN2',
-                    'deliveryStatus' => 'read',
-                    'sender' => 'agent',
-                    'agentName' => $targetCloserName,
-                    'text' => '🎙️ Voice note (0:14): Payment verified brother, your account is activated! Welcome aboard.',
-                    'type' => 'audio',
-                    'duration' => '0:14',
-                    'durationSeconds' => 14,
-                    'hasMedia' => true,
-                    'timestamp' => time() - 30,
-                    'time' => date('H:i', time() - 30)
                 ]
             ]
         ],
@@ -343,9 +339,9 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
             'display' => '+92 312 2759900',
             'city' => 'Karachi',
             'network' => 'WhatsApp',
-            'ownerId' => $targetCloserId,
-            'ownerName' => $targetCloserName,
-            'ownerUsername' => $targetCloserUser,
+            'ownerId' => $askariId,
+            'ownerName' => $askariName,
+            'ownerUsername' => $askariUser,
             'leadState' => 'ongoing',
             'status' => 'unread',
             'unreadCount' => 1,
@@ -360,7 +356,7 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'waMessageId' => 'true_923122759900@s.whatsapp.net_1',
                     'deliveryStatus' => 'read',
                     'sender' => 'agent',
-                    'agentName' => $targetCloserName,
+                    'agentName' => $askariName,
                     'text' => 'Assalam o Alaikum Naveed bhai, special 30% discount on Whale Lifetime package ending tonight!',
                     'type' => 'text',
                     'timestamp' => time() - 900,
@@ -389,9 +385,9 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
             'display' => '+92 333 2190847',
             'city' => 'Lahore',
             'network' => 'WhatsApp',
-            'ownerId' => $targetCloserId,
-            'ownerName' => $targetCloserName,
-            'ownerUsername' => $targetCloserUser,
+            'ownerId' => $askariId,
+            'ownerName' => $askariName,
+            'ownerUsername' => $askariUser,
             'leadState' => 'fresh',
             'status' => 'replied',
             'unreadCount' => 0,
@@ -405,7 +401,7 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'waMessageId' => 'true_923332190847@s.whatsapp.net_1',
                     'deliveryStatus' => 'delivered',
                     'sender' => 'agent',
-                    'agentName' => $targetCloserName,
+                    'agentName' => $askariName,
                     'text' => 'Exclusive trade signals and automated bot copy trading available now. Interested in free trial?',
                     'type' => 'text',
                     'timestamp' => time() - 600,
@@ -421,9 +417,9 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
             'display' => '+92 300 9876543',
             'city' => 'Islamabad',
             'network' => 'WhatsApp',
-            'ownerId' => $targetCloserId,
-            'ownerName' => $targetCloserName,
-            'ownerUsername' => $targetCloserUser,
+            'ownerId' => $askariId,
+            'ownerName' => $askariName,
+            'ownerUsername' => $askariUser,
             'leadState' => 'pending_verification',
             'status' => 'pending_verification',
             'verificationStatus' => 'pending',
@@ -435,10 +431,13 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
             'notes' => 'Transferred via JazzCash Rs. 12,000. TID: JC99882211',
             'paidDetails' => [
                 'amount' => 12000,
+                'commission' => 1200,
                 'plan' => 'Nunno Scalper VIP Pro',
-                'closedBy' => $targetCloserName,
-                'closerId' => $targetCloserId,
-                'closerUsername' => $targetCloserUser,
+                'closedBy' => $askariName,
+                'closerId' => $askariId,
+                'closerUsername' => $askariUser,
+                'method' => 'JazzCash',
+                'trxId' => 'JC99882211',
                 'notes' => 'JazzCash Deposit TID: JC99882211',
                 'markedAt' => date('c', time() - 300)
             ],
@@ -448,7 +447,7 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'waMessageId' => 'true_923009876543@s.whatsapp.net_1',
                     'deliveryStatus' => 'read',
                     'sender' => 'agent',
-                    'agentName' => $targetCloserName,
+                    'agentName' => $askariName,
                     'text' => 'Salam Usman bhai, JazzCash account details bhej di hain.',
                     'type' => 'text',
                     'timestamp' => time() - 600,
@@ -465,30 +464,252 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'time' => date('H:i', time() - 300)
                 ]
             ]
+        ],
+        [
+            'id' => 'lead_wa_923451122334',
+            'company_id' => $activeCompanyId,
+            'name' => 'Kamran Siddiqui (+923451122334)',
+            'phone' => '923451122334',
+            'display' => '+92 345 1122334',
+            'city' => 'Rawalpindi',
+            'network' => 'WhatsApp',
+            'ownerId' => $askariId,
+            'ownerName' => $askariName,
+            'ownerUsername' => $askariUser,
+            'leadState' => 'paid',
+            'status' => 'paid',
+            'verificationStatus' => 'verified',
+            'unreadCount' => 0,
+            'interest' => 'Pro Trader Standard',
+            'lastActive' => '1h ago',
+            'lastMessageAt' => time() - 3600,
+            'dealAmount' => 8000,
+            'notes' => 'Successfully closed deal. Paid via Bank Alfalah.',
+            'messages' => [
+                [
+                    'id' => 'msg_kam_1',
+                    'sender' => 'agent',
+                    'agentName' => $askariName,
+                    'text' => '🟢 PAYMENT VERIFIED & APPROVED (DEAL WON)! Welcome to Nunno Trading Club.',
+                    'type' => 'text',
+                    'timestamp' => time() - 3600,
+                    'time' => date('H:i', time() - 3600)
+                ]
+            ]
+        ],
+
+        // 5 LEADS ALLOTTED TO SYEDA ERIJ FATIMA
+        [
+            'id' => 'lead_wa_923351234567',
+            'company_id' => $activeCompanyId,
+            'name' => 'Zeeshan Haider (+923351234567)',
+            'phone' => '923351234567',
+            'display' => '+92 335 1234567',
+            'city' => 'Karachi',
+            'network' => 'WhatsApp',
+            'ownerId' => $erijId,
+            'ownerName' => $erijName,
+            'ownerUsername' => $erijUser,
+            'leadState' => 'ongoing',
+            'status' => 'replied',
+            'unreadCount' => 0,
+            'interest' => 'Crypto Scalper Elite',
+            'lastActive' => 'Just now',
+            'lastMessageAt' => time() - 90,
+            'dealAmount' => 6000,
+            'notes' => 'Allotted to Erij. Active dialogue.',
+            'messages' => [
+                [
+                    'id' => 'msg_erij_z1',
+                    'waMessageId' => 'true_923351234567@s.whatsapp.net_1',
+                    'deliveryStatus' => 'read',
+                    'sender' => 'agent',
+                    'agentName' => $erijName,
+                    'text' => 'Salam Zeeshan bhai! Nunno Automated Scalper packages mein interested hain aap?',
+                    'type' => 'text',
+                    'timestamp' => time() - 1500,
+                    'time' => date('H:i', time() - 1500)
+                ],
+                [
+                    'id' => 'msg_erij_z2',
+                    'waMessageId' => 'false_923351234567@s.whatsapp.net_2',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'lead',
+                    'text' => 'Ji Erij sister, monthly signals aur automation details share kar dain.',
+                    'type' => 'text',
+                    'timestamp' => time() - 90,
+                    'time' => date('H:i', time() - 90)
+                ]
+            ]
+        ],
+        [
+            'id' => 'lead_wa_923159988776',
+            'company_id' => $activeCompanyId,
+            'name' => 'Maryam Qureshi (+923159988776)',
+            'phone' => '923159988776',
+            'display' => '+92 315 9988776',
+            'city' => 'Lahore',
+            'network' => 'WhatsApp',
+            'ownerId' => $erijId,
+            'ownerName' => $erijName,
+            'ownerUsername' => $erijUser,
+            'leadState' => 'ongoing',
+            'status' => 'unread',
+            'unreadCount' => 1,
+            'interest' => 'Forex Swing Masters',
+            'lastActive' => '4m ago',
+            'lastMessageAt' => time() - 240,
+            'dealAmount' => 7500,
+            'notes' => 'High interest in copy trading.',
+            'messages' => [
+                [
+                    'id' => 'msg_erij_m1',
+                    'waMessageId' => 'false_923159988776@s.whatsapp.net_VN1',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'lead',
+                    'text' => '🎙️ Voice note (0:15): Assalam o Alaikum, fees structure EasyPaisa pe payable hai?',
+                    'type' => 'audio',
+                    'duration' => '0:15',
+                    'durationSeconds' => 15,
+                    'hasMedia' => true,
+                    'timestamp' => time() - 240,
+                    'time' => date('H:i', time() - 240)
+                ]
+            ]
+        ],
+        [
+            'id' => 'lead_wa_923023344556',
+            'company_id' => $activeCompanyId,
+            'name' => 'Bilal Ahmed (+923023344556)',
+            'phone' => '923023344556',
+            'display' => '+92 302 3344556',
+            'city' => 'Faisalabad',
+            'network' => 'WhatsApp',
+            'ownerId' => $erijId,
+            'ownerName' => $erijName,
+            'ownerUsername' => $erijUser,
+            'leadState' => 'fresh',
+            'status' => 'unread',
+            'unreadCount' => 0,
+            'interest' => 'Campaign Dispatch',
+            'lastActive' => '15m ago',
+            'lastMessageAt' => time() - 900,
+            'notes' => 'Dispatched via Erij device.',
+            'messages' => [
+                [
+                    'id' => 'msg_erij_b1',
+                    'waMessageId' => 'true_923023344556@s.whatsapp.net_1',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'agent',
+                    'agentName' => $erijName,
+                    'text' => 'Assalam o Alaikum! Nunno Cloud automated Forex & Crypto signals desk se rabta kar rahe hain.',
+                    'type' => 'text',
+                    'timestamp' => time() - 900,
+                    'time' => date('H:i', time() - 900)
+                ]
+            ]
+        ],
+        [
+            'id' => 'lead_wa_923145566778',
+            'company_id' => $activeCompanyId,
+            'name' => 'Imran Abbasi (+923145566778)',
+            'phone' => '923145566778',
+            'display' => '+92 314 5566778',
+            'city' => 'Peshawar',
+            'network' => 'WhatsApp',
+            'ownerId' => $erijId,
+            'ownerName' => $erijName,
+            'ownerUsername' => $erijUser,
+            'leadState' => 'pending_verification',
+            'status' => 'pending_verification',
+            'verificationStatus' => 'pending',
+            'unreadCount' => 0,
+            'interest' => 'Nunno VIP Annual',
+            'lastActive' => '8m ago',
+            'lastMessageAt' => time() - 480,
+            'dealAmount' => 10000,
+            'notes' => 'Transferred via EasyPaisa Rs. 10,000. TID: EP55443322',
+            'paidDetails' => [
+                'amount' => 10000,
+                'commission' => 1000,
+                'plan' => 'Nunno VIP Annual',
+                'closedBy' => $erijName,
+                'closerId' => $erijId,
+                'closerUsername' => $erijUser,
+                'method' => 'EasyPaisa',
+                'trxId' => 'EP55443322',
+                'notes' => 'EasyPaisa Deposit TID: EP55443322',
+                'markedAt' => date('c', time() - 480)
+            ],
+            'messages' => [
+                [
+                    'id' => 'msg_erij_i1',
+                    'sender' => 'lead',
+                    'text' => 'Sister Erij, 10,000 PKR EasyPaisa par transfer kar diye hain. TID: EP55443322.',
+                    'type' => 'text',
+                    'timestamp' => time() - 480,
+                    'time' => date('H:i', time() - 480)
+                ]
+            ]
+        ],
+        [
+            'id' => 'lead_wa_923214433221',
+            'company_id' => $activeCompanyId,
+            'name' => 'Dr. Adnan Tariq (+923214433221)',
+            'phone' => '923214433221',
+            'display' => '+92 321 4433221',
+            'city' => 'Quetta',
+            'network' => 'WhatsApp',
+            'ownerId' => $erijId,
+            'ownerName' => $erijName,
+            'ownerUsername' => $erijUser,
+            'leadState' => 'paid',
+            'status' => 'paid',
+            'verificationStatus' => 'verified',
+            'unreadCount' => 0,
+            'interest' => 'Whale Lifetime VIP',
+            'lastActive' => '2h ago',
+            'lastMessageAt' => time() - 7200,
+            'dealAmount' => 15000,
+            'notes' => 'Closed by Erij. Verified deal.',
+            'messages' => [
+                [
+                    'id' => 'msg_erij_a1',
+                    'sender' => 'agent',
+                    'agentName' => $erijName,
+                    'text' => '🟢 PAYMENT VERIFIED & APPROVED (DEAL WON)! Lifetime membership confirmed.',
+                    'type' => 'text',
+                    'timestamp' => time() - 7200,
+                    'time' => date('H:i', time() - 7200)
+                ]
+            ]
         ]
     ];
 
-    // Merge or prepend demo leads
-    $existingIds = array_column($currentLeads, 'id');
-    foreach ($demoLeads as $dl) {
-        $found = false;
-        foreach ($currentLeads as &$cl) {
-            if ($cl['id'] === $dl['id'] || ($cl['phone'] ?? '') === $dl['phone']) {
-                $cl = array_merge($cl, $dl);
-                $found = true;
-                break;
+    if ($shouldClear) {
+        $currentLeads = $demoLeads;
+    } else {
+        $existingIds = array_column($currentLeads, 'id');
+        foreach ($demoLeads as $dl) {
+            $found = false;
+            foreach ($currentLeads as &$cl) {
+                if ($cl['id'] === $dl['id'] || ($cl['phone'] ?? '') === $dl['phone']) {
+                    $cl = array_merge($cl, $dl);
+                    $found = true;
+                    break;
+                }
             }
-        }
-        unset($cl);
-        if (!$found) {
-            array_unshift($currentLeads, $dl);
+            unset($cl);
+            if (!$found) {
+                array_unshift($currentLeads, $dl);
+            }
         }
     }
 
     saveStoredLeads($dataFile, $currentLeads);
     echo json_encode([
         'success' => true,
-        'message' => 'Demo campaign leads seeded successfully with text, voice notes and live sync state.',
+        'message' => 'Demo campaign seeded: 10 leads (5 for Askari, 5 for Erij) with conversations, voice notes, and pending deals.',
         'leads_count' => count($currentLeads)
     ]);
     exit;
