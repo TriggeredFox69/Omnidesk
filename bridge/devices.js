@@ -138,7 +138,24 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
     if (!d) throw Object.assign(new Error('That login session has expired. Scan the QR again.'), { status: 404 });
     if (fromId === toId) return snapshot(d);
     const old = devices.get(toId);
-    if (old && old !== d) await disconnect(toId, !samePhone(old.number, d.number));
+    // A newly scanned QR always has fresh Signal keys. Remove the previous
+    // session even when it is the same phone; retaining it can make restoreAll
+    // pick the stale auth directory on the next restart.
+    if (old && old !== d) await disconnect(toId, true);
+    // Clean up older duplicate directories left by previous same-number adopts.
+    try {
+      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name === d.dir || safeId(entry.name) !== entry.name) continue;
+        const dir = path.join(root, entry.name);
+        let meta = {};
+        try { meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')); } catch (_) {}
+        if (safeId(meta.owner || entry.name) === toId) {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      }
+    } catch (err) {
+      console.warn(`[Devices] Could not remove superseded session folders for ${toId}:`, err.message);
+    }
     devices.delete(fromId);
     d.id = toId;
     if (name) d.name = name;
