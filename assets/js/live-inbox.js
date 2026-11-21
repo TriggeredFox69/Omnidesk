@@ -193,8 +193,8 @@
         message.deliveryError = error.message; toast(error.message);
       } finally { sendingMedia = false; renderList(); if (state.activeLeadId === lead.id) renderChat(); }
     }
-    // Poll every 4.5 seconds for snappy updates without exhausting server workers
-    setInterval(poll, 4500);
+    // Poll every 2 seconds for instant real-time live WhatsApp sync
+    setInterval(poll, 2000);
     return { poll, loadMedia, sendMedia };
   };
 })();

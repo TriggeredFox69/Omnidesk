@@ -1010,11 +1010,23 @@ document.addEventListener('DOMContentLoaded', () => {
           renderCompanyContextPill();
 
           if (Array.isArray(data.leads)) {
+            const existingMap = new Map();
+            (state.leads || []).forEach(l => {
+              if (l.id) existingMap.set(l.id, l);
+              if (l.phone) existingMap.set(normalizePhone(l.phone), l);
+            });
+
             state.leads = data.leads.map(l => {
               const raw = (l.name || '').trim();
               const lower = raw.toLowerCase();
               if (!raw || lower === 'trader' || lower === 'alishba' || lower === 'new contact' || lower === 'unknown') {
                 l.name = l.display || (l.phone ? '+' + l.phone : '');
+              }
+              const local = existingMap.get(l.id) || existingMap.get(normalizePhone(l.phone || ''));
+              if (local && Array.isArray(local.messages) && local.messages.length > (l.messages?.length || 0)) {
+                const serverMsgIds = new Set((l.messages || []).map(m => m.id || m.waMessageId));
+                const missing = local.messages.filter(m => !serverMsgIds.has(m.id || m.waMessageId));
+                l.messages = [...(l.messages || []), ...missing];
               }
               return l;
             });
