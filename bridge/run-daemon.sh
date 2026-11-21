@@ -57,6 +57,10 @@ fi
 
 DELAY=2
 while true; do
+    # Keep the log small: rotate at 20 MB (one old copy kept).
+    if [ -f "$LOGFILE" ] && [ "$(stat -c %s "$LOGFILE" 2>/dev/null || echo 0)" -gt 20971520 ]; then
+        mv -f "$LOGFILE" "$LOGFILE.1"
+    fi
     STARTED=$(date +%s)
     "$NODE" $NODE_FLAGS "$SCRIPT" >> "$LOGFILE" 2>&1
     EXIT_CODE=$?
