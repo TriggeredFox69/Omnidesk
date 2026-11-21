@@ -2,6 +2,12 @@
   window.NunnoLiveInbox = function ({ state, getLead, renderList, renderChat, toast, stopAudio }) {
     let cursor = 0, busy = false, epoch = '', activePhone = '', sendingMedia = false, lastPresenceAt = 0, hydrated = false;
     const mediaRequests = new Map();
+    // Leads whose messages changed during one poll, saved once after the poll.
+    // (Saving inside merge() sent one request per message: a reload delivers up to
+    // 2,000 messages, which flooded the server and made Chrome refuse every request
+    // with ERR_INSUFFICIENT_RESOURCES, including "Start campaign".)
+    const pendingSync = new Map();
+    const MAX_SYNC_PER_POLL = 25;
     async function api(action, data = {}) {
       const response = await fetch('api/direct_sender.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...data }), signal: AbortSignal.timeout(action === 'send_direct' ? 90000 : action === 'get_media' ? 35000 : 15000) });
       const result = await response.json();
@@ -72,6 +78,7 @@
       }
       if (!lead) return null;
       const previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
+      const previousStatus = previous ? previous.deliveryStatus : undefined;
       // Contact names are user-managed only; do not auto-override with WhatsApp push names
       const fields = { ...item, time: new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: item.durationSeconds ? `${Math.floor(item.durationSeconds / 60)}:${String(item.durationSeconds % 60).padStart(2,'0')}` : undefined };
@@ -86,8 +93,10 @@
       lead.lastMessageAt = Math.max(lead.lastMessageAt || 0, item.timestamp);
       // Message time is not last-seen presence.
       if (!state.activeLeadId) state.activeLeadId = lead.id;
-      if (typeof window.NUNNO_SYNC_LEAD === 'function') {
-        window.NUNNO_SYNC_LEAD(lead, { newMessage: fields });
+      if (!previous || previousStatus !== fields.deliveryStatus) {
+        const entry = pendingSync.get(lead.id) || { lead, messages: [] };
+        entry.messages.push(fields);
+        pendingSync.set(lead.id, entry);
       }
       return lead;
     }
@@ -111,7 +120,11 @@
       busy = true;
       try {
         const result = await api('get_events', { after: cursor });
+        // 'online' is PHP's placeholder when the bridge did not answer: not a restart.
+        if (!result.epoch || result.epoch === 'online') return;
         if (epoch && epoch !== result.epoch) { cursor = 0; epoch = result.epoch; hydrated = false; return; }
+        const wasHydrated = hydrated;
+        pendingSync.clear();
         epoch = result.epoch;
         let activeChanged = false;
         let mergedAny = false;
@@ -124,6 +137,16 @@
         }
         cursor = result.cursor;
         hydrated = true;
+        // The first load (or a bridge restart) replays history the server already has:
+        // nothing to save. Afterwards save only real changes, and never a flood.
+        let changes = 0;
+        for (const entry of pendingSync.values()) changes += entry.messages.length;
+        if (wasHydrated && changes <= MAX_SYNC_PER_POLL && typeof window.NUNNO_SYNC_LEAD === 'function') {
+          for (const { lead, messages } of pendingSync.values()) {
+            for (const m of messages) window.NUNNO_SYNC_LEAD(lead, { newMessage: m });
+          }
+        }
+        pendingSync.clear();
         if (result.presences && typeof window.onWhatsAppPresencesUpdate === 'function') {
           window.onWhatsAppPresencesUpdate(result.presences);
         }
