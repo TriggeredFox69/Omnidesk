@@ -92,10 +92,12 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     const remote = message.id?.remote?._serialized || message.id?.remote || '';
     const resolvedRemotePhone = remote ? await phoneFor(remote) : null;
     const phone = opts.phone || resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
-    if (!phone || !/^\d{10,18}$/.test(phone)) return;
+    const debug = why => { if (process.env.WHATSAPP_BRIDGE_DEBUG) console.log(`[Inbox:debug] ${id} phone=${phone || '?'} ${why}`); };
+    if (!phone || !/^\d{10,18}$/.test(phone)) { debug('dropped: no phone number for this chat'); return; }
     // Keep the inbox limited to Chatly lead conversations. Inbound personal
     // chats from a linked phone are ignored unless Chatly already knows the lead.
-    if (!fromMe && !isChatlyLead(phone)) return;
+    if (!fromMe && !isChatlyLead(phone)) { debug('dropped: not a Chatly lead (personal chat)'); return; }
+    debug(fromMe ? 'kept: sent by us' : 'kept: reply from a lead');
     const previous = messages.get(id);
     const pendingAck = pendingAcks.get(id);
     if (pendingAck !== undefined) pendingAcks.delete(id);

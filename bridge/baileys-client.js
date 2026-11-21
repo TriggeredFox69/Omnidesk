@@ -619,6 +619,9 @@ class BaileysClient extends EventEmitter {
           }
         }
         const adaptedMsg = adaptMessage(msg);
+        if (process.env.WHATSAPP_BRIDGE_DEBUG) {
+          console.log(`[Baileys:debug] in id=${msg?.key?.id} fromMe=${Boolean(msg?.key?.fromMe)} remote=${remote} alt=${msg?.key?.remoteJidAlt || ''} -> ${adaptedMsg ? adaptedMsg.id.remote : 'skipped (no text/media)'}`);
+        }
         if (!adaptedMsg) continue;
         this._messageCache.set(msg.key.id, adaptedMsg);
         if (this._messageCache.size > 2000) {
