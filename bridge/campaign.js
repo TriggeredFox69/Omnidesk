@@ -47,7 +47,7 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, dataDir, getLeadsPath, getUsersPath, offlineGraceMs }) {
+function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs }) {
   const digits = v => String(v || '').replace(/\D/g, '');
   const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
   const isMainOnline = () => { const m = typeof mainStatus === 'function' ? mainStatus() : null; return !!(m && m.ready); };
@@ -497,7 +497,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, data
   // sends from its TM's own number in parallel. If a TM's WhatsApp drops for more
   // than OFFLINE_GRACE_MS, their unsent numbers move to the TMs still connected,
   // so the campaign always runs until every number has been messaged.
-  const OFFLINE_GRACE_MS = offlineGraceMs || 45000;
+  const OFFLINE_GRACE_MS = offlineGraceMs || 15000;
   const laneTimers = new Map();
   const laneBusy = new Set();
 
@@ -598,6 +598,17 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, data
         id: `msg_c_${Date.now()}`, waMessageId: contact.messageId, deliveryStatus: 'accepted', sender: 'agent',
         agentName: lane.name, senderPhone: lane.phone, senderRole: lane.role, text: personalizedMsg, time: contact.sentAt
       }, state.assignMode, laneSender(lane));
+      if (inbox && typeof inbox.ingest === 'function') {
+        const cleanPhone = String(contact.phone || '').replace(/\D/g, '');
+        inbox.ingest({
+          id: { _serialized: contact.messageId, fromMe: true, remote: cleanPhone + '@s.whatsapp.net' },
+          fromMe: true,
+          type: state.media ? (state.media.mimetype?.startsWith('audio') ? 'ptt' : (state.media.mimetype?.startsWith('image') ? 'image' : 'document')) : 'chat',
+          body: personalizedMsg,
+          timestamp: Math.floor(Date.now() / 1000),
+          ack: 0
+        }, cleanPhone, { phone: cleanPhone, agentName: lane.name, viaUserId: lane.id, viaNumber: lane.phone }).catch(() => {});
+      }
       log(`✅ ${lane.name} (${lane.display}) ➔ ${contact.display || contact.phone}  [${lane.sent + lane.failed}/${lane.assigned}]`, 'success');
     } catch (err) {
       if (err && err.deviceOffline) {

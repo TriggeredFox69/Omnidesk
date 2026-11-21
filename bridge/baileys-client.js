@@ -223,57 +223,103 @@ class BaileysClient extends EventEmitter {
       if (v?.version) version = v.version;
     } catch (_) {}
 
+    const getMessageFn = async (key) => {
+      const id = key?.id;
+      if (!id) return undefined;
+      const remote = key?.remoteJid || '';
+      const comboKey = remote ? `${remote}_${id}` : '';
+      const cleanRemote = remote.split('@')[0].split(':')[0].replace(/\D/g, '');
+      const cleanCombo = cleanRemote ? `${cleanRemote}_${id}` : '';
+
+      if (this._rawMessageStore.has(id)) {
+        const raw = this._rawMessageStore.get(id);
+        try {
+          return proto.Message.fromObject(raw);
+        } catch (_) {
+          return raw;
+        }
+      }
+      if (comboKey && this._rawMessageStore.has(comboKey)) {
+        const raw = this._rawMessageStore.get(comboKey);
+        try {
+          return proto.Message.fromObject(raw);
+        } catch (_) {
+          return raw;
+        }
+      }
+      if (cleanCombo && this._rawMessageStore.has(cleanCombo)) {
+        const raw = this._rawMessageStore.get(cleanCombo);
+        try {
+          return proto.Message.fromObject(raw);
+        } catch (_) {
+          return raw;
+        }
+      }
+      const cached = this._messageCache.get(id);
+      if (cached?.body) {
+        return { conversation: cached.body };
+      }
+      // Fallback to inbox.json storage so campaign & direct messages can ALWAYS be retrieved for retries
+      try {
+        const inboxCandidates = [
+          path.resolve(this.authPath, '../inbox.json'),
+          path.resolve(this.authPath, '../../inbox.json'),
+          path.resolve(__dirname, '../data/whatsapp-bridge/inbox.json')
+        ];
+        for (const inboxPath of inboxCandidates) {
+          if (fs.existsSync(inboxPath)) {
+            const rawInbox = fs.readFileSync(inboxPath, 'utf8');
+            const items = JSON.parse(rawInbox);
+            if (Array.isArray(items)) {
+              const found = items.find(m => m.waMessageId === id || m.id === id);
+              if (found && found.text) {
+                return { conversation: found.text };
+              }
+            }
+            break;
+          }
+        }
+      } catch (_) {}
+      // Fallback to leads.json storage so campaign outreach messages can ALWAYS be retrieved for retries
+      try {
+        const leadsCandidates = [
+          path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
+          path.resolve(__dirname, '../data/leads.json')
+        ];
+        for (const lp of leadsCandidates) {
+          if (fs.existsSync(lp)) {
+            const leads = JSON.parse(fs.readFileSync(lp, 'utf8'));
+            if (Array.isArray(leads)) {
+              for (const lead of leads) {
+                if (Array.isArray(lead.messages)) {
+                  const found = lead.messages.find(m => m.waMessageId === id || m.id === id);
+                  if (found && found.text) {
+                    return { conversation: found.text };
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+      return undefined;
+    };
+    this.getMessage = getMessageFn;
+
     this.sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
       browser: Browsers.ubuntu('Chrome'),
-      syncFullHistory: true,
+      syncFullHistory: false,
       keepAliveIntervalMs: 25000,
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       retryRequestDelayMs: 250,
       markOnlineOnConnect: true,
       msgRetryCounterCache: this._msgRetryCache,
-      getMessage: async (key) => {
-        const id = key?.id;
-        if (!id) return undefined;
-        const remote = key?.remoteJid || '';
-        const comboKey = remote ? `${remote}_${id}` : '';
-        const cleanRemote = remote.split('@')[0].split(':')[0].replace(/\D/g, '');
-        const cleanCombo = cleanRemote ? `${cleanRemote}_${id}` : '';
-
-        if (this._rawMessageStore.has(id)) {
-          const raw = this._rawMessageStore.get(id);
-          try {
-            return proto.Message.fromObject(raw);
-          } catch (_) {
-            return raw;
-          }
-        }
-        if (comboKey && this._rawMessageStore.has(comboKey)) {
-          const raw = this._rawMessageStore.get(comboKey);
-          try {
-            return proto.Message.fromObject(raw);
-          } catch (_) {
-            return raw;
-          }
-        }
-        if (cleanCombo && this._rawMessageStore.has(cleanCombo)) {
-          const raw = this._rawMessageStore.get(cleanCombo);
-          try {
-            return proto.Message.fromObject(raw);
-          } catch (_) {
-            return raw;
-          }
-        }
-        const cached = this._messageCache.get(id);
-        if (cached?.body) {
-          return { conversation: cached.body };
-        }
-        return undefined;
-      }
+      getMessage: getMessageFn
     });
 
     const safeSaveCreds = async () => {
@@ -575,6 +621,50 @@ class BaileysClient extends EventEmitter {
       }
     });
 
+    // Socket fail-safe: answer retry receipts by querying WhatsApp for fresh prekeys and re-relaying message
+    if (this.sock.ws) {
+      this.sock.ws.on('CB:receipt', async (node) => {
+        try {
+          if (node?.attrs?.type === 'retry') {
+            const id = node.attrs?.id;
+            const remoteJid = node.attrs?.from;
+            const participant = node.attrs?.participant || remoteJid;
+            const retryChild = Array.isArray(node.content) ? node.content.find(c => c?.tag === 'retry') : null;
+            const count = +(retryChild?.attrs?.count || 1);
+            if (!id || !remoteJid) return;
+
+            const cacheKey = `${id}:${participant}`;
+            const retried = this._msgRetryCache.get(cacheKey) || 0;
+            if (retried > 4) return;
+            this._msgRetryCache.set(cacheKey, retried + 1);
+
+            console.log(`[Baileys Auto-Heal] Socket retry receipt received for msg ${id} from ${participant} (count ${count})`);
+
+            if (typeof this.sock.assertSessions === 'function') {
+              await this.sock.assertSessions([participant], true).catch(() => {});
+            }
+
+            const rawMsg = await this.getMessage({ remoteJid, id, fromMe: true });
+            if (rawMsg) {
+              const isGroup = remoteJid?.endsWith('@g.us');
+              const relayOpts = { messageId: id };
+              if (!isGroup) {
+                const device = participant.split(':')[1]?.split('@')[0];
+                if (device) relayOpts.participant = { jid: participant, count };
+                else relayOpts.useUserDevicesCache = false;
+              } else {
+                relayOpts.participant = { jid: participant, count };
+              }
+              await this.sock.relayMessage(remoteJid, rawMsg, relayOpts);
+              console.log(`[Baileys Auto-Heal] Socket retry re-relay completed for msg ${id} to ${participant}`);
+            }
+          }
+        } catch (err) {
+          console.warn('[Baileys Auto-Heal] Socket retry notice:', err?.message || err);
+        }
+      });
+    }
+
   }
 
   _normalizeJid(jidOrPhone) {
@@ -735,16 +825,60 @@ class BaileysClient extends EventEmitter {
 
   async getChatById(chatId) {
     const cleanJid = this._normalizeJid(chatId);
+    const cleanPhone = cleanJid.split('@')[0].split(':')[0].replace(/\D/g, '');
     return {
       id: { _serialized: cleanJid },
       fetchMessages: async ({ limit = 50 } = {}) => {
         const msgs = [];
+        const seenIds = new Set();
         for (const msg of this._messageCache.values()) {
           const remote = (typeof msg.id?.remote === 'string' ? msg.id.remote : msg.id?.remote?._serialized) || '';
-          if (remote === cleanJid) {
-            msgs.push(msg);
+          const remotePhone = remote.split('@')[0].split(':')[0].replace(/\D/g, '');
+          if (remote === cleanJid || (cleanPhone && remotePhone === cleanPhone)) {
+            const mId = msg.id?._serialized || msg.id;
+            if (mId && !seenIds.has(mId)) {
+              seenIds.add(mId);
+              msgs.push(msg);
+            }
           }
         }
+        // Also load from inbox.json so all ingested phone & campaign messages are included
+        try {
+          const inboxCandidates = [
+            path.resolve(this.authPath, '../inbox.json'),
+            path.resolve(__dirname, '../data/whatsapp-bridge/inbox.json')
+          ];
+          for (const ip of inboxCandidates) {
+            if (fs.existsSync(ip)) {
+              const raw = fs.readFileSync(ip, 'utf8');
+              const items = JSON.parse(raw);
+              if (Array.isArray(items)) {
+                for (const item of items) {
+                  const itemClean = String(item.phone || '').replace(/\D/g, '');
+                  if (itemClean && cleanPhone && itemClean === cleanPhone) {
+                    const waId = item.waMessageId || item.id;
+                    if (waId && !seenIds.has(waId)) {
+                      seenIds.add(waId);
+                      msgs.push({
+                        id: { _serialized: waId, fromMe: item.sender === 'agent', remote: cleanJid },
+                        fromMe: item.sender === 'agent',
+                        from: item.sender === 'agent' ? `${this.info?.wid?.user || ''}@s.whatsapp.net` : cleanJid,
+                        to: item.sender === 'agent' ? cleanJid : `${this.info?.wid?.user || ''}@s.whatsapp.net`,
+                        body: item.text || '',
+                        timestamp: item.timestamp || Math.floor(Date.now() / 1000),
+                        hasMedia: Boolean(item.hasMedia),
+                        type: item.type || 'chat',
+                        ack: item.deliveryStatus === 'read' ? 3 : (item.deliveryStatus === 'delivered' ? 2 : 1)
+                      });
+                    }
+                  }
+                }
+              }
+              break;
+            }
+          }
+        } catch (_) {}
+        msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
         return msgs.slice(-limit);
       }
     };

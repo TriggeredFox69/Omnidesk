@@ -93,6 +93,18 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   <base href="/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <script>
+    window.escapeHtml = function(text) {
+      if (text === null || text === undefined) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+    function escapeHtml(text) { return window.escapeHtml(text); }
+  </script>
   <title><?php echo $isAdmin ? ('Chatly Company Admin — ' . htmlspecialchars($activeCompany['name'])) : 'Chatly — Company Administrator Portal'; ?></title>
   <link rel="icon" type="image/png" href="assets/images/chatly-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">

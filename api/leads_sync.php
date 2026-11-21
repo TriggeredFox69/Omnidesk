@@ -70,6 +70,142 @@ function saveStoredLeads($dataFile, $leads) {
     } catch (Exception $e) {}
 }
 
+// Seamless 2-Way Sync: Merge incoming & outgoing messages and ACKs from inbox.json into centralized leads
+function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
+    global $activeCompanyId;
+    $dataRoot = dirname(__DIR__) . '/data';
+    $inboxFiles = [
+        $dataRoot . '/whatsapp-bridge/inbox.json',
+        $dataRoot . '/whatsapp-bridge/whatsapp-bridge/inbox.json',
+        $dataRoot . '/inbox.json'
+    ];
+    $inboxMessages = [];
+    foreach ($inboxFiles as $f) {
+        if (file_exists($f)) {
+            $raw = @file_get_contents($f);
+            $parsed = json_decode($raw, true);
+            if (is_array($parsed)) {
+                foreach ($parsed as $m) {
+                    $waId = $m['waMessageId'] ?? ($m['id'] ?? '');
+                    if ($waId && !isset($inboxMessages[$waId])) {
+                        $inboxMessages[$waId] = $m;
+                    }
+                }
+            }
+        }
+    }
+    if (empty($inboxMessages)) return false;
+
+    $cleanDigits = function($p) {
+        $c = preg_replace('/\D/', '', (string)$p);
+        if (str_starts_with($c, '0092')) $c = substr($c, 2);
+        elseif (str_starts_with($c, '03') && strlen($c) === 11) $c = '92' . substr($c, 1);
+        elseif (str_starts_with($c, '3') && strlen($c) === 10) $c = '92' . $c;
+        return $c;
+    };
+
+    // Index existing leads by clean phone
+    $leadMap = [];
+    foreach ($leads as $idx => $l) {
+        $p = $cleanDigits($l['phone'] ?? '');
+        if ($p) $leadMap[$p] = $idx;
+    }
+
+    $modified = false;
+    foreach ($inboxMessages as $m) {
+        $mPhone = $cleanDigits($m['phone'] ?? '');
+        if (!$mPhone || strlen($mPhone) < 8) continue;
+
+        $targetIdx = $leadMap[$mPhone] ?? null;
+        if ($targetIdx === null) {
+            $defaultDisplay = '+' . $mPhone;
+            $newLead = [
+                'id' => 'lead_wa_' . $mPhone,
+                'company_id' => $activeCompanyId,
+                'name' => $m['name'] ?? $defaultDisplay,
+                'phone' => $mPhone,
+                'display' => $defaultDisplay,
+                'city' => '',
+                'network' => 'WhatsApp',
+                'ownerId' => $m['viaUserId'] ?? 'EMP-TM-MWMK43N9',
+                'ownerName' => $m['agentName'] ?? 'Askari Raza',
+                'ownerUsername' => !empty($m['viaUserId']) ? strtolower(explode(' ', $m['agentName'] ?? 'askari')[0]) : 'askari',
+                'leadState' => 'ongoing',
+                'status' => ($m['sender'] === 'lead') ? 'unread' : 'replied',
+                'unreadCount' => ($m['sender'] === 'lead') ? 1 : 0,
+                'interest' => 'WhatsApp Direct Sync',
+                'lastActive' => 'Just now',
+                'lastMessageAt' => $m['timestamp'] ?? time(),
+                'notes' => 'Synced from connected WhatsApp account',
+                'messages' => []
+            ];
+            $leads[] = $newLead;
+            $targetIdx = count($leads) - 1;
+            $leadMap[$mPhone] = $targetIdx;
+            $modified = true;
+        }
+
+        $lead = &$leads[$targetIdx];
+        if (!isset($lead['messages']) || !is_array($lead['messages'])) {
+            $lead['messages'] = [];
+        }
+
+        $waMsgId = $m['waMessageId'] ?? $m['id'];
+        $existingMsgIdx = null;
+        foreach ($lead['messages'] as $i => $lm) {
+            if (($lm['waMessageId'] ?? '') === $waMsgId || ($lm['id'] ?? '') === $waMsgId) {
+                $existingMsgIdx = $i;
+                break;
+            }
+        }
+
+        $deliveryStatus = $m['deliveryStatus'] ?? 'delivered';
+        if ($existingMsgIdx !== null) {
+            // Update deliveryStatus if it transitioned (e.g. accepted -> delivered -> read)
+            if (($lead['messages'][$existingMsgIdx]['deliveryStatus'] ?? '') !== $deliveryStatus && $deliveryStatus !== 'accepted') {
+                $lead['messages'][$existingMsgIdx]['deliveryStatus'] = $deliveryStatus;
+                $modified = true;
+            }
+        } else {
+            $msgEntry = [
+                'id' => $m['id'] ?? ('msg_' . uniqid()),
+                'waMessageId' => $waMsgId,
+                'deliveryStatus' => $deliveryStatus,
+                'sender' => $m['sender'] ?? 'agent',
+                'agentName' => $m['agentName'] ?? 'Agent',
+                'text' => $m['text'] ?? '',
+                'type' => $m['type'] ?? 'text',
+                'timestamp' => $m['timestamp'] ?? time(),
+                'time' => date('H:i', $m['timestamp'] ?? time()),
+                'hasMedia' => !empty($m['hasMedia']),
+                'duration' => $m['duration'] ?? '',
+                'durationSeconds' => $m['durationSeconds'] ?? 0
+            ];
+            $lead['messages'][] = $msgEntry;
+            usort($lead['messages'], function($a, $b) {
+                return ($a['timestamp'] ?? 0) - ($b['timestamp'] ?? 0);
+            });
+            $lead['lastMessageAt'] = max($lead['lastMessageAt'] ?? 0, $m['timestamp'] ?? time());
+            $lead['lastActive'] = 'Just now';
+            if (($m['sender'] ?? '') === 'lead') {
+                $lead['status'] = 'unread';
+                $lead['unreadCount'] = ($lead['unreadCount'] ?? 0) + 1;
+            } else {
+                $lead['status'] = 'replied';
+            }
+            if ($lead['leadState'] === 'fresh') {
+                $lead['leadState'] = 'ongoing';
+            }
+            $modified = true;
+        }
+    }
+
+    if ($modified) {
+        saveStoredLeads($dataFile, $leads);
+    }
+    return $modified;
+}
+
 // Default initial leads if data/leads.json doesn't exist yet
 $defaultLeads = [
     [
@@ -868,6 +1004,7 @@ if ($action === 'reject_deal') {
 
 // 1. Get All Leads
 if ($action === 'get_leads') {
+    syncInboxMessagesIntoLeads($currentLeads, $dataFile);
     $modified = false;
     foreach ($currentLeads as &$lead) {
         $curName = trim($lead['name'] ?? '');

@@ -69,6 +69,7 @@ if ! "$NODE_BIN" -e "require('@whiskeysockets/baileys'); require('qrcode'); requ
     rm -rf node_modules package-lock.json
     "$NODE_NPM" install --omit=dev --no-audit --no-fund --ignore-scripts
 fi
+"$NODE_BIN" patch-baileys.js || true
 
 # Restart WhatsApp bridge daemon with fresh code
 echo "Restarting WhatsApp bridge service..."

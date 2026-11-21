@@ -101,23 +101,125 @@ function createInbox({ getClient, storageFile }) {
     messages.set(id, { ...value, revision: ++revision });
     if (messages.size > 2000) messages.delete(messages.keys().next().value);
     save();
+    syncToLeadsFile(value, false);
   }
+
+  function syncToLeadsFile(item, ackStatusOnly = false) {
+    if (!item) return;
+    try {
+      const candidates = [
+        path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
+        path.resolve(__dirname, '../data/leads.json')
+      ];
+      const waId = item.waMessageId || item.id;
+      const cleanPhone = String(item.phone || '').replace(/\D/g, '');
+      if (!cleanPhone && !waId) return;
+
+      for (const p of candidates) {
+        if (!fs.existsSync(p)) continue;
+        let leads = [];
+        try { leads = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_) {}
+        if (!Array.isArray(leads)) continue;
+
+        let modified = false;
+        let targetLead = cleanPhone ? leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone) : null;
+        if (!targetLead && waId) {
+          targetLead = leads.find(l => Array.isArray(l.messages) && l.messages.some(m => m.waMessageId === waId || m.id === waId));
+        }
+
+        if (targetLead) {
+          if (!Array.isArray(targetLead.messages)) targetLead.messages = [];
+          const existing = targetLead.messages.find(m => (m.waMessageId === waId || m.id === waId));
+          if (existing) {
+            if (item.deliveryStatus && existing.deliveryStatus !== item.deliveryStatus && item.deliveryStatus !== 'accepted') {
+              existing.deliveryStatus = item.deliveryStatus;
+              modified = true;
+            }
+          } else if (!ackStatusOnly) {
+            targetLead.messages.push({
+              id: item.id || ('msg_inbox_' + Date.now()),
+              waMessageId: waId,
+              deliveryStatus: item.deliveryStatus || 'delivered',
+              sender: item.sender || 'agent',
+              agentName: item.agentName || (item.sender === 'agent' ? 'Askari Raza' : targetLead.name),
+              text: item.text || '',
+              time: new Date((item.timestamp || Math.floor(Date.now() / 1000)) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              timestamp: item.timestamp || Math.floor(Date.now() / 1000),
+              type: item.type || 'text',
+              hasMedia: Boolean(item.hasMedia),
+              durationSeconds: item.durationSeconds || 0
+            });
+            targetLead.lastMessageAt = item.timestamp || Math.floor(Date.now() / 1000);
+            if (item.sender === 'lead') {
+              targetLead.status = 'unread';
+              targetLead.unreadCount = (targetLead.unreadCount || 0) + 1;
+            } else {
+              targetLead.status = 'replied';
+            }
+            modified = true;
+          }
+        } else if (!ackStatusOnly && cleanPhone && cleanPhone.length >= 10) {
+          const defaultDisplay = '+' + cleanPhone;
+          leads.push({
+            id: 'lead_wa_' + cleanPhone,
+            company_id: 'COMP-001',
+            name: item.name || defaultDisplay,
+            phone: cleanPhone,
+            display: defaultDisplay,
+            city: '',
+            network: 'WhatsApp',
+            ownerId: item.viaUserId || 'EMP-TM-MWMK43N9',
+            ownerName: item.agentName || 'Askari Raza',
+            ownerUsername: 'askari',
+            leadState: 'ongoing',
+            status: item.sender === 'lead' ? 'unread' : 'replied',
+            unreadCount: item.sender === 'lead' ? 1 : 0,
+            interest: 'WhatsApp Live Sync',
+            lastActive: 'Just now',
+            lastMessageAt: item.timestamp || Math.floor(Date.now() / 1000),
+            notes: 'Live synced from connected WhatsApp',
+            messages: [{
+              id: item.id || ('msg_inbox_' + Date.now()),
+              waMessageId: waId,
+              deliveryStatus: item.deliveryStatus || 'delivered',
+              sender: item.sender || 'agent',
+              agentName: item.agentName || 'Askari Raza',
+              text: item.text || '',
+              time: new Date((item.timestamp || Math.floor(Date.now() / 1000)) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              timestamp: item.timestamp || Math.floor(Date.now() / 1000),
+              type: item.type || 'text',
+              hasMedia: Boolean(item.hasMedia),
+              durationSeconds: item.durationSeconds || 0
+            }]
+          });
+          modified = true;
+        }
+
+        if (modified) {
+          try { fs.writeFileSync(p, JSON.stringify(leads, null, 2), 'utf8'); } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
   function ack(message, value) {
     const id = message.id?._serialized;
+    const nextStatus = statusOf(value);
     const item = messages.get(id);
     if (!item) {
       if (id) {
         const current = pendingAcks.get(id);
         if (current === undefined || Number(value) === -1 || Number(value) > current) pendingAcks.set(id, Number(value));
         if (pendingAcks.size > 2000) pendingAcks.delete(pendingAcks.keys().next().value);
+        syncToLeadsFile({ waMessageId: id, deliveryStatus: nextStatus }, true);
       }
       return;
     }
-    const nextStatus = statusOf(value);
     const currentRank = statusRank[item.deliveryStatus] ?? -1;
     const nextRank = statusRank[nextStatus] ?? -1;
     if (item.deliveryStatus !== nextStatus && (nextRank > currentRank || (nextStatus === 'failed' && currentRank < 2))) {
       item.deliveryStatus = nextStatus; item.revision = ++revision; save();
+      syncToLeadsFile(item, true);
     }
   }
   async function syncChat(phone) {

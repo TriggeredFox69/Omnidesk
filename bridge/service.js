@@ -61,6 +61,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
     deviceReady: id => devicePool.isReady(id),
     // The company's main linked WhatsApp, so a TM whose phone is linked there also counts.
     mainStatus: () => ({ ready: phase === 'ready', number }),
+    inbox,
     dataDir: bridgeDataDir,
     getLeadsPath: (companyId = 'COMP-001') => {
       const cleanId = String(companyId || 'COMP-001').replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';

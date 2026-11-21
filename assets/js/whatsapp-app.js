@@ -6,7 +6,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
   // Safe HTML Escaping Helper
-  function escapeHtml(text) {
+  window.escapeHtml = function(text) {
     if (text === null || text === undefined) return '';
     return String(text)
       .replace(/&/g, '&amp;')
@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-  }
+  };
+  function escapeHtml(text) { return window.escapeHtml(text); }
 
   // Default Team Agents (Strict Roles: Admin, Team Lead, Team Member)
   const defaultAgents = [
