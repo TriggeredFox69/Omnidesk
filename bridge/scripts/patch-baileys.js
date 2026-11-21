@@ -20,6 +20,15 @@ const path = require('node:path');
 //    address and crashes ("Cannot destructure property 'user' of jidDecode(...)"), so
 //    that device stays on "Waiting for this message". The bridge remembers where each
 //    message it sent went; Baileys now asks it (config.resolveRetryDestination).
+//
+// 3. When a contact's phone cannot decrypt a message it asks for a resend. rc14 resent
+//    with the SAME session the phone just failed on, and only rebuilt the session on a
+//    second request if none had been rebuilt for that device in the last hour (and it
+//    never passed the phone's MAC-error code, so its "recreate immediately" rule could
+//    not fire). A broken session therefore stayed broken: every message showed
+//    "Waiting for this message". Now any resend request rebuilds the session (fresh
+//    key exchange) for that device first; resends per message stay capped by Baileys'
+//    retry limit.
 const socketDir = path.join(__dirname, '..', 'node_modules', '@whiskeysockets', 'baileys', 'lib', 'Socket');
 
 function applyAll(fileName, mark, patches) {
@@ -85,5 +94,17 @@ applyAll('messages-recv.js', '/* chatly-patch: retry-destination */', [
         if (!remoteJid && attrs.type === 'retry' && isNodeFromMe && typeof config.resolveRetryDestination === 'function') {
             remoteJid = config.resolveRetryDestination(attrs.id) || remoteJid;
         }`
+  }
+]);
+
+applyAll('messages-recv.js', '/* chatly-patch: fresh-session-on-retry */', [
+  {
+    from: `        if (enableAutoSessionRecreation && messageRetryManager && retryCount > 1 && !injectedFromBundle) {`,
+    to: `        /* chatly-patch: fresh-session-on-retry */
+        if (enableAutoSessionRecreation && messageRetryManager && retryCount >= 1 && !injectedFromBundle) {`
+  },
+  {
+    from: `                const result = messageRetryManager.shouldRecreateSession(participant, hasSession.exists);`,
+    to: `                const result = { recreate: true, reason: hasSession.exists ? 'contact could not decrypt: fresh session for the resend' : 'no session' };`
   }
 ]);

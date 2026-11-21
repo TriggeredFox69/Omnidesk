@@ -22,6 +22,10 @@ SCRIPT="$BASE_DIR/bridge/bridge.bundle.js"
 if [ ! -f "$SCRIPT" ]; then SCRIPT="$BASE_DIR/bridge/server.js"; fi
 
 PIDFILE="$WHATSAPP_DATA_DIR/daemon.pid"
+# Temporary diagnostics: put "debug" in data/whatsapp-bridge/log_level and restart.
+if [ -s "$WHATSAPP_DATA_DIR/log_level" ]; then
+    export WHATSAPP_BRIDGE_LOG_LEVEL="$(head -c 10 "$WHATSAPP_DATA_DIR/log_level" | tr -cd 'a-z')"
+fi
 LOGFILE="$WHATSAPP_DATA_DIR/bridge.log"
 
 # Only ONE supervisor may run. Extra copies used to start extra bridges that fought
