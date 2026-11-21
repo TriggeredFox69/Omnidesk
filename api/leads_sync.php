@@ -412,6 +412,59 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
                     'time' => date('H:i', time() - 600)
                 ]
             ]
+        ],
+        [
+            'id' => 'lead_wa_923009876543',
+            'company_id' => $activeCompanyId,
+            'name' => 'Usman Butt (+923009876543)',
+            'phone' => '923009876543',
+            'display' => '+92 300 9876543',
+            'city' => 'Islamabad',
+            'network' => 'WhatsApp',
+            'ownerId' => $targetCloserId,
+            'ownerName' => $targetCloserName,
+            'ownerUsername' => $targetCloserUser,
+            'leadState' => 'pending_verification',
+            'status' => 'pending_verification',
+            'verificationStatus' => 'pending',
+            'unreadCount' => 0,
+            'interest' => 'Nunno Scalper VIP Pro',
+            'lastActive' => '5m ago',
+            'lastMessageAt' => time() - 300,
+            'dealAmount' => 12000,
+            'notes' => 'Transferred via JazzCash Rs. 12,000. TID: JC99882211',
+            'paidDetails' => [
+                'amount' => 12000,
+                'plan' => 'Nunno Scalper VIP Pro',
+                'closedBy' => $targetCloserName,
+                'closerId' => $targetCloserId,
+                'closerUsername' => $targetCloserUser,
+                'notes' => 'JazzCash Deposit TID: JC99882211',
+                'markedAt' => date('c', time() - 300)
+            ],
+            'messages' => [
+                [
+                    'id' => 'msg_usm_1',
+                    'waMessageId' => 'true_923009876543@s.whatsapp.net_1',
+                    'deliveryStatus' => 'read',
+                    'sender' => 'agent',
+                    'agentName' => $targetCloserName,
+                    'text' => 'Salam Usman bhai, JazzCash account details bhej di hain.',
+                    'type' => 'text',
+                    'timestamp' => time() - 600,
+                    'time' => date('H:i', time() - 600)
+                ],
+                [
+                    'id' => 'msg_usm_2',
+                    'waMessageId' => 'false_923009876543@s.whatsapp.net_2',
+                    'deliveryStatus' => 'delivered',
+                    'sender' => 'lead',
+                    'text' => 'Done Askari bhai! Sent 12,000 PKR to JazzCash. TID is JC99882211. Kindly verify and activate VIP signals.',
+                    'type' => 'text',
+                    'timestamp' => time() - 300,
+                    'time' => date('H:i', time() - 300)
+                ]
+            ]
         ]
     ];
 
@@ -438,6 +491,157 @@ if ($action === 'seed_demo_campaign' || $action === 'seed_demo') {
         'message' => 'Demo campaign leads seeded successfully with text, voice notes and live sync state.',
         'leads_count' => count($currentLeads)
     ]);
+    exit;
+}
+
+// 0b. Get All Pending Verification Deals for Admin Audit
+if ($action === 'get_pending_deals') {
+    $pending = [];
+    foreach ($currentLeads as $l) {
+        $state = strtolower($l['leadState'] ?? ($l['status'] ?? ''));
+        $verifStatus = strtolower($l['verificationStatus'] ?? '');
+        if ($state === 'pending_verification' || $verifStatus === 'pending') {
+            $pending[] = $l;
+        }
+    }
+    echo json_encode([
+        'success' => true,
+        'deals' => $pending,
+        'count' => count($pending)
+    ]);
+    exit;
+}
+
+// 0c. Admin Action: Verify Deal & Release Commission to Closer Wallet
+if ($action === 'verify_deal') {
+    $userRole = strtolower($sessionUser['role'] ?? '');
+    if (!in_array($userRole, ['admin', 'superadmin'], true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Only administrators can verify deals and release commissions.']);
+        exit;
+    }
+
+    $leadId = $input['id'] ?? '';
+    if (empty($leadId)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Lead ID is required.']);
+        exit;
+    }
+
+    $foundLead = null;
+    foreach ($currentLeads as &$l) {
+        if (($l['id'] ?? '') === $leadId || ($l['phone'] ?? '') === $leadId) {
+            $l['leadState'] = 'paid';
+            $l['status'] = 'paid';
+            $l['verificationStatus'] = 'verified';
+            $l['verifiedBy'] = $sessionUser['name'] ?? 'System Administrator';
+            $l['verifiedAt'] = date('Y-m-d H:i:s');
+
+            $amount = (int)($l['paidDetails']['amount'] ?? ($l['dealAmount'] ?? 5000));
+            $commission = (int)($l['paidDetails']['commission'] ?? 1500);
+            $plan = $l['paidDetails']['plan'] ?? ($l['interest'] ?? 'Nunno Pro');
+            $closerId = $l['originalOwnerId'] ?? ($l['paidDetails']['closedById'] ?? ($l['ownerId'] ?? ''));
+            $closerName = $l['originalOwnerName'] ?? ($l['paidDetails']['closedBy'] ?? ($l['ownerName'] ?? 'Closer'));
+
+            // Credit closer commission in data/users.json
+            if ($closerId) {
+                $usersFile = __DIR__ . '/../data/users.json';
+                if (file_exists($usersFile)) {
+                    $users = json_decode(file_get_contents($usersFile), true) ?: [];
+                    foreach ($users as &$u) {
+                        if (($u['id'] ?? '') === $closerId || strtolower($u['username'] ?? '') === strtolower($closerId)) {
+                            $u['commission_balance'] = ((int)($u['commission_balance'] ?? 0)) + $commission;
+                            $u['total_sales_amount'] = ((int)($u['total_sales_amount'] ?? 0)) + $amount;
+                            $u['deals_won_count'] = ((int)($u['deals_won_count'] ?? 0)) + 1;
+                            break;
+                        }
+                    }
+                    unset($u);
+                    file_put_contents($usersFile, json_encode($users, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                }
+            }
+
+            // Append official confirmation to messages
+            if (!isset($l['messages']) || !is_array($l['messages'])) $l['messages'] = [];
+            $l['messages'][] = [
+                'id' => 'verif_' . time(),
+                'sender' => 'agent',
+                'agentName' => 'Security Audit',
+                'text' => "🟢 PAYMENT VERIFIED & COMMISSION RELEASED!\n• Deal: {$plan} (Rs. " . number_format($amount) . ")\n• Commission Released: Rs. " . number_format($commission) . " to {$closerName}\n• Approved by: " . ($sessionUser['name'] ?? 'System Administrator'),
+                'time' => date('H:i'),
+                'timestamp' => time()
+            ];
+
+            $foundLead = $l;
+            break;
+        }
+    }
+    unset($l);
+
+    if ($foundLead) {
+        saveStoredLeads($dataFile, $currentLeads);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Deal verified successfully! Commission released to closer wallet.',
+            'lead' => $foundLead
+        ]);
+    } else {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Lead not found.']);
+    }
+    exit;
+}
+
+// 0d. Admin Action: Reject Fake Transaction
+if ($action === 'reject_deal') {
+    $userRole = strtolower($sessionUser['role'] ?? '');
+    if (!in_array($userRole, ['admin', 'superadmin'], true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Only administrators can reject deals.']);
+        exit;
+    }
+
+    $leadId = $input['id'] ?? '';
+    $reason = trim($input['reason'] ?? 'Fake slip or payment not received on banking portal');
+
+    $foundLead = null;
+    foreach ($currentLeads as &$l) {
+        if (($l['id'] ?? '') === $leadId || ($l['phone'] ?? '') === $leadId) {
+            $l['leadState'] = !empty($l['ownerId']) ? 'ongoing' : 'fresh';
+            $l['status'] = !empty($l['ownerId']) ? 'replied' : 'unread';
+            $l['verificationStatus'] = 'rejected';
+            $l['rejectionReason'] = $reason;
+            $l['rejectedBy'] = $sessionUser['name'] ?? 'System Administrator';
+            $l['rejectedAt'] = date('Y-m-d H:i:s');
+            $l['paidDetails'] = null;
+
+            if (!isset($l['messages']) || !is_array($l['messages'])) $l['messages'] = [];
+            $l['messages'][] = [
+                'id' => 'rej_' . time(),
+                'sender' => 'agent',
+                'agentName' => 'Security Audit',
+                'text' => "🔴 TRANSACTION REJECTED (AUDIT NOTICE)\n• Reason: {$reason}\n• Audited by: " . ($sessionUser['name'] ?? 'System Administrator') . "\n• Status reverted to Ongoing.",
+                'time' => date('H:i'),
+                'timestamp' => time()
+            ];
+
+            $foundLead = $l;
+            break;
+        }
+    }
+    unset($l);
+
+    if ($foundLead) {
+        saveStoredLeads($dataFile, $currentLeads);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Transaction rejected and lead reverted to ongoing.',
+            'lead' => $foundLead
+        ]);
+    } else {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Lead not found.']);
+    }
     exit;
 }
 

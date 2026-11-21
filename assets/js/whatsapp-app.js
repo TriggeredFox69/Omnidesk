@@ -190,6 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
     authSubmitBtn: document.getElementById('authSubmitBtn'),
 
     // Employee Provisioning & Roster Modal Elements
+    openVerifyDealsModalBtn: document.getElementById('openVerifyDealsModalBtn'),
+    closeVerifyDealsModalBtn: document.getElementById('closeVerifyDealsModalBtn'),
+    verifyDealsModal: document.getElementById('verifyDealsModal'),
+    headerPendingDealsBadge: document.getElementById('headerPendingDealsBadge'),
+    modalPendingDealsCountBadge: document.getElementById('modalPendingDealsCountBadge'),
+    verifyDealsListContainer: document.getElementById('verifyDealsListContainer'),
     openTeamModalBtn: document.getElementById('openTeamModalBtn'),
     openEmailModalBtn: document.getElementById('openEmailModalBtn'),
     employeeModal: document.getElementById('employeeModal'),
@@ -532,6 +538,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Strict Role Restrictions: Hide Campaigns & Employees for Normal Users
     if (els.tabCampaign) els.tabCampaign.style.display = isAdmin ? 'inline-flex' : 'none';
     if (els.openTeamModalBtn) els.openTeamModalBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (els.openVerifyDealsModalBtn) {
+      els.openVerifyDealsModalBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+      const pendingDeals = (state.leads || []).filter(l => getLeadState(l) === 'pending_verification');
+      if (els.headerPendingDealsBadge) {
+        els.headerPendingDealsBadge.textContent = pendingDeals.length;
+        els.headerPendingDealsBadge.style.display = pendingDeals.length > 0 ? 'inline-block' : 'none';
+      }
+    }
     if (els.adminDeleteToggleBtn) els.adminDeleteToggleBtn.style.display = 'inline-flex';
 
     if (els.tabEmployeeLabel) {
@@ -5994,6 +6008,109 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // --- ADMIN VERIFY DEALS MODAL & COMMISSION RELEASE ---
+  function openVerifyDealsModal() {
+    if (!state.currentUser || (state.currentUser.role !== 'admin' && state.currentUser.role !== 'master admin')) {
+      showToast('⚠️ Access Denied: Only Administrator can verify paid deals.');
+      return;
+    }
+    if (els.verifyDealsModal) els.verifyDealsModal.classList.add('open');
+    renderVerifyDealsModal();
+  }
+
+  function closeVerifyDealsModal() {
+    if (els.verifyDealsModal) els.verifyDealsModal.classList.remove('open');
+  }
+
+  function renderVerifyDealsModal() {
+    if (!els.verifyDealsListContainer) return;
+    const pendingDeals = (state.leads || []).filter(l => getLeadState(l) === 'pending_verification');
+    if (els.modalPendingDealsCountBadge) {
+      els.modalPendingDealsCountBadge.textContent = `${pendingDeals.length} Pending`;
+    }
+    if (els.headerPendingDealsBadge) {
+      els.headerPendingDealsBadge.textContent = pendingDeals.length;
+      els.headerPendingDealsBadge.style.display = pendingDeals.length > 0 ? 'inline-block' : 'none';
+    }
+
+    if (!pendingDeals.length) {
+      els.verifyDealsListContainer.innerHTML = `
+        <div style="text-align:center; padding:48px 20px; background:rgba(255,255,255,0.02); border-radius:12px; border:1px dashed var(--border-color);">
+          <div style="font-size:36px; margin-bottom:8px;">✅</div>
+          <div style="font-weight:700; font-size:15px; color:var(--text-primary); margin-bottom:4px;">No Pending Deals Awaiting Verification</div>
+          <div class="text-xs text-muted">When a closer marks a deal as paid, it will appear here for payment proof verification and commission release.</div>
+        </div>
+      `;
+      return;
+    }
+
+    els.verifyDealsListContainer.innerHTML = pendingDeals.map(l => {
+      const closerName = escapeHtml(l.originalOwnerName || l.paidDetails?.closedBy || l.ownerName || 'Closer');
+      const custName = escapeHtml(l.name || l.phone || 'Customer');
+      const plan = escapeHtml(l.paidDetails?.plan || l.interest || 'Product Deal');
+      const amount = Number(l.paidDetails?.amount || 5000);
+      const commission = Math.round(amount * 0.10);
+      const ref = escapeHtml(l.paidDetails?.notes || l.paidDetails?.reference || 'N/A');
+      const time = l.paidDetails?.markedAt ? new Date(l.paidDetails.markedAt).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : (l.time || 'Just now');
+
+      return `
+        <div style="background:var(--bg-secondary); border:1px solid rgba(245,158,11,0.25); border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:40px; height:40px; border-radius:50%; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); display:flex; align-items:center; justify-content:center; font-size:18px;">
+                💰
+              </div>
+              <div>
+                <div style="font-size:15px; font-weight:800; color:var(--text-primary);">
+                  ${custName} <span class="text-xs text-muted">(${escapeHtml(l.phone || '')})</span>
+                </div>
+                <div class="text-xs" style="color:var(--text-muted); display:flex; gap:8px; margin-top:2px;">
+                  <span>👤 Closer: <strong style="color:var(--text-primary);">${closerName}</strong></span>
+                  <span>•</span>
+                  <span>📦 Package: <strong>${plan}</strong></span>
+                  <span>•</span>
+                  <span>⏱️ ${time}</span>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:16px; font-weight:900; color:#10b981;">Rs. ${amount.toLocaleString()}</div>
+              <div style="font-size:11px; font-weight:700; color:#fbbf24;">Commission: Rs. ${commission.toLocaleString()} (10%)</div>
+            </div>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.15); border-radius:8px; padding:8px 12px; font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span style="font-weight:600; color:var(--text-primary);">Payment Ref / Transaction Proof:</span> ${ref}
+            </div>
+            <div style="font-size:11px; color:#f59e0b; font-weight:700;">
+              ⏳ Awaiting Bank/Wallet Audit
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:4px;">
+            <button class="btn btn-secondary btn-sm" style="color:#ef4444; border-color:rgba(239,68,68,0.3);" onclick="window.adminRejectDealFromModal('${l.id}')">
+              ❌ Reject Fake / Void
+            </button>
+            <button class="btn btn-primary btn-sm" style="background:#10b981; border-color:#059669; font-weight:700;" onclick="window.adminVerifyDealFromModal('${l.id}')">
+              ✅ Verify &amp; Release Commission (Rs. ${commission.toLocaleString()})
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.adminVerifyDealFromModal = async function(id) {
+    await verifyPaymentDeal(id);
+    renderVerifyDealsModal();
+  };
+
+  window.adminRejectDealFromModal = async function(id) {
+    await rejectFakeDeal(id);
+    renderVerifyDealsModal();
+  };
+
   // --- EMPLOYEE PROVISIONING & MANAGEMENT (ADMIN ONLY) ---
 
   function openTeamModal() {
@@ -6568,6 +6685,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   if (els.headerLogoutBtn) els.headerLogoutBtn.addEventListener('click', handleLogout);
+  if (els.openVerifyDealsModalBtn) els.openVerifyDealsModalBtn.addEventListener('click', openVerifyDealsModal);
+  if (els.closeVerifyDealsModalBtn) els.closeVerifyDealsModalBtn.addEventListener('click', closeVerifyDealsModal);
   if (els.openTeamModalBtn) els.openTeamModalBtn.addEventListener('click', openTeamModal);
   if (els.closeTeamModalBtn) els.closeTeamModalBtn.addEventListener('click', closeTeamModal);
   if (els.genEmpPassBtn) els.genEmpPassBtn.addEventListener('click', generateRandomPassword);
@@ -7311,9 +7430,16 @@ document.addEventListener('DOMContentLoaded', () => {
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
+    if (typeof renderVerifyDealsModal === 'function') renderVerifyDealsModal();
     if (els.scoreModal && els.scoreModal.classList.contains('open')) {
       renderScoreData(state.activeScoreTab || 'verify');
     }
+
+    fetch('api/leads_sync.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify_deal', id: lead.id })
+    }).catch(e => console.warn('verify_deal sync:', e));
 
     syncLeadToServer(lead, {
       leadState: 'paid',
@@ -7366,9 +7492,16 @@ document.addEventListener('DOMContentLoaded', () => {
     renderConversationsList();
     renderActiveChat();
     renderAgentProfile();
+    if (typeof renderVerifyDealsModal === 'function') renderVerifyDealsModal();
     if (els.scoreModal && els.scoreModal.classList.contains('open')) {
       renderScoreData(state.activeScoreTab || 'verify');
     }
+
+    fetch('api/leads_sync.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject_deal', id: lead.id, reason: reason || defaultReason })
+    }).catch(e => console.warn('reject_deal sync:', e));
 
     syncLeadToServer(lead, {
       leadState: lead.leadState,

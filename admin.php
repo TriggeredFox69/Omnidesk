@@ -602,6 +602,9 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     <button class="dash-tab-btn" id="tabBtnLeads" onclick="switchDashboardTab('leads')">
       <span>👑</span> Live Leads &amp; Admin Takeover
     </button>
+    <button class="dash-tab-btn" id="tabBtnVerifyDeals" onclick="switchDashboardTab('verifyDeals')" style="border-color:rgba(245,158,11,0.35);">
+      <span>🛡️</span> Verify Paid Deals <span id="badgePendingDealsCount" style="display:none; background:#ef4444; color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; font-weight:800; margin-left:6px;">0</span>
+    </button>
     <button class="dash-tab-btn" id="tabBtnCampaigns" onclick="switchDashboardTab('campaigns')">
       <span>🚀</span> Multi-Device Campaign (Round-Robin)
     </button>
@@ -714,6 +717,44 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
           </thead>
           <tbody id="employeeTableBody">
             <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Loading employee roster...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: VERIFY PAID DEALS & RELEASE COMMISSIONS -->
+  <div class="dash-pane" id="paneVerifyDeals">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>🛡️</span> Marked Paid Deals &amp; Closer Commission Release</div>
+          <div class="box-desc">
+            When closers (TMs) or Team Leads close a sale and mark it paid, deals arrive here for verification. 
+            Confirm the deposit on your EasyPaisa, JazzCash, or Bank statement, then click <strong>Verify &amp; Release Commission</strong> to credit the closer's wallet.
+          </div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-secondary" onclick="loadPendingDeals()">🔄 Refresh Deals</button>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Closer (TM/TL)</th>
+              <th>Customer Lead</th>
+              <th>Package / Product</th>
+              <th>Deal Amount</th>
+              <th>Commission Due</th>
+              <th>Payment Proof / Ref</th>
+              <th>Submitted</th>
+              <th>Audit Action</th>
+            </tr>
+          </thead>
+          <tbody id="pendingDealsTableBody">
+            <tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Loading pending deals...</td></tr>
           </tbody>
         </table>
       </div>
@@ -1390,7 +1431,7 @@ async function saveTLCommissionRate() {
 }
 
 function switchDashboardTab(tabName) {
-  const tabs = ['closers', 'pending', 'leads', 'campaigns', 'commissions', 'products', 'withdrawals'];
+  const tabs = ['closers', 'pending', 'verifyDeals', 'leads', 'campaigns', 'commissions', 'products', 'withdrawals'];
   tabs.forEach((t) => {
     const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
     const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1398,6 +1439,7 @@ function switchDashboardTab(tabName) {
     if (btn) btn.classList.toggle('active', t === tabName);
   });
   if (tabName === 'pending') loadPendingTMs();
+  if (tabName === 'verifyDeals') loadPendingDeals();
   if (tabName === 'leads') loadCompanyLeads();
   if (tabName === 'campaigns') { loadCampaignSenders(); pollCampaignStatus(); }
   if (tabName === 'products') loadCompanyConfig();
@@ -1927,6 +1969,116 @@ function renderTLLedger(employees) {
       </tr>
     `;
   }).join('');
+}
+
+// Load Pending Deals for Verification & Commission Release
+async function loadPendingDeals() {
+  const tbody = document.getElementById('pendingDealsTableBody');
+  const badge = document.getElementById('badgePendingDealsCount');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">Fetching pending deals...</td></tr>';
+  try {
+    const res = await fetch('api/leads_sync.php?action=get_pending_deals');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.deals)) {
+      if (badge) {
+        badge.textContent = data.deals.length;
+        badge.style.display = data.deals.length > 0 ? 'inline-block' : 'none';
+      }
+      if (!data.deals.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:36px; color:var(--text-muted); font-size:13px;">✅ All clear! There are no marked paid deals awaiting verification.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.deals.map(d => {
+        const closerName = d.originalOwnerName || d.paidDetails?.closedBy || d.ownerName || 'Closer';
+        const closerId = d.originalOwnerId || d.paidDetails?.closedById || d.ownerId || '';
+        const amt = parseInt(d.paidDetails?.amount || d.dealAmount || 5000, 10);
+        const comm = parseInt(d.paidDetails?.commission || 1500, 10);
+        const plan = d.paidDetails?.plan || d.interest || 'Nunno Pro';
+        const method = d.paidDetails?.method || 'EasyPaisa / Bank';
+        const trx = d.paidDetails?.trxId || d.paidDetails?.refId || 'Slip attached in chat';
+        const time = d.paidDetails?.closedAt || d.lastActive || 'Recently';
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:700; color:var(--text-primary);">${escapeHtml(closerName)}</div>
+              <div style="font-size:10.5px; color:var(--text-muted);">${escapeHtml(closerId)}</div>
+            </td>
+            <td>
+              <div style="font-weight:700; color:#38bdf8;">+${escapeHtml(d.phone || '')}</div>
+              <div style="font-size:11px; color:var(--text-secondary);">${escapeHtml(d.name || '')}</div>
+            </td>
+            <td><span class="badge-pkg">${escapeHtml(plan)}</span></td>
+            <td><strong style="color:#fbbf24;">Rs. ${amt.toLocaleString()}</strong></td>
+            <td><strong style="color:#10b981;">Rs. ${comm.toLocaleString()}</strong></td>
+            <td>
+              <div style="font-size:11.5px; font-weight:600; color:#e2e8f0;">${escapeHtml(method)}</div>
+              <div style="font-size:10.5px; font-family:'JetBrains Mono',monospace; color:#94a3b8;">${escapeHtml(trx)}</div>
+            </td>
+            <td style="font-size:11.5px; color:var(--text-muted);">${escapeHtml(time)}</td>
+            <td>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button class="btn btn-emerald btn-xs" onclick="adminVerifyDeal('${d.id}')" style="padding:4px 9px; font-weight:750; font-size:11px;" title="Approve & Release Commission">
+                  ✓ Verify & Release
+                </button>
+                <button class="btn btn-secondary btn-xs" onclick="adminRejectDeal('${d.id}')" style="padding:4px 9px; font-weight:700; font-size:11px; color:#ef4444;" title="Reject Fake Transaction">
+                  ✕ Reject
+                </button>
+                <a href="index.html?chat=${encodeURIComponent(d.phone || d.id)}" target="_blank" class="btn btn-ghost btn-xs" style="padding:4px 6px; font-size:11px;" title="Open Chat Thread">
+                  💬
+                </a>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#ef4444;">Error loading pending deals: ${err.message}</td></tr>`;
+  }
+}
+
+async function adminVerifyDeal(leadId) {
+  if (!confirm('Verify this transaction and release commission to the closer wallet?')) return;
+  try {
+    const res = await fetch('api/leads_sync.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify_deal', id: leadId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('🟢 ' + (data.message || 'Deal verified successfully and commission released!'));
+      loadPendingDeals();
+      loadCompanyLeads();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to verify deal.'));
+    }
+  } catch (e) {
+    alert('Error verifying deal: ' + e.message);
+  }
+}
+
+async function adminRejectDeal(leadId) {
+  const reason = prompt('Reason for rejecting this deal (Fake slip / Payment not received / Invalid Ref):', 'Fake slip or payment not received on bank statement');
+  if (reason === null) return;
+  try {
+    const res = await fetch('api/leads_sync.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject_deal', id: leadId, reason })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('🔴 ' + (data.message || 'Transaction rejected.'));
+      loadPendingDeals();
+      loadCompanyLeads();
+    } else {
+      alert('Error: ' + (data.error || 'Failed to reject deal.'));
+    }
+  } catch (e) {
+    alert('Error rejecting deal: ' + e.message);
+  }
 }
 
 // Load Company Leads for Live Board & Takeover (Request 8)
@@ -2992,6 +3144,7 @@ async function handleAdminPayoutSubmit(e) {
 <?php if ($isAdmin): ?>
 loadEmployees();
 loadPendingTMs();
+loadPendingDeals();
 loadCompanyLeads();
 loadCompanyConfig();
 loadCompanyWithdrawals();

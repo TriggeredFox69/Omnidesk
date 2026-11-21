@@ -172,6 +172,12 @@
         <span class="badge-role-admin" id="headerEmpCount">2</span>
       </button>
 
+      <button class="btn-header-admin" id="openVerifyDealsModalBtn" style="display:none; background:rgba(245,158,11,0.18); border-color:rgba(245,158,11,0.45); color:#fbbf24;" title="Verify Marked Paid Deals &amp; Release Closer Commissions">
+        <span>🛡️</span>
+        <span>Verify Deals</span>
+        <span class="badge-role-admin" id="headerPendingDealsBadge" style="display:none; background:#ef4444; color:#fff; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:800; margin-left:4px;">0</span>
+      </button>
+
       <button class="btn-header-admin" id="openEmailModalBtn" style="display:none;" title="Admin Portal: Email Communications Hub">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         <span>Email Hub</span>
@@ -1955,6 +1961,35 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       MODAL: ADMIN VERIFY PAID DEALS & RELEASE COMMISSIONS
+  ════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="verifyDealsModal">
+    <div class="emp-modal-box" style="max-width:920px;">
+      <div class="emp-modal-header">
+        <div class="emp-modal-title-group">
+          <div class="emp-modal-icon" style="background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.3); color:#fbbf24;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:17px; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+              <span>Marked Paid Deals &amp; Commission Release</span>
+              <span class="badge-role-admin" id="modalPendingDealsCountBadge" style="background:#ef4444; color:#fff;">0 Pending</span>
+            </div>
+            <div class="text-xs text-muted">Audit submitted payments before approving deals won and releasing closer commissions to their wallet</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-xs" id="closeVerifyDealsModalBtn">✕</button>
+      </div>
+
+      <div style="padding:20px 24px; max-height:550px; overflow-y:auto;">
+        <div id="verifyDealsListContainer" style="display:flex; flex-direction:column; gap:12px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
     </div>
   </div>
 

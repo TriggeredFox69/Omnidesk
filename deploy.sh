@@ -4,6 +4,7 @@
 # ========================================================
 set -e
 export PATH="/opt/alt/alt-nodejs22/root/usr/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+export npm_config_ignore_scripts=true
 
 TARGETS=(
   "/home/dailygol/chatly.pk"
@@ -31,9 +32,6 @@ for TARGET in "${TARGETS[@]}"; do
     /bin/cp -R bridge/dist "$TARGET/bridge/" 2>/dev/null || true
     /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json "$TARGET/bridge/" 2>/dev/null || true
     /bin/chmod +x "$TARGET/bridge/"*.sh 2>/dev/null || true
-    if [ -d "/home/dailygol/repositories/Omnidesk/bridge/node_modules" ] && [ ! -d "$TARGET/bridge/node_modules" ]; then
-        ln -sfn /home/dailygol/repositories/Omnidesk/bridge/node_modules "$TARGET/bridge/node_modules" 2>/dev/null || true
-    fi
 
     # Data files (preserve existing runtime json if present)
     /bin/cp -f data/.htaccess "$TARGET/data/" 2>/dev/null || true
@@ -46,18 +44,18 @@ for TARGET in "${TARGETS[@]}"; do
   fi
 done
 
-# Ensure node_modules exists
-if [ ! -d "/home/dailygol/chatly.pk/bridge/node_modules/@whiskeysockets/baileys" ]; then
-    echo "Installing missing bridge node_modules..."
-    cd /home/dailygol/chatly.pk/bridge
-    if [ -d "/home/dailygol/repositories/Omnidesk/bridge/node_modules/@whiskeysockets/baileys" ]; then
-        ln -sfn /home/dailygol/repositories/Omnidesk/bridge/node_modules ./node_modules 2>/dev/null || true
-    fi
-    if [ ! -d "/home/dailygol/chatly.pk/bridge/node_modules/@whiskeysockets/baileys" ]; then
-        NODE_NPM="/opt/alt/alt-nodejs22/root/usr/bin/npm"
-        if [ ! -x "$NODE_NPM" ]; then NODE_NPM="$(which npm 2>/dev/null || echo npm)"; fi
-        "$NODE_NPM" install --omit=dev --no-audit --no-fund --ignore-scripts 2>&1 || true
-    fi
+# Ensure bridge node_modules exists and is 100% functional
+echo "Verifying WhatsApp Bridge Node environment..."
+cd /home/dailygol/chatly.pk/bridge
+NODE_BIN="/opt/alt/alt-nodejs22/root/usr/bin/node"
+if [ ! -x "$NODE_BIN" ]; then NODE_BIN="$(which node 2>/dev/null || echo node)"; fi
+NODE_NPM="/opt/alt/alt-nodejs22/root/usr/bin/npm"
+if [ ! -x "$NODE_NPM" ]; then NODE_NPM="$(which npm 2>/dev/null || echo npm)"; fi
+
+if ! "$NODE_BIN" -e "require('@whiskeysockets/baileys'); require('qrcode'); require('pino');" >/dev/null 2>&1; then
+    echo "Bridge dependencies missing or broken. Installing cleanly with --ignore-scripts..."
+    rm -rf node_modules package-lock.json
+    "$NODE_NPM" install --omit=dev --no-audit --no-fund --ignore-scripts
 fi
 
 # Restart WhatsApp bridge daemon with fresh code
@@ -70,4 +68,6 @@ rm -f /home/dailygol/chatly.pk/data/whatsapp-bridge/daemon.pid /home/dailygol/ch
 if [ -f "/home/dailygol/chatly.pk/bridge/run-daemon.sh" ]; then
     nohup /bin/bash /home/dailygol/chatly.pk/bridge/run-daemon.sh >/dev/null 2>&1 &
 fi
-echo "Deployment complete!"
+sleep 2
+echo "Deployment complete! Checking bridge status..."
+curl -s -m 3 http://127.0.0.1:3210/status || echo "Bridge starting up..."
