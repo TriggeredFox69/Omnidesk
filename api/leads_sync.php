@@ -263,10 +263,25 @@ if ($action === 'get_leads') {
     if ($modified) {
         saveStoredLeads($dataFile, $currentLeads);
     }
+    $leadsToReturn = $currentLeads;
+    $userRole = strtolower($sessionUser['role'] ?? '');
+    if (!empty($sessionUser) && $userRole === 'member') {
+        $myId = $sessionUser['id'] ?? '';
+        $myUser = strtolower($sessionUser['username'] ?? '');
+        $leadsToReturn = array_values(array_filter($currentLeads, function($l) use ($myId, $myUser) {
+            $ownerId = $l['ownerId'] ?? ($l['assignedOwnerId'] ?? ($l['assignedCloser']['id'] ?? ''));
+            $ownerUser = strtolower($l['ownerUsername'] ?? ($l['assignedOwnerUsername'] ?? ($l['assignedCloser']['username'] ?? '')));
+            if ($ownerId && $ownerId === $myId) return true;
+            if ($myUser && $ownerUser === $myUser) return true;
+            if (!empty($l['originalOwnerId']) && $l['originalOwnerId'] === $myId) return true;
+            return false;
+        }));
+    }
+
     echo json_encode([
         'success'        => true,
-        'leads'          => $currentLeads,
-        'count'          => count($currentLeads),
+        'leads'          => $leadsToReturn,
+        'count'          => count($leadsToReturn),
         'company_id'     => $activeCompanyId,
         'company_config' => $companyConfig
     ]);

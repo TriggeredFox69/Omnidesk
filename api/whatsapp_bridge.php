@@ -754,6 +754,19 @@ function handleLoginQr(string $action): void {
         'connected_number' => '',
         'message' => $snap['message'] ?? '',
     ];
+    if (empty($out['qr']) && empty($out['is_connected'])) {
+        $mainSnap = whatsappBridgeRequest('/status');
+        if (!empty($mainSnap['qr'])) {
+            $out['qr'] = $mainSnap['qr'];
+            $out['state'] = 'qr';
+            $out['success'] = true;
+        } elseif (!empty($mainSnap['is_connected'])) {
+            $out['is_connected'] = true;
+            $out['state'] = 'ready';
+            $out['connected_number'] = $mainSnap['connected_number'] ?? '';
+            $out['success'] = true;
+        }
+    }
     if (!empty($snap['is_connected']) && !empty($snap['connected_number'])) {
         $phone = preg_replace('/\D+/', '', (string) $snap['connected_number']);
         $_SESSION['qr_verified_phone'] = $phone;

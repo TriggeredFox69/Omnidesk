@@ -1601,8 +1601,27 @@ document.addEventListener('DOMContentLoaded', () => {
       return latest(b) - latest(a);
     });
 
+    const currentUser = state.currentUser || state.currentAgent;
+    const userRole = (currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const myId = currentUser ? currentUser.id : '';
+    const myUsername = currentUser ? (currentUser.username || '').toLowerCase() : '';
+
+    const isMyAllottedLead = l => {
+      if (isAdmin) return true; // Company Admins can see all chats
+      const ownerId = l.ownerId || l.assignedOwnerId || l.assignedCloser?.id || '';
+      const ownerUsername = (l.ownerUsername || l.assignedOwnerUsername || l.assignedCloser?.username || '').toLowerCase();
+      return (ownerId && ownerId === myId) || 
+             (myUsername && ownerUsername === myUsername) || 
+             l.originalOwnerId === myId || 
+             l.paidDetails?.closedById === myId;
+    };
+
     // Filter leads
     let filtered = state.leads.filter(l => {
+      // Strict closer isolation: non-admins NEVER see chats assigned to other closers, even in "All Chats"
+      if (!isAdmin && !isMyAllottedLead(l)) return false;
+
       // Search match
       if (state.searchQuery) {
         const q = state.searchQuery.toLowerCase();
@@ -1616,9 +1635,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Traffic-light filter tabs
       if (state.inboxFilter === 'all') return true;
       if (state.inboxFilter === 'my_ongoing') {
-        const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-        const isOwner = l.ownerId === myId || (state.currentUser?.role === 'admin' && (l.ownerId === 'USR-ADMIN-01' || l.ownerId === 'local-admin' || l.ownerId === myId));
-        return isOwner && lState === 'ongoing';
+        return lState === 'ongoing';
       }
       if (state.inboxFilter === 'fresh') return lState === 'fresh';
       if (state.inboxFilter === 'ongoing') return lState === 'ongoing';
@@ -1627,9 +1644,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.inboxFilter === 'useless') return lState === 'useless';
       if (state.inboxFilter === 'takeover') return l.isTakeover === true;
       if (state.inboxFilter === 'mine') {
-        const myId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-        const myUser = state.currentUser ? (state.currentUser.username || '').toLowerCase() : '';
-        return l.ownerId === myId || (myUser && (l.ownerUsername || '').toLowerCase() === myUser) || l.originalOwnerId === myId || l.paidDetails?.closedById === myId;
+        return true;
       }
       return true;
     });
@@ -1640,15 +1655,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.pipelineFilterTakeover) els.pipelineFilterTakeover.style.display = isMasterRole ? 'inline-block' : 'none';
 
     // Update Subbar KPI widgets and badges
-    const countAll = state.leads.length;
-    const countFresh = state.leads.filter(l => getLeadState(l) === 'fresh').length;
-    const countOngoing = state.leads.filter(l => getLeadState(l) === 'ongoing').length;
-    const countPending = state.leads.filter(l => getLeadState(l) === 'pending_verification').length;
-    const countPaid = state.leads.filter(l => getLeadState(l) === 'paid').length;
-    const countUseless = state.leads.filter(l => getLeadState(l) === 'useless').length;
-    const currentUserId = state.currentUser ? state.currentUser.id : state.currentAgent.id;
-    const currentUsername = state.currentUser ? (state.currentUser.username || '').toLowerCase() : '';
-    const countMine = state.leads.filter(l => l.ownerId === currentUserId || (currentUsername && (l.ownerUsername || '').toLowerCase() === currentUsername) || l.paidDetails?.closedById === currentUserId).length;
+    const baseLeads = isAdmin ? state.leads : state.leads.filter(isMyAllottedLead);
+    const countAll = baseLeads.length;
+    const countFresh = baseLeads.filter(l => getLeadState(l) === 'fresh').length;
+    const countOngoing = baseLeads.filter(l => getLeadState(l) === 'ongoing').length;
+    const countPending = baseLeads.filter(l => getLeadState(l) === 'pending_verification').length;
+    const countPaid = baseLeads.filter(l => getLeadState(l) === 'paid').length;
+    const countUseless = baseLeads.filter(l => getLeadState(l) === 'useless').length;
+    const countMine = baseLeads.length;
 
     if (els.kpiCountAll) els.kpiCountAll.textContent = countAll;
     if (els.kpiCountFresh) els.kpiCountFresh.textContent = countFresh;
