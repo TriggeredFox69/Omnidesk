@@ -1606,13 +1606,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
     const myId = currentUser ? currentUser.id : '';
     const myUsername = currentUser ? (currentUser.username || '').toLowerCase() : '';
+    const myName = currentUser ? (currentUser.name || '').toLowerCase() : '';
 
     const isMyAllottedLead = l => {
       if (isAdmin) return true; // Company Admins can see all chats
       const ownerId = l.ownerId || l.assignedOwnerId || l.assignedCloser?.id || '';
       const ownerUsername = (l.ownerUsername || l.assignedOwnerUsername || l.assignedCloser?.username || '').toLowerCase();
+      const ownerName = (l.ownerName || l.assignedOwnerName || '').toLowerCase().replace(/\s+/g, '');
+      const myNameClean = myName.replace(/\s+/g, '');
+
       return (ownerId && ownerId === myId) || 
              (myUsername && ownerUsername === myUsername) || 
+             (myNameClean && (ownerName === myNameClean || ownerName.includes(myNameClean) || myNameClean.includes(ownerName))) ||
              l.originalOwnerId === myId || 
              l.paidDetails?.closedById === myId;
     };
@@ -1677,7 +1682,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const countMyOngoing = state.leads.filter(l => {
       const lState = getLeadState(l);
-      const isOwner = l.ownerId === currentUserId || (currentUsername && (l.ownerUsername || '').toLowerCase() === currentUsername) || (state.currentUser?.role === 'admin' && (l.ownerId === 'USR-ADMIN-01' || l.ownerId === 'local-admin' || l.ownerId === currentUserId));
+      const isOwner = isMyAllottedLead(l);
       return isOwner && lState === 'ongoing';
     }).length;
 

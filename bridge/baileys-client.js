@@ -234,28 +234,6 @@ class BaileysClient extends EventEmitter {
       if (v?.version) version = v.version;
     } catch (_) {}
 
-    // Auto-heal Signal Protocol Sessions:
-    // Intercept state.keys.get for 'session' to ensure Baileys never encrypts with a closed/broken session.
-    // If a session has no open ratchet (indexInfo.closed !== -1), returning null triggers Baileys to
-    // query WhatsApp for a fresh prekey bundle and establish a brand new Signal session (pkmsg).
-    const originalGet = state.keys.get;
-    state.keys.get = async (type, ids) => {
-      const data = await originalGet(type, ids);
-      if (type === 'session') {
-        for (const id of ids) {
-          const sess = data[id];
-          if (sess && !hasOpenSignalSession(sess)) {
-            console.log(`[Baileys Auto-Heal] Pruning closed/dead session for ${id} to trigger fresh prekey handshake`);
-            data[id] = null;
-            const safeId = String(id).replace(/\//g, '__').replace(/:/g, '-');
-            const filePath = path.join(this.authPath, `session-${safeId}.json`);
-            try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) {}
-          }
-        }
-      }
-      return data;
-    };
-
     this.sock = makeWASocket({
       version,
       auth: state,
@@ -904,16 +882,6 @@ class BaileysClient extends EventEmitter {
     const isVoice = Boolean(options.sendAudioAsVoice || (content?.mimetype?.startsWith('audio/') && options.voice));
 
     console.log(`[Baileys] Sending to ${jid}: ${typeof content === 'string' ? content.slice(0, 40) : (isVoice ? 'Voice Note' : (content?.mimetype || 'media'))}`);
-
-    // Assert and verify active Signal ratchet session exists before encryption
-    try {
-      if (typeof this.sock.assertSessions === 'function') {
-        const assertTargets = [jid];
-        const myJid = this.sock.user?.id ? (this.sock.user.id.split(':')[0].split('@')[0] + '@s.whatsapp.net') : '';
-        if (myJid && myJid !== jid) assertTargets.push(myJid);
-        await this.sock.assertSessions(assertTargets, false).catch(() => {});
-      }
-    } catch (_) {}
 
     if (typeof content === 'string') {
       sent = await this.sock.sendMessage(jid, { text: content });

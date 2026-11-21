@@ -268,11 +268,14 @@ if ($action === 'get_leads') {
     if (!empty($sessionUser) && $userRole === 'member') {
         $myId = $sessionUser['id'] ?? '';
         $myUser = strtolower($sessionUser['username'] ?? '');
-        $leadsToReturn = array_values(array_filter($currentLeads, function($l) use ($myId, $myUser) {
+        $myNameClean = preg_replace('/\s+/', '', strtolower($sessionUser['name'] ?? ''));
+        $leadsToReturn = array_values(array_filter($currentLeads, function($l) use ($myId, $myUser, $myNameClean) {
             $ownerId = $l['ownerId'] ?? ($l['assignedOwnerId'] ?? ($l['assignedCloser']['id'] ?? ''));
             $ownerUser = strtolower($l['ownerUsername'] ?? ($l['assignedOwnerUsername'] ?? ($l['assignedCloser']['username'] ?? '')));
+            $ownerNameClean = preg_replace('/\s+/', '', strtolower($l['ownerName'] ?? ($l['assignedOwnerName'] ?? '')));
             if ($ownerId && $ownerId === $myId) return true;
             if ($myUser && $ownerUser === $myUser) return true;
+            if ($myNameClean && ($ownerNameClean === $myNameClean || strpos($ownerNameClean, $myNameClean) !== false || strpos($myNameClean, $ownerNameClean) !== false)) return true;
             if (!empty($l['originalOwnerId']) && $l['originalOwnerId'] === $myId) return true;
             return false;
         }));

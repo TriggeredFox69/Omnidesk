@@ -3,6 +3,7 @@
 # Chatly Deployment Script for cPanel (chatly.pk)
 # ========================================================
 set -e
+export PATH="/opt/alt/alt-nodejs22/root/usr/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 TARGETS=(
   "/home/dailygol/chatly.pk"
@@ -49,13 +50,13 @@ done
 if [ ! -d "/home/dailygol/chatly.pk/bridge/node_modules/@whiskeysockets/baileys" ]; then
     echo "Installing missing bridge node_modules..."
     cd /home/dailygol/chatly.pk/bridge
-    if [ -d "/home/dailygol/repositories/Omnidesk/bridge/node_modules" ]; then
+    if [ -d "/home/dailygol/repositories/Omnidesk/bridge/node_modules/@whiskeysockets/baileys" ]; then
         ln -sfn /home/dailygol/repositories/Omnidesk/bridge/node_modules ./node_modules 2>/dev/null || true
     fi
     if [ ! -d "/home/dailygol/chatly.pk/bridge/node_modules/@whiskeysockets/baileys" ]; then
         NODE_NPM="/opt/alt/alt-nodejs22/root/usr/bin/npm"
         if [ ! -x "$NODE_NPM" ]; then NODE_NPM="$(which npm 2>/dev/null || echo npm)"; fi
-        "$NODE_NPM" install --omit=dev --no-audit --no-fund 2>&1 || true
+        "$NODE_NPM" install --omit=dev --no-audit --no-fund --ignore-scripts 2>&1 || true
     fi
 fi
 

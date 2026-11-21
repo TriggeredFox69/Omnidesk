@@ -1,5 +1,6 @@
 #!/bin/bash
 # 24/7 Supervisor daemon for Nunno WhatsApp Bridge on cPanel
+export PATH="/opt/alt/alt-nodejs22/root/usr/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 export PORT=3210
 export WHATSAPP_BRIDGE_HOST=127.0.0.1
 export WHATSAPP_ENGINE=baileys
