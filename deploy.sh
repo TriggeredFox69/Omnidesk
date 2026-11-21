@@ -42,7 +42,7 @@ for TARGET in "${TARGETS[@]}"; do
 
     # Bridge Files
     /bin/cp -R bridge/dist "$TARGET/bridge/" 2>/dev/null || true
-    /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json "$TARGET/bridge/" 2>/dev/null || true
+    /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json bridge/package-lock.json "$TARGET/bridge/" 2>/dev/null || true
     /bin/chmod +x "$TARGET/bridge/"*.sh 2>/dev/null || true
 
     # Data files (preserve existing runtime json if present)
@@ -64,9 +64,8 @@ if [ ! -x "$NODE_BIN" ]; then NODE_BIN="$(which node 2>/dev/null || echo node)";
 NODE_NPM="/opt/alt/alt-nodejs22/root/usr/bin/npm"
 if [ ! -x "$NODE_NPM" ]; then NODE_NPM="$(which npm 2>/dev/null || echo npm)"; fi
 
-if ! "$NODE_BIN" -e "require('@whiskeysockets/baileys'); require('qrcode'); require('pino');" >/dev/null 2>&1; then
-    echo "Bridge dependencies missing or broken. Installing cleanly with --ignore-scripts..."
-    rm -rf node_modules package-lock.json
+if ! "$NODE_BIN" -e "if (require('./node_modules/@whiskeysockets/baileys/package.json').version !== '7.0.0-rc14') process.exit(1); import('@whiskeysockets/baileys').then(() => { require('qrcode'); require('pino'); }).catch(() => process.exit(1))" >/dev/null 2>&1; then
+    echo "Bridge dependencies missing or broken. Installing with --ignore-scripts..."
     "$NODE_NPM" install --omit=dev --no-audit --no-fund --ignore-scripts
 fi
 # Restart WhatsApp bridge daemon with fresh code

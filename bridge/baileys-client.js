@@ -7,16 +7,10 @@
 const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const fs = require('node:fs');
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  downloadMediaMessage,
-  normalizeMessageContent,
-  proto,
-  Browsers,
-  fetchLatestBaileysVersion
-} = require('@whiskeysockets/baileys');
+// Baileys v7 is ESM-only. Load it dynamically from this CommonJS bridge.
+let baileysApi;
+let makeWASocket, useMultiFileAuthState, DisconnectReason;
+let downloadMediaMessage, normalizeMessageContent, proto, Browsers, fetchLatestBaileysVersion;
 let pino;
 try {
   pino = require('pino');
@@ -198,6 +192,18 @@ class BaileysClient extends EventEmitter {
     this._destroyed = false;
     fs.mkdirSync(this.authPath, { recursive: true, mode: 0o700 });
 
+    baileysApi ||= await import('@whiskeysockets/baileys');
+    ({
+      default: makeWASocket,
+      useMultiFileAuthState,
+      DisconnectReason,
+      downloadMediaMessage,
+      normalizeMessageContent,
+      proto,
+      Browsers,
+      fetchLatestBaileysVersion
+    } = baileysApi);
+
     // Auto-restore credentials from backup ONLY if the backup contains a valid registered session
     const credsFile = path.join(this.authPath, 'creds.json');
     const backupFile = path.join(this.authPath, '../creds.json.bak');
@@ -255,53 +261,8 @@ class BaileysClient extends EventEmitter {
           return raw;
         }
       }
-      const cached = this._messageCache.get(id);
-      if (cached?.body) {
-        return { conversation: cached.body };
-      }
-      // Fallback to inbox.json storage so campaign & direct messages can ALWAYS be retrieved for retries
-      try {
-        const inboxCandidates = [
-          path.resolve(this.authPath, '../inbox.json'),
-          path.resolve(this.authPath, '../../inbox.json'),
-          path.resolve(__dirname, '../data/whatsapp-bridge/inbox.json')
-        ];
-        for (const inboxPath of inboxCandidates) {
-          if (fs.existsSync(inboxPath)) {
-            const rawInbox = fs.readFileSync(inboxPath, 'utf8');
-            const items = JSON.parse(rawInbox);
-            if (Array.isArray(items)) {
-              const found = items.find(m => m.waMessageId === id || m.id === id);
-              if (found && found.text) {
-                return { conversation: found.text };
-              }
-            }
-            break;
-          }
-        }
-      } catch (_) {}
-      // Fallback to leads.json storage so campaign outreach messages can ALWAYS be retrieved for retries
-      try {
-        const leadsCandidates = [
-          path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
-          path.resolve(__dirname, '../data/leads.json')
-        ];
-        for (const lp of leadsCandidates) {
-          if (fs.existsSync(lp)) {
-            const leads = JSON.parse(fs.readFileSync(lp, 'utf8'));
-            if (Array.isArray(leads)) {
-              for (const lead of leads) {
-                if (Array.isArray(lead.messages)) {
-                  const found = lead.messages.find(m => m.waMessageId === id || m.id === id);
-                  if (found && found.text) {
-                    return { conversation: found.text };
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch (_) {}
+      // Never fabricate a retry payload from CRM text: WhatsApp needs the
+      // original message proto to resend the same encrypted message safely.
       return undefined;
     };
     this.getMessage = getMessageFn;
@@ -310,9 +271,11 @@ class BaileysClient extends EventEmitter {
       version,
       auth: state,
       printQRInTerminal: false,
-      logger: pino({ level: 'silent' }),
+      logger: pino({ level: process.env.WHATSAPP_BRIDGE_LOG_LEVEL || 'warn' }),
       browser: Browsers.ubuntu('Chrome'),
       syncFullHistory: true,
+      enableRecentMessageCache: true,
+      enableAutoSessionRecreation: true,
       keepAliveIntervalMs: 25000,
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
