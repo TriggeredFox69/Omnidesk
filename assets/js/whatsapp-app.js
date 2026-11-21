@@ -606,6 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!els.connectedNumberText) return;
     const userRole = (state.currentUser?.role || '').toLowerCase();
     const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'company admin';
+    if (els.connectedNumberPill) els.connectedNumberPill.style.display = isAdmin ? 'inline-flex' : 'none';
 
     const pillCircle = document.querySelector('#connectedNumberPill .pulse-circle');
     const senders = Array.isArray(window.currentCampaignSenders) ? window.currentCampaignSenders : [];
@@ -636,26 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Closer (TM / TL) personal status
-    const userPhoneRaw = state.connectedWaNumber || state.currentUser?.phone || '';
-    const cleanDigits = String(userPhoneRaw).replace(/\D/g, '');
-    const userPhone = cleanDigits ? ('+' + cleanDigits) : '';
-
-    if (state.senderConfigured) {
-      els.connectedNumberText.textContent = userPhone ? `Connected (${userPhone})` : 'Connected';
-      els.connectedNumberText.style.color = 'var(--c-wa)';
-      if (pillCircle) {
-        pillCircle.classList.remove('offline');
-        pillCircle.classList.add('online');
-      }
-    } else {
-      els.connectedNumberText.textContent = userPhone ? `Disconnected (${userPhone}) · Click to Link` : 'Disconnected · Click to Link';
-      els.connectedNumberText.style.color = '#f59e0b';
-      if (pillCircle) {
-        pillCircle.classList.remove('online');
-        pillCircle.classList.add('offline');
-      }
-    }
+    // Closers use only their dedicated "My WhatsApp for Campaigns" card.
     if (els.quickReconnectWaBtn) {
       els.quickReconnectWaBtn.style.display = 'none';
       try { els.quickReconnectWaBtn.remove(); } catch (_) {}
@@ -6677,8 +6659,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const userRole = (state.currentUser?.role || '').toLowerCase();
       if (userRole === 'admin' || userRole === 'superadmin' || userRole === 'company admin') {
         openTeamModal();
-      } else {
-        openConnectWaModal();
       }
     });
   }
