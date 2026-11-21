@@ -169,7 +169,8 @@
       const lead = getLead(leadId || state.activeLeadId);
       if (!lead) return toast('Select a conversation first.');
       const user = state.currentUser;
-      if (lead.ownerId && lead.ownerId !== user?.id && user?.role !== 'admin') return toast('This conversation is assigned to another agent.');
+      const isOwner = !lead.ownerId || lead.ownerId === user?.id || (user?.username && (lead.ownerUsername || '').toLowerCase() === (user.username || '').toLowerCase());
+      if (!isOwner && user?.role !== 'admin' && user?.role !== 'superadmin') return toast('This conversation is assigned to another agent.');
       if (sendingMedia) return toast('An attachment is already being sent.');
       const match = /^data:([^,]+);base64,(.+)$/s.exec(dataUrl || '');
       if (!match || match[2].length > 14*1024*1024) return toast('Choose an attachment up to 10 MB.');

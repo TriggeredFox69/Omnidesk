@@ -1009,11 +1009,51 @@ document.addEventListener('DOMContentLoaded', () => {
   window.NUNNO_SYNC_LEAD = syncLeadToServer;
 
   // Fetch Centralized Leads on cPanel (Tenant Isolated per Company)
+  function isMyAllottedLead(l) {
+    if (!l) return false;
+    const currentUser = state.currentUser || state.currentAgent;
+    const userRole = (currentUser?.role || '').toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    if (isAdmin) return true; // Company Admins can see all chats in executive mode
+
+    const myId = currentUser ? currentUser.id : '';
+    const myUsername = currentUser ? (currentUser.username || '').toLowerCase() : '';
+    const myName = currentUser ? (currentUser.name || '').toLowerCase() : '';
+    const myNameClean = myName.replace(/\s+/g, '');
+
+    const ownerId = l.ownerId || l.assignedOwnerId || l.assignedCloser?.id || '';
+    const ownerUsername = (l.ownerUsername || l.assignedOwnerUsername || l.assignedCloser?.username || '').toLowerCase();
+    const ownerName = (l.ownerName || l.assignedOwnerName || '').toLowerCase().replace(/\s+/g, '');
+
+    // Rejection rule: If lead is explicitly assigned to another agent, NEVER show to this closer
+    if (ownerId && myId && ownerId !== myId) return false;
+    if (ownerUsername && myUsername && ownerUsername !== myUsername) return false;
+    if (ownerName && myNameClean && ownerName !== myNameClean && !ownerName.includes(myNameClean) && !myNameClean.includes(ownerName)) {
+      return false;
+    }
+
+    if (ownerId && myId && ownerId === myId) return true;
+    if (myUsername && ownerUsername && ownerUsername === myUsername) return true;
+    if (myNameClean && ownerName && (ownerName === myNameClean || ownerName.includes(myNameClean))) return true;
+    if (l.originalOwnerId && myId && l.originalOwnerId === myId) return true;
+    if (l.paidDetails?.closedById && myId && l.paidDetails.closedById === myId) return true;
+
+    return false;
+  }
+
   function fetchServerLeads(silent = false) {
     if (window.NUNNO_LOCAL_LIVE) return;
     const urlParams = new URLSearchParams(window.location.search);
     const compParam = urlParams.get('company_id') || state.currentCompanyId || '';
-    const query = compParam ? ('?action=get_leads&company_id=' + encodeURIComponent(compParam)) : '?action=get_leads';
+    const myId = state.currentUser?.id || '';
+    const myUser = state.currentUser?.username || '';
+    const myRole = state.currentUser?.role || '';
+    const myName = state.currentUser?.name || '';
+    let query = compParam ? ('?action=get_leads&company_id=' + encodeURIComponent(compParam)) : '?action=get_leads';
+    if (myId) query += '&user_id=' + encodeURIComponent(myId);
+    if (myUser) query += '&username=' + encodeURIComponent(myUser);
+    if (myRole) query += '&user_role=' + encodeURIComponent(myRole);
+    if (myName) query += '&user_name=' + encodeURIComponent(myName);
 
     fetch('api/leads_sync.php' + query)
       .then(res => res.json())
@@ -1044,13 +1084,15 @@ document.addEventListener('DOMContentLoaded', () => {
               }
               return l;
             });
+            const myAllotted = state.leads.filter(isMyAllottedLead);
             const urlChat = urlParams.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
             if (urlChat) {
               const cleanTarget = normalizePhone(urlChat);
               const matched = state.leads.find(l => normalizePhone(l.phone || '') === cleanTarget || l.id === urlChat);
-              if (matched) state.activeLeadId = matched.id;
-            } else if (!state.activeLeadId || !state.leads.some(l => l.id === state.activeLeadId)) {
-              state.activeLeadId = state.leads.length ? state.leads[0].id : null;
+              if (matched && isMyAllottedLead(matched)) state.activeLeadId = matched.id;
+              else state.activeLeadId = myAllotted.length ? myAllotted[0].id : null;
+            } else if (!state.activeLeadId || !myAllotted.some(l => l.id === state.activeLeadId)) {
+              state.activeLeadId = myAllotted.length ? myAllotted[0].id : null;
             }
             renderConversationsList();
             if (!silent || (document.activeElement !== els.chatInput)) {
@@ -1633,20 +1675,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const myId = currentUser ? currentUser.id : '';
     const myUsername = currentUser ? (currentUser.username || '').toLowerCase() : '';
     const myName = currentUser ? (currentUser.name || '').toLowerCase() : '';
-
-    const isMyAllottedLead = l => {
-      if (isAdmin) return true; // Company Admins can see all chats
-      const ownerId = l.ownerId || l.assignedOwnerId || l.assignedCloser?.id || '';
-      const ownerUsername = (l.ownerUsername || l.assignedOwnerUsername || l.assignedCloser?.username || '').toLowerCase();
-      const ownerName = (l.ownerName || l.assignedOwnerName || '').toLowerCase().replace(/\s+/g, '');
-      const myNameClean = myName.replace(/\s+/g, '');
-
-      return (ownerId && ownerId === myId) || 
-             (myUsername && ownerUsername === myUsername) || 
-             (myNameClean && (ownerName === myNameClean || ownerName.includes(myNameClean) || myNameClean.includes(ownerName))) ||
-             l.originalOwnerId === myId || 
-             l.paidDetails?.closedById === myId;
-    };
 
     // Filter leads
     let filtered = state.leads.filter(l => {
