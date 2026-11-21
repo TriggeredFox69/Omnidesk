@@ -234,13 +234,35 @@ class BaileysClient extends EventEmitter {
       if (v?.version) version = v.version;
     } catch (_) {}
 
+    // Auto-heal Signal Protocol Sessions:
+    // Intercept state.keys.get for 'session' to ensure Baileys never encrypts with a closed/broken session.
+    // If a session has no open ratchet (indexInfo.closed !== -1), returning null triggers Baileys to
+    // query WhatsApp for a fresh prekey bundle and establish a brand new Signal session (pkmsg).
+    const originalGet = state.keys.get;
+    state.keys.get = async (type, ids) => {
+      const data = await originalGet(type, ids);
+      if (type === 'session') {
+        for (const id of ids) {
+          const sess = data[id];
+          if (sess && !hasOpenSignalSession(sess)) {
+            console.log(`[Baileys Auto-Heal] Pruning closed/dead session for ${id} to trigger fresh prekey handshake`);
+            data[id] = null;
+            const safeId = String(id).replace(/\//g, '__').replace(/:/g, '-');
+            const filePath = path.join(this.authPath, `session-${safeId}.json`);
+            try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) {}
+          }
+        }
+      }
+      return data;
+    };
+
     this.sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
       browser: Browsers.ubuntu('Chrome'),
-      syncFullHistory: false,
+      syncFullHistory: true,
       keepAliveIntervalMs: 25000,
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
@@ -582,6 +604,81 @@ class BaileysClient extends EventEmitter {
         }
       }
     });
+
+    // Intercept retry receipts directly from the socket to eliminate "Waiting for this message"
+    if (this.sock.ws) {
+      this.sock.ws.on('CB:receipt', async (node) => {
+        try {
+          if (node?.attrs?.type === 'retry' && (node?.attrs?.id || node?.content)) {
+            const ids = [];
+            if (node.attrs.id) ids.push(node.attrs.id);
+            if (Array.isArray(node.content)) {
+              for (const child of node.content) {
+                if (child?.tag === 'item' && child?.attrs?.id) {
+                  ids.push(child.attrs.id);
+                }
+              }
+            }
+
+            const from = node.attrs.from || '';
+            const participant = node.attrs.participant || from;
+            const retryChild = Array.isArray(node.content) ? node.content.find(c => c?.tag === 'retry') : null;
+            const count = +(retryChild?.attrs?.count || 1);
+
+            console.log(`[Baileys Auto-Heal] Socket retry receipt received for ${ids.length} msgs [${ids.join(', ')}] from ${participant} (count ${count})`);
+
+            // When retry count >= 2, the ratchet is definitely out of sync; purge stale session to force fresh prekey bundle
+            if (count >= 2) {
+              console.log(`[Baileys Auto-Heal] Retry count >= 2 for ${participant}. Purging desynchronized session to force fresh prekey exchange...`);
+              this.resetContactSession(participant);
+            }
+
+            try {
+              if (typeof this.sock.assertSessions === 'function') {
+                await this.sock.assertSessions([participant], true);
+              }
+            } catch (e) {
+              console.warn('[Baileys Auto-Heal] assertSessions error during retry:', e?.message || e);
+            }
+
+            for (const id of ids) {
+              let rawMsg = null;
+              if (this._rawMessageStore.has(id)) {
+                rawMsg = this._rawMessageStore.get(id);
+              } else if (from && this._rawMessageStore.has(`${from}_${id}`)) {
+                rawMsg = this._rawMessageStore.get(`${from}_${id}`);
+              } else {
+                const cleanPhone = from.split('@')[0].split(':')[0].replace(/\D/g, '');
+                if (cleanPhone && this._rawMessageStore.has(`${cleanPhone}_${id}`)) {
+                  rawMsg = this._rawMessageStore.get(`${cleanPhone}_${id}`);
+                } else if (this._messageCache.has(id)) {
+                  const c = this._messageCache.get(id);
+                  if (c?.body) rawMsg = { conversation: c.body };
+                }
+              }
+
+              if (rawMsg) {
+                console.log(`[Baileys Auto-Heal] Re-encrypting & resending message ${id} to ${participant} (count ${count})`);
+                const isGroup = from.endsWith('@g.us');
+                const relayOptions = { messageId: id };
+                if (isGroup) {
+                  relayOptions.participant = { jid: participant, count };
+                } else {
+                  // For 1-on-1 chats, WhatsApp stanza takes additionalAttributes with retry count
+                  relayOptions.additionalAttributes = { retry: String(count) };
+                }
+                await this.sock.relayMessage(from, rawMsg, relayOptions);
+                console.log(`[Baileys Auto-Heal] Re-relay completed successfully for msg ${id} to ${participant}`);
+              } else {
+                console.warn(`[Baileys Auto-Heal] Message ${id} not found in store for re-relay to ${participant}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[Baileys Auto-Heal] Error in socket retry receipt handler:', err?.message || err);
+        }
+      });
+    }
   }
 
   _normalizeJid(jidOrPhone) {
@@ -711,8 +808,31 @@ class BaileysClient extends EventEmitter {
   }
 
   resetContactSession(contactJidOrPhone) {
-    // Retain sessions intact so Signal Protocol ratchet is never broken during retry handshakes
-    return false;
+    if (!contactJidOrPhone) return false;
+    const clean = String(contactJidOrPhone).split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (!clean) return false;
+    try {
+      const lid = this._phoneToLid.get(clean);
+      const phone = this._lidToPhone.get(clean);
+      if (fs.existsSync(this.authPath)) {
+        const files = fs.readdirSync(this.authPath);
+        for (const file of files) {
+          if (file.startsWith('session-') && (
+            file.includes(clean) ||
+            (lid && file.includes(lid)) ||
+            (phone && file.includes(phone))
+          )) {
+            try {
+              fs.unlinkSync(path.join(this.authPath, file));
+              console.log(`[Baileys Auto-Heal] Purged stale session file: ${file}`);
+            } catch (_) {}
+          }
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   async getContactLidAndPhone(ids) {
@@ -787,6 +907,16 @@ class BaileysClient extends EventEmitter {
     const isVoice = Boolean(options.sendAudioAsVoice || (content?.mimetype?.startsWith('audio/') && options.voice));
 
     console.log(`[Baileys] Sending to ${jid}: ${typeof content === 'string' ? content.slice(0, 40) : (isVoice ? 'Voice Note' : (content?.mimetype || 'media'))}`);
+
+    // Assert and verify active Signal ratchet session exists before encryption
+    try {
+      if (typeof this.sock.assertSessions === 'function') {
+        const assertTargets = [jid];
+        const myJid = this.sock.user?.id ? (this.sock.user.id.split(':')[0].split('@')[0] + '@s.whatsapp.net') : '';
+        if (myJid && myJid !== jid) assertTargets.push(myJid);
+        await this.sock.assertSessions(assertTargets, false).catch(() => {});
+      }
+    } catch (_) {}
 
     if (typeof content === 'string') {
       sent = await this.sock.sendMessage(jid, { text: content });

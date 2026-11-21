@@ -13,6 +13,18 @@ TARGETS=(
   "/home/dailygol/public_html/omnidesk"
 )
 
+if [ "$1" == "clean" ] || [ "$1" == "clean_pair" ]; then
+  echo "Wiping stale WhatsApp session files, prekeys, and raw messages for 100% clean pairing..."
+  for TARGET in "${TARGETS[@]}"; do
+    rm -rf "$TARGET/data/whatsapp-bridge/baileys_auth" \
+           "$TARGET/data/whatsapp-bridge/baileys_auth.bak" \
+           "$TARGET/data/whatsapp-bridge/creds.json.bak" \
+           "$TARGET/data/whatsapp-bridge/raw_messages.json" \
+           "$TARGET/data/whatsapp-bridge/lid_map.json" \
+           "$TARGET/data/whatsapp-bridge/devices" 2>/dev/null || true
+  done
+fi
+
 for TARGET in "${TARGETS[@]}"; do
   if [ -d "$TARGET" ] || [ -d "$(dirname "$TARGET")" ]; then
     echo "Deploying to $TARGET..."
