@@ -331,9 +331,9 @@ class BaileysClient extends EventEmitter {
       retryRequestDelayMs: 250,
       // false = the TM's own phone keeps getting WhatsApp notifications while Chatly is linked.
       markOnlineOnConnect: false,
-      // Status updates and channels are never Chatly conversations; skipping them
-      // avoids decrypting (and retrying) thousands of broadcast messages.
-      shouldIgnoreJid: jid => typeof jid === 'string' && (jid.endsWith('@broadcast') || jid.endsWith('@newsletter')),
+      // Groups, status updates and channels are never Chatly conversations; skipping
+      // them avoids decrypting (and retrying) thousands of messages from big groups.
+      shouldIgnoreJid: jid => typeof jid === 'string' && (jid.endsWith('@g.us') || jid.endsWith('@broadcast') || jid.endsWith('@newsletter')),
       msgRetryCounterCache: this._msgRetryCache,
       getMessage: getMessageFn
     });

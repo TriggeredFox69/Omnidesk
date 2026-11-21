@@ -30,8 +30,15 @@ function createAtomicAuthState(folder, { proto, initAuthCreds, BufferJSON }) {
     const target = path.join(folder, fixFileName(file));
     return serial(target, async () => {
       const tmp = `${target}.${process.pid}.${++seq}.tmp`;
-      await fsp.writeFile(tmp, JSON.stringify(data, BufferJSON.replacer), { mode: 0o600 });
-      await fsp.rename(tmp, target);
+      try {
+        await fsp.writeFile(tmp, JSON.stringify(data, BufferJSON.replacer), { mode: 0o600 });
+        await fsp.rename(tmp, target);
+      } catch (err) {
+        // The session folder was deleted (login scan discarded, device unlinked) while
+        // this socket was still saving keys: nothing to save any more.
+        if (err && err.code === 'ENOENT' && !fs.existsSync(folder)) return;
+        throw err;
+      }
     });
   }
 

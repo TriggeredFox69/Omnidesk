@@ -42,10 +42,19 @@ echo $$ > "$PIDFILE"
 
 # Supervisor loop: restart Node if it ever stops. Quick crashes back off (2s -> 60s)
 # so a broken start cannot spin and burn the account's CPU/process limits.
+# Processes started from PHP inherit a 4 GB address-space cap on this host. Baileys 7
+# loads a WebAssembly module, and V8 normally reserves ~10 GB of address space per
+# WebAssembly memory, so it failed with "Cannot allocate Wasm memory" and WhatsApp
+# could not start. This flag makes V8 reserve only what it uses (Node >= 20.15 / 22.2).
+NODE_FLAGS=""
+if "$NODE" --disable-wasm-trap-handler -e 0 >/dev/null 2>&1; then
+    NODE_FLAGS="--disable-wasm-trap-handler"
+fi
+
 DELAY=2
 while true; do
     STARTED=$(date +%s)
-    "$NODE" "$SCRIPT" >> "$LOGFILE" 2>&1
+    "$NODE" $NODE_FLAGS "$SCRIPT" >> "$LOGFILE" 2>&1
     EXIT_CODE=$?
     if [ ! -f "$PIDFILE" ]; then
         break
