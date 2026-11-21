@@ -359,6 +359,22 @@ class BaileysClient extends EventEmitter {
 
     this.sock.ev.on('creds.update', safeSaveCreds);
 
+    // One line per resend request: which device could not open which message, and why
+    // (WhatsApp's reason code). This is what "Waiting for this message" looks like from
+    // our side, so it is always logged.
+    const RETRY_REASONS = ['unknown', 'no session', 'invalid key', 'invalid key id', 'invalid message (MAC)', 'invalid signature',
+      'future message', 'bad MAC', 'invalid session', 'invalid message key', 'broadcast ephemeral', 'companion has no prekey', 'ADV (device identity) failure', 'status revoke delay'];
+    try {
+      this.sock.ws.on('CB:receipt', node => {
+        if (node?.attrs?.type !== 'retry') return;
+        const kids = Array.isArray(node.content) ? node.content : [];
+        const retry = kids.find(k => k && k.tag === 'retry');
+        const code = retry?.attrs?.error;
+        const reason = code !== undefined ? `${code} ${RETRY_REASONS[Number(code)] || ''}`.trim() : 'not given';
+        console.warn(`[Baileys] Resend requested by ${node.attrs.from} for ${node.attrs.id}: attempt ${retry?.attrs?.count || '?'}, reason ${reason}, includes keys: ${kids.some(k => k && k.tag === 'keys')}`);
+      });
+    } catch (_) {}
+
     this.sock.ev.on('connection.update', async (update) => {
       if (this._destroyed || this.sock !== sock) return;
       const { connection, lastDisconnect, qr } = update;
