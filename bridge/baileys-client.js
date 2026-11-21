@@ -273,7 +273,9 @@ class BaileysClient extends EventEmitter {
       printQRInTerminal: false,
       logger: pino({ level: process.env.WHATSAPP_BRIDGE_LOG_LEVEL || 'warn' }),
       browser: Browsers.ubuntu('Chrome'),
-      syncFullHistory: true,
+      // Chatly keeps conversations created in Chatly and their live replies;
+      // never import a linked phone's personal WhatsApp history.
+      syncFullHistory: false,
       enableRecentMessageCache: true,
       enableAutoSessionRecreation: true,
       keepAliveIntervalMs: 25000,
@@ -550,20 +552,10 @@ class BaileysClient extends EventEmitter {
       emitMessages(messages);
     });
 
-    // Handle full chat history sync from newly linked device
-    this.sock.ev.on('messaging-history.set', async ({ chats, contacts, messages }) => {
-      console.log(`[Baileys] History sync received: ${chats?.length || 0} chats, ${messages?.length || 0} messages.`);
+    // Accept useful contact mappings, but never backfill old WhatsApp chats.
+    this.sock.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
+      console.log(`[Baileys] Ignoring historical chat import (${chats?.length || 0} chats, ${messages?.length || 0} messages); live Chatly conversations only.`);
       registerContacts(contacts);
-      for (const msg of messages || []) {
-        if (msg.key?.id && msg.message) {
-          this._rawMessageStore.set(msg.key.id, msg.message);
-          if (msg.key.remoteJid) this._rawMessageStore.set(`${msg.key.remoteJid}_${msg.key.id}`, msg.message);
-        }
-      }
-      this._saveRawStore();
-      // Backfill the same supported 1:1 conversations used by live sync. The
-      // inbox filters groups/broadcasts and deduplicates messages by WhatsApp ID.
-      emitMessages(messages);
     });
 
     // Handle delivery / read receipts

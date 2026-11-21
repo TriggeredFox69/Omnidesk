@@ -122,7 +122,6 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
           if (client !== active) return;
           phase = 'ready'; qr = null; error = '';
           number = active.info?.wid?.user || '';
-          inbox.syncRecent().catch(err => console.error('Inbox sync:', err.message));
         } catch (err) {
           phase = 'error'; qr = null;
           error = 'Could not initialize WhatsApp message tracking. Reconnect the sender.';
@@ -304,7 +303,9 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         reply(200, { success: true, message: 'Session reset cleanly. Generating fresh QR code.', ...snapshot() });
         return;
       }
-      if (url.pathname === '/sync-chat') { await inbox.syncChat(body.phone); reply(200, { success: true }); return; }
+      // Historical per-chat fetches are intentionally disabled. Live Chatly
+      // sends and new replies still arrive through the socket event stream.
+      if (url.pathname === '/sync-chat') { reply(200, { success: true, synced: false, message: 'Historical WhatsApp sync is disabled.' }); return; }
       if (url.pathname === '/presence') {
         const phone = body.phone || '';
         const type = body.type || 'composing';

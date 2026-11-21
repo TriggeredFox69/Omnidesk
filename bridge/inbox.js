@@ -69,6 +69,22 @@ function createInbox({ getClient, storageFile }) {
     }
     return null;
   }
+  function isChatlyLead(phone) {
+    const wanted = String(phone || '').replace(/\D/g, '').slice(-9);
+    if (wanted.length < 9) return false;
+    const candidates = [
+      path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
+      path.resolve(__dirname, '../data/leads.json')
+    ];
+    for (const file of candidates) {
+      try {
+        if (!fs.existsSync(file)) continue;
+        const leads = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (Array.isArray(leads) && leads.some(lead => String(lead.phone || '').replace(/\D/g, '').slice(-9) === wanted)) return true;
+      } catch (_) {}
+    }
+    return false;
+  }
   async function ingest(message, knownPhone, opts = {}) {
     const id = message.id?._serialized;
     if (!id) return;
@@ -77,6 +93,9 @@ function createInbox({ getClient, storageFile }) {
     const resolvedRemotePhone = remote ? await phoneFor(remote) : null;
     const phone = opts.phone || resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
     if (!phone || !/^\d{10,18}$/.test(phone)) return;
+    // Keep the inbox limited to Chatly lead conversations. Inbound personal
+    // chats from a linked phone are ignored unless Chatly already knows the lead.
+    if (!fromMe && !isChatlyLead(phone)) return;
     const previous = messages.get(id);
     const pendingAck = pendingAcks.get(id);
     if (pendingAck !== undefined) pendingAcks.delete(id);

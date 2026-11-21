@@ -139,8 +139,6 @@
           if (activePhone !== lead.phone) {
             activePhone = lead.phone;
             lastPresenceAt = 0;
-            // Request a focused backfill without holding up the live event cursor.
-            api('sync_chat', { phone: lead.phone }).catch(() => {});
           }
           // Poll presence for active chat at a responsive cadence (every 5s)
           if (Date.now() - lastPresenceAt > 5000) {
