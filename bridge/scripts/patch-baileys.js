@@ -14,16 +14,35 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const file = path.join(__dirname, '..', 'node_modules', '@whiskeysockets', 'baileys', 'lib', 'Socket', 'messages-send.js');
-const MARK = '/* chatly-patch: retry-resend-once */';
+//
+// 2. A resend request from one of OUR other devices (e.g. a Meta-hosted device, id 99)
+//    can arrive without the "recipient" attribute. Baileys then resends with no chat
+//    address and crashes ("Cannot destructure property 'user' of jidDecode(...)"), so
+//    that device stays on "Waiting for this message". The bridge remembers where each
+//    message it sent went; Baileys now asks it (config.resolveRetryDestination).
+const socketDir = path.join(__dirname, '..', 'node_modules', '@whiskeysockets', 'baileys', 'lib', 'Socket');
 
-let src = fs.readFileSync(file, 'utf8');
-if (src.includes(MARK)) {
-  console.log('[patch-baileys] retry-resend fix already applied');
-  process.exit(0);
+function applyAll(fileName, mark, patches) {
+  const file = path.join(socketDir, fileName);
+  let src = fs.readFileSync(file, 'utf8');
+  if (src.includes(mark)) {
+    console.log(`[patch-baileys] ${fileName}: already applied`);
+    return;
+  }
+  for (const p of patches) {
+    const count = src.split(p.from).length - 1;
+    if (count !== 1) {
+      console.error(`[patch-baileys] Cannot patch ${fileName}: expected 1 match, found ${count}. Baileys changed; review ${file}`);
+      process.exit(1);
+    }
+    src = src.replace(p.from, p.to);
+  }
+  fs.writeFileSync(file, src);
+  console.log(`[patch-baileys] ${fileName}: patched`);
 }
 
-const patches = [
+const MARK = '/* chatly-patch: retry-resend-once */';
+applyAll('messages-send.js', MARK, [
   {
     from: `        if (participant) {
             if (!isGroup && !isStatus) {
@@ -56,15 +75,15 @@ const patches = [
                     jid: participant.jid
                 });`
   }
-];
+]);
 
-for (const p of patches) {
-  const count = src.split(p.from).length - 1;
-  if (count !== 1) {
-    console.error(`[patch-baileys] Cannot apply retry-resend fix: expected 1 match, found ${count}. Baileys changed; review ${file}`);
-    process.exit(1);
+applyAll('messages-recv.js', '/* chatly-patch: retry-destination */', [
+  {
+    from: `        const remoteJid = !isNodeFromMe || isJidGroup(attrs.from) ? attrs.from : attrs.recipient;`,
+    to: `        /* chatly-patch: retry-destination */
+        let remoteJid = !isNodeFromMe || isJidGroup(attrs.from) ? attrs.from : attrs.recipient;
+        if (!remoteJid && attrs.type === 'retry' && isNodeFromMe && typeof config.resolveRetryDestination === 'function') {
+            remoteJid = config.resolveRetryDestination(attrs.id) || remoteJid;
+        }`
   }
-  src = src.replace(p.from, p.to);
-}
-fs.writeFileSync(file, src);
-console.log('[patch-baileys] retry-resend fix applied');
+]);

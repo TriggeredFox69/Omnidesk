@@ -77,6 +77,7 @@ class BaileysClient extends EventEmitter {
     this._presences = new Map();
     this._msgRetryCache = new NodeCache({ stdTTL: 3600, useClones: false });
     this._numberCache = new Map();
+    this._sentTo = new Map();   // message id -> chat it was sent to (answers resend requests)
     this._rawStoreLoaded = false;
     this._loadLidMap();
   }
@@ -335,7 +336,10 @@ class BaileysClient extends EventEmitter {
       // them avoids decrypting (and retrying) thousands of messages from big groups.
       shouldIgnoreJid: jid => typeof jid === 'string' && (jid.endsWith('@g.us') || jid.endsWith('@broadcast') || jid.endsWith('@newsletter')),
       msgRetryCounterCache: this._msgRetryCache,
-      getMessage: getMessageFn
+      getMessage: getMessageFn,
+      // Used by scripts/patch-baileys.js: a resend request from one of our own devices
+      // may omit the chat; we know where every message we sent went.
+      resolveRetryDestination: id => this._sentTo.get(id)
     });
     const sock = this.sock;
 
@@ -897,9 +901,27 @@ class BaileysClient extends EventEmitter {
     return [...chatMap.values()];
   }
 
+  // Contacts whose WhatsApp moved to LID addressing must be messaged at their LID, the
+  // way WhatsApp Web does. A message addressed to the phone number was encrypted for
+  // the old phone-number sessions; the contact's phone could not open it, showed
+  // "Waiting for this message" and had to ask for a resend. Only Baileys' own LID
+  // store is used here (it comes from WhatsApp's servers), never a guessed pair.
+  async _preferLidAddress(jid) {
+    if (!jid.endsWith('@s.whatsapp.net') || !this.sock?.signalRepository?.lidMapping?.getLIDForPN) return jid;
+    try {
+      const lid = await this.sock.signalRepository.lidMapping.getLIDForPN(jid);
+      const user = lid ? String(lid).split('@')[0].split(':')[0] : '';
+      if (user && String(lid).includes('@lid')) {
+        this._recordLidPhone(user, jid);
+        return `${user}@lid`;
+      }
+    } catch (_) {}
+    return jid;
+  }
+
   async sendMessage(toJid, content, options = {}) {
     if (!this.sock) throw new Error('WhatsApp connection is not initialized.');
-    const jid = this._normalizeJid(toJid);
+    const jid = await this._preferLidAddress(this._normalizeJid(toJid));
     let sent;
     const isVoice = Boolean(options.sendAudioAsVoice || (content?.mimetype?.startsWith('audio/') && options.voice));
 
@@ -953,6 +975,10 @@ class BaileysClient extends EventEmitter {
 
     // CRITICAL: Cache raw message proto so retry requests can decrypt and prevent "Waiting for this message"
     if (sent?.key?.id && sent?.message) this._rememberRaw(sent.key.id, sent.message);
+    if (sent?.key?.id) {
+      this._sentTo.set(sent.key.id, sent.key.remoteJid || jid);
+      if (this._sentTo.size > 5000) this._sentTo.delete(this._sentTo.keys().next().value);
+    }
 
     console.log(`[Baileys] Message sent successfully! ID: ${id} to ${jid}`);
 

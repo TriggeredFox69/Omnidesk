@@ -19,6 +19,8 @@ test('bridge.bundle.js is rebuilt from the current bridge code', () => {
   assert.ok(bundle.includes('await assertSessions([participant.jid])') &&
     bundle.includes('device_fanout:"false"}),await authState.keys.transaction'),
     'bundle was built without scripts/patch-baileys.js (retry resend encrypted twice -> 479); run npm run build');
+  assert.ok(bundle.includes('config.resolveRetryDestination(attrs.id)'),
+    'bundle was built without the retry-destination patch (own-device resend crash); run npm run build');
   for (const marker of ['createAtomicAuthState', 'lid-mapping.update', 'createDevicePool']) {
     assert.ok(bundle.includes(marker), `bundle is missing ${marker}; rebuild it`);
   }
