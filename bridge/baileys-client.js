@@ -654,6 +654,7 @@ class BaileysClient extends EventEmitter {
     if (!this.sock) return;
     try {
       const candidatePaths = [
+        path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
         path.resolve(__dirname, '../data/leads.json'),
         path.resolve(__dirname, '../../data/leads.json'),
         path.resolve(this.authPath, '../../../data/leads.json'),
@@ -665,7 +666,20 @@ class BaileysClient extends EventEmitter {
           if (Array.isArray(leads)) {
             for (const lead of leads) {
               const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
-              if (phone && !this._phoneToLid.has(phone)) {
+              if (!phone) continue;
+              // Check existing message IDs for embedded LID strings
+              if (Array.isArray(lead.messages)) {
+                for (const m of lead.messages) {
+                  const mId = String(m.waMessageId || m.id || '');
+                  if (mId.includes('@lid')) {
+                    const match = /([0-9]{10,25})@lid/.exec(mId);
+                    if (match && match[1]) {
+                      this._recordLidPhone(match[1], phone);
+                    }
+                  }
+                }
+              }
+              if (!this._phoneToLid.has(phone)) {
                 try {
                   const [res] = await this.sock.onWhatsApp(phone);
                   if (res?.lid) {
@@ -719,6 +733,7 @@ class BaileysClient extends EventEmitter {
     // Proactively query leads from leads.json
     try {
       const candidatePaths = [
+        path.resolve(__dirname, '../data/tenants/COMP-001/leads.json'),
         path.resolve(__dirname, '../data/leads.json'),
         path.resolve(__dirname, '../../data/leads.json'),
         path.resolve(this.authPath, '../../../data/leads.json'),
@@ -727,10 +742,20 @@ class BaileysClient extends EventEmitter {
       for (const leadsPath of candidatePaths) {
         if (fs.existsSync(leadsPath)) {
           const leads = JSON.parse(fs.readFileSync(leadsPath, 'utf8'));
-          if (Array.isArray(leads) && this.sock) {
+          if (Array.isArray(leads)) {
             for (const lead of leads) {
               const phone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
-              if (phone && !this._phoneToLid.has(phone)) {
+              if (!phone) continue;
+              if (Array.isArray(lead.messages)) {
+                for (const m of lead.messages) {
+                  const mId = String(m.waMessageId || m.id || '');
+                  if (mId.includes(lidClean)) {
+                    this._recordLidPhone(lidClean, phone);
+                    return phone;
+                  }
+                }
+              }
+              if (this.sock && !this._phoneToLid.has(phone)) {
                 try {
                   const [res] = await this.sock.onWhatsApp(phone);
                   if (res?.lid) {
