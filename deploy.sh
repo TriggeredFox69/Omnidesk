@@ -74,6 +74,20 @@ pkill -9 -f "bridge/server.js" 2>/dev/null || true
 pkill -9 -f "run-daemon.sh" 2>/dev/null || true
 fuser -k 3210/tcp 2>/dev/null || true
 sleep 1
+if [ "${1:-}" = "--reset-closer-whatsapp" ]; then
+    CLOSER_DEVICE_DIR="/home/dailygol/chatly.pk/data/whatsapp-bridge/devices"
+    if [ "$CLOSER_DEVICE_DIR" != "/home/dailygol/chatly.pk/data/whatsapp-bridge/devices" ]; then
+        echo "Refusing to reset an unexpected WhatsApp device directory."
+        exit 1
+    fi
+    /bin/mkdir -p "$CLOSER_DEVICE_DIR"
+    /usr/bin/find "$CLOSER_DEVICE_DIR" -mindepth 1 -maxdepth 1 -exec /bin/rm -rf -- {} +
+    /bin/rm -f /home/dailygol/chatly.pk/data/whatsapp-bridge/inbox.json \
+        /home/dailygol/chatly.pk/data/whatsapp-bridge/inbox.json.tmp \
+        /home/dailygol/chatly.pk/data/whatsapp-bridge/raw_messages.json \
+        /home/dailygol/chatly.pk/data/whatsapp-bridge/lid_map.json
+    echo "Closer WhatsApp sessions and bridge sync cache cleared. Chatly accounts, leads, campaigns, and CRM records preserved."
+fi
 rm -f /home/dailygol/chatly.pk/data/whatsapp-bridge/daemon.pid /home/dailygol/chatly.pk/data/whatsapp-bridge/daemon.lock /home/dailygol/chatly.pk/data/whatsapp-bridge/upgrade.lock 2>/dev/null || true
 if [ -f "/home/dailygol/chatly.pk/bridge/run-daemon.sh" ]; then
     nohup /bin/bash /home/dailygol/chatly.pk/bridge/run-daemon.sh >/dev/null 2>&1 &

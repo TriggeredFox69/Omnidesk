@@ -1058,7 +1058,7 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         </div>
       </div>
 
-      <span id="qrStatusText" style="display:none;"></span>
+      <span id="qrStatusText" role="status" aria-live="polite" style="display:block; min-height:18px; margin-top:8px; font-size:12px; line-height:1.5; color:var(--wa-text-secondary);">Connecting securely to WhatsApp…</span>
       <input type="hidden" id="simPhoneInput" value="">
 
       <div style="display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:0 4px;">
