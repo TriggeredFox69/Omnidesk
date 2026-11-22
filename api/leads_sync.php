@@ -35,6 +35,10 @@ $activeCompanyId = resolveActiveCompanyId();
 $dataFile = getTenantLeadsFile($activeCompanyId);
 $companyConfig = getTenantConfig($activeCompanyId);
 
+// This endpoint never writes to $_SESSION: release the session lock now so the dozen
+// parallel startup/poll requests are not serialized behind each other (PHP file sessions).
+if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+
 // Helper: Read current centralized leads
 function getStoredLeads($dataFile) {
     if (file_exists($dataFile)) {

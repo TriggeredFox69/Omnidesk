@@ -179,6 +179,11 @@ function requireCompanyAdmin($user) {
     }
 }
 
+// Read-only lookups don't touch $_SESSION: release the lock so parallel requests don't queue.
+if (in_array($action, ['list', 'public_list', 'get_company_config'], true) && session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
 switch ($action) {
 
     // 1. Get Platform-wide Telemetry (Super Admin)

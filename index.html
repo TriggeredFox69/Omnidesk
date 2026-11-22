@@ -63,7 +63,7 @@
   </script>
 
   <!-- CHATLY LAUNCH LOADER OVERLAY -->
-  <div id="loginAnimOverlay" class="login-anim-overlay" aria-hidden="true" role="status" aria-live="polite">
+  <div id="loginAnimOverlay" class="login-anim-overlay active loading" aria-live="polite" role="status">
     <div class="anim-aura"></div>
     <div class="anim-scene">
       <div class="anim-logo-box">
@@ -73,13 +73,30 @@
       <div class="anim-label">
         <div class="anim-brand-text">
           <span>Chatly</span>
-          <span class="anim-role-tag" id="animRoleTag">Closer Portal</span>
+          <span class="anim-role-tag" id="animRoleTag">Sales Desk</span>
         </div>
-        <div class="anim-subtext" id="animSubtext">Opening closer workspace…</div>
+        <div class="anim-subtext" id="animSubtext">Loading your workspace…</div>
         <div class="anim-dots" aria-hidden="true"><i></i><i></i><i></i></div>
       </div>
     </div>
   </div>
+  <script>
+    /* Launch loader: themed before first paint, hidden by whatsapp-app.js once the session and
+       first leads load are ready. The timer is only a safety net so a dead API can never trap the page. */
+    (function () {
+      var o = document.getElementById('loginAnimOverlay');
+      if (!o) return;
+      var dark = true;
+      try { dark = localStorage.getItem('nunno_theme') !== 'light'; } catch (_) {}
+      o.classList.add(dark ? 'theme-dark' : 'theme-light');
+      var hide = function () {
+        o.classList.remove('active');
+        setTimeout(function () { o.classList.remove('loading'); }, 300);
+      };
+      window.chatlyHideBootLoader = hide;
+      setTimeout(function () { if (o.classList.contains('loading')) hide(); }, 15000);
+    })();
+  </script>
 
   <!-- Impersonation Mode Banner (Admin Direct Login Active) -->
   <div id="adminImpersonationBanner" style="display:none; background:linear-gradient(90deg, #059669, #0d9488); color:#ffffff; padding:8px 20px; font-size:12.5px; font-weight:700; z-index:999999; box-shadow:0 2px 10px rgba(0,0,0,0.25); align-items:center; justify-content:space-between;">

@@ -428,6 +428,8 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
     $action = $_GET['action'] ?? $input['action'] ?? '';
     chatlyRequireUser();   // company data: sign-in required
     $companyId = resolveActiveCompanyId();
+    // No action here writes to $_SESSION: free the session lock so parallel requests don't queue.
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
     if ($action === 'list_company_employees' || $action === 'get_employees' || $action === 'list_employees') {
         $usersFile = __DIR__ . '/../data/users.json';

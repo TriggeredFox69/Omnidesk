@@ -30,7 +30,7 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OmniDesk — Enterprise Email Dispatch Studio</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z'/><polyline points='22,6 12,13 2,6'/></svg>">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.0">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.1">
   <style>
     :root {
       --hub-bg: #f8fafc;

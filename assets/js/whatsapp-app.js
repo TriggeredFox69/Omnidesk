@@ -675,6 +675,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Startup loading gate: the launch loader (see #loginAnimOverlay.loading) stays up until the
+  // signed-in session AND the first leads load have both finished.
+  const _boot = { auth: false, leads: false };
+  function bootStepDone(step) {
+    _boot[step] = true;
+    if (_boot.auth && _boot.leads) window.chatlyHideBootLoader?.();
+  }
+
+  let _brandSyncedFor = '';
   function applyCompanyBranding(companyId) {
     const urlComp = new URLSearchParams(window.location.search).get('company_id');
     const compId = companyId || urlComp || state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
@@ -729,21 +738,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.title = `${brand.name} — Chatly Sales Closing Platform`;
 
-    // Dynamic fetch from companies API to ensure real-time consistency
-    fetch('api/companies.php?action=list')
-      .then(r => r.json())
-      .then(data => {
-        if (data?.success && Array.isArray(data.companies)) {
-          const match = data.companies.find(c => c.id === compId);
-          if (match) {
-            if (compContextName && match.name) compContextName.textContent = match.name;
-            if (companyBadgeLogo && match.logo) companyBadgeLogo.src = match.logo;
-            if (profileCompLogo && match.logo) profileCompLogo.src = match.logo;
-            if (profileCompName && match.name) profileCompName.textContent = match.name;
-            if (brandSub && match.name) brandSub.textContent = match.name;
+    // Dynamic fetch from companies API (once per company: this runs on every 5s lead poll)
+    if (_brandSyncedFor !== compId) {
+      _brandSyncedFor = compId;
+      fetch('api/companies.php?action=list')
+        .then(r => r.json())
+        .then(data => {
+          if (data?.success && Array.isArray(data.companies)) {
+            const match = data.companies.find(c => c.id === compId);
+            if (match) {
+              if (compContextName && match.name) compContextName.textContent = match.name;
+              if (companyBadgeLogo && match.logo) companyBadgeLogo.src = match.logo;
+              if (profileCompLogo && match.logo) profileCompLogo.src = match.logo;
+              if (profileCompName && match.name) profileCompName.textContent = match.name;
+              if (brandSub && match.name) brandSub.textContent = match.name;
+            }
           }
-        }
-      }).catch(() => {});
+        }).catch(() => { _brandSyncedFor = ''; });
+    }
     try { applyCampaignCompanyMode(compId, brand); } catch (_) { /* campaign studio not initialised yet */ }
   }
 
@@ -826,19 +838,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function refreshSenderConnection() {
-    let response = await fetch('api/direct_sender.php?action=get_sender_info', { cache: 'no-store' });
-    let result = await response.json();
-    if (!result.is_connected || result.state === 'offline') {
-      try {
-        await fetch('api/keep_alive.php', { cache: 'no-store' });
-        response = await fetch('api/direct_sender.php?action=get_sender_info', { cache: 'no-store' });
-        result = await response.json();
-      } catch (_) {}
-    }
-    renderSenderConnection(result);
-    if (!response.ok || !result.success) throw new Error(result.message || 'Could not check WhatsApp connection.');
-    return state.senderConfigured;
+  let _senderRefreshInFlight = null;
+  let _keepAliveNudgedAt = 0;
+  function refreshSenderConnection() {
+    // Share one request between callers (startup used to fire this twice in parallel).
+    if (_senderRefreshInFlight) return _senderRefreshInFlight;
+    _senderRefreshInFlight = (async () => {
+      const response = await fetch('api/direct_sender.php?action=get_sender_info', { cache: 'no-store' });
+      const result = await response.json();
+      renderSenderConnection(result);
+      // Wake the bridge in the background (never block the UI on it, at most once a minute).
+      // The regular 10s status poll picks up the new state.
+      if ((!result.is_connected || result.state === 'offline') && Date.now() - _keepAliveNudgedAt > 60000) {
+        _keepAliveNudgedAt = Date.now();
+        fetch('api/keep_alive.php', { cache: 'no-store' }).catch(() => {});
+      }
+      if (!response.ok || !result.success) throw new Error(result.message || 'Could not check WhatsApp connection.');
+      return state.senderConfigured;
+    })().finally(() => { _senderRefreshInFlight = null; });
+    return _senderRefreshInFlight;
   }
 
   async function pollWhatsAppConnection(generation) {
@@ -1029,7 +1047,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let _initialChatRestored = false;
   let _leadsFetchBusy = false;
   function fetchServerLeads(silent = false) {
-    if (window.NUNNO_LOCAL_LIVE || _leadsFetchBusy) return;
+    if (window.NUNNO_LOCAL_LIVE) { bootStepDone('leads'); return; }
+    if (_leadsFetchBusy) return;
     _leadsFetchBusy = true;
     const urlParams = new URLSearchParams(window.location.search);
     const compParam = urlParams.get('company_id') || state.currentCompanyId || '';
@@ -1145,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       })
       .catch(() => {})
-      .finally(() => { _leadsFetchBusy = false; });
+      .finally(() => { _leadsFetchBusy = false; bootStepDone('leads'); });
   }
 
   // Assign Lead -> Associates lead with active closer without locking barriers
@@ -5996,7 +6015,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginContainer = document.getElementById('loginMainContainer');
     if (loginContainer) loginContainer.style.display = 'flex';
     const animOverlay = document.getElementById('loginAnimOverlay');
-    if (animOverlay) animOverlay.classList.remove('active');
+    if (animOverlay) animOverlay.classList.remove('active', 'loading');
 
     if (els.authOverlay) {
       els.authOverlay.classList.remove('hidden');
@@ -6050,7 +6069,7 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.toggle('theme-light', !isDark);
 
     // 2. Force CSS reflow so the animation restarts smoothly from frame 0
-    overlay.classList.remove('active');
+    overlay.classList.remove('active', 'loading');
     void overlay.offsetWidth;
     overlay.classList.add('active');
 
@@ -6089,7 +6108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.toggle('theme-light', !isDark);
 
     // Force CSS reflow so the 360 spin & zoom-out animation always replays cleanly from 0s
-    overlay.classList.remove('active');
+    overlay.classList.remove('active', 'loading');
     void overlay.offsetWidth;
     overlay.classList.add('active');
 
@@ -6190,6 +6209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderEmployeeWorkspace();
     if (!isNunnoPlanLocked(user) && (user.role === 'admin' || isImpersonated || hasChatParam)) switchTab('inbox');
     else switchTab('employee');
+    bootStepDone('auth');
   }
 
   function showAccountSuspendedScreen(user) {
@@ -9374,7 +9394,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkAuthSession();
   renderAgentProfile();
   renderConnectedNumber();
-  refreshSenderConnection().catch(() => {});
+  // (WhatsApp status is refreshed from applyUserSession and the 10s poll below; no extra startup call.)
   setInterval(() => {
     if (state.currentUser && !document.hidden && !els.connectWaModal?.classList.contains('open')) {
       refreshSenderConnection().catch(() => {

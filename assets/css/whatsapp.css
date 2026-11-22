@@ -2140,7 +2140,43 @@ img.logo-img {
 .anim-dots i:nth-child(1) { animation-delay: -0.32s; }
 .anim-dots i:nth-child(2) { animation-delay: -0.16s; }
 
+/* Persistent loading state: loops until the page is ready (the one-shot launch/send-off above
+   would play once and vanish, leaving a blank screen on slow loads). */
+.login-anim-overlay.loading.active .anim-logo-box {
+  animation: chatlyLoadFloat 1.8s ease-in-out infinite;
+}
+.login-anim-overlay.loading.active .anim-logo-box::after {
+  animation: chatlyLoadPulse 1.8s ease-out infinite;
+}
+.login-anim-overlay.loading.active .anim-ring {
+  animation: chatlyLoadSpin 1.1s linear infinite;
+}
+.login-anim-overlay.loading.active .anim-ring-arc {
+  animation: none;
+  stroke-dashoffset: 240;
+}
+.login-anim-overlay.loading.active .anim-logo-img {
+  animation: chatlyGlow 1.8s ease-in-out infinite;
+}
+.login-anim-overlay.loading.active .anim-label {
+  animation: none;
+  opacity: 1;
+}
+@keyframes chatlyLoadFloat {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.06); }
+}
+@keyframes chatlyLoadPulse {
+  0%   { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.8); }
+}
+@keyframes chatlyLoadSpin {
+  from { transform: rotate(-90deg); }
+  to   { transform: rotate(270deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .login-anim-overlay.loading.active .anim-ring { animation: none; }
   .login-anim-overlay.active .anim-logo-box,
   .login-anim-overlay.active .anim-logo-box::after,
   .login-anim-overlay.active .anim-aura,
