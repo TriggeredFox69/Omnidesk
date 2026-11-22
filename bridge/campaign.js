@@ -445,9 +445,12 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       ownerUsername = fallbackCloser.username || '';
     }
 
+    // The chat list is ordered by the newest message, so every campaign send carries its time.
+    const sentAt = Number(crmMessage.timestamp) || Math.floor(Date.now() / 1000);
     if (existingLead) {
       existingLead.messages = existingLead.messages || [];
       if (!existingLead.messages.some(m => m.waMessageId === crmMessage.waMessageId)) existingLead.messages.push(crmMessage);
+      existingLead.lastMessageAt = Math.max(Number(existingLead.lastMessageAt) || 0, sentAt);
       existingLead.lastActive = 'Just now';
       existingLead.status = 'sent';
       if (existingLead.leadState !== 'paid' && existingLead.leadState !== 'pending_verification') existingLead.leadState = 'ongoing';
@@ -477,6 +480,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       unreadCount: 0,
       interest: 'Campaign Outreach',
       lastActive: 'Just now',
+      lastMessageAt: sentAt,
       notes: `Outreach dispatched via campaign "${item.campaignName}". Allocated Closer: ${ownerName || 'TM Closer'} (${activeSender?.role || contact.assignedOwnerRole || 'Closer'}). Device: ${activeSender ? activeSender.name : 'Primary Device'}.`,
       messages: [crmMessage]
     };
@@ -700,7 +704,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       lane.lastSentAt = contact.sentAt;
       incrementUserMessageCount(lane.id);
       updateCrmLead(contact, {
-        id: `msg_c_${Date.now()}`, waMessageId: contact.messageId, deliveryStatus: 'accepted', sender: 'agent',
+        id: `msg_c_${Date.now()}`, waMessageId: contact.messageId, timestamp: Math.floor(Date.now() / 1000), deliveryStatus: 'accepted', sender: 'agent',
         agentName: lane.name, senderPhone: lane.phone, senderRole: lane.role, text: personalizedMsg, time: contact.sentAt
       }, state.assignMode, laneSender(lane));
       if (inbox && typeof inbox.ingest === 'function') {

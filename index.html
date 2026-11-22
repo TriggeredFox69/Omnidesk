@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.3">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.4">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=15.1">
   <script>
     (function() {
@@ -871,11 +871,8 @@
     <!-- Pane 2: Active Chat Thread -->
     <section class="chat-thread-col" id="chatThreadCol" style="position:relative;">
       <div class="chat-transition-overlay" id="chatTransitionOverlay" aria-hidden="true">
-        <div class="chat-transition-logo-box">
-          <img src="assets/images/chatly-icon.png" alt="Chatly" class="chat-transition-logo">
-        </div>
-        <div class="chat-transition-spinner"></div>
-        <span class="chat-transition-text">Opening Chatly conversation…</span>
+        <div class="chat-loader-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <span class="chat-transition-text">Opening chat…</span>
       </div>
       <div class="chat-header">
         <div class="chat-lead-info">
@@ -2524,6 +2521,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
   <script src="assets/js/offline-preview.js?v=15.1"></script>
   <script src="assets/js/live-inbox.js?v=15.1"></script>
   <script src="assets/js/wa-widget.js?v=15.1"></script>
-  <script src="assets/js/whatsapp-app.js?v=15.2"></script>
+  <script src="assets/js/whatsapp-app.js?v=15.4"></script>
 </body>
 </html>

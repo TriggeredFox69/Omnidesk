@@ -965,6 +965,148 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
       .wa-card-footer > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; }
       .lp-access-head { padding-top: 0; margin-bottom: 16px; }
     }  </style>
+  <style>
+    /* ═════════ HOMEPAGE: MOTION + MOBILE (v2) ═════════ */
+
+    /* Hero entrance and soft moving glow */
+    .lp-hero { isolation: isolate; }
+    .lp-hero::before { content: ''; position: absolute; z-index: -1; width: 520px; height: 520px; left: -160px; top: 60px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(31, 224, 138, 0.22), rgba(31, 224, 138, 0) 65%); filter: blur(20px); animation: lpDrift 14s ease-in-out infinite; pointer-events: none; }
+    @keyframes lpDrift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(60px, 40px); } }
+    .lp-hero > div:first-child > * { animation: lpUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .lp-hero > div:first-child > *:nth-child(2) { animation-delay: 0.08s; }
+    .lp-hero > div:first-child > *:nth-child(3) { animation-delay: 0.16s; }
+    .lp-hero > div:first-child > *:nth-child(4) { animation-delay: 0.24s; }
+    .lp-hero > div:first-child > *:nth-child(5) { animation-delay: 0.32s; }
+    .hero-login-card { animation: lpUp 0.8s 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    @keyframes lpUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+    .lp-hero h1 .lp-grad { background-size: 200% auto; animation: lpShine 6s linear infinite; }
+    .lp-hero h1 .lp-grad { background-image: linear-gradient(110deg, #0fa968 0%, #1fe08a 30%, #4cecab 50%, #1fe08a 70%, #0fa968 100%); }
+    html.theme-light .lp-hero h1 .lp-grad { background-image: linear-gradient(110deg, #0b8a57 0%, #0fa968 35%, #1fe08a 50%, #0fa968 65%, #0b8a57 100%);
+      background-size: 200% auto; -webkit-background-clip: text; background-clip: text; }
+    @keyframes lpShine { to { background-position: 200% center; } }
+
+    /* Reveal on scroll (only when the script has switched it on, so nothing hides without JS) */
+    html.lp-anim .lp-reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    html.lp-anim .lp-reveal.is-in { opacity: 1; transform: none; }
+
+    /* How it works: phone walkthrough + steps */
+    .lp-how { display: grid; grid-template-columns: 330px 1fr; gap: 40px; align-items: center; margin-top: 40px; text-align: left; }
+    .lp-how .lp-steps { grid-template-columns: 1fr; gap: 14px; margin-top: 0; }
+    .lp-demo { display: flex; justify-content: center; position: relative; }
+    .lp-demo::before { content: ''; position: absolute; inset: 10% 0; border-radius: 50%; background: radial-gradient(circle, rgba(31, 224, 138, 0.3), transparent 65%); filter: blur(24px); }
+    .lp-phone { position: relative; width: 280px; height: 540px; padding: 12px; border-radius: 42px; background: #07140f; border: 1px solid rgba(31, 224, 138, 0.35);
+      box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.7), inset 0 0 0 2px rgba(255, 255, 255, 0.04); }
+    .lp-phone-notch { position: absolute; z-index: 3; top: 20px; left: 50%; width: 86px; height: 22px; transform: translateX(-50%); border-radius: 12px; background: #07140f; }
+    .lp-phone-screen { position: relative; height: 100%; border-radius: 32px; overflow: hidden; background: #e6f5ee;
+      background-image: radial-gradient(rgba(15, 169, 104, 0.14) 0.8px, transparent 0.8px); background-size: 14px 14px; }
+    html:not(.theme-light) .lp-phone-screen { background-color: #06100c; background-image: radial-gradient(rgba(31, 224, 138, 0.08) 0.8px, transparent 0.8px); }
+    .lp-scene { position: absolute; inset: 0; padding: 54px 14px 16px; display: flex; flex-direction: column; gap: 10px; opacity: 0; animation: lpScene 12s infinite both; }
+    .lp-s2 { animation-delay: 4s; } .lp-s3 { animation-delay: 8s; }
+    @keyframes lpScene { 0% { opacity: 0; transform: translateY(10px); } 3%, 30% { opacity: 1; transform: none; } 33.4%, 100% { opacity: 0; transform: translateY(-6px); } }
+    .lp-app-bar { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.85); }
+    html:not(.theme-light) .lp-app-bar { background: rgba(15, 34, 26, 0.92); }
+    .lp-app-bar img, .lp-av { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+    .lp-av { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #03130c; background: linear-gradient(135deg, #4cecab, #0fa968); }
+    .lp-app-bar b { display: block; font-size: 13px; color: var(--wa-text-primary); }
+    .lp-app-bar small { font-size: 11px; color: var(--wa-accent); font-weight: 700; }
+    .lp-send-list { display: flex; flex-direction: column; gap: 7px; }
+    .lp-send-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--wa-text-primary);
+      background: rgba(255, 255, 255, 0.8); opacity: 0; animation: lpPop 12s infinite both; }
+    html:not(.theme-light) .lp-send-row { background: rgba(15, 34, 26, 0.85); }
+    .lp-send-row i { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 11px; font-weight: 800; color: #03130c; background: rgba(31, 224, 138, 0.55); }
+    .lp-send-row span { flex: 1; }
+    .lp-send-row em { font-style: normal; color: #34b7f1; font-weight: 800; letter-spacing: -2px; }
+    .lp-send-row:nth-child(2) { animation-delay: 0.35s; } .lp-send-row:nth-child(3) { animation-delay: 0.7s; }
+    .lp-send-row:nth-child(4) { animation-delay: 1.05s; } .lp-send-row:nth-child(5) { animation-delay: 1.4s; }
+    @keyframes lpPop { 0% { opacity: 0; transform: translateY(8px) scale(0.96); } 4%, 28% { opacity: 1; transform: none; } 31%, 100% { opacity: 0; } }
+    .lp-progress { height: 6px; border-radius: 99px; overflow: hidden; background: rgba(15, 169, 104, 0.18); }
+    .lp-progress i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #4cecab, #0fa968); animation: lpFill 12s infinite; }
+    @keyframes lpFill { 0% { width: 4%; } 30% { width: 100%; } 33.4%, 100% { width: 100%; } }
+    .lp-chat-stream { display: flex; flex-direction: column; gap: 8px; }
+    .lp-b { max-width: 82%; padding: 8px 11px; font-size: 12.5px; line-height: 1.4; font-weight: 600; opacity: 0; animation: lpPop 12s infinite both; }
+    .lp-in { align-self: flex-start; border-radius: 14px 14px 14px 4px; background: #ffffff; color: #07140f; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+    html:not(.theme-light) .lp-in { background: #11241c; color: #effff7; }
+    .lp-out { align-self: flex-end; border-radius: 14px 14px 4px 14px; background: #d9fdd3; color: #07140f; }
+    html:not(.theme-light) .lp-out { background: #005c4b; color: #e9edef; }
+    .lp-s2 .lp-b:nth-child(1) { animation-delay: 4.2s; } .lp-s2 .lp-b:nth-child(2) { animation-delay: 5s; }
+    .lp-s2 .lp-b:nth-child(3) { animation-delay: 5.8s; } .lp-s2 .lp-b:nth-child(4) { animation-delay: 6.6s; }
+    .lp-typing { align-self: flex-start; display: inline-flex; gap: 4px; padding: 9px 12px; border-radius: 14px 14px 14px 4px; background: #ffffff; }
+    html:not(.theme-light) .lp-typing { background: #11241c; }
+    .lp-typing span { width: 6px; height: 6px; border-radius: 50%; background: #0fa968; animation: lpDot 1s ease-in-out infinite; }
+    .lp-typing span:nth-child(2) { animation-delay: 0.15s; } .lp-typing span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes lpDot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+    .lp-deal { margin-top: 30px; padding: 22px 16px; border-radius: 20px; text-align: center; background: rgba(255, 255, 255, 0.9); box-shadow: 0 10px 30px -12px rgba(6, 40, 26, 0.3); }
+    html:not(.theme-light) .lp-deal { background: rgba(15, 34, 26, 0.95); }
+    .lp-deal-check { width: 58px; height: 58px; margin: 0 auto 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: #03130c;
+      background: linear-gradient(135deg, #4cecab, #0fa968); box-shadow: 0 0 0 8px rgba(31, 224, 138, 0.18); animation: lpCheck 12s 8s infinite both; }
+    @keyframes lpCheck { 0% { transform: scale(0.4); opacity: 0; } 4% { transform: scale(1.15); opacity: 1; } 7%, 30% { transform: scale(1); opacity: 1; } 33.4%, 100% { opacity: 0; } }
+    .lp-deal > b { display: block; font-size: 15px; color: var(--wa-text-primary); }
+    .lp-deal-amt { margin: 4px 0 2px; font-size: 30px; font-weight: 900; letter-spacing: -0.03em; color: #0fa968; }
+    .lp-deal small { font-size: 11.5px; color: var(--wa-text-secondary); }
+    .lp-deal-row { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(15, 169, 104, 0.3); font-size: 12px; color: var(--wa-text-secondary); }
+    .lp-deal-row b { color: #0fa968; }
+    .lp-scene-tag { margin-top: auto; align-self: center; padding: 6px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: #03130c; background: linear-gradient(135deg, #4cecab, #1fe08a); box-shadow: 0 6px 16px -6px rgba(31, 224, 138, 0.7); }
+    /* the step beside the phone lights up with its scene */
+    .lp-how .lp-step { transition: none; animation: lpStepOn 12s infinite both; }
+    .lp-how .lp-st2 { animation-delay: 4s; } .lp-how .lp-st3 { animation-delay: 8s; }
+    @keyframes lpStepOn { 0%, 31% { border-color: rgba(31, 224, 138, 0.6); box-shadow: 0 16px 40px -20px rgba(31, 224, 138, 0.55); transform: translateX(6px); }
+      34%, 100% { border-color: var(--wa-card-border); box-shadow: none; transform: none; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .lp-hero::before, .lp-hero > div:first-child > *, .hero-login-card, .lp-hero h1 .lp-grad,
+      .lp-scene, .lp-send-row, .lp-b, .lp-progress i, .lp-deal-check, .lp-typing span, .lp-how .lp-step { animation: none !important; }
+      .lp-s1, .lp-send-row, .lp-b { opacity: 1; }
+      .lp-progress i { width: 60%; }
+      html.lp-anim .lp-reveal { opacity: 1; transform: none; }
+    }
+
+    @media (max-width: 920px) {
+      .lp-how { grid-template-columns: 1fr; gap: 28px; }
+      .lp-how .lp-step { animation: none; }
+    }
+
+    /* ═════════ MOBILE (most visitors) ═════════ */
+    @media (max-width: 640px) {
+      body { overflow-x: clip; }   /* decorative glows must never cause sideways scrolling */
+      .wa-top-header { height: 60px !important; padding: 10px 14px !important; }
+      .chatly-header-logo { height: 28px; }
+      .wa-top-header > div { gap: 8px !important; }
+      .lp-nav { gap: 8px; }
+      .lp-nav .lp-nav-cta { padding: 8px 14px; font-size: 12.5px; white-space: nowrap; max-width: 52vw; overflow: hidden; text-overflow: ellipsis; }
+      .lp-theme-btn { padding: 7px 10px !important; font-size: 13px !important; }
+      .lp-hide-sm { display: none; }
+
+      .lp-section { padding: 0 16px; }
+      .lp-hero { padding-top: 84px; padding-bottom: 20px; gap: 28px; text-align: center; }
+      .lp-hero::before { width: 360px; height: 360px; left: -120px; top: 40px; }
+      .lp-eyebrow { font-size: 10px; letter-spacing: 0.06em; padding: 5px 11px; }
+      .lp-hero h1 { font-size: clamp(32px, 9.4vw, 40px); line-height: 1.08; margin: 14px 0 12px; }
+      .lp-hero .lp-lead { font-size: 15.5px; line-height: 1.6; margin: 0 auto; }
+      .lp-cta-row { flex-direction: column; gap: 10px; margin-top: 22px; }
+      .lp-cta-row .lp-btn { width: 100%; padding: 15px 18px; }
+      .lp-trust { justify-content: center; gap: 6px 14px; margin-top: 18px; font-size: 12.5px; }
+      .hero-login-card { width: 100%; padding: 20px 16px; border-radius: 22px; }
+
+      .lp-stats { padding: 18px 12px; border-radius: 20px; }
+      .lp-stat b { font-size: 24px; }
+      .lp-block { padding-top: 60px; }
+      .lp-h2 { font-size: 27px; }
+      .lp-lead { font-size: 15px; }
+      .lp-grid3 { gap: 12px; margin-top: 26px; }
+      .lp-card { padding: 18px; display: grid; grid-template-columns: 44px 1fr; column-gap: 14px; align-items: start; }
+      .lp-card .lp-ico { grid-row: span 2; margin: 0; width: 44px; height: 44px; font-size: 20px; }
+      .lp-card h3 { font-size: 16px; margin: 2px 0 4px; }
+      .lp-card p { font-size: 13.5px; }
+      .lp-phone { width: 250px; height: 480px; border-radius: 38px; }
+      .lp-step { padding: 18px; }
+      .lp-panel { padding: 22px 18px; }
+      .lp-panel h3 { font-size: 21px; }
+      .lp-panel .lp-btn { width: 100%; }
+      .lp-final { margin-top: 64px; padding: 36px 18px; border-radius: 24px; }
+      .lp-final .lp-cta-row .lp-btn { width: 100%; }
+    }
+  </style>
 </head>
 <body>
 
@@ -993,14 +1135,14 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
         <a href="<?php echo htmlspecialchars($destUrl); ?>" class="lp-nav-cta" style="background:rgba(31,224,138,0.22); border:1px solid var(--wa-accent); color:var(--wa-accent); font-weight:800;"><?php echo $btnText; ?> &rarr;</a>
         <a href="/login.php?action=logout" onclick="handleGeneralLogout(event)" style="color:#ef4444; font-size:12.5px; font-weight:700;">Logout</a>
       <?php else: ?>
-        <a href="#top" class="lp-nav-cta" onclick="focusHeroQR(); return false;">⚡ Workspace Login</a>
+        <a href="#top" class="lp-nav-cta" onclick="focusHeroQR(); return false;">⚡ <span class="lp-hide-sm">Workspace </span>Login</a>
       <?php endif; ?>
       <a href="#offer">What we offer</a>
       <a href="#how">How it works</a>
       <a href="#promote" onclick="openPromoteProductModal(); return false;">For brands</a>
     </nav>
-    <button onclick="toggleTheme()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600;">
-      🌓 Theme
+    <button onclick="toggleTheme()" class="lp-theme-btn" aria-label="Switch theme" style="background:rgba(255,255,255,0.2); border:none; color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; font-weight:600;">
+      🌓 <span class="lp-hide-sm">Theme</span>
     </button>
   </div>
 </div>
@@ -1189,10 +1331,54 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
   <span class="lp-eyebrow">How it works</span>
   <h2 class="lp-h2">From product to <span class="lp-grad">paid order</span> in three steps</h2>
   <p class="lp-lead">No ad guesswork. You pay for promotion, closers do the selling.</p>
-  <div class="lp-steps" style="text-align:left;">
-    <div class="lp-step"><h3>List your product</h3><p>Set up your company workspace and tell us what you sell. Approve the closers who will represent your brand.</p></div>
-    <div class="lp-step"><h3>Closers start chatting</h3><p>Closers link WhatsApp in seconds, promote your product and handle every conversation in the shared inbox.</p></div>
-    <div class="lp-step"><h3>You get customers</h3><p>Track deals in real time. You pay for promotion and keep the customers and revenue that come in.</p></div>
+  <div class="lp-how">
+    <!-- Animated walkthrough: campaign goes out -> a closer chats -> the deal is paid (CSS only, loops every 12 s) -->
+    <div class="lp-demo" aria-hidden="true">
+      <div class="lp-phone">
+        <div class="lp-phone-notch"></div>
+        <div class="lp-phone-screen">
+          <div class="lp-scene lp-s1">
+            <div class="lp-app-bar"><img src="assets/images/chatly-icon.png" alt=""><div><b>Campaign</b><small>Sending to 10,000 buyers</small></div></div>
+            <div class="lp-send-list">
+              <div class="lp-send-row"><i>A</i><span>Ali · Lahore</span><em>✓✓</em></div>
+              <div class="lp-send-row"><i>S</i><span>Sana · Karachi</span><em>✓✓</em></div>
+              <div class="lp-send-row"><i>B</i><span>Bilal · Multan</span><em>✓✓</em></div>
+              <div class="lp-send-row"><i>H</i><span>Hira · Islamabad</span><em>✓✓</em></div>
+              <div class="lp-send-row"><i>U</i><span>Usman · Faisalabad</span><em>✓✓</em></div>
+            </div>
+            <div class="lp-progress"><i></i></div>
+            <div class="lp-scene-tag">Your product reaches buyers</div>
+          </div>
+          <div class="lp-scene lp-s2">
+            <div class="lp-app-bar"><span class="lp-av">AK</span><div><b>Ahmed Khan</b><small>online</small></div></div>
+            <div class="lp-chat-stream">
+              <div class="lp-b lp-in">Salam! Is this still available?</div>
+              <div class="lp-b lp-out">Yes! 30% off for today only 🔥</div>
+              <div class="lp-b lp-in">Great, how do I pay?</div>
+              <div class="lp-b lp-out">EasyPaisa, JazzCash or bank 👍</div>
+            </div>
+            <div class="lp-typing"><span></span><span></span><span></span></div>
+            <div class="lp-scene-tag">Closers chat and sell for you</div>
+          </div>
+          <div class="lp-scene lp-s3">
+            <div class="lp-deal">
+              <div class="lp-deal-check">✓</div>
+              <b>Deal closed</b>
+              <div class="lp-deal-amt">PKR 5,000</div>
+              <small>Paid via EasyPaisa · just now</small>
+              <div class="lp-deal-row"><span>Brand revenue</span><b>+ PKR 5,000</b></div>
+              <div class="lp-deal-row"><span>Closer commission</span><b>+ PKR 500</b></div>
+            </div>
+            <div class="lp-scene-tag">You get paying customers</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="lp-steps" style="text-align:left;">
+      <div class="lp-step lp-st1"><h3>List your product</h3><p>Set up your company workspace and tell us what you sell. Approve the closers who will represent your brand.</p></div>
+      <div class="lp-step lp-st2"><h3>Closers start chatting</h3><p>Closers link WhatsApp in seconds, promote your product and handle every conversation in the shared inbox.</p></div>
+      <div class="lp-step lp-st3"><h3>You get customers</h3><p>Track deals in real time. You pay for promotion and keep the customers and revenue that come in.</p></div>
+    </div>
   </div>
 </section>
 
@@ -1333,6 +1519,25 @@ function _origScrollToAccess(role) {
   if (reduce || !('IntersectionObserver' in window)) { nodes.forEach(el => render(el, parseFloat(el.dataset.count))); return; }
   const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { run(en.target); io.unobserve(en.target); } }), { threshold: 0.4 });
   nodes.forEach(n => io.observe(n));
+})();
+
+// Sections fade up as they scroll into view (cards in a row follow each other slightly).
+(function () {
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || !('IntersectionObserver' in window)) return;
+  const items = document.querySelectorAll('.lp-stats, .lp-block .lp-h2, .lp-card, .lp-demo, .lp-panel, .lp-brand-tile, .lp-final');
+  if (!items.length) return;
+  items.forEach(el => {
+    el.classList.add('lp-reveal');
+    const siblings = el.parentElement ? [...el.parentElement.children].filter(c => c.classList.contains(el.classList[0])) : [];
+    const i = siblings.indexOf(el);
+    if (i > 0) el.style.transitionDelay = (Math.min(i, 5) * 0.08) + 's';
+  });
+  document.documentElement.classList.add('lp-anim');
+  const io = new IntersectionObserver(es => es.forEach(en => {
+    if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); }
+  }), { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  items.forEach(el => io.observe(el));
 })();
 </script>
 

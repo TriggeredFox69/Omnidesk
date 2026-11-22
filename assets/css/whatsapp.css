@@ -2529,6 +2529,7 @@ img.logo-img {
 }
 
 /* ─── 13. CHAT TRANSITION OVERLAY (NUNNO LOGO PULSE) ─────── */
+/* Simple "opening chat" state: three typing dots, like a WhatsApp typing bubble. */
 .chat-transition-overlay {
   position: absolute;
   inset: 0;
@@ -2537,66 +2538,48 @@ img.logo-img {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  background: rgba(240, 250, 245, 0.95);
-  backdrop-filter: blur(10px);
+  gap: 10px;
+  background: var(--chat-wallpaper-bg);
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 650;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.16s ease, visibility 0.16s ease;
+  transition: opacity 0.14s ease, visibility 0.14s ease;
 }
-body.theme-dark .chat-transition-overlay {
-  background: rgba(5, 11, 9, 0.96);
+.chat-loader-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border-radius: 18px 18px 18px 6px;
+  background: var(--bubble-inbound-bg);
+  border: 1px solid var(--bubble-inbound-border);
+  box-shadow: var(--bubble-inbound-shadow);
+}
+.chat-loader-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-wa);
+  animation: chatLoaderDot 1s ease-in-out infinite;
+}
+.chat-loader-dots span:nth-child(2) { animation-delay: 0.15s; }
+.chat-loader-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes chatLoaderDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-loader-dots span { animation: none; opacity: 0.7; }
 }
 .chat-transition-overlay.active {
   opacity: 1;
   visibility: visible;
 }
-.chat-transition-logo-box {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: logoPulse 1.2s ease-in-out infinite alternate;
-}
-.chat-transition-logo-box::before {
-  content: '';
-  position: absolute;
-  inset: -7px;
-  border-radius: 26px;
-  border: 2px solid transparent;
-  border-top-color: var(--accent-wa);
-  border-right-color: var(--accent-wa-border);
-  animation: spin 1s linear infinite;
-}
-.chat-transition-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 20px;
-  object-fit: contain;
-}
-@keyframes logoPulse {
-  0%   { transform: scale(0.95); filter: drop-shadow(0 4px 10px rgba(31, 224, 138, 0.25)); }
-  100% { transform: scale(1.06); filter: drop-shadow(0 8px 22px rgba(31, 224, 138, 0.55)); }
-}.chat-transition-text {
+.chat-transition-text {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text-secondary);
-}
-.chat-transition-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
-  border-top-color: var(--accent-wa);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -5437,6 +5420,181 @@ body:not(.theme-dark) #viewCampaign .log-error { color: #b91c1c; }
 @media (max-width: 1180px) {
   #viewCampaign .campaign-grid { grid-template-columns: 1fr 1fr; }
   #viewCampaign .cs-launch { grid-column: 1 / -1; }
+}
+
+/* ─── MOBILE NAVIGATION ────────────────────────────────────────
+   On phones the header's right-hand buttons used to squeeze the Team Inbox / My Stats
+   tabs down to nothing, so closers could not reach their stats. The tabs become a
+   bottom tab bar instead (hidden only while a chat is open full-screen). */
+@media (max-width: 768px) {
+  :root { --topbar-height: 52px; --mobile-nav-h: 58px; }
+  /* backdrop-filter on the header would make it the containing block of the fixed bar */
+  .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--glass-surface-elevated); }
+  .nav-tab-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    height: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0px));
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px));
+    display: flex; justify-content: space-around; align-items: stretch; gap: 6px; overflow: visible;
+    border: 0; border-top: 1px solid var(--glass-border); border-radius: 0;
+    background: var(--glass-surface-elevated); backdrop-filter: none;
+    box-shadow: 0 -8px 24px rgba(6, 40, 26, 0.08);
+  }
+  .nav-tab-btn {
+    position: relative; flex: 1 1 0; min-width: 0; height: 100%;
+    flex-direction: column; justify-content: center; gap: 3px;
+    padding: 4px 6px; border-radius: 14px; font-size: 11px; font-weight: 700;
+  }
+  .nav-tab-btn svg { display: block; width: 20px; height: 20px; }
+  .nav-tab-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .nav-tab-btn.active, .nav-tab-btn.tab-wa { color: var(--accent-wa); background: var(--accent-wa-glass); box-shadow: none; }
+  .nav-tab-btn .unread-badge { position: absolute; top: 3px; left: calc(50% + 6px); min-width: 18px; text-align: center; }
+  body.mobile-in-chat:has(#viewInbox.mobile-chat-open:not([style*="display: none"])) .nav-tab-bar { display: none; }
+
+  .inbox-view-container, .employee-workspace, .view-container {
+    height: calc(100dvh - var(--topbar-height) - var(--mobile-nav-h) - env(safe-area-inset-bottom, 0px));
+  }
+  body.mobile-in-chat .inbox-view-container { height: calc(100dvh - var(--topbar-height)); }
+
+  /* Header: company as its logo only, so everything fits on one row */
+  #companyContextBadge { padding: 3px !important; }
+  #companyContextName { display: none; }
+  .header-quota-pill { padding: 4px 8px !important; }
+}
+
+/* Daily quota pill: its inline colour is meant for the dark header */
+body:not(.theme-dark) .header-quota-pill { color: #067a4a !important; background: rgba(15, 169, 104, 0.1) !important; border-color: rgba(15, 169, 104, 0.3) !important; }
+
+/* ─── USER PORTAL / MY STATS (v2 look) ─────────────────────────
+   Presentation only, scoped to #viewEmployee; markup and element ids are unchanged.
+   Inline styles in the markup and from the script need a few !important rules. */
+#viewEmployee {
+  --pv-surface: var(--glass-surface-elevated);
+  --pv-line: var(--glass-border-subtle);
+  --pv-line-strong: var(--glass-border);
+  max-width: 1040px;
+  gap: 14px;
+  padding: 20px 20px 40px;
+}
+/* switchTab() shows this view with an inline display:block, which would drop the gap between cards */
+#viewEmployee[style*="block"] { display: flex !important; }
+#viewEmployee > * { flex-shrink: 0; }   /* the view scrolls; cards must never be squeezed to fit its height */
+#viewEmployee .profile-hero-ambient,
+#viewEmployee .bento-ambient-glow,
+#viewEmployee .radar-pulse,
+#viewEmployee .hourglass-pulse { display: none; }
+
+/* Shared card surface */
+#viewEmployee .profile-hero-card,
+#viewEmployee #campDeviceCard,
+#viewEmployee .bento-card:not(.bento-card-revenue),
+#viewEmployee .profile-pipeline-progress,
+#viewEmployee .employee-withdrawal-section {
+  background: var(--pv-surface) !important;
+  border: 1px solid var(--pv-line) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--shadow-card) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Profile header */
+#viewEmployee .profile-hero-card { padding: 18px 20px; gap: 14px; }
+#viewEmployee .profile-hero-main { flex: 1; min-width: 0; gap: 14px; flex-wrap: wrap; }
+#viewEmployee .profile-avatar-box { width: 52px; height: 52px; border-radius: 50%; font-size: 18px; border: 0; box-shadow: 0 6px 18px rgba(31, 224, 138, 0.3); }
+#viewEmployee .profile-hero-details { min-width: 0; }
+#viewEmployee .profile-hero-name-row h1 { font-size: 19px; font-weight: 800; }
+#viewEmployee .profile-company-badge { background: var(--glass-surface-subtle) !important; border-color: var(--pv-line) !important; backdrop-filter: none !important; padding: 6px 12px !important; }
+#viewEmployee #profileCompanyName { color: var(--text-primary) !important; }
+#viewEmployee .btn-hero-inbox { padding: 10px 18px; border-radius: 12px; border: 0; background: var(--accent-wa); color: var(--on-accent); box-shadow: 0 6px 18px var(--accent-wa-glow); }
+#viewEmployee .btn-hero-inbox:hover { transform: none; background: var(--accent-wa-hover); }
+
+/* My WhatsApp for campaigns */
+#viewEmployee #campDeviceCard { margin: 0 !important; padding: 16px 18px !important; }
+#viewEmployee #campDeviceCard > div > div:first-child > div:first-child { font-size: 14.5px !important; }
+#viewEmployee #campDevConnectBtn { border-radius: 12px !important; }
+
+/* Revenue: the one dark, branded card */
+#viewEmployee .bento-card-revenue {
+  background: radial-gradient(ellipse 80% 120% at 0% 0%, rgba(31, 224, 138, 0.28), transparent 60%), linear-gradient(135deg, #0b3d2a 0%, #072a1d 100%);
+  border: 1px solid rgba(31, 224, 138, 0.35);
+  border-radius: 20px;
+  box-shadow: 0 14px 34px -14px rgba(6, 40, 26, 0.55);
+  padding: 20px 22px;
+}
+#viewEmployee .bento-revenue-value { text-shadow: none !important; }
+#viewEmployee .bento-revenue-right { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
+
+/* KPI cards */
+#viewEmployee .profile-bento-grid { gap: 12px; }
+#viewEmployee .bento-card { transition: border-color 0.2s ease; }
+#viewEmployee .bento-card:hover { transform: none; }
+#viewEmployee .bento-card:not(.bento-card-revenue) { padding: 14px 16px; gap: 8px; }
+#viewEmployee .bento-card:not(.bento-card-revenue):hover { border-color: var(--pv-line-strong) !important; }
+#viewEmployee .bento-icon-box { width: 34px; height: 34px; border-radius: 10px; font-size: 16px; }
+#viewEmployee .bento-card-title { font-size: 13px; }
+#viewEmployee .bento-status-chip { font-size: 9.5px; padding: 2px 7px; }
+#viewEmployee .bento-counter { font-size: 30px; line-height: 1; }
+#viewEmployee .bento-footer-note { font-size: 11.5px; color: var(--text-muted); }
+
+/* Pipeline */
+#viewEmployee .profile-pipeline-progress { padding: 16px 18px; }
+#viewEmployee .pipeline-segmented-track { height: 10px; border-radius: 99px; }
+
+/* Earnings */
+#viewEmployee .employee-withdrawal-section { padding: 18px; }
+#viewEmployee .wd-balance-card { border-radius: 14px; box-shadow: none; }
+#viewEmployee .wd-balance-card:hover { transform: none; }
+#viewEmployee .withdrawal-history-box { border-radius: 14px; }
+
+@media (max-width: 768px) {
+  #viewEmployee { padding: 12px 12px 24px; gap: 12px; }
+  #viewEmployee .nunno-plan-lock-card { padding: 18px 16px; border-radius: 18px; }
+
+  /* Profile: avatar + name on top, company and the inbox button below, full width */
+  #viewEmployee .profile-hero-card { padding: 16px; flex-direction: column; align-items: stretch; gap: 12px; }
+  #viewEmployee .profile-hero-main { flex-wrap: wrap; gap: 12px; }
+  #viewEmployee .profile-hero-details { flex: 1 1 0; }
+  #viewEmployee .profile-hero-name-row h1 { font-size: 18px; overflow-wrap: anywhere; }
+  #viewEmployee .profile-pill-role { font-size: 10.5px; padding: 2px 8px; }
+  #viewEmployee .profile-badge { font-size: 10.5px; padding: 2px 8px; }
+  #viewEmployee .profile-company-badge { flex: 1 1 100%; margin-left: 0 !important; }
+  #viewEmployee .profile-hero-actions { width: 100%; }
+  #viewEmployee .btn-hero-inbox { width: 100%; justify-content: center; padding: 12px 16px; font-size: 14px; }
+
+  #viewEmployee #campDeviceCard { padding: 14px !important; }
+  #viewEmployee #campDevConnectBtn { width: 100%; justify-content: center; }
+
+  /* Revenue stacks; the target box goes full width */
+  #viewEmployee .bento-card-revenue { flex-direction: column; align-items: stretch; gap: 14px; padding: 18px 16px; }
+  #viewEmployee .bento-revenue-right, #viewEmployee .bento-admin-right { min-width: 0; width: 100%; padding: 12px 14px; }
+  #viewEmployee .bento-revenue-value { font-size: 36px !important; }
+  #viewEmployee .bento-revenue-right > div:last-child { flex-wrap: wrap; }
+
+  /* KPI cards: compact 2 x 2 */
+  #viewEmployee .profile-bento-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  #viewEmployee .bento-card:not(.bento-card-revenue) { padding: 12px; gap: 6px; }
+  #viewEmployee .bento-card-desc,
+  #viewEmployee .bento-status-chip,
+  #viewEmployee .bento-wave-sparkline,
+  #viewEmployee .bento-micro-badge,
+  #viewEmployee .bento-mini-ring-wrap { display: none; }
+  #viewEmployee .bento-icon-box { width: 28px; height: 28px; border-radius: 8px; font-size: 14px; }
+  #viewEmployee .bento-card-title { font-size: 12px; line-height: 1.25; }
+  #viewEmployee .bento-counter { font-size: 26px; }
+  #viewEmployee .bento-footer-note { font-size: 10.5px; line-height: 1.35; }
+
+  /* Pipeline chips 2 x 2 */
+  #viewEmployee .profile-pipeline-progress { padding: 14px; }
+  #viewEmployee .pipeline-progress-header { flex-wrap: wrap; gap: 8px; }
+  #viewEmployee .pipeline-chips-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  /* Earnings: one column */
+  #viewEmployee .employee-withdrawal-section { padding: 14px; }
+  #viewEmployee .withdrawal-header-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  #viewEmployee .btn-request-payout { width: 100%; justify-content: center; }
+  #viewEmployee .withdrawal-balance-strip { grid-template-columns: 1fr; gap: 10px; }
+  #viewEmployee .withdrawal-history-header { flex-wrap: wrap; gap: 8px; }
+  #viewEmployee .wd-filter-tabs { flex-wrap: wrap; }
 }
 @media (max-width: 760px) {
   #viewCampaign { padding: 16px 14px 40px; }

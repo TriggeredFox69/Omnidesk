@@ -1725,20 +1725,56 @@ document.addEventListener('DOMContentLoaded', () => {
     _renderListRAF = requestAnimationFrame(() => { _renderListRAF = 0; renderConversationsList(); });
   }
 
-  // Cache the latest-message timestamp extractor outside the sort to avoid closure allocations
+  // A message's time in epoch seconds (some writers store milliseconds), or 0 if unknown.
+  const _msgEpoch = m => {
+    let t = Number((m && m.timestamp) || 0);
+    if (t > 1e11) t = Math.floor(t / 1000);
+    return t > 0 ? t : 0;
+  };
+
+  // Times are shown in the viewer's own timezone, from the message timestamp. The stored
+  // "time" text was written by the server in ITS timezone and in mixed formats
+  // ("18:19", "06:59 PM", "12:00 AM"), so it is only a fallback for old messages.
+  function clockLabel(m) {
+    const t = _msgEpoch(m);
+    return t ? new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : String((m && m.time) || '');
+  }
+
+  // Chat list label, like WhatsApp: time today, "Yesterday", weekday this week, else a date.
+  function listTimeLabel(ts) {
+    const d = new Date(ts * 1000);
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const t = d.getTime();
+    if (t >= startToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (t >= startToday - 86400000) return 'Yesterday';
+    if (t >= startToday - 6 * 86400000) return d.toLocaleDateString([], { weekday: 'long' });
+    return d.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+
+  // The newest message of a chat for the list preview (the last stored one when none has a time).
+  const _newestMessage = lead => {
+    const msgs = Array.isArray(lead.messages) ? lead.messages : [];
+    let best = msgs.length ? msgs[msgs.length - 1] : null;
+    let bestTs = best ? _msgEpoch(best) : 0;
+    for (let i = 0; i < msgs.length; i++) {
+      const t = _msgEpoch(msgs[i]);
+      if (t > bestTs) { best = msgs[i]; bestTs = t; }
+    }
+    return best;
+  };
+
+  // Latest activity on a chat (sent or received), used to order the list like WhatsApp:
+  // the newest message of any direction puts the chat on top. Messages are not always
+  // stored in order, so every one is checked.
   const _latestTs = lead => {
     let ts = Number(lead.lastMessageAt || 0);
-    if (Array.isArray(lead.messages) && lead.messages.length > 0) {
-      for (let i = lead.messages.length - 1; i >= 0; i--) {
-        const m = lead.messages[i];
-        const mTs = Number(m.timestamp || 0);
-        if (mTs > 0) {
-          if (mTs > ts) ts = mTs;
-          break;
-        }
-      }
-    }
     if (ts > 1e11) ts = Math.floor(ts / 1000);
+    const msgs = Array.isArray(lead.messages) ? lead.messages : [];
+    for (let i = 0; i < msgs.length; i++) {
+      const mTs = _msgEpoch(msgs[i]);
+      if (mTs > ts) ts = mTs;
+    }
     return ts;
   };
 
@@ -1869,7 +1905,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     visibleSlice.forEach(lead => {
       const isSelected = lead.id === state.activeLeadId;
-      const lastMsg = lead.messages.length ? lead.messages[lead.messages.length - 1] : { text: 'No messages', time: '' };
+      const lastMsg = _newestMessage(lead) || { text: 'No messages', time: '' };
+      const chatTs = _latestTs(lead);
       const owner = lead.ownerId ? getAgent(lead.ownerId) : null;
       const leadState = getLeadState(lead);
       const isAdmin = state.currentUser ? state.currentUser.role === 'admin' : false;
@@ -1958,7 +1995,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="conv-body">
           <div class="conv-top-row">
             <span class="conv-contact-name">${escapeHtml(displayTitle)}</span>
-            <span class="conv-timestamp">${lastMsg.time || lead.lastActive}</span>
+            <span class="conv-timestamp">${escapeHtml(chatTs ? listTimeLabel(chatTs) : (lastMsg.time || lead.lastActive || ''))}</span>
           </div>
           <div class="conv-tm-row">
             <span class="conv-tm-pill ${assignedTm.isUnassigned ? 'unassigned' : ''}" title="Assigned Closer: ${escapeHtml(assignedTm.name)}">
@@ -2391,7 +2428,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
             <div class="msg-meta-row">
-              <span>${escapeHtml(msg.time)}</span>
+              <span>${escapeHtml(clockLabel(msg))}</span>
               ${deliveryMarkup}
             </div>
           `;
@@ -2422,7 +2459,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>` : ''}
             ${hasCustomCaption || (!isDoc && !isImg && !isVideo) ? `<div>${formatText(msg.text)}</div>` : ''}
             <div class="msg-meta-row">
-              <span>${escapeHtml(msg.time)}</span>
+              <span>${escapeHtml(clockLabel(msg))}</span>
               ${deliveryMarkup}
             </div>
           `;
