@@ -426,7 +426,14 @@ class BaileysClient extends EventEmitter {
             this._reconnectAttempts = 8;
             this._reconnectTimer = setTimeout(() => { this._reconnectTimer = null; this._scheduleReconnect(); }, 60000);
           }
+        } else if (!this._auth?.state?.creds?.me?.id) {
+          // Never linked: the QR code expired with nobody scanning it. Reconnecting here
+          // made every abandoned QR (login pages, unlinked devices) loop forever inside the
+          // bridge. Go idle instead; the next QR request starts a fresh socket.
+          console.log('[Baileys] QR code expired without a scan; idle until a new QR is requested.');
+          this.emit('qr_expired');
         } else {
+          console.warn(`[Baileys] Connection closed (code ${statusCode ?? 'none'}): ${lastDisconnect?.error?.message || 'no reason given'}`);
           this.emit('disconnected');
           if (!this._destroyed) {
             this._scheduleReconnect();
@@ -632,9 +639,10 @@ class BaileysClient extends EventEmitter {
     };
     const emitMessages = async messages => {
       for (const msg of messages || []) {
-        // Chatly strictly ignores historical messages sent before WhatsApp connected
+        // Ignore old chat history, but keep replies that arrived during a short
+        // disconnect or restart: WhatsApp delivers those with their original time.
         const msgTs = Number(msg?.messageTimestamp || 0);
-        if (this._connectedAt && msgTs > 0 && msgTs < (this._connectedAt - 15)) {
+        if (this._connectedAt && msgTs > 0 && msgTs < (this._connectedAt - 6 * 3600)) {
           continue;
         }
         const remote = msg?.key?.remoteJid || '';

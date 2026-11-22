@@ -33,7 +33,10 @@ test('createCampaignManager starts, executes, pauses, and stops', async () => {
   const mgr = createCampaignManager({
     send: fakeSend,
     dataDir: tmpDir,
-    getLeadsPath: () => leadsFile
+    getLeadsPath: () => leadsFile,
+    getUsersPath: () => path.join(tmpDir, 'users.json'),
+    // the company's main WhatsApp is linked, so a TM without their own device sends through it
+    mainStatus: () => ({ ready: true })
   });
 
   const audience = [
@@ -45,6 +48,7 @@ test('createCampaignManager starts, executes, pauses, and stops', async () => {
     name: 'Test Outreach',
     message: 'Hello {name}',
     audience,
+    senders: [{ id: 'TM-1', name: 'TM One', phone: '923000000001', roleType: 'member' }],
     minDelay: 1,
     maxDelay: 1
   });

@@ -744,6 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       }).catch(() => {});
+    try { applyCampaignCompanyMode(compId, brand); } catch (_) { /* campaign studio not initialised yet */ }
   }
 
   // Render Multi-Tenant Company Context Badge in Topbar
@@ -786,13 +787,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const userRole = (state.currentUser?.role || '').toLowerCase();
       const isAdmin = userRole === 'admin' || userRole === 'superadmin' || userRole === 'company admin';
       if (isAdmin && senders.length > 0) {
-        els.campaignConnectionStatus.textContent = `✓ Multi-Device Dispatch Ready (${senders.length} Team Devices)`;
+        els.campaignConnectionStatus.textContent = `✓ Ready: ${senders.length} team WhatsApp${senders.length === 1 ? '' : 's'} connected`;
       } else {
         els.campaignConnectionStatus.textContent = window.NUNNO_OFFLINE_PREVIEW
           ? '🧪 Offline simulation — no real sends'
           : state.senderConfigured
             ? `✓ WhatsApp connected${state.connectedWaNumber ? ' · +' + state.connectedWaNumber : ''} — ready to send`
-            : (senders.length > 0 ? `✓ Multi-Device Dispatch Ready (${senders.length} Team Devices)` : 'WhatsApp not connected · Click to link');
+            : (senders.length > 0 ? `✓ Ready: ${senders.length} team WhatsApp${senders.length === 1 ? '' : 's'} connected` : 'WhatsApp not connected · Click to link');
       }
     }
     if (!wasConnected && state.senderConfigured && !window.NUNNO_OFFLINE_PREVIEW) {
@@ -1041,11 +1042,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (myUser) query += '&username=' + encodeURIComponent(myUser);
     if (myRole) query += '&user_role=' + encodeURIComponent(myRole);
     if (myName) query += '&user_name=' + encodeURIComponent(myName);
+    // Background polls send the last revision; the server answers "unchanged" when the CRM,
+    // the inbox and the user are the same, instead of re-sending every lead every 5 seconds.
+    if (silent && state.leadsRev && state.leadsRevCompany === compParam) query += '&rev=' + encodeURIComponent(state.leadsRev);
+    // Light sync: leads arrive with only their latest messages; a chat's full history is
+    // loaded when it is opened (ensureFullHistory).
+    query += '&summary=1';
 
     fetch('api/leads_sync.php' + query)
       .then(res => res.json())
       .then(data => {
+        if (data && data.success && data.unchanged) return;
         if (data && data.success) {
+          if (data.rev) { state.leadsRev = data.rev; state.leadsRevCompany = compParam; }
           if (data.company_id) state.currentCompanyId = data.company_id;
           if (data.company_config) state.companyConfig = data.company_config;
           renderCompanyContextPill();
@@ -1065,9 +1074,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 l.name = l.display || (l.phone ? '+' + l.phone : '');
               }
               const local = existingMap.get(l.id) || existingMap.get(normalizePhone(l.phone || ''));
-              if (local && Array.isArray(local.messages) && local.messages.length > (l.messages?.length || 0)) {
-                const serverMsgIds = new Set((l.messages || []).map(m => m.id || m.waMessageId));
-                const missing = local.messages.filter(m => !serverMsgIds.has(m.id || m.waMessageId));
+              const msgKey = m => m.id || m.waMessageId;
+              if (l.summary && local && local._fullHistory && Array.isArray(local.messages)) {
+                // Keep the full history this browser already loaded; add only what is new.
+                const have = new Set(local.messages.map(msgKey));
+                const added = (l.messages || []).filter(m => !have.has(msgKey(m)));
+                l.messages = added.length ? [...local.messages, ...added] : local.messages;
+                l._fullHistory = true;
+              } else if (local && Array.isArray(local.messages) && local.messages.length > (l.messages?.length || 0)) {
+                // Keep messages this browser sent that the server has not saved yet. With a
+                // summary, older messages outside its window are not "missing", so only local
+                // messages at least as new as the summary's oldest one are kept.
+                const serverMsgIds = new Set((l.messages || []).map(msgKey));
+                const oldestTs = l.summary && l.messages && l.messages.length ? (l.messages[0].timestamp || 0) : 0;
+                const missing = local.messages.filter(m => !serverMsgIds.has(msgKey(m))
+                  && (!l.summary || m.deliveryStatus === 'sending' || (m.timestamp && m.timestamp >= oldestTs)));
                 l.messages = [...(l.messages || []), ...missing];
               }
               if (local && (local.id === state.activeLeadId || normalizePhone(local.phone || '') === normalizePhone(state.activeLeadId || ''))) {
@@ -1078,6 +1099,8 @@ document.addEventListener('DOMContentLoaded', () => {
               return l;
             });
             const myAllotted = state.leads.filter(isMyAllottedLead);
+            const openLead = state.activeLeadId ? getLead(state.activeLeadId) : null;
+            if (openLead) ensureFullHistory(openLead);
             if (!_initialChatRestored) {
               _initialChatRestored = true;
               const urlChat = urlParams.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
@@ -1701,8 +1724,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let inboxDisplayLimit = 50;
+  let inboxFilteredTotal = 0;      // latest list size, read by the infinite-scroll handler
   function renderConversationsList() {
     if (!els.conversationsScroll) return;
+    // only one "Load more" button: drop the one from the previous render
+    els.conversationsScroll.querySelectorAll('.conv-load-more-btn').forEach(el => el.remove());
 
     // Keep the inbox ordered by the latest message, including updates on an
     // existing chat, so active conversations rise immediately after sync.
@@ -1806,7 +1832,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!filtered.length) {
       els.conversationsScroll.innerHTML = `
-        <div style="padding:40px 20px;text-align:center;color:var(--text-dim);">
+        <div class="conv-empty-state" style="padding:40px 20px;text-align:center;color:var(--text-dim);">
           <div style="font-size:24px;margin-bottom:8px;">📭</div>
           <p class="text-sm">No conversations in this section.</p>
         </div>
@@ -1814,9 +1840,12 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // conversations exist now: drop the "No conversations" placeholder from an earlier render
+    els.conversationsScroll.querySelectorAll('.conv-empty-state').forEach(el => el.remove());
     const newPhoneSet = new Set();
     const fragment = document.createDocumentFragment();
     const totalFiltered = filtered.length;
+    inboxFilteredTotal = totalFiltered;
     const visibleSlice = filtered.slice(0, inboxDisplayLimit);
 
     visibleSlice.forEach(lead => {
@@ -1973,7 +2002,7 @@ document.addEventListener('DOMContentLoaded', () => {
       els.conversationsScroll._scrollBound = true;
       els.conversationsScroll.addEventListener('scroll', () => {
         if (els.conversationsScroll.scrollTop + els.conversationsScroll.clientHeight >= els.conversationsScroll.scrollHeight - 120) {
-          if (inboxDisplayLimit < filtered.length) {
+          if (inboxDisplayLimit < inboxFilteredTotal) {
             inboxDisplayLimit += 50;
             scheduleRenderConversationsList();
           }
@@ -1983,9 +2012,36 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Select Lead
+  // A chat's whole message history, fetched once when it is opened (the background sync
+  // only carries each lead's latest messages).
+  async function ensureFullHistory(lead) {
+    if (!lead || lead._fullHistory || lead._loadingHistory || window.NUNNO_OFFLINE_PREVIEW || window.NUNNO_LOCAL_LIVE) return;
+    const have = Array.isArray(lead.messages) ? lead.messages.length : 0;
+    const total = typeof lead.messageCount === 'number' ? lead.messageCount : have;
+    if (total <= have) { lead._fullHistory = true; return; }
+    lead._loadingHistory = true;
+    try {
+      const comp = state.currentCompanyId ? '&company_id=' + encodeURIComponent(state.currentCompanyId) : '';
+      const res = await fetch('api/leads_sync.php?action=get_lead_messages&id=' + encodeURIComponent(lead.id) + comp, { cache: 'no-store' });
+      const data = await res.json();
+      if (!data || !data.success || !Array.isArray(data.messages)) return;
+      const key = m => m.id || m.waMessageId;
+      const serverKeys = new Set(data.messages.map(key));
+      const lastTs = data.messages.length ? (data.messages[data.messages.length - 1].timestamp || 0) : 0;
+      // keep anything this browser sent that the server has not stored yet
+      const pendingLocal = (lead.messages || []).filter(m => !serverKeys.has(key(m)) && (m.deliveryStatus === 'sending' || (m.timestamp && m.timestamp >= lastTs)));
+      lead.messages = [...data.messages, ...pendingLocal];
+      lead.messageCount = data.messageCount;
+      lead._fullHistory = true;
+      if (state.activeLeadId === lead.id) renderActiveChat();
+    } catch (_) { /* the summary stays on screen; the next open retries */ }
+    finally { lead._loadingHistory = false; }
+  }
+
   function selectLead(leadId) {
     state.activeLeadId = leadId;
     const lead = getLead(leadId);
+    if (lead) ensureFullHistory(lead);
     if (lead) {
       if (lead.unreadCount > 0) {
         lead.unreadCount = 0;
@@ -2170,12 +2226,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ⚡ Header Admin Takeover Button (ONLY visible to Admin or Super Admin)
     if (els.adminTakeoverBtn) {
       if (isAdmin && leadState !== 'paid') {
-        if (lead.isTakeover && lead.takenOverById === myId) {
+        if (lead.isTakeover && lead.takenOverById === currentUserId) {
           els.adminTakeoverBtn.style.display = 'inline-flex';
           els.adminTakeoverBtn.innerHTML = `<span>⚡ Taken Over</span>`;
           els.adminTakeoverBtn.style.opacity = '0.75';
           els.adminTakeoverBtn.onclick = null;
-        } else if (lead.ownerId && lead.ownerId !== myId) {
+        } else if (lead.ownerId && lead.ownerId !== currentUserId) {
           els.adminTakeoverBtn.style.display = 'inline-flex';
           els.adminTakeoverBtn.innerHTML = `<span>⚡ Takeover</span>`;
           els.adminTakeoverBtn.style.opacity = '1';
@@ -2848,8 +2904,8 @@ document.addEventListener('DOMContentLoaded', () => {
     currentIndex: 0,
     isRunning: false,
     isPaused: false,
-    minDelay: 3,
-    maxDelay: 6,
+    minDelay: 8,
+    maxDelay: 15,
     timeoutId: null,
     countdownInterval: null,
     remainingSeconds: 0,
@@ -2950,6 +3006,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateCampaignPreview() {
+    queueMicrotask(() => { try { updateCampaignLaunchSummary(); } catch (_) {} });
     if (!els.campaignBubblePreview) return;
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -3162,6 +3219,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderCampaignAudienceUI() {
+    queueMicrotask(() => { try { updateCampaignLaunchSummary(); } catch (_) {} });
     const count = campaignState.audience.length;
     if (els.campaignAudienceBadge) {
       els.campaignAudienceBadge.textContent = `${count} Contacts`;
@@ -3215,14 +3273,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return `
           <div class="campaign-audience-item" id="c_item_${c.id}" style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center;">
-            <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto;">
               <div style="width:7px;height:7px;border-radius:50%;background:${dotBg};flex-shrink:0;"></div>
               <div style="min-width:0;">
                 <div style="font-weight:700;color:#ffffff;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)} <span class="mono text-muted" style="font-size:10.5px;">(${escapeHtml(c.display)})</span></div>
                 <div class="text-xs text-muted" style="font-size:10px;">📍 ${escapeHtml(c.city)} • <span style="color:#10b981;font-weight:600;">${escapeHtml(c.network)}</span></div>
               </div>
             </div>
-            <div style="font-size:10.5px;flex-shrink:0;" id="c_status_${c.id}">${statusLabel}</div>
+            <div style="font-size:10.5px;flex:0 1 auto;min-width:0;max-width:45%;margin-left:8px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="c_status_${c.id}" title="">${statusLabel}</div>
           </div>
         `;
       }).join('');
@@ -3253,22 +3311,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function applyCampaignDelayPreset(val) {
     if (!els.campaignDelayMin || !els.campaignDelayMax) return;
+    // The server never sends faster than one message every 6 s per WhatsApp.
     if (val === 'fast') {
-      els.campaignDelayMin.value = 3;
-      els.campaignDelayMax.value = 6;
-    } else if (val === 'recommended') {
       els.campaignDelayMin.value = 6;
-      els.campaignDelayMax.value = 12;
+      els.campaignDelayMax.value = 10;
+    } else if (val === 'recommended') {
+      els.campaignDelayMin.value = 8;
+      els.campaignDelayMax.value = 15;
     } else if (val === 'human') {
-      els.campaignDelayMin.value = 12;
-      els.campaignDelayMax.value = 25;
+      els.campaignDelayMin.value = 15;
+      els.campaignDelayMax.value = 30;
     }
-    campaignState.minDelay = parseInt(els.campaignDelayMin.value, 10) || 3;
-    campaignState.maxDelay = parseInt(els.campaignDelayMax.value, 10) || 6;
+    campaignState.minDelay = Math.max(6, parseInt(els.campaignDelayMin.value, 10) || 8);
+    campaignState.maxDelay = Math.max(campaignState.minDelay + 3, parseInt(els.campaignDelayMax.value, 10) || 15);
     loadCampaignSenders();
   }
 
-  // --- Multi-Device Round-Robin Campaign Senders Pool ---
+  // --- Launch checklist shown above the Start button ---
+  // Tells the admin, in plain words, what is still missing and how long the run will take.
+  function updateCampaignLaunchSummary() {
+    const box = document.getElementById('campaignLaunchSummary');
+    if (!box) return;
+    if (campaignState.isRunning || campaignState.isPaused) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    const numbers = (campaignState.audience || []).length;
+    const senders = (window.currentCampaignSenders || []).filter(s => s.connected !== false).length;
+    const hasMessage = campaignState.variation === 'audio' ? true : !!(els.campaignCustomMsg?.value || '').trim();
+    const minD = Math.max(1, parseInt(els.campaignDelayMin?.value || 3, 10) || 3);
+    const maxD = Math.max(minD, parseInt(els.campaignDelayMax?.value || 6, 10) || minD);
+    const perWa = senders ? Math.ceil(numbers / senders) : numbers;
+    const seconds = perWa * ((minD + maxD) / 2 + 1.5);
+    const dur = seconds < 90 ? `${Math.max(1, Math.round(seconds))} seconds` : seconds < 5400 ? `${Math.round(seconds / 60)} minutes`
+      : `${(seconds / 3600).toFixed(seconds < 36000 ? 1 : 0)} hours`;
+    const row = (ok, text) => `<div class="cls-row ${ok ? 'ok' : 'todo'}"><span>${ok ? '✓' : '•'}</span><span>${text}</span></div>`;
+    box.innerHTML =
+      row(numbers > 0, numbers > 0 ? `<strong>${numbers.toLocaleString()}</strong> numbers ready` : 'Add the numbers to message (step ①)') +
+      row(hasMessage, hasMessage ? 'Message written' : 'Write the message (step ②)') +
+      row(senders > 0, senders > 0 ? `<strong>${senders}</strong> team WhatsApp${senders === 1 ? '' : 's'} will send`
+        : (window.NUNNO_OFFLINE_PREVIEW ? 'Offline test: sends are simulated' : 'No team WhatsApp linked yet: Link Phone / Scan QR')) +
+      (numbers > 0 && senders > 0 ? `<div class="cls-eta">≈ ${perWa.toLocaleString()} numbers per WhatsApp · finishes in about <strong>${dur}</strong></div>` : '');
+    if (els.startCampaignBtn && !campaignState.isStarting) {
+      const ready = numbers > 0 && hasMessage;
+      els.startCampaignBtn.disabled = !ready;
+      els.startCampaignBtn.title = ready ? '' : 'Add numbers and write a message first';
+    }
+  }
+  window.updateCampaignLaunchSummary = updateCampaignLaunchSummary;
+  ['campaignDelayMin', 'campaignDelayMax', 'campaignCustomMsg', 'campaignPresetSelect'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.addEventListener('input', updateCampaignLaunchSummary); el.addEventListener('change', updateCampaignLaunchSummary); }
+  });
+
+  // Nunno's crypto pitch templates, coupon tags and built-in voice notes belong to Nunno only.
+  // Every other company starts from a clean message box with general personalization tags.
+  function applyCampaignCompanyMode(compId, brand) {
+    const isNunno = (compId || 'COMP-001') === 'COMP-001';
+    const presetGroup = document.getElementById('campaignPitchPresetGroup');
+    if (presetGroup) presetGroup.style.display = isNunno ? '' : 'none';
+    document.querySelectorAll('#viewCampaign .tag-chip').forEach(chip => {
+      const tag = chip.getAttribute('data-insert') || '';
+      if (['{plan}', '{price}', '{coupon}'].includes(tag)) chip.style.display = isNunno ? '' : 'none';
+    });
+    const audioPreset = document.getElementById('campaignAudioPreset');
+    if (audioPreset) audioPreset.style.display = isNunno ? '' : 'none';
+    if (!isNunno) {
+      const audioTitle = document.getElementById('campaignAudioTitle');
+      if (audioTitle && !campaignState.audioMedia) audioTitle.textContent = 'Upload your voice note';
+      const msgBox = els.campaignCustomMsg;
+      if (msgBox && /nunno|liquidation|NUNNO30/i.test(msgBox.value)) {
+        msgBox.value = '';
+        msgBox.placeholder = 'Write your message…\n\nTip: {name} becomes each person\'s name, and {Salam|AoA|Hello} picks one greeting at random so every message is a little different.';
+        if (els.campaignPitchPreset) els.campaignPitchPreset.value = 'custom';
+      }
+      if (els.campaignNameInput && /^(OmniDesk|Nunno)/i.test(els.campaignNameInput.value || '')) {
+        els.campaignNameInput.value = `${(brand && brand.short_name) || 'Team'} campaign`;
+      }
+    }
+    try { updateCampaignPreview(); } catch (_) {}
+    updateCampaignLaunchSummary();
+  }
+
+  // --- Campaign senders pool: every team WhatsApp sends an equal share ---
   window.currentCampaignSenders = [];
 
   async function loadCampaignSenders(companyId) {
@@ -3351,6 +3474,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, senders, window.lastCampaignStatus || null);
+        updateCampaignLaunchSummary();
 
         if (preview) {
           const flow = senders.map(s => `<strong>${escapeHtml(s.name.split(' ')[0])}</strong>`).join(' · ');
@@ -3361,14 +3485,14 @@ document.addEventListener('DOMContentLoaded', () => {
           const poolSize = Math.max(1, senders.length);
           const minD = parseInt(els.campaignDelayMin?.value || 3, 10);
           const maxD = parseInt(els.campaignDelayMax?.value || 6, 10);
-          const avgD = Math.round((minD + maxD) / 2);
-          const teamMsgsPerMin = Math.round(60 / avgD);
-          const perDeviceSec = avgD * poolSize;
-          mathInfo.innerHTML = `<span>⚡ Pace: ${avgD}s avg · Team: ~${teamMsgsPerMin} msgs/min · Per device: 1 msg every ~${perDeviceSec}s</span><span style="color:#10b981;font-weight:700;">🛡️ 0 Risk of Ban</span>`;
+          const avgD = Math.max(1, Math.round((minD + maxD) / 2));
+          // every WhatsApp sends in parallel: one message every ~avgD seconds each
+          const teamMsgsPerMin = Math.round(poolSize * 60 / avgD);
+          mathInfo.innerHTML = `<span>⚡ Each WhatsApp sends 1 message every ~${avgD}s · whole team ≈ ${teamMsgsPerMin} messages/min</span>`;
         }
 
         if (els.campaignConnectionStatus) {
-          els.campaignConnectionStatus.textContent = `✓ Multi-Device Dispatch Ready (${senders.length} Team Devices)`;
+          els.campaignConnectionStatus.textContent = `✓ Ready: ${senders.length} team WhatsApp${senders.length === 1 ? '' : 's'} connected`;
         }
         renderConnectedNumber();
       } else {
@@ -3416,6 +3540,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyServerCampaignState(data) {
+    queueMicrotask(() => { try { updateCampaignLaunchSummary(); } catch (_) {} });
     if (!data || !data.status) return;
     // live red / orange / green lights on the connected-WhatsApps widget
     window.lastCampaignStatus = data;
@@ -3443,10 +3568,15 @@ document.addEventListener('DOMContentLoaded', () => {
       campaignState.audience = data.audience;
       renderCampaignAudienceUI();
     } else if (data.audience && data.audience.length > 0 && !campaignState.audienceCleared) {
-      const localMap = new Map();
-      for (let i = 0; i < campaignState.audience.length; i++) {
-        localMap.set(campaignState.audience[i].phone, campaignState.audience[i]);
+      // Index the local audience once (it can hold 100k numbers), not on every 3.5 s poll.
+      if (campaignState._phoneIndexFor !== campaignState.audience || campaignState._phoneIndexLen !== campaignState.audience.length) {
+        const idx = new Map();
+        for (let i = 0; i < campaignState.audience.length; i++) idx.set(campaignState.audience[i].phone, campaignState.audience[i]);
+        campaignState._phoneIndex = idx;
+        campaignState._phoneIndexFor = campaignState.audience;
+        campaignState._phoneIndexLen = campaignState.audience.length;
       }
+      const localMap = campaignState._phoneIndex;
       for (const sa of data.audience) {
         const local = localMap.get(sa.phone);
         if (local) {
@@ -3619,10 +3749,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'OmniDesk campaign';
 
-    let minD = parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 3, 10) || 3;
-    let maxD = parseInt(els.campaignDelayMax ? els.campaignDelayMax.value : 6, 10) || 6;
-    if (minD < 1) minD = 1;
-    if (maxD < minD) maxD = minD + 2;
+    let minD = parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 8, 10) || 8;
+    let maxD = parseInt(els.campaignDelayMax ? els.campaignDelayMax.value : 15, 10) || 15;
+    if (minD < 6) minD = 6;                    // same floor as the server
+    if (maxD < minD + 3) maxD = minD + 3;
     campaignState.minDelay = minD;
     campaignState.maxDelay = maxD;
 
@@ -3636,6 +3766,12 @@ document.addEventListener('DOMContentLoaded', () => {
         filename: campaignState.imageMedia.filename
       };
     } else if (campaignState.variation === 'audio') {
+      if (!campaignState.audioMedia && (state.currentCompanyId || 'COMP-001') !== 'COMP-001') {
+        campaignState.isStarting = false;
+        if (els.startCampaignBtn) els.startCampaignBtn.disabled = false;
+        showToast('🎙️ Upload your voice note first (Just Audio needs your own recording).');
+        return;
+      }
       mediaPayload = campaignState.audioMedia ? {
         mimetype: campaignState.audioMedia.mimetype,
         data: campaignState.audioMedia.data,
@@ -3663,7 +3799,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const deviceCount = sendersPool.length;
     logCampaignTerminal(`🚀 Launching Multi-Device Round-Robin Campaign <strong>"${escapeHtml(campaignName)}"</strong> (${campaignState.variation.toUpperCase()}) with ${campaignState.audience.length} target contacts rotating across ${deviceCount} connected TL &amp; TM devices...`, 'info');
-    showToast(`🚀 Multi-Device Campaign running! Rotating across ${deviceCount} team devices.`);
+    showToast(`🚀 Campaign started: ${campaignState.audience.length.toLocaleString()} numbers shared between ${deviceCount} WhatsApp${deviceCount === 1 ? '' : 's'}.`);
 
     try {
       const response = await fetch('api/direct_sender.php?action=start_campaign', {

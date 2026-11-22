@@ -8,7 +8,7 @@ const { EventEmitter } = require('node:events');
 test('incoming text, audio and images are deduplicated and mapped from LID to a phone', async () => {
   const inbox = createInbox({ getClient: () => ({ getContactLidAndPhone: async () => [{ pn: '923001234567@c.us' }] }) });
   for (const type of ['chat','ptt','image']) {
-    const message = { id: { _serialized: 'id-' + type, remote: '123@lid', fromMe: false }, body: 'hello', type, hasMedia: type !== 'chat', timestamp: 100 };
+    const message = { id: { _serialized: 'id-' + type, remote: '123@lid', fromMe: false }, body: 'hello', type, hasMedia: type !== 'chat', timestamp: Math.floor(Date.now() / 1000) };
     await inbox.ingest(message); await inbox.ingest(message);
   }
   const result = inbox.events(0);
@@ -20,7 +20,7 @@ test('incoming text, audio and images are deduplicated and mapped from LID to a 
 
 test('ACKs distinguish a single sent tick, delivered double tick and read double tick', async () => {
   const inbox = createInbox({ getClient: () => ({}) });
-  const message = { id: { _serialized: 'outgoing', remote: '923001234567@c.us', fromMe: true }, body: 'hi', timestamp: 100 };
+  const message = { id: { _serialized: 'outgoing', remote: '923001234567@c.us', fromMe: true }, body: 'hi', timestamp: Math.floor(Date.now() / 1000) };
   await inbox.ingest(message);
   for (const [ack, status] of [[1,'sent'],[2,'delivered'],[3,'read']]) {
     inbox.ack(message, ack); assert.equal(inbox.events(0).messages[0].deliveryStatus, status);

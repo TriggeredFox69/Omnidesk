@@ -5212,3 +5212,13 @@ body:not(.theme-dark) .profile-company-badge span { color: var(--text-primary); 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(31, 224, 138, 0.25); border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(31, 224, 138, 0.45); }
+/* Campaign launch checklist (above Start campaign) */
+.campaign-launch-summary { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 12.5px; line-height: 1.45; }
+.campaign-launch-summary:empty { display: none; }
+.campaign-launch-summary .cls-row { display: flex; gap: 8px; align-items: flex-start; color: var(--text-secondary, #cbd5e1); }
+.campaign-launch-summary .cls-row > span:first-child { width: 16px; flex-shrink: 0; text-align: center; font-weight: 800; }
+.campaign-launch-summary .cls-row.ok > span:first-child { color: #10b981; }
+.campaign-launch-summary .cls-row.todo { color: #fbbf24; }
+.campaign-launch-summary .cls-eta { margin-top: 2px; padding-top: 8px; border-top: 1px dashed rgba(255, 255, 255, 0.1); color: #38bdf8; }
+#startCampaignBtn:disabled { opacity: 0.55; cursor: not-allowed; }

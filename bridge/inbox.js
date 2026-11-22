@@ -13,6 +13,7 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
   let revision = 0, saveTimer;
   const epoch = require('node:crypto').randomUUID();
   const inboxStartTime = Math.floor(Date.now() / 1000);
+  const HISTORY_WINDOW_S = 6 * 3600;
   if (storageFile && fs.existsSync(storageFile)) {
     try { for (const item of JSON.parse(fs.readFileSync(storageFile, 'utf8'))) messages.set(item.waMessageId, { ...item, revision: ++revision }); } catch (_) {}
   }
@@ -25,7 +26,7 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
       fs.writeFileSync(storageFile + '.tmp', JSON.stringify([...messages.values()]), { mode: 0o600 });
       fs.renameSync(storageFile + '.tmp', storageFile);
       } catch (error) { console.error('Inbox persistence:', error.message); }
-    }, 100);
+    }, 1000);   // one write per second at most, even when a campaign records a message every few ms
   }
   async function phoneFor(id) {
     if (!id || /@(g\.us|broadcast|newsletter)$/.test(id)) return null;
@@ -88,9 +89,11 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     const phone = opts.phone || resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
     const debug = why => { if (process.env.WHATSAPP_BRIDGE_DEBUG) console.log(`[Inbox:debug] ${id} phone=${phone || '?'} ${why}`); };
     if (!phone || !/^\d{10,18}$/.test(phone)) { debug('dropped: no phone number for this chat'); return; }
-    // Never backfill or import old WhatsApp chats sent before session initialization
+    // Never backfill old WhatsApp history. Replies that arrived while the bridge was
+    // restarting or reconnecting come in with their original time, so they are kept
+    // as long as they are newer than HISTORY_WINDOW_S before this bridge started.
     const msgTs = Number(message.timestamp || 0);
-    if (msgTs > 0 && msgTs < (inboxStartTime - 30)) { debug('dropped: historical message prior to connection'); return; }
+    if (msgTs > 0 && msgTs < (inboxStartTime - HISTORY_WINDOW_S)) { debug('dropped: historical message prior to connection'); return; }
     // Keep the inbox limited to Chatly lead conversations. Inbound personal
     // chats from a linked phone are ignored unless Chatly already knows the lead.
     // A reply is kept only if it is a lead of the company that owns this WhatsApp;

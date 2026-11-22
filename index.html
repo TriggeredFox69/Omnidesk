@@ -15,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.0">
-  <link rel="stylesheet" href="assets/css/omnidesk.css?v=15.0">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.1">
+  <link rel="stylesheet" href="assets/css/omnidesk.css?v=15.1">
   <script>
     (function() {
       try {
@@ -1152,10 +1152,10 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
         <h2 style="font-size:20px;font-weight:800;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:22px;">🚀</span>
-          <span class="grad-text">Multi-Device Campaign Dispatcher</span>
+          <span style="font-size:22px;">📣</span>
+          <span class="grad-text">Send a campaign</span>
         </h2>
-        <p class="text-xs text-muted" style="margin-top:4px;">Dispatches outreach using all connected TL &amp; TM WhatsApp numbers simultaneously in batches.</p>
+        <p class="text-xs text-muted" style="margin-top:4px;"><strong>① Add numbers</strong> → <strong>② Write the message</strong> → <strong>③ Press Start.</strong> The numbers are shared equally between your team's connected WhatsApps.</p>
       </div>
       <div id="campaignStatusBadge" class="panel-badge">⚪ Ready to Launch</div>
     </div>
@@ -1165,10 +1165,10 @@
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
         <div>
           <div style="font-weight:800; font-size:16px; color:#fff; display:flex; align-items:center; gap:9px; letter-spacing:-0.01em;">
-            <span style="font-size:18px;">📱</span> Connected WhatsApp Numbers (TMs &amp; TLs)
+            <span style="font-size:18px;">📱</span> Who sends: your team's WhatsApps
           </div>
           <p class="text-xs text-muted" style="margin:4px 0 0; line-height:1.5;">
-            All registered WhatsApp devices of active Team Members and Team Leaders. All devices send <strong>simultaneously per batch</strong> in an equal round-robin split.
+            Every Team Member and Team Leader whose WhatsApp is linked sends <strong>an equal share</strong> of the numbers from their own WhatsApp, all at the same time.
           </p>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
@@ -1192,10 +1192,10 @@
       <!-- Batch Send Explanation -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 16px;">
         <div id="campaignRotationFlowPreview" style="font-size:12px; color:#38bdf8; font-family:'JetBrains Mono', monospace; font-weight:700;">
-          ⚡ Batch Dispatch: All connected WhatsApps send simultaneously
+          ⚖️ Numbers are shared equally between the connected WhatsApps
         </div>
         <div id="campaignCycleMathInfo" style="font-size:11.5px; color:var(--text-muted);">
-          Each batch = 1 msg per connected device &bull; Repeats until all numbers are delivered
+          Each WhatsApp sends one message, waits a few seconds, then sends the next
         </div>
       </div>
     </div>
@@ -1206,7 +1206,7 @@
         <div class="panel-header">
           <div class="panel-title">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>Target Audience</span>
+            <span>① Numbers</span>
           </div>
           <span id="campaignAudienceBadge" class="panel-badge">0 Contacts</span>
         </div>
@@ -1278,7 +1278,8 @@
           </div>
         </div>
 
-        <div class="form-group" style="margin:0;">
+        <!-- Replies always belong to the team member whose WhatsApp sent the message, so this choice is hidden. -->
+        <div class="form-group" style="margin:0;display:none;">
           <label class="form-label">Assign Created Leads To</label>
           <select id="campaignAssignSelect" class="form-select form-select-sm">
             <option value="round_robin" selected>🔄 Multi-Device Round-Robin (Assigned to Sender TL/TM)</option>
@@ -1293,7 +1294,7 @@
         <div class="panel-header">
           <div class="panel-title">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>Message & delivery pace</span>
+            <span>② Message &amp; speed</span>
           </div>
           <span class="panel-badge" style="color:var(--cyan);">Personalized messages</span>
         </div>
@@ -1302,20 +1303,20 @@
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span style="font-weight:700;font-size:12px;color:var(--text-secondary);">⏱️ Delivery pace</span>
             <select id="campaignPresetSelect" class="form-select form-select-sm" style="width:auto;padding:3px 8px;font-size:11px;">
-              <option value="fast" selected>⚡ Fast (3s – 6s)</option>
-              <option value="recommended">🛡️ Steady (6s – 12s)</option>
-              <option value="human">👤 Relaxed (12s – 25s)</option>
+              <option value="fast">⚡ Fast (6s – 10s)</option>
+              <option value="recommended" selected>🛡️ Safe (8s – 15s), recommended</option>
+              <option value="human">👤 Very safe (15s – 30s), new numbers</option>
               <option value="custom">⚙️ Custom</option>
             </select>
           </div>
           <div style="display:flex;gap:10px;margin-top:8px;">
             <div style="flex:1;">
               <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Min Delay (s)</label>
-              <input type="number" id="campaignDelayMin" class="form-input form-input-sm" value="3" min="1" max="180">
+              <input type="number" id="campaignDelayMin" class="form-input form-input-sm" value="8" min="6" max="180">
             </div>
             <div style="flex:1;">
               <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Max Delay (s)</label>
-              <input type="number" id="campaignDelayMax" class="form-input form-input-sm" value="6" min="2" max="300">
+              <input type="number" id="campaignDelayMax" class="form-input form-input-sm" value="15" min="9" max="300">
             </div>
           </div>
         </div>
@@ -1437,7 +1438,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         <div class="panel-header">
           <div class="panel-title">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            <span>Live Message Preview</span>
+            <span>③ Check &amp; start</span>
           </div>
           <span class="panel-badge">Preview</span>
         </div>
@@ -1447,6 +1448,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:8px;">
+          <div id="campaignLaunchSummary" class="campaign-launch-summary" aria-live="polite"></div>
           <button type="button" class="btn btn-wa btn-lg" id="startCampaignBtn" style="width:100%;justify-content:center;font-weight:700;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             <span>Start campaign</span>
@@ -2562,9 +2564,9 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script src="assets/js/offline-preview.js?v=15.0"></script>
-  <script src="assets/js/live-inbox.js?v=15.0"></script>
-  <script src="assets/js/wa-widget.js?v=15.0"></script>
-  <script src="assets/js/whatsapp-app.js?v=15.0"></script>
+  <script src="assets/js/offline-preview.js?v=15.1"></script>
+  <script src="assets/js/live-inbox.js?v=15.1"></script>
+  <script src="assets/js/wa-widget.js?v=15.1"></script>
+  <script src="assets/js/whatsapp-app.js?v=15.1"></script>
 </body>
 </html>

@@ -108,7 +108,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   };
   const snapshot = () => ({ success: true, mode: 'whatsapp_web', state: phase,
     is_connected: phase === 'ready', is_configured: phase === 'ready',
-    connected_number: number, qr, message: error, version: '18.6', engine: 'baileys' });
+    connected_number: number, qr, message: error, version: '18.7', engine: 'baileys' });
 
   async function disconnect(wipe = false) {
     phase = 'disconnected'; qr = null; number = ''; error = '';
@@ -151,6 +151,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         }
       });
       client.on('auth_failure', () => { phase = 'error'; qr = null; number = ''; error = 'WhatsApp authentication failed. Link your phone again.'; });
+      client.on('qr_expired', () => { if (client === active) { phase = 'disconnected'; qr = null; error = 'The QR code expired. Click Connect to show a new one.'; } });
       client.on('disconnected', () => {
         if (phase === 'ready' || number) {
           phase = 'starting';

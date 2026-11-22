@@ -12,7 +12,7 @@ function setup(eventsFor) {
   const state = { currentUser: { id: 'admin', role: 'admin' }, senderConfigured: false, leads: [], currentTab: 'inbox' };
   const synced = [];
   const context = vm.createContext({ window: {}, setInterval() {}, AbortSignal,
-    document: { hidden: false, getElementById: () => ({}) },
+    document: { hidden: false, addEventListener: () => {}, getElementById: () => ({}) },
     fetch: async (url, options) => {
       const request = JSON.parse(options.body);
       return { ok: true, json: async () => request.action === 'get_events' ? eventsFor(request.after) : { success: true } };

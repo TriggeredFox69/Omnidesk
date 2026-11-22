@@ -9,7 +9,7 @@ test('saved voice history loads before linking; reconnect resumes live chat sync
   const calls = [];
   const presence = {};
   const context = vm.createContext({ window: {}, setInterval() {}, AbortSignal,
-    document: { hidden: false, getElementById: () => presence },
+    document: { hidden: false, addEventListener: () => {}, getElementById: () => presence },
     fetch: async (url, options) => {
       const request = JSON.parse(options.body);
       if (!url || String(url).includes('direct_sender.php')) calls.push(request.action);
@@ -30,5 +30,6 @@ test('saved voice history loads before linking; reconnect resumes live chat sync
   state.senderConfigured = true;
   await inbox.poll();
   assert.equal(state.leads[0].messages.length, 1);
-  assert.deepEqual(calls.slice(1), ['get_events', 'sync_chat', 'get_presence', 'get_media']);
+  // Historical chat sync was removed on purpose (Chatly keeps only messages after linking).
+  assert.deepEqual(calls.slice(1), ['get_events', 'get_presence', 'get_media']);
 });

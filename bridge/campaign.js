@@ -98,13 +98,25 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     saveState();
   }
 
-  function saveState() {
+  // The state file holds the whole audience (10k-100k numbers). Writing it after every
+  // message blocked the bridge (and every WhatsApp socket) for hundreds of ms, so writes
+  // are batched: at most one compact write every SAVE_EVERY_MS, and an immediate write on
+  // start / pause / resume / stop / finish.
+  // Big audiences make the file big (100k numbers ~ 40 MB), so they are saved less often.
+  const saveEveryMs = () => (state.audience.length >= 50000 ? 5000 : state.audience.length >= 20000 ? 3000 : 1500);
+  let saveTimer = null;
+  function writeStateNow() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
     try {
       state.updatedAt = Date.now();
       const tmp = stateFile + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
+      fs.writeFileSync(tmp, JSON.stringify(state), 'utf8');
       fs.renameSync(tmp, stateFile);
     } catch (_) {}
+  }
+  function saveState() {
+    state.updatedAt = Date.now();
+    if (!saveTimer) saveTimer = setTimeout(writeStateNow, saveEveryMs());
   }
 
   function loadState() {
@@ -116,7 +128,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
           (state.audience || []).forEach(c => { if (c.status === 'sending') c.status = 'pending'; });
           if (state.status === 'running') {
             state.status = 'paused';
-            log('Campaign paused after server restart. Click Resume to continue.', 'warn');
+            state.resumeAfterRestart = true;
+            log('Server restarted. The campaign will continue by itself as soon as a team WhatsApp is back online.', 'warn');
           }
         }
       }
@@ -251,19 +264,32 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     }];
   }
 
+  // Per-TM "messages sent today" counters are collected in memory and written to
+  // users.json together with the CRM batch (one read + one write every few seconds).
+  const pendingUserCounts = new Map();
   function incrementUserMessageCount(userId) {
     if (!userId) return;
+    pendingUserCounts.set(userId, (pendingUserCounts.get(userId) || 0) + 1);
+    scheduleCrmFlush();
+  }
+  function flushUserCounts() {
+    if (!pendingUserCounts.size) return;
+    const counts = new Map(pendingUserCounts);
+    pendingUserCounts.clear();
     try {
       const usersFile = typeof getUsersPath === 'function' ? getUsersPath() : path.join(dataDir, '../users.json');
-      if (fs.existsSync(usersFile)) {
-        const users = JSON.parse(fs.readFileSync(usersFile, 'utf8') || '[]');
-        if (Array.isArray(users)) {
-          const user = users.find(u => u.id === userId);
-          if (user) {
-            user.messages_sent_today = (Number(user.messages_sent_today) || 0) + 1;
-            fs.writeFileSync(usersFile, JSON.stringify(users, null, 2), 'utf8');
-          }
-        }
+      if (!fs.existsSync(usersFile)) return;
+      const users = JSON.parse(fs.readFileSync(usersFile, 'utf8') || '[]');
+      if (!Array.isArray(users)) return;
+      let changed = false;
+      for (const user of users) {
+        const n = counts.get(user.id);
+        if (n) { user.messages_sent_today = (Number(user.messages_sent_today) || 0) + n; changed = true; }
+      }
+      if (changed) {
+        const tmp = usersFile + '.tmp.' + process.pid;
+        fs.writeFileSync(tmp, JSON.stringify(users, null, 2), 'utf8');
+        fs.renameSync(tmp, usersFile);
       }
     } catch (_) {}
   }
@@ -380,109 +406,131 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     }
   }
 
+  // ── CRM updates ──────────────────────────────────────────────────────────────
+  // Every sent message records itself on the receiver's CRM lead (so a reply opens the
+  // right chat, owned by the TM who sent it). Reading + rewriting a company's whole
+  // leads.json for EVERY message froze the bridge on big CRMs, so sends are queued and
+  // applied in one read + one write every CRM_FLUSH_MS (and at pause / stop / finish).
+  const CRM_FLUSH_MS = 3000;
+  const crmQueue = [];
+  let crmTimer = null;
+  function scheduleCrmFlush() {
+    if (!crmTimer) crmTimer = setTimeout(flushCrm, CRM_FLUSH_MS);
+  }
   function updateCrmLead(contact, crmMessage, assignMode, activeSender) {
-    try {
-      const companyId = state.companyId || 'COMP-001';
-      const cleanId = String(companyId).replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
+    crmQueue.push({
+      companyId: state.companyId || 'COMP-001', campaignName: state.name, closersPool: state.closersPool || [],
+      contact: { phone: contact.phone, name: contact.name, display: contact.display, city: contact.city, network: contact.network,
+        assignedOwnerId: contact.assignedOwnerId, assignedOwnerName: contact.assignedOwnerName,
+        assignedOwnerUsername: contact.assignedOwnerUsername, assignedOwnerRole: contact.assignedOwnerRole },
+      crmMessage, activeSender: activeSender || null
+    });
+    scheduleCrmFlush();
+  }
 
-      // Always resolve target files to update both tenant file and global mirror
-      const tenantPath = path.resolve(__dirname, `../data/tenants/${cleanId}/leads.json`);
-      const globalPath = path.resolve(__dirname, '../data/leads.json');
-      const targetPaths = [tenantPath];
-      if (cleanId === 'COMP-001' && globalPath !== tenantPath) {
-        targetPaths.push(globalPath);
+  function applyCrmItem(leads, byPhone, cleanId, item) {
+    const { contact, crmMessage, activeSender } = item;
+    const cleanPhone = String(contact.phone || '').replace(/\D/g, '');
+    if (!cleanPhone) return;
+    const existingLead = byPhone.get(cleanPhone);
+
+    // STRICT LEAD ALLOCATION RULE: the lead belongs to the closer (TM / TL) whose device sent it.
+    let ownerId = (activeSender && activeSender.roleType !== 'admin') ? activeSender.id : contact.assignedOwnerId;
+    let ownerName = (activeSender && activeSender.roleType !== 'admin') ? activeSender.name : contact.assignedOwnerName;
+    let ownerUsername = (activeSender && activeSender.roleType !== 'admin') ? (activeSender.username || activeSender.name) : contact.assignedOwnerUsername;
+    if (!ownerId && item.closersPool.length > 0) {
+      const fallbackCloser = item.closersPool[0];
+      ownerId = fallbackCloser.id;
+      ownerName = fallbackCloser.name;
+      ownerUsername = fallbackCloser.username || '';
+    }
+
+    if (existingLead) {
+      existingLead.messages = existingLead.messages || [];
+      if (!existingLead.messages.some(m => m.waMessageId === crmMessage.waMessageId)) existingLead.messages.push(crmMessage);
+      existingLead.lastActive = 'Just now';
+      existingLead.status = 'sent';
+      if (existingLead.leadState !== 'paid' && existingLead.leadState !== 'pending_verification') existingLead.leadState = 'ongoing';
+      if (ownerId && (!existingLead.ownerId || existingLead.ownerId.includes('ADMIN') || existingLead.ownerId.includes('FALLBACK') || existingLead.ownerId === 'USR-ADMIN-01')) {
+        existingLead.ownerId = ownerId;
+        existingLead.ownerName = ownerName;
+        existingLead.ownerUsername = ownerUsername;
       }
+      existingLead.lastSenderPhone = activeSender ? activeSender.phone : null;
+      existingLead.lastSenderName = activeSender ? activeSender.name : null;
+      return;
+    }
+    const newLead = {
+      id: `lead_${Date.now()}_${cleanPhone}`,
+      company_id: cleanId,
+      name: contact.name || contact.display || `+${cleanPhone}`,
+      phone: cleanPhone,
+      display: contact.display || `+${cleanPhone}`,
+      city: contact.city || 'Pakistan',
+      network: contact.network || 'WhatsApp',
+      ownerId, ownerName, ownerUsername,
+      sender_id: activeSender ? activeSender.id : ownerId,
+      sender_name: activeSender ? activeSender.name : ownerName,
+      sender_phone: activeSender ? activeSender.phone : null,
+      leadState: 'ongoing',
+      status: 'sent',
+      unreadCount: 0,
+      interest: 'Campaign Outreach',
+      lastActive: 'Just now',
+      notes: `Outreach dispatched via campaign "${item.campaignName}". Allocated Closer: ${ownerName || 'TM Closer'} (${activeSender?.role || contact.assignedOwnerRole || 'Closer'}). Device: ${activeSender ? activeSender.name : 'Primary Device'}.`,
+      messages: [crmMessage]
+    };
+    leads.unshift(newLead);
+    byPhone.set(cleanPhone, newLead);
+  }
 
-      // Read current leads from tenant file (or global file if tenant not initialized)
-      let leads = [];
-      let sourceFile = fs.existsSync(tenantPath) ? tenantPath : (fs.existsSync(globalPath) ? globalPath : null);
-      if (sourceFile) {
-        try {
-          const raw = fs.readFileSync(sourceFile, 'utf8');
-          leads = JSON.parse(raw);
-        } catch (_) {}
-      }
-      if (!Array.isArray(leads)) leads = [];
+  function flushCrm() {
+    if (crmTimer) { clearTimeout(crmTimer); crmTimer = null; }
+    flushUserCounts();
+    if (!crmQueue.length) return;
+    const batch = crmQueue.splice(0, crmQueue.length);
+    const byCompany = new Map();
+    for (const item of batch) {
+      const id = String(item.companyId).replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
+      if (!byCompany.has(id)) byCompany.set(id, []);
+      byCompany.get(id).push(item);
+    }
+    for (const [cleanId, items] of byCompany) {
+      try {
+        // The company's CRM file (service.js passes getLeadsPath; same tenant path as below).
+        const tenantPath = (typeof getLeadsPath === 'function' && getLeadsPath(cleanId)) || path.resolve(__dirname, `../data/tenants/${cleanId}/leads.json`);
+        const globalPath = path.resolve(__dirname, '../data/leads.json');
+        const targetPaths = [tenantPath];
+        // Nunno keeps a legacy mirror at data/leads.json (only if it exists).
+        const sameDataRoot = path.resolve(tenantPath, '../../..') === path.dirname(globalPath);
+        if (cleanId === 'COMP-001' && sameDataRoot && globalPath !== tenantPath && fs.existsSync(globalPath)) targetPaths.push(globalPath);
 
-      const cleanPhone = String(contact.phone || '').replace(/\D/g, '');
-      let existingLead = leads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPhone);
-
-      // STRICT LEAD ALLOCATION RULE:
-      // Lead ownership MUST go to the active closer (TM or TL) whose device sent the message!
-      let ownerId = (activeSender && activeSender.roleType !== 'admin') ? activeSender.id : contact.assignedOwnerId;
-      let ownerName = (activeSender && activeSender.roleType !== 'admin') ? activeSender.name : contact.assignedOwnerName;
-      let ownerUsername = (activeSender && activeSender.roleType !== 'admin') ? (activeSender.username || activeSender.name) : contact.assignedOwnerUsername;
-
-      if (!ownerId && state.closersPool && state.closersPool.length > 0) {
-        const fallbackCloser = state.closersPool[0];
-        ownerId = fallbackCloser.id;
-        ownerName = fallbackCloser.name;
-        ownerUsername = fallbackCloser.username || '';
-      }
-
-      if (existingLead) {
-        existingLead.messages = existingLead.messages || [];
-        if (!existingLead.messages.some(m => m.waMessageId === crmMessage.waMessageId)) {
-          existingLead.messages.push(crmMessage);
+        let leads = [];
+        const sourceFile = fs.existsSync(tenantPath) ? tenantPath : (fs.existsSync(globalPath) ? globalPath : null);
+        if (sourceFile) { try { leads = JSON.parse(fs.readFileSync(sourceFile, 'utf8')); } catch (_) {} }
+        if (!Array.isArray(leads)) leads = [];
+        const byPhone = new Map();
+        for (const l of leads) {
+          const p = String(l.phone || '').replace(/\D/g, '');
+          if (p && !byPhone.has(p)) byPhone.set(p, l);
         }
-        existingLead.lastActive = 'Just now';
-        existingLead.status = 'sent';
-        if (existingLead.leadState !== 'paid' && existingLead.leadState !== 'pending_verification') {
-          existingLead.leadState = 'ongoing';
-        }
-        // Auto-fix / allocate if previously unowned, fallback, or locked to admin
-        if (ownerId && (!existingLead.ownerId || existingLead.ownerId.includes('ADMIN') || existingLead.ownerId.includes('FALLBACK') || existingLead.ownerId === 'USR-ADMIN-01')) {
-          existingLead.ownerId = ownerId;
-          existingLead.ownerName = ownerName;
-          existingLead.ownerUsername = ownerUsername;
-        }
-        existingLead.lastSenderPhone = activeSender ? activeSender.phone : null;
-        existingLead.lastSenderName = activeSender ? activeSender.name : null;
-      } else {
-        const newLead = {
-          id: `lead_${Date.now()}_${cleanPhone}`,
-          company_id: cleanId,
-          name: contact.name || contact.display || `+${cleanPhone}`,
-          phone: cleanPhone,
-          display: contact.display || `+${cleanPhone}`,
-          city: contact.city || 'Pakistan',
-          network: contact.network || 'WhatsApp',
-          ownerId: ownerId,
-          ownerName: ownerName,
-          ownerUsername: ownerUsername,
-          sender_id: activeSender ? activeSender.id : ownerId,
-          sender_name: activeSender ? activeSender.name : ownerName,
-          sender_phone: activeSender ? activeSender.phone : null,
-          leadState: 'ongoing',
-          status: 'sent',
-          unreadCount: 0,
-          interest: 'Campaign Outreach',
-          lastActive: 'Just now',
-          notes: `Outreach dispatched via campaign "${state.name}". Allocated Closer: ${ownerName || 'TM Closer'} (${activeSender?.role || contact.assignedOwnerRole || 'Closer'}). Device: ${activeSender ? activeSender.name : 'Primary Device'}.`,
-          messages: [crmMessage]
-        };
-        leads.unshift(newLead);
-      }
+        for (const item of items) applyCrmItem(leads, byPhone, cleanId, item);
 
-      // Write atomically to all target files with fallback
-      for (const targetFile of targetPaths) {
-        try {
-          const dir = path.dirname(targetFile);
-          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          const tmp = targetFile + '.tmp.' + Date.now();
-          fs.writeFileSync(tmp, JSON.stringify(leads, null, 2), 'utf8');
+        const body = JSON.stringify(leads, null, 2);
+        for (const targetFile of targetPaths) {
           try {
-            fs.renameSync(tmp, targetFile);
-          } catch (_) {
-            fs.writeFileSync(targetFile, JSON.stringify(leads, null, 2), 'utf8');
-            try { fs.unlinkSync(tmp); } catch (_) {}
+            fs.mkdirSync(path.dirname(targetFile), { recursive: true });
+            const tmp = targetFile + '.bridge-' + process.pid + '.tmp';
+            fs.writeFileSync(tmp, body, 'utf8');
+            try { fs.renameSync(tmp, targetFile); }
+            catch (_) { fs.writeFileSync(targetFile, body, 'utf8'); try { fs.unlinkSync(tmp); } catch (_) {} }
+          } catch (fErr) {
+            console.warn(`[Campaign] Failed writing leads to ${targetFile}:`, fErr.message);
           }
-        } catch (fErr) {
-          console.warn(`[Campaign] Failed writing leads to ${targetFile}:`, fErr.message);
         }
+      } catch (err) {
+        console.warn('[Campaign CRM Sync Error]:', err.message);
       }
-    } catch (err) {
-      console.warn('[Campaign CRM Sync Error]:', err.message);
     }
   }
 
@@ -493,10 +541,69 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   // than OFFLINE_GRACE_MS, their unsent numbers move to the TMs still connected,
   // so the campaign always runs until every number has been messaged.
   const OFFLINE_GRACE_MS = offlineGraceMs || 15000;
+  const MIN_DELAY_S = 6;
   const laneTimers = new Map();
   const laneBusy = new Set();
 
-  const isDone = c => ['accepted', 'sent', 'delivered', 'read', 'failed'].includes(c.status);
+  // ── Campaign media (image / voice note) lives in a file, not inside the state JSON ──
+  // The state file is rewritten every few seconds; a base64 image or voice note inside it
+  // made every one of those writes megabytes bigger.
+  const mediaDir = path.join(dataDir || path.dirname(stateFile), 'campaign_media');
+  const mediaCache = new Map();          // file -> base64 (only the current campaign's file)
+  function storeCampaignMedia(companyId, campaignId, media) {
+    if (!media || !media.data) return media || null;
+    try {
+      fs.mkdirSync(mediaDir, { recursive: true });
+      const safeCompany = String(companyId || 'COMP').replace(/[^a-zA-Z0-9_-]/g, '');
+      // drop this company's media from earlier campaigns (other companies' files stay)
+      for (const f of fs.readdirSync(mediaDir)) if (f.startsWith(safeCompany + '__')) { try { fs.unlinkSync(path.join(mediaDir, f)); } catch (_) {} }
+      const fromName = /\.([a-z0-9]{1,5})$/i.exec(String(media.filename || ''));
+      const ext = (fromName ? fromName[1] : String(media.mimetype || 'bin').split('/')[1] || 'bin').split(';')[0].replace(/[^a-z0-9]/gi, '') || 'bin';
+      const file = path.join(mediaDir, `${safeCompany}__${campaignId}.${ext}`);
+      fs.writeFileSync(file, Buffer.from(media.data, 'base64'));
+      mediaCache.clear();
+      mediaCache.set(file, media.data);
+      const { data, ...rest } = media;
+      return { ...rest, file };
+    } catch (err) {
+      console.warn('[Campaign] Could not store campaign media as a file, keeping it inline:', err.message);
+      return media;
+    }
+  }
+  function mediaForSend(media) {
+    if (!media || !media.file) return media || null;
+    let data = mediaCache.get(media.file);
+    if (!data) {
+      data = fs.readFileSync(media.file).toString('base64');
+      mediaCache.clear();
+      mediaCache.set(media.file, data);
+    }
+    const { file, ...rest } = media;
+    return { ...rest, data };
+  }
+
+  const DONE = new Set(['accepted', 'sent', 'delivered', 'read', 'failed']);
+  const isDone = c => DONE.has(c.status);
+  // Progress bookkeeping without rescanning the whole audience on every message:
+  // doneCount = numbers finished (sent or failed); laneCursor = where each TM's next
+  // pending number is. Both are rebuilt with recount() after loads, resumes and rebalances.
+  let doneCount = 0;
+  const laneCursor = new Map();
+  function recount() {
+    doneCount = 0;
+    for (const c of state.audience) if (isDone(c)) doneCount++;
+    laneCursor.clear();
+    state.currentIndex = doneCount;
+  }
+  function nextPendingFor(laneId) {
+    const list = state.audience;
+    for (let i = laneCursor.get(laneId) || 0; i < list.length; i++) {
+      const c = list[i];
+      if (c.laneId === laneId && c.status === 'pending') { laneCursor.set(laneId, i); return c; }
+    }
+    laneCursor.set(laneId, list.length);
+    return null;
+  }
   const laneOf = id => (state.lanes || []).find(l => l.id === id);
   const deviceOnline = lane => lane.mode === 'main' ? isMainOnline() : (typeof deviceReady === 'function' && deviceReady(lane.id));
   const laneSender = lane => ({ id: lane.id, name: lane.name, username: lane.username, role: lane.role, roleType: lane.roleType, phone: lane.phone });
@@ -528,6 +635,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       t.assigned++;
     });
     lane.assigned -= pending.length;
+    laneCursor.clear();
     log(`🔁 ${lane.name}'s WhatsApp is offline. Moved their ${pending.length} unsent numbers to ${targets.map(t => t.name).join(', ')}.`, 'warn');
     targets.forEach(t => {
       if (t.status === 'done') t.status = 'ready';
@@ -539,13 +647,16 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
 
   function checkFinish() {
     if (state.status !== 'running') return;
-    if (state.audience.length && state.audience.every(isDone)) finish();
+    if (state.audience.length && doneCount >= state.audience.length) {
+      recount();                                    // confirm before finishing
+      if (doneCount >= state.audience.length) finish();
+    }
   }
 
   async function runLane(laneId) {
     const lane = laneOf(laneId);
     if (!lane || state.status !== 'running' || laneBusy.has(laneId)) return;
-    const contact = state.audience.find(c => c.laneId === laneId && c.status === 'pending');
+    const contact = nextPendingFor(laneId);
     if (!contact) { lane.status = 'done'; saveState(); checkFinish(); return; }
 
     if (!deviceOnline(lane)) {
@@ -571,14 +682,13 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     contact.senderName = lane.name;
     contact.senderRole = lane.role;
     contact.senderPhone = lane.phone;
-    const personalizedMsg = personalizeMessage(state.messageTemplate, contact, state.companyName);
-    contact.preparedMessage = personalizedMsg;
+    const personalizedMsg = personalizeMessage(state.messageTemplate, contact, state.companyName);   // not stored per contact (keeps the state file small)
     state.activeLaneId = lane.id;
     saveState();
 
     try {
       const payload = { phone: contact.phone, message: personalizedMsg, request_id: contact.requestId, simulate: false, allow_simulation: false };
-      if (state.media) payload.media = state.media;
+      if (state.media) payload.media = mediaForSend(state.media);
       const result = lane.mode === 'main' ? await send(payload) : await deviceSend(lane.id, payload);
       if (result && result.simulated) throw new Error('WhatsApp is not connected.');
 
@@ -606,7 +716,15 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       }
       log(`✅ ${lane.name} (${lane.display}) ➔ ${contact.display || contact.phone}  [${lane.sent + lane.failed}/${lane.assigned}]`, 'success');
     } catch (err) {
-      if (err && err.deviceOffline) {
+      // A send that died because the TM's WhatsApp dropped ("Connection Closed", or a
+      // submission that never confirmed while the device went offline) is retried after the
+      // reconnect instead of being marked failed. At most twice per number.
+      const msg = String((err && err.message) || '');
+      const dropped = err && (err.deviceOffline
+        || /connection (closed|terminated|lost)|not connected|socket/i.test(msg)
+        || (/unconfirmed/i.test(msg) && !deviceOnline(lane)));
+      if (dropped && (contact.retries || 0) < 2) {
+        contact.retries = (contact.retries || 0) + 1;
         contact.status = 'pending';            // not sent: retry after reconnect, or move to another TM
         lane.status = 'offline';
         lane.offlineSince = lane.offlineSince || Date.now();
@@ -621,7 +739,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       }
     } finally {
       laneBusy.delete(laneId);
-      state.currentIndex = state.audience.filter(isDone).length;
+      if (isDone(contact)) doneCount++;
+      state.currentIndex = doneCount;
       saveState();
     }
 
@@ -629,8 +748,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     checkFinish();
     if (state.status !== 'running') return;
     if (lane.status === 'offline') { scheduleLane(lane, 5000); return; }
-    const minSec = state.minDelay || 4;
-    const maxSec = Math.max(minSec, state.maxDelay || 8);
+    // also applies to campaigns saved before the 6 s floor existed (e.g. resumed after a restart)
+    const minSec = Math.max(MIN_DELAY_S, state.minDelay || 8);
+    const maxSec = Math.max(minSec, state.maxDelay || 15);
     const jitter = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
     lane.nextAt = Date.now() + jitter * 1000;
     lane.status = 'waiting';
@@ -648,7 +768,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.remainingSeconds = 0;
     const per = (state.lanes || []).map(l => `${l.name}: ${l.sent}`).join(' · ');
     log(`🎉 Campaign completed! ${state.totalSent} sent, ${state.totalFailed} failed. ${per}`, 'success');
-    saveState();
+    flushCrm();
+    writeStateNow();
   }
 
   function start(params = {}) {
@@ -711,7 +832,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.companyName = companyName;
     state.messageTemplate = params.message || '';
     state.variation = params.variation || 'text';
-    state.media = params.media || null;
+    state.media = storeCampaignMedia(companyId, state.id, params.media || null);
     if (params.image_url && !state.media) state.media = { mimetype: 'image/jpeg', filename: 'flyer.jpg', url: params.image_url };
     if (params.audio_url && !state.media) state.media = { mimetype: 'audio/ogg', filename: 'voice_pitch.ogg', url: params.audio_url };
 
@@ -753,8 +874,10 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.totalSent = 0;
     state.totalFailed = 0;
     const requestedDelay = parseInt(params.minDelay, 10) || parseInt(params.delay, 10) || 5;
-    state.minDelay = Math.max(2, requestedDelay);
-    state.maxDelay = Math.max(state.minDelay, parseInt(params.maxDelay, 10) || (state.minDelay + 4));
+    // Faster than one message every ~6 s from one number gets WhatsApp numbers throttled
+    // (sends hang, then "unconfirmed") or banned, so 6 s is the floor per WhatsApp.
+    state.minDelay = Math.max(MIN_DELAY_S, requestedDelay);
+    state.maxDelay = Math.max(state.minDelay + 3, parseInt(params.maxDelay, 10) || (state.minDelay + 4));
     state.remainingSeconds = 0;
     state.assignMode = 'equal_split';
     state.status = 'running';
@@ -766,37 +889,44 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     log(`🚀 Campaign "${state.name}" launched for ${companyName}: ${state.audience.length} numbers split equally across ${n} Team Member${n > 1 ? 's' : ''}.`, 'info');
     log(`📱 ${state.lanes.map(l => `${l.name} (${l.display}) → ${l.assigned} numbers`).join(' | ')}`, 'info');
     if (skipped.length) log(`⚠️ Not included (WhatsApp not connected): ${skipped.map(s => s.name).join(', ')}`, 'warn');
-    saveState();
+    recount();
+    writeStateNow();
     kickAllLanes();
     return { ...getStatus(), allocations: state.audience.map(c => ({ phone: c.phone, ownerId: c.assignedOwnerId })) };
   }
 
   function pause() {
+    state.resumeAfterRestart = false;
     if (state.status !== 'running') return getStatus();
     clearLaneTimers();
     state.status = 'paused';
-    log(`⏸️ Campaign paused. ${state.audience.filter(isDone).length} of ${state.audience.length} done.`, 'warn');
-    saveState();
+    log(`⏸️ Campaign paused. ${doneCount} of ${state.audience.length} done.`, 'warn');
+    flushCrm();
+    writeStateNow();
     return getStatus();
   }
 
   function resume() {
+    state.resumeAfterRestart = false;
     if (state.status !== 'paused') return getStatus();
     state.status = 'running';
     (state.lanes || []).forEach(l => { if (l.status !== 'done') { l.status = 'ready'; l.offlineSince = null; } });
     state.audience.forEach(c => { if (c.status === 'sending') c.status = 'pending'; });
     log('▶️ Campaign resumed on every connected Team Member.', 'info');
-    saveState();
+    recount();
+    writeStateNow();
     kickAllLanes();
     return getStatus();
   }
 
   function stop() {
+    state.resumeAfterRestart = false;
     clearLaneTimers();
     state.status = 'stopped';
     state.remainingSeconds = 0;
     log(`⏹️ Campaign halted. ${state.totalSent} of ${state.audience.length} messages sent.`, 'warn');
-    saveState();
+    flushCrm();
+    writeStateNow();
     return getStatus();
   }
 
@@ -811,19 +941,26 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.totalFailed = 0;
     state.remainingSeconds = 0;
     state.logs = [];
-    saveState();
+    recount();
+    writeStateNow();
     return getStatus();
+  }
+
+  function firstMatching(list, test, limit) {
+    const out = [];
+    for (let i = 0; i < list.length && out.length < limit; i++) if (test(list[i])) out.push(list[i]);
+    return out;
   }
 
   function getStatus() {
     const lanes = (state.lanes || []).map(l => ({
       ...l,
       connected: deviceOnline(l),
-      remaining: state.audience.filter(c => c.laneId === l.id && !isDone(c)).length,
+      remaining: Math.max(0, (l.assigned || 0) - (l.sent || 0) - (l.failed || 0)),
       nextInSeconds: l.nextAt ? Math.max(0, Math.round((l.nextAt - Date.now()) / 1000)) : 0
     }));
     const poolSize = Math.max(1, lanes.length);
-    const done = state.audience.filter(isDone).length;
+    const done = doneCount;
     const active = lanes.find(l => l.id === state.activeLaneId) || lanes[0] || null;
     const waiting = lanes.filter(l => l.status === 'waiting').map(l => l.nextInSeconds);
     return {
@@ -846,7 +983,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       startedAt: state.startedAt, updatedAt: state.updatedAt,
       logs: state.logs.slice(-60),
       audience: state.audience.length > 60
-        ? state.audience.filter(c => c.status === 'sending' || c.status === 'failed').slice(0, 60).map(c => ({
+        ? firstMatching(state.audience, c => c.status === 'sending' || c.status === 'failed', 60).map(c => ({
             id: c.id, phone: c.phone, display: c.display, name: c.name, city: c.city, network: c.network,
             status: c.status, laneId: c.laneId, senderId: c.senderId, senderName: c.senderName || c.assignedOwnerName,
             senderRole: c.senderRole, senderPhone: c.senderPhone, cycle: c.cycle, sentAt: c.sentAt, error: c.error
@@ -860,6 +997,27 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   }
 
   loadState();
+  recount();
+
+  // After a restart, WhatsApp sockets need a few seconds to reconnect. Check every 15 s
+  // (for up to 15 minutes) and resume as soon as one of the campaign's WhatsApps is online.
+  if (state.resumeAfterRestart && state.status === 'paused') {
+    let tries = 0;
+    const autoResume = setInterval(() => {
+      tries++;
+      if (!state.resumeAfterRestart || state.status !== 'paused') { clearInterval(autoResume); return; }
+      if ((state.lanes || []).some(l => deviceOnline(l))) {
+        clearInterval(autoResume);
+        resume();
+        log('▶️ Continued automatically after the server restart.', 'info');
+      } else if (tries >= 60) {
+        clearInterval(autoResume);
+        state.resumeAfterRestart = false;
+        log('No team WhatsApp came back online within 15 minutes. Click Resume once they are connected.', 'warn');
+      }
+    }, 15000);
+    if (autoResume.unref) autoResume.unref();
+  }
 
   return {
     start,

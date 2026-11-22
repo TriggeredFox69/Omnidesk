@@ -84,14 +84,15 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
 
     // High performance mtime cache: skip file I/O & loops completely if no new messages were written
     $cacheFile = sys_get_temp_dir() . '/chatly_inbox_mtime_' . md5($dataFile);
-    $maxMtime = 0;
+    // Signature = every inbox file's mtime AND size (mtime alone has 1-second resolution, so two
+    // writes in the same second looked identical and the second batch of messages was skipped).
+    clearstatcache();
+    $sigParts = [];
     foreach ($inboxFiles as $f) {
-        if (file_exists($f)) {
-            $mt = @filemtime($f);
-            if ($mt > $maxMtime) $maxMtime = $mt;
-        }
+        $sigParts[] = file_exists($f) ? (@filemtime($f) . ':' . @filesize($f)) : '-';
     }
-    if ($maxMtime > 0 && file_exists($cacheFile) && (int)@file_get_contents($cacheFile) >= $maxMtime) {
+    $maxMtime = implode(',', $sigParts);   // (kept the old variable name: it is what gets cached)
+    if (file_exists($cacheFile) && @file_get_contents($cacheFile) === $maxMtime) {
         return false;
     }
 
@@ -101,9 +102,10 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
             $raw = @file_get_contents($f);
             $parsed = json_decode($raw, true);
             if (is_array($parsed)) {
-                // If inbox file has thousands of items, only take the most recent 150
-                $slice = count($parsed) > 150 ? array_slice($parsed, -150) : $parsed;
-                foreach ($slice as $m) {
+                // Every message is merged. (Only taking the last 150 lost replies whenever more
+                // than 150 messages arrived between two polls, because the mtime cache below then
+                // marks the inbox as processed.) The cache already skips this when nothing changed.
+                foreach ($parsed as $m) {
                     $waId = $m['waMessageId'] ?? ($m['id'] ?? '');
                     if ($waId && !isset($inboxMessages[$waId])) {
                         $inboxMessages[$waId] = $m;
@@ -112,8 +114,7 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
             }
         }
     }
-    @file_put_contents($cacheFile, (string)$maxMtime);
-    if (empty($inboxMessages)) return false;
+    if (empty($inboxMessages)) { @file_put_contents($cacheFile, (string)$maxMtime); return false; }
 
     $cleanDigits = function($p) {
         $c = preg_replace('/\D/', '', (string)$p);
@@ -236,6 +237,8 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
     if ($modified) {
         saveStoredLeads($dataFile, $leads);
     }
+    // Mark this inbox version as merged only after the merge and save went through.
+    @file_put_contents($cacheFile, (string)$maxMtime);
     return $modified;
 }
 
@@ -261,6 +264,47 @@ $defaultLeads = [
         ]
     ]
 ];
+
+const CHATLY_SUMMARY_MESSAGES = 12;   // messages per lead in the light background sync
+
+// May this user (a closer / team lead) see this lead? Admins see everything (checked by callers).
+function chatlyLeadVisibleTo($l, $myId, $myUser, $myNameClean) {
+    $ownerId = $l['ownerId'] ?? ($l['assignedOwnerId'] ?? ($l['assignedCloser']['id'] ?? ''));
+    $ownerUser = strtolower($l['ownerUsername'] ?? ($l['assignedOwnerUsername'] ?? ($l['assignedCloser']['username'] ?? '')));
+    $ownerNameClean = preg_replace('/\s+/', '', strtolower($l['ownerName'] ?? ($l['assignedOwnerName'] ?? '')));
+
+    // If lead is assigned to someone else, reject completely
+    if ($ownerId && $myId && $ownerId !== $myId) return false;
+    if ($ownerUser && $myUser && $ownerUser !== $myUser) return false;
+    if ($ownerNameClean && $myNameClean && $ownerNameClean !== $myNameClean && strpos($ownerNameClean, $myNameClean) === false && strpos($myNameClean, $ownerNameClean) === false) {
+        return false;
+    }
+
+    if ($ownerId && $myId && $ownerId === $myId) return true;
+    if ($myUser && $ownerUser && $ownerUser === $myUser) return true;
+    if ($myNameClean && $ownerNameClean && ($ownerNameClean === $myNameClean || strpos($ownerNameClean, $myNameClean) !== false)) return true;
+    if (!empty($l['originalOwnerId']) && $l['originalOwnerId'] === $myId) return true;
+    return false;
+}
+
+// Revision tag of everything get_leads reads for this user. The dashboard polls get_leads
+// every 5 seconds from every open tab; when the tag it sends back still matches, nothing
+// changed, so we answer "unchanged" without reading or re-sending the whole CRM.
+function chatlyLeadsRevision($dataFile, $sessionUser) {
+    $dataRoot = dirname(__DIR__) . '/data';
+    $parts = [$dataFile, (string) ($sessionUser['id'] ?? ''), (string) ($sessionUser['role'] ?? '')];
+    foreach ([$dataFile, $dataRoot . '/whatsapp-bridge/inbox.json', $dataRoot . '/whatsapp-bridge/whatsapp-bridge/inbox.json', $dataRoot . '/inbox.json'] as $f) {
+        $parts[] = is_file($f) ? (filemtime($f) . ':' . filesize($f)) : '-';
+    }
+    return substr(md5(implode('|', $parts)), 0, 16);
+}
+if (($_GET['action'] ?? '') === 'get_leads' && !empty($_GET['rev'])) {
+    clearstatcache();
+    if (hash_equals(chatlyLeadsRevision($dataFile, $sessionUser), (string) $_GET['rev'])) {
+        echo json_encode(['success' => true, 'unchanged' => true, 'rev' => (string) $_GET['rev'], 'company_id' => $activeCompanyId]);
+        exit;
+    }
+}
 
 // Initialize if not present
 $currentLeads = getStoredLeads($dataFile);
@@ -1072,33 +1116,59 @@ if ($action === 'get_leads') {
     // Only administrators in executive mode see company-wide chats.
     // Every Sales Closer (TM) and Team Lead (TL) strictly sees ONLY their allotted leads.
     if ($userRole !== 'admin' && $userRole !== 'superadmin' && ($myId || $myUser || $myNameClean)) {
-        $leadsToReturn = array_values(array_filter($currentLeads, function($l) use ($myId, $myUser, $myNameClean) {
-            $ownerId = $l['ownerId'] ?? ($l['assignedOwnerId'] ?? ($l['assignedCloser']['id'] ?? ''));
-            $ownerUser = strtolower($l['ownerUsername'] ?? ($l['assignedOwnerUsername'] ?? ($l['assignedCloser']['username'] ?? '')));
-            $ownerNameClean = preg_replace('/\s+/', '', strtolower($l['ownerName'] ?? ($l['assignedOwnerName'] ?? '')));
-
-            // If lead is assigned to someone else, reject completely
-            if ($ownerId && $myId && $ownerId !== $myId) return false;
-            if ($ownerUser && $myUser && $ownerUser !== $myUser) return false;
-            if ($ownerNameClean && $myNameClean && $ownerNameClean !== $myNameClean && strpos($ownerNameClean, $myNameClean) === false && strpos($myNameClean, $ownerNameClean) === false) {
-                return false;
-            }
-
-            if ($ownerId && $myId && $ownerId === $myId) return true;
-            if ($myUser && $ownerUser && $ownerUser === $myUser) return true;
-            if ($myNameClean && $ownerNameClean && ($ownerNameClean === $myNameClean || strpos($ownerNameClean, $myNameClean) !== false)) return true;
-            if (!empty($l['originalOwnerId']) && $l['originalOwnerId'] === $myId) return true;
-            return false;
-        }));
+        $leadsToReturn = array_values(array_filter($currentLeads, fn($l) => chatlyLeadVisibleTo($l, $myId, $myUser, $myNameClean)));
     }
 
+    // Light sync: the dashboard's background poll asks for summaries (each lead with only
+    // its latest messages + the total count). Opening a chat loads its full history through
+    // get_lead_messages, so long conversations are not re-sent every few seconds.
+    if (($_GET['summary'] ?? '') === '1') {
+        $leadsToReturn = array_map(function ($l) {
+            $msgs = is_array($l['messages'] ?? null) ? $l['messages'] : [];
+            $l['messageCount'] = count($msgs);
+            $l['messages'] = count($msgs) > CHATLY_SUMMARY_MESSAGES ? array_slice($msgs, -CHATLY_SUMMARY_MESSAGES) : $msgs;
+            $l['summary'] = true;
+            return $l;
+        }, $leadsToReturn);
+    }
+
+    clearstatcache();
     echo json_encode([
         'success'        => true,
         'leads'          => $leadsToReturn,
         'count'          => count($leadsToReturn),
         'company_id'     => $activeCompanyId,
-        'company_config' => $companyConfig
+        'company_config' => $companyConfig,
+        'rev'            => chatlyLeadsRevision($dataFile, $sessionUser)
     ]);
+    exit;
+}
+
+// Full message history of ONE conversation (loaded when a chat is opened).
+// Same visibility rule as get_leads: closers only ever see their own leads.
+if ($action === 'get_lead_messages') {
+    syncInboxMessagesIntoLeads($currentLeads, $dataFile);
+    $wantId = (string) ($input['id'] ?? ($_GET['id'] ?? ''));
+    $wantPhone = preg_replace('/\D+/', '', (string) ($input['phone'] ?? ($_GET['phone'] ?? '')));
+    $myId = $sessionUser['id'] ?? '';
+    $myUser = strtolower($sessionUser['username'] ?? '');
+    $userRole = strtolower($sessionUser['role'] ?? 'member');
+    $myNameClean = preg_replace('/\s+/', '', strtolower($sessionUser['name'] ?? ''));
+    foreach ($currentLeads as $l) {
+        $lp = preg_replace('/\D+/', '', (string) ($l['phone'] ?? ''));
+        if (($wantId !== '' && ($l['id'] ?? '') === $wantId) || ($wantPhone !== '' && $lp === $wantPhone)) {
+            if ($userRole !== 'admin' && $userRole !== 'superadmin' && ($myId || $myUser || $myNameClean) && !chatlyLeadVisibleTo($l, $myId, $myUser, $myNameClean)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'This conversation is assigned to another agent.']);
+                exit;
+            }
+            $msgs = is_array($l['messages'] ?? null) ? $l['messages'] : [];
+            echo json_encode(['success' => true, 'id' => $l['id'] ?? '', 'messages' => $msgs, 'messageCount' => count($msgs)]);
+            exit;
+        }
+    }
+    http_response_code(404);
+    echo json_encode(['success' => false, 'error' => 'Conversation not found.']);
     exit;
 }
 

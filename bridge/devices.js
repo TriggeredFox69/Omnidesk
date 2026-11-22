@@ -100,6 +100,13 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
         if (d.client !== client) return;
         if (d.phase === 'ready') { d.phase = 'starting'; d.error = 'Connection interrupted. Reconnecting...'; }
       });
+      client.on('qr_expired', () => {
+        if (d.client !== client) return;
+        // An unscanned login QR is dropped: an open login page asks for a fresh one on
+        // its next poll, an abandoned page costs nothing. A TM's own device waits for "Link".
+        if (d.id.startsWith(LOGIN_PREFIX)) { disconnect(d.id, true).catch(() => {}); return; }
+        d.phase = 'disconnected'; d.qr = null; d.error = 'The QR code expired. Click Link to show a new one.';
+      });
       client.on('message_create', message => {
         if (typeof onMessage === 'function') onMessage(d, client, message);
       });
