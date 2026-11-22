@@ -384,6 +384,12 @@ if ($action === 'clear_demo_data' || $action === 'wipe_demo') {
 
 // Permanently delete single or multiple conversations
 if ($action === 'delete_leads' || $action === 'delete_lead') {
+    // Only company admins (and the super admin) may delete chats; closers, TLs and TMs may not.
+    if (!chatlyIsCompanyAdmin($sessionUser) && !chatlyIsSuperAdmin($sessionUser)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Only an admin can delete chats.']);
+        exit;
+    }
     $leadIds = $input['ids'] ?? [];
     if (empty($leadIds) && !empty($input['id'])) {
         $leadIds = [$input['id']];
@@ -1239,39 +1245,16 @@ if ($action === 'update_lead') {
     }
     unset($lead);
 
-    if (!$found && (!empty($inputPhone) || !empty($leadId))) {
-        $targetPhone = !empty($inputPhone) ? $inputPhone : preg_replace('/\D+/', '', $leadId);
-        $rawContactName = trim($input['name'] ?? '');
-        $lowerC = strtolower($rawContactName);
-        $contactName = (!empty($rawContactName) && $lowerC !== 'trader' && $lowerC !== 'alishba' && $lowerC !== 'new contact') ? $rawContactName : ('+' . $targetPhone);
-        $newLead = [
-            'id' => !empty($leadId) ? $leadId : ('lead_' . bin2hex(random_bytes(6))),
-            'name' => $contactName,
-            'phone' => $targetPhone,
-            'display' => '+' . $targetPhone,
-            'city' => 'Inbound',
-            'network' => 'WhatsApp',
-            'company_id' => $activeCompanyId,
-            'ownerId' => 'USR-ADMIN-01',
-            'ownerName' => 'System Administrator',
-            'leadState' => 'fresh',
-            'status' => 'unread',
-            'unreadCount' => 1,
-            'interest' => 'Direct WhatsApp',
-            'lastActive' => 'Just now',
-            'notes' => 'Inbound contact automatically synchronized.',
-            'messages' => isset($input['newMessage']) ? [$input['newMessage']] : []
-        ];
-        array_unshift($currentLeads, $newLead);
-        $found = true;
+    // update_lead never creates a lead any more: browsers used it to save chats from personal
+    // WhatsApp conversations as new "Unassigned Pool" leads. New chats are made with add_lead,
+    // and campaign leads by the bridge when the message is actually sent.
+    if (!$found) {
+        echo json_encode(['success' => false, 'message' => 'Lead not found.']);
+        exit;
     }
 
-    if ($found) {
-        saveStoredLeads($dataFile, $currentLeads);
-        echo json_encode(['success' => true, 'message' => 'Lead updated successfully']);
-    } else {
-        echo json_encode(['success' => false, 'message' => 'Lead not found']);
-    }
+    saveStoredLeads($dataFile, $currentLeads);
+    echo json_encode(['success' => true, 'message' => 'Lead updated successfully']);
     exit;
 }
 

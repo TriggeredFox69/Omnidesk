@@ -442,7 +442,54 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
             return ($u['company_id'] ?? 'COMP-001') === $companyId;
         }));
 
-        echo json_encode(['success' => true, 'employees' => $filtered]);
+        // Today's count only (a count from an earlier day shows as 0), plus when it resets.
+        require_once __DIR__ . '/quota.php';
+        $filtered = array_map(function ($u) {
+            unset($u['password_hash'], $u['password']);
+            $u['messages_sent_today'] = chatlyQuotaSentToday($u);
+            $u['quota_metrics'] = chatlyQuotaMetrics($u);
+            return $u;
+        }, $filtered);
+
+        echo json_encode(['success' => true, 'employees' => $filtered, 'quota_resets_in' => chatlyQuotaSecondsToReset()]);
+        exit;
+    }
+
+    // Daily-limit controls on the company admin panel (admin.php): set a closer's limit,
+    // reset today's count, suspend / activate. Company admins only, own company only.
+    if (in_array($action, ['update_message_limit', 'reset_employee_quota', 'toggle_employee_status'], true)) {
+        $me = chatlySessionUser();
+        if (!chatlyIsCompanyAdmin($me) && !chatlyIsSuperAdmin($me)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Only a company admin can change this.']);
+            exit;
+        }
+        require_once __DIR__ . '/quota.php';
+        $targetId = (string) ($input['user_id'] ?? $input['employee_id'] ?? '');
+        $outcome = chatlyUsersUpdate(__DIR__ . '/../data/users.json', function (array &$users) use ($targetId, $companyId, $action, $input) {
+            foreach ($users as &$u) {
+                if (($u['id'] ?? '') !== $targetId) continue;
+                $role = strtolower((string) ($u['role'] ?? ''));
+                if (($u['company_id'] ?? 'COMP-001') !== $companyId || in_array($role, ['admin', 'superadmin'], true)) return 'denied';
+                if ($action === 'update_message_limit') {
+                    $limit = (int) ($input['message_limit'] ?? 100);
+                    $u['message_limit'] = $limit < 0 ? -1 : $limit;
+                } elseif ($action === 'reset_employee_quota') {
+                    $u['messages_sent_today'] = 0;
+                    $u['quota_reset_date'] = chatlyQuotaToday();
+                } else {
+                    $u['status'] = (strtolower((string) ($u['status'] ?? 'active')) === 'suspended') ? 'active' : 'suspended';
+                }
+                return 'ok';
+            }
+            return false;
+        });
+        if ($outcome === 'ok') {
+            echo json_encode(['success' => true]);
+        } else {
+            http_response_code($outcome === 'denied' ? 403 : 404);
+            echo json_encode(['success' => false, 'error' => $outcome === 'denied' ? 'That user is not a closer in your company.' : 'Employee not found.']);
+        }
         exit;
     }
 
@@ -483,6 +530,7 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         }
 
         require_once __DIR__ . '/whatsapp_bridge.php';
+        require_once __DIR__ . '/quota.php';
         $connectedDevices = campaignConnectedDevices($uniqueMatched);
         $senders = [];
         $idx = 1;
@@ -503,7 +551,7 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
                 'roleType'      => $u['role'] ?? 'member',
                 'phone'         => $cleanPhone,
                 'display'       => str_starts_with($u['phone'] ?? '', '+') ? $u['phone'] : ('+' . $cleanPhone),
-                'messages_sent' => (int)($u['messages_sent_today'] ?? 0),
+                'messages_sent' => chatlyQuotaSentToday($u),
                 'device_number' => $devNum,
                 'connected'     => true,
                 'status'        => 'ready'

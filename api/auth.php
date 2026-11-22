@@ -1003,9 +1003,20 @@ switch ($action) {
     // 1. Check current session
     case 'check':
         if ($currentUser) {
+            // The session holds a copy from sign-in; today's count and limit come from users.json.
+            require_once __DIR__ . '/quota.php';
+            $checkUser = $currentUser;
+            $stored = json_decode((string) @file_get_contents($usersFile), true);
+            foreach ((is_array($stored) ? $stored : []) as $su) {
+                if (($su['id'] ?? '') !== ($currentUser['id'] ?? '')) continue;
+                if (isset($su['message_limit'])) $checkUser['message_limit'] = $su['message_limit'];
+                $checkUser['messages_sent_today'] = chatlyQuotaSentToday($su);
+                $checkUser['quota_metrics'] = chatlyQuotaMetrics($su);
+                break;
+            }
             echo json_encode([
                 'authenticated' => true,
-                'user'          => $currentUser
+                'user'          => $checkUser
             ]);
         } else {
             echo json_encode([
@@ -1693,8 +1704,9 @@ switch ($action) {
                 }
                 $u['message_limit'] = $newLimit;
                 if ($resetToday) {
+                    require_once __DIR__ . '/quota.php';
                     $u['messages_sent_today'] = 0;
-                    $u['quota_reset_date'] = date('Y-m-d');
+                    $u['quota_reset_date'] = chatlyQuotaToday();
                 }
                 $empName = $u['name'];
                 $updated = true;
@@ -1731,38 +1743,22 @@ switch ($action) {
             ? $_GET['company_id'] 
             : ($currentUser['company_id'] ?? 'COMP-001');
 
+        require_once __DIR__ . '/quota.php';
         $users = getUsers($usersFile);
         $filtered = [];
-        $today = date('Y-m-d');
 
-        foreach ($users as &$u) {
+        foreach ($users as $u) {
             if (($u['role'] ?? '') === 'superadmin') continue;
             if (($u['role'] ?? '') === 'admin') continue; // Admins are not closer employees
             if ($currentUser['role'] !== 'superadmin' && ($u['company_id'] ?? '') !== $companyId) continue;
 
-            // Daily quota auto-reset
-            if (($u['quota_reset_date'] ?? '') !== $today) {
-                $u['messages_sent_today'] = 0;
-                $u['quota_reset_date'] = $today;
-            }
-
+            // Today's count only (Pakistan day; resets at 12:00 AM). Read-only: this used to
+            // reset and save the count here, which wiped messages already sent today.
             $sanitized = sanitizeUser($u);
-            $limit = (int)($u['message_limit'] ?? 100);
-            $sent = (int)($u['messages_sent_today'] ?? 0);
-            $remaining = ($limit < 0) ? 'Unlimited' : max(0, $limit - $sent);
-            $percent = ($limit <= 0) ? 0 : min(100, round(($sent / $limit) * 100));
-
-            $sanitized['quota_metrics'] = [
-                'limit'     => $limit,
-                'sent'      => $sent,
-                'remaining' => $remaining,
-                'percent'   => $percent
-            ];
+            $sanitized['messages_sent_today'] = chatlyQuotaSentToday($u);
+            $sanitized['quota_metrics'] = chatlyQuotaMetrics($u);
             $filtered[] = $sanitized;
         }
-        unset($u);
-
-        saveUsers($usersFile, $users);
 
         echo json_encode([
             'success'   => true,

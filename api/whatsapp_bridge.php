@@ -604,7 +604,28 @@ function handleWhatsAppBridge(string $action, array $input): void {
             }
         }
         unset($input['closer']);
+
+        // Auto Data: the admin only chose how many messages; the numbers come from the
+        // Supabase pool (first the ones a stopped Auto Data campaign never reached).
+        $autoClaim = null;
+        $input['auto_data'] = !empty($input['auto_data']);
+        if ($input['auto_data']) {
+            require_once __DIR__ . '/auto_data.php';
+            $leftover = whatsappBridgeRequest('/campaign/leftover?company_id=' . rawurlencode($campaignCompany));
+            $built = chatlyAutoDataAudience($campaignCompany, (int) ($input['auto_count'] ?? 0),
+                is_array($leftover['phones'] ?? null) ? $leftover['phones'] : []);
+            if (empty($built['ok'])) {
+                echo json_encode(['success' => false, 'message' => $built['error'] ?? 'Auto Data could not pick numbers.']);
+                exit;
+            }
+            $input['audience'] = $built['audience'];
+            $autoClaim = $built['claim'];
+        }
+
         $result = whatsappBridgeRequest('/campaign/start', $input);
+        if (empty($result['success']) && $autoClaim) {
+            chatlyAutoDataRelease($campaignCompany, $autoClaim['from'], $autoClaim['to']);   // nothing was sent: give the numbers back
+        }
         if (!empty($result['success'])) {
             // The audience is NOT copied into the CRM here any more. That created a
             // "Queued for outreach" lead for every number of every campaign (14,000+ leads that
@@ -649,40 +670,32 @@ function handleWhatsAppBridge(string $action, array $input): void {
             echo json_encode(['success' => false, 'message' => 'POST required.']); exit;
         }
 
-        // --- ENFORCE EMPLOYEE MESSAGE LIMITER ---
+        // --- ENFORCE EMPLOYEE MESSAGE LIMITER (resets every day at 12:00 AM Pakistan time) ---
+        require_once __DIR__ . '/quota.php';
         $usersFile = __DIR__ . '/../data/users.json';
-        $currentUserId = $user['id'] ?? '';
+        $currentUserId = (string) ($user['id'] ?? '');
         $userRole = strtolower($user['role'] ?? '');
-        $quotaUserIndex = -1;
-        $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
-        if (!is_array($allUsers)) $allUsers = [];
-        $today = date('Y-m-d');
+        $quotaUserId = '';
 
         if ($currentUserId && !in_array($userRole, ['superadmin', 'admin'], true)) {
-            foreach ($allUsers as $idx => $u) {
-                if ($u['id'] === $currentUserId) {
-                    $quotaUserIndex = $idx;
-                    $userLimit = (int)($u['message_limit'] ?? 100);
-                    $userSent = (int)($u['messages_sent_today'] ?? 0);
-                    $resetDate = $u['quota_reset_date'] ?? '';
-
-                    if ($resetDate !== $today) {
-                        $userSent = 0;
-                        $allUsers[$idx]['messages_sent_today'] = 0;
-                        $allUsers[$idx]['quota_reset_date'] = $today;
-                    }
-
-                    if ($userLimit > 0 && $userSent >= $userLimit) {
-                        http_response_code(429);
-                        echo json_encode([
-                            'success'        => false,
-                            'quota_exceeded' => true,
-                            'message'        => "Daily message quota reached ({$userSent}/{$userLimit} sent today). Please contact your Company Administrator to increase your message allowance."
-                        ]);
-                        exit;
-                    }
-                    break;
+            $allUsers = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
+            foreach ((is_array($allUsers) ? $allUsers : []) as $u) {
+                if (($u['id'] ?? '') !== $currentUserId) continue;
+                $quotaUserId = $currentUserId;
+                $q = chatlyQuotaMetrics($u);
+                if ($q['reached']) {
+                    $wait = $q['resets_in'];
+                    $waitLabel = floor($wait / 3600) . 'h ' . floor(($wait % 3600) / 60) . 'm';
+                    http_response_code(429);
+                    echo json_encode([
+                        'success'        => false,
+                        'quota_exceeded' => true,
+                        'quota_metrics'  => $q,
+                        'message'        => "Daily message limit reached ({$q['sent']}/{$q['limit']} sent today). It resets at 12:00 AM (in {$waitLabel}), or your Company Administrator can raise it."
+                    ]);
+                    exit;
                 }
+                break;
             }
         }
 
@@ -729,17 +742,12 @@ function handleWhatsAppBridge(string $action, array $input): void {
             exit;
         }
         if (!empty($result['success']) && !empty($result['message_id'])) {
-            // Increment message counter for quota tracking
-            if ($quotaUserIndex >= 0 && isset($allUsers[$quotaUserIndex])) {
-                $allUsers[$quotaUserIndex]['messages_sent_today'] = ((int)($allUsers[$quotaUserIndex]['messages_sent_today'] ?? 0)) + 1;
-                file_put_contents($usersFile, json_encode($allUsers, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-                $lim = (int)($allUsers[$quotaUserIndex]['message_limit'] ?? 100);
-                $cur = (int)$allUsers[$quotaUserIndex]['messages_sent_today'];
-                $result['quota_metrics'] = [
-                    'limit'     => $lim,
-                    'sent'      => $cur,
-                    'remaining' => ($lim < 0) ? 'Unlimited' : max(0, $lim - $cur)
-                ];
+            // Count the message for today's limit. Re-reads users.json under a lock AFTER the
+            // send: saving the copy read before the send (which can take seconds) used to
+            // overwrite the campaign counts the bridge wrote meanwhile.
+            if ($quotaUserId !== '') {
+                $q = chatlyQuotaAdd($usersFile, $quotaUserId, 1);
+                if ($q) $result['quota_metrics'] = $q;
             }
 
             $handle = fopen(__DIR__ . '/../data/campaign_logs.json', 'c+');

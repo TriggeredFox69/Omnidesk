@@ -320,6 +320,10 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         reply(200, campaignFor(url.searchParams.get('company_id')).getStatus());
         return;
       }
+      if (url.pathname === '/campaign/leftover') {
+        reply(200, campaignFor(url.searchParams.get('company_id')).leftover());
+        return;
+      }
       if (req.method !== 'POST') { reply(404, { success: false, message: 'Unknown route.' }); return; }
       let raw = '';
       for await (const chunk of req) {

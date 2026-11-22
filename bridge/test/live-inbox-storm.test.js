@@ -8,8 +8,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+// The 40 numbers the messages below use are existing leads (chats only exist for leads).
+const leadPhones = Array.from({ length: 40 }, (_, i) => '9230012345' + String(i).padStart(2, '0'));
 function setup(eventsFor) {
-  const state = { currentUser: { id: 'admin', role: 'admin' }, senderConfigured: false, leads: [], currentTab: 'inbox' };
+  const state = { currentUser: { id: 'admin', role: 'admin' }, senderConfigured: false, currentTab: 'inbox',
+    leads: leadPhones.map(phone => ({ id: 'lead_' + phone, phone, name: phone, messages: [] })) };
   const synced = [];
   const context = vm.createContext({ window: {}, setInterval() {}, AbortSignal,
     document: { hidden: false, addEventListener: () => {}, getElementById: () => ({}) },
@@ -33,7 +36,24 @@ test('loading 2,000 saved messages sends no lead-save requests', async () => {
   const { synced, inbox, state } = setup(after => ({ success: true, epoch: 'e1', cursor: 2000, messages: after ? [] : history }));
   await inbox.poll();
   assert.equal(state.leads.length, 40);
+  assert.equal(state.leads.reduce((n, l) => n + l.messages.length, 0), 2000);
   assert.equal(synced.length, 0);
+});
+
+test('a chat with a number that is not a lead (personal chat) never becomes a lead', async () => {
+  let round = 0;
+  const stranger = { id: 'p1', waMessageId: 'personal-1', phone: '923459990000', type: 'text', text: 'subha uth kr message krna',
+    sender: 'agent', name: 'Askari', timestamp: 5000, deliveryStatus: 'sent' };
+  const { synced, inbox, state } = setup(() => {
+    round++;
+    if (round === 1) return { success: true, epoch: 'e1', cursor: 1, messages: [] };
+    return { success: true, epoch: 'e1', cursor: 2, messages: round === 2 ? [stranger, { ...stranger, waMessageId: 'personal-2', sender: 'lead' }] : [] };
+  });
+  await inbox.poll();
+  await inbox.poll();
+  assert.equal(state.leads.length, 40, 'no "Unassigned Pool" chat was created');
+  assert.ok(!state.leads.some(l => l.phone === '923459990000'));
+  assert.equal(synced.length, 0, 'nothing was saved to the server');
 });
 
 test('after loading, only new messages and tick changes are saved, once each', async () => {

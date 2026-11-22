@@ -8,8 +8,9 @@
  * This moves leads that were NEVER contacted (no messages at all, still "fresh", nothing
  * unread, no owner-entered payment) into tenants/<company>/leads_archive_cold.json.
  *
- * It also moves PERSONAL-CHAT leads: ones the bridge or PHP auto-created from chats a closer
- * had on their own phone (interest "WhatsApp outreach" / "WhatsApp Direct Sync"), which
+ * It also moves PERSONAL-CHAT leads: ones the bridge, PHP or the browser auto-created from chats
+ * a closer had on their own phone (interest "WhatsApp outreach" / "WhatsApp Direct Sync" /
+ * "TL Cold Outreach" / "TM Closer Chat" / "Direct WhatsApp", or the auto-sync notes), which
  * Chatly no longer creates. A lead is kept if a campaign ever messaged it (the campaign's CRM
  * sync stamps lastSenderPhone/lastSenderName, or a "msg_c_" message) or if it is paid / in
  * payment review. These go to tenants/<company>/leads_archive_personal.json.
@@ -36,12 +37,16 @@ const neverContacted = l =>
   !(Number(l.unreadCount) > 0) &&
   !l.paidDetails && !l.paymentProof;
 
-const PERSONAL_INTERESTS = new Set(['WhatsApp outreach', 'WhatsApp Direct Sync']);
+// Interests / notes stamped by the code paths that turned personal chats into leads:
+// the bridge and PHP inbox sync, and the browser (live-inbox.js + update_lead), which made
+// "Unassigned Pool" chats named after the phone owner's WhatsApp name.
+const PERSONAL_INTERESTS = new Set(['WhatsApp outreach', 'WhatsApp Direct Sync', 'TL Cold Outreach', 'TM Closer Chat', 'Direct WhatsApp']);
+const PERSONAL_NOTES = new Set(['Conversation synced from connected WhatsApp', 'Inbound contact automatically synchronized.']);
 const touchedByCampaign = l =>
   Object.prototype.hasOwnProperty.call(l, 'lastSenderPhone') || Object.prototype.hasOwnProperty.call(l, 'lastSenderName') ||
   (Array.isArray(l.messages) && l.messages.some(m => String((m && m.id) || '').startsWith('msg_c_')));
 const personalChat = l =>
-  PERSONAL_INTERESTS.has(String(l.interest || '')) &&
+  (PERSONAL_INTERESTS.has(String(l.interest || '')) || PERSONAL_NOTES.has(String(l.notes || '').trim())) &&
   !touchedByCampaign(l) &&
   !['paid', 'pending_verification'].includes(String(l.leadState || '')) &&
   !l.paidDetails && !l.paymentProof && !l.isTakeover;

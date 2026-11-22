@@ -21,6 +21,8 @@ data/whatsapp-bridge/
 # Environment & Server Overrides
 .env
 .env.local
+.env.supabase
+data/supabase.php
 *.log
 
 # Private linked-device session and Node dependencies

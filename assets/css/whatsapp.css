@@ -5347,6 +5347,42 @@ body:not(.theme-dark) #viewCampaign .cs-status { filter: brightness(0.8) saturat
 #viewCampaign .drop-zone-sub { margin-top: 2px; }
 #viewCampaign .drop-zone-hint { margin-top: 8px; font-size: 11px; color: var(--text-muted); }
 
+/* Step 1: Auto Data (numbers from the Chatly pool). The toggle turns green when it is on. */
+#viewCampaign .cs-autodata { display: flex; flex-direction: column; gap: 12px; }
+#viewCampaign .cs-ad-toggle { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; cursor: pointer;
+  border-radius: 14px; background: var(--cs-soft); border: 1.5px solid var(--cs-line-strong); color: var(--text-primary);
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+#viewCampaign .cs-ad-toggle:hover { border-color: var(--accent-wa-border); }
+#viewCampaign .cs-ad-toggle:focus-visible { outline: 2px solid var(--accent-wa); outline-offset: 2px; }
+#viewCampaign .cs-ad-icon { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--glass-surface-hover); color: var(--text-secondary); transition: background 0.2s ease, color 0.2s ease; }
+#viewCampaign .cs-ad-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+#viewCampaign .cs-ad-text strong { font-size: 13.5px; font-weight: 750; }
+#viewCampaign .cs-ad-text small { font-size: 11.5px; color: var(--text-muted); }
+#viewCampaign .cs-ad-switch { width: 40px; height: 22px; flex-shrink: 0; position: relative; border-radius: 999px; background: var(--cs-line-strong); transition: background 0.2s ease; }
+#viewCampaign .cs-ad-switch i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.2s ease; }
+#viewCampaign .cs-ad-toggle.on { background: var(--accent-wa-glass); border-color: var(--accent-wa); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-wa) 14%, transparent); }
+#viewCampaign .cs-ad-toggle.on .cs-ad-icon { background: var(--accent-wa); color: var(--on-accent); }
+#viewCampaign .cs-ad-toggle.on .cs-ad-text small { color: var(--accent-wa); font-weight: 650; }
+#viewCampaign .cs-ad-toggle.on .cs-ad-switch { background: var(--accent-wa); }
+#viewCampaign .cs-ad-toggle.on .cs-ad-switch i { transform: translateX(18px); }
+#viewCampaign .cs-ad-pane { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: var(--cs-soft); border: 1px solid var(--cs-line); }
+#viewCampaign .cs-ad-pane[hidden], #viewCampaign #manualNumbersBox[hidden] { display: none; }
+#viewCampaign #manualNumbersBox { display: flex; flex-direction: column; gap: 16px; }
+#viewCampaign .cs-ad-count-row { display: flex; align-items: center; gap: 10px; }
+#viewCampaign .cs-ad-count-row .form-input { flex: 1; min-width: 0; font-size: 18px; font-weight: 800; padding: 10px 12px; }
+#viewCampaign .cs-ad-unit { font-size: 12px; font-weight: 650; color: var(--text-muted); }
+#viewCampaign .cs-ad-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#viewCampaign .cs-ad-chips button { padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; cursor: pointer;
+  background: var(--cs-surface); border: 1px solid var(--cs-line-strong); color: var(--text-secondary); }
+#viewCampaign .cs-ad-chips button:hover { border-color: var(--accent-wa-border); color: var(--text-primary); }
+#viewCampaign .cs-ad-chips button.active { background: var(--accent-wa); border-color: var(--accent-wa); color: var(--on-accent); }
+#viewCampaign .cs-ad-pool { padding: 9px 12px; border-radius: 10px; font-size: 12.5px; color: var(--text-secondary); background: var(--cs-surface); border: 1px solid var(--cs-line); }
+#viewCampaign .cs-ad-pool strong { color: var(--accent-wa); font-weight: 800; }
+#viewCampaign .cs-ad-pool.warn { color: var(--status-ongoing-text); background: var(--status-ongoing-glass); border-color: var(--status-ongoing-border); }
+#viewCampaign .cs-ad-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
+#viewCampaign .cs-step-head .cs-pill.cs-pill-auto { background: var(--accent-wa); color: var(--on-accent); border-color: var(--accent-wa); }
+
 #viewCampaign .cs-audience { padding: 14px; border-radius: 14px; background: var(--cs-soft); border: 1px solid var(--cs-line); }
 #viewCampaign .cs-audience > * + * { margin-top: 10px; }
 #viewCampaign .cs-audience-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }

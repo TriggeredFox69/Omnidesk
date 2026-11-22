@@ -564,7 +564,8 @@ document.addEventListener('DOMContentLoaded', () => {
         els.headerPendingDealsBadge.style.display = pendingDeals.length > 0 ? 'inline-block' : 'none';
       }
     }
-    if (els.adminDeleteToggleBtn) els.adminDeleteToggleBtn.style.display = 'inline-flex';
+    if (els.adminDeleteToggleBtn) els.adminDeleteToggleBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (els.deleteCurrentChatBtn) els.deleteCurrentChatBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
     if (els.tabEmployeeLabel) {
       els.tabEmployeeLabel.textContent = isAdmin ? '📊 Team Stats' : '📊 My Stats';
@@ -2277,6 +2278,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // Delete Chat: admins only (closers / TLs / TMs never see it)
+    if (els.deleteCurrentChatBtn) els.deleteCurrentChatBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
     // Header Claim Button: Permanently hidden (no take-lead barrier)
     if (els.chatClaimBtn) {
       els.chatClaimBtn.style.display = 'none';
@@ -3333,11 +3337,111 @@ document.addEventListener('DOMContentLoaded', () => {
     return added;
   }
 
+  // ===== Auto Data: the numbers come from the Chatly number pool (Supabase) =====
+  // The admin only says how many messages to send; the server picks that many fresh numbers
+  // for the company at start and the bridge splits them equally, exactly like a dropped list.
+  const AUTO_DATA_MAX = 50000;
+  function clampAutoCount(v) {
+    const n = parseInt(String(v).replace(/[^\d]/g, ''), 10);
+    return Math.max(1, Math.min(AUTO_DATA_MAX, Number.isFinite(n) ? n : 500));
+  }
+  function autoDataState() {
+    if (!campaignState.autoData) {
+      campaignState.autoData = { on: false, count: 500, pool: null };
+      try {
+        const saved = JSON.parse(localStorage.getItem('chatly_auto_data') || 'null');
+        if (saved) { campaignState.autoData.on = !!saved.on; campaignState.autoData.count = clampAutoCount(saved.count); }
+      } catch (_) {}
+    }
+    return campaignState.autoData;
+  }
+  function saveAutoDataState() {
+    const ad = autoDataState();
+    try { localStorage.setItem('chatly_auto_data', JSON.stringify({ on: ad.on, count: ad.count })); } catch (_) {}
+  }
+  /** How many numbers the next campaign will message (Auto Data count, or the loaded list). */
+  function campaignNumberCount() {
+    const ad = autoDataState();
+    return ad.on ? ad.count : (campaignState.audience || []).length;
+  }
+  function renderAutoDataPool() {
+    const el = document.getElementById('autoDataPool');
+    if (!el) return;
+    const ad = autoDataState();
+    const p = ad.pool;
+    el.classList.remove('warn');
+    if (!p) { el.textContent = 'Checking your number pool…'; return; }
+    if (!p.success) { el.classList.add('warn'); el.textContent = p.message || 'The number pool is not available right now.'; return; }
+    const left = Number(p.remaining) || 0;
+    if (ad.count > left) el.classList.add('warn');
+    el.innerHTML = left > 0
+      ? `<strong>${left.toLocaleString()}</strong> fresh numbers left for your company${ad.count > left ? ` · only ${left.toLocaleString()} will be sent` : ''}`
+      : 'Your company has used every number in the pool.';
+  }
+  function renderAutoData() {
+    const ad = autoDataState();
+    const toggle = document.getElementById('autoDataToggle');
+    const pane = document.getElementById('autoDataPane');
+    const manual = document.getElementById('manualNumbersBox');
+    const sub = document.getElementById('autoDataToggleSub');
+    const input = document.getElementById('autoDataCount');
+    if (toggle) { toggle.classList.toggle('on', ad.on); toggle.setAttribute('aria-pressed', ad.on ? 'true' : 'false'); }
+    if (sub) sub.textContent = ad.on ? 'On: numbers come from your Chatly number pool' : 'Off: use your own phone list';
+    if (pane) pane.hidden = !ad.on;
+    if (manual) manual.hidden = ad.on;
+    if (input && document.activeElement !== input) input.value = ad.count;
+    document.querySelectorAll('#autoDataChips [data-ad-count]').forEach(b => b.classList.toggle('active', Number(b.dataset.adCount) === ad.count));
+    if (els.campaignAudienceBadge) {
+      els.campaignAudienceBadge.textContent = ad.on ? `${ad.count.toLocaleString()} Auto` : `${(campaignState.audience || []).length} Contacts`;
+      els.campaignAudienceBadge.classList.toggle('cs-pill-auto', ad.on);
+    }
+    renderAutoDataPool();
+    try { updateCampaignLaunchSummary(); } catch (_) {}
+  }
+  async function loadAutoDataPool() {
+    const ad = autoDataState();
+    try {
+      const res = await fetch('api/auto_data.php?action=status', { signal: AbortSignal.timeout(15000) });
+      ad.pool = await res.json();
+    } catch (_) {
+      ad.pool = { success: false, message: 'Could not check the number pool. Check your connection and try again.' };
+    }
+    renderAutoDataPool();
+  }
+  (function wireAutoData() {
+    const toggle = document.getElementById('autoDataToggle');
+    if (!toggle) return;
+    toggle.addEventListener('click', () => {
+      if (campaignState.isRunning || campaignState.isPaused) { showToast('⚠️ Stop the current campaign before switching Auto Data.'); return; }
+      const ad = autoDataState();
+      ad.on = !ad.on;
+      saveAutoDataState();
+      renderAutoData();
+      if (ad.on) loadAutoDataPool();
+    });
+    const input = document.getElementById('autoDataCount');
+    if (input) {
+      input.addEventListener('input', () => {
+        if (input.value === '') return;
+        autoDataState().count = clampAutoCount(input.value);
+        saveAutoDataState();
+        renderAutoData();
+      });
+      input.addEventListener('change', () => { input.value = autoDataState().count; });
+    }
+    document.querySelectorAll('#autoDataChips [data-ad-count]').forEach(btn => btn.addEventListener('click', () => {
+      autoDataState().count = clampAutoCount(btn.dataset.adCount);
+      saveAutoDataState();
+      renderAutoData();
+    }));
+    renderAutoData();   // the pool count loads when the Campaign tab opens (admins only)
+  })();
+
   function renderCampaignAudienceUI() {
     queueMicrotask(() => { try { updateCampaignLaunchSummary(); } catch (_) {} });
     const count = campaignState.audience.length;
     if (els.campaignAudienceBadge) {
-      els.campaignAudienceBadge.textContent = `${count} Contacts`;
+      els.campaignAudienceBadge.textContent = autoDataState().on ? `${autoDataState().count.toLocaleString()} Auto` : `${count} Contacts`;
     }
     if (els.campaignLoadedCountText) {
       els.campaignLoadedCountText.textContent = `${count} Numbers`;
@@ -3449,7 +3553,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!box) return;
     if (campaignState.isRunning || campaignState.isPaused) { box.style.display = 'none'; return; }
     box.style.display = '';
-    const numbers = (campaignState.audience || []).length;
+    const autoOn = autoDataState().on;
+    const numbers = campaignNumberCount();
     const senders = (window.currentCampaignSenders || []).filter(s => s.connected !== false).length;
     const hasMessage = campaignState.variation === 'audio' ? true : !!(els.campaignCustomMsg?.value || '').trim();
     const minD = Math.max(1, parseInt(els.campaignDelayMin?.value || 3, 10) || 3);
@@ -3460,7 +3565,9 @@ document.addEventListener('DOMContentLoaded', () => {
       : `${(seconds / 3600).toFixed(seconds < 36000 ? 1 : 0)} hours`;
     const row = (ok, text) => `<div class="cls-row ${ok ? 'ok' : 'todo'}"><span>${ok ? '✓' : '•'}</span><span>${text}</span></div>`;
     box.innerHTML =
-      row(numbers > 0, numbers > 0 ? `<strong>${numbers.toLocaleString()}</strong> numbers ready` : 'Add the numbers to message (step ①)') +
+      row(numbers > 0, numbers > 0
+        ? (autoOn ? `Auto Data: <strong>${numbers.toLocaleString()}</strong> numbers from your pool` : `<strong>${numbers.toLocaleString()}</strong> numbers ready`)
+        : 'Add the numbers to message (step ①)') +
       row(hasMessage, hasMessage ? 'Message written' : 'Write the message (step ②)') +
       row(senders > 0, senders > 0 ? `<strong>${senders}</strong> team WhatsApp${senders === 1 ? '' : 's'} will send`
         : (window.NUNNO_OFFLINE_PREVIEW ? 'Offline test: sends are simulated' : 'No team WhatsApp linked yet: Link Phone / Scan QR')) +
@@ -3658,6 +3765,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyServerCampaignState(data) {
     queueMicrotask(() => { try { updateCampaignLaunchSummary(); } catch (_) {} });
     if (!data || !data.status) return;
+    // A status poll that left before Stop was clicked must not flip the screen back to "sending".
+    if (campaignState.isStopping && (data.status === 'running' || data.status === 'paused')) return;
     // live red / orange / green lights on the connected-WhatsApps widget
     window.lastCampaignStatus = data;
     const waContainer = els.campaignSendersPoolContainer || document.getElementById('campaignSendersPoolContainer');
@@ -3680,7 +3789,7 @@ document.addEventListener('DOMContentLoaded', () => {
       els.campaignNameInput.value = data.name;
     }
 
-    if (data.audience && data.audience.length > 0 && campaignState.audience.length === 0 && (isRunning || isPaused) && !campaignState.audienceCleared) {
+    if (data.audience && data.audience.length > 0 && campaignState.audience.length === 0 && (isRunning || isPaused) && !campaignState.audienceCleared && !autoDataState().on) {
       campaignState.audience = data.audience;
       renderCampaignAudienceUI();
     } else if (data.audience && data.audience.length > 0 && !campaignState.audienceCleared) {
@@ -3815,8 +3924,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (campaignState.isStarting || campaignState.inFlight) return;
     if (campaignState.isRunning && !campaignState.isPaused) return;
 
-    if (campaignState.audience.length === 0) {
-      showToast('⚠️ Please drop a .txt phone list or paste numbers first!');
+    const autoData = autoDataState();
+    if (!autoData.on && campaignState.audience.length === 0) {
+      showToast('⚠️ Please drop a .txt phone list or paste numbers first, or turn on Auto Data.');
+      return;
+    }
+    if (autoData.on && autoData.pool && autoData.pool.success && Number(autoData.pool.remaining) <= 0) {
+      showToast('⚠️ Your company has used every number in the Auto Data pool.');
       return;
     }
 
@@ -3914,8 +4028,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const deviceCount = sendersPool.length;
-    logCampaignTerminal(`🚀 Launching Multi-Device Round-Robin Campaign <strong>"${escapeHtml(campaignName)}"</strong> (${campaignState.variation.toUpperCase()}) with ${campaignState.audience.length} target contacts rotating across ${deviceCount} connected TL &amp; TM devices...`, 'info');
-    showToast(`🚀 Campaign started: ${campaignState.audience.length.toLocaleString()} numbers shared between ${deviceCount} WhatsApp${deviceCount === 1 ? '' : 's'}.`);
+    const launchCount = autoData.on ? autoData.count : campaignState.audience.length;
+    logCampaignTerminal(`🚀 Launching Multi-Device Round-Robin Campaign <strong>"${escapeHtml(campaignName)}"</strong> (${campaignState.variation.toUpperCase()}) with ${launchCount} ${autoData.on ? 'Auto Data numbers' : 'target contacts'} rotating across ${deviceCount} connected TL &amp; TM devices...`, 'info');
+    if (autoData.on) showToast(`🗄️ Picking ${launchCount.toLocaleString()} fresh numbers from your pool…`);
 
     try {
       const response = await fetch('api/direct_sender.php?action=start_campaign', {
@@ -3929,7 +4044,9 @@ document.addEventListener('DOMContentLoaded', () => {
           variation: campaignState.variation,
           media: mediaPayload,
           message: msg,
-          audience: campaignState.audience,
+          audience: autoData.on ? [] : campaignState.audience,
+          auto_data: autoData.on,
+          auto_count: autoData.on ? autoData.count : 0,
           minDelay: minD,
           maxDelay: maxD,
           assignMode,
@@ -3940,10 +4057,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await response.json();
       if (data && data.success) {
+        const started = Number(data.totalContacts) || launchCount;
+        showToast(`🚀 Campaign started: ${started.toLocaleString()} numbers shared between ${deviceCount} WhatsApp${deviceCount === 1 ? '' : 's'}.`);
         applyServerCampaignState(data);
         startCampaignStatusPolling();
         fetchServerLeads(true);
         setTimeout(() => fetchServerLeads(true), 1200);
+        if (autoData.on) loadAutoDataPool();
       } else {
         showToast('⚠️ Could not start campaign: ' + (data?.message || 'Server error'));
         const userRole = (state.currentUser?.role || '').toLowerCase();
@@ -3994,19 +4114,44 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    if (campaignState.isStopping) return;
+    // Instant feedback: the button reacts on the click, not when the server answers.
+    campaignState.isStopping = true;
+    const stopBtn = els.stopCampaignBtn;
+    const stopLabel = stopBtn ? stopBtn.innerHTML : '';
+    if (stopBtn) { stopBtn.disabled = true; stopBtn.innerHTML = '⏳ Stopping…'; }
+    if (els.pauseCampaignBtn) els.pauseCampaignBtn.disabled = true;
+    if (els.campaignCountdown) els.campaignCountdown.textContent = 'Stopping…';
+    if (els.campaignStatusBadge) {
+      els.campaignStatusBadge.style.color = '#ef4444';
+      els.campaignStatusBadge.style.borderColor = '#ef4444';
+      els.campaignStatusBadge.innerHTML = '⏹️ Stopping — no new messages will be sent';
+    }
+    let stopped = false;
     try {
       const response = await fetch('api/direct_sender.php?action=stop_campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'stop_campaign' })
+        body: JSON.stringify({ action: 'stop_campaign' }),
+        keepalive: true,
+        signal: AbortSignal.timeout(20000)
       });
       const data = await response.json();
-      if (data && data.success) {
+      if (data && data.success && data.status === 'stopped') {
+        stopped = true;
+        campaignState.isStopping = false;
         applyServerCampaignState(data);
+        showToast('⏹️ Campaign stopped.');
+      } else {
+        showToast('⚠️ Could not stop the campaign: ' + ((data && data.message) || 'server error') + '. Click Stop again.');
       }
-      showToast('⏹️ Campaign stopped on server.');
     } catch (err) {
-      showToast('Stop failed: ' + err.message);
+      showToast('⚠️ Stop did not reach the server (' + err.message + '). Click Stop again.');
+    } finally {
+      campaignState.isStopping = false;
+      if (stopBtn) { stopBtn.disabled = false; stopBtn.innerHTML = stopLabel || '⏹️ Stop'; }
+      if (els.pauseCampaignBtn) els.pauseCampaignBtn.disabled = false;
+      if (!stopped) syncServerCampaignStatus();
     }
   }
 
@@ -4809,6 +4954,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (els.viewCampaign) els.viewCampaign.style.display = 'block';
       updateCampaignPreview();
       renderCampaignAudienceUI();
+      renderAutoData();
+      if (autoDataState().on) loadAutoDataPool();
       loadCampaignSenders();
       loadCampaignDraftFromServer();
     } else if (tabName === 'employee') {
@@ -6305,6 +6452,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const lim = (user.message_limit !== undefined) ? user.message_limit : 150;
         if (headerQuotaCount) headerQuotaCount.textContent = user.messages_sent_today || 0;
         if (headerQuotaLimit) headerQuotaLimit.textContent = lim < 0 ? '∞' : lim;
+        const qm = user.quota_metrics;
+        if (qm && qm.reached && qm.resets_in > 0) {
+          const h = Math.floor(qm.resets_in / 3600), m = Math.floor((qm.resets_in % 3600) / 60);
+          headerQuotaPill.title = `Daily limit reached. Resets at 12:00 AM (in ${h}h ${m}m).`;
+        } else {
+          headerQuotaPill.title = 'Messages sent today / daily limit. Resets every day at 12:00 AM.';
+        }
       } else {
         headerQuotaPill.style.display = 'none';
       }

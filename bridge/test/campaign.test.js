@@ -65,10 +65,41 @@ test('createCampaignManager starts, executes, pauses, and stops', async () => {
 
   const stopped = mgr.stop();
   assert.equal(stopped.status, 'stopped');
+  // stop() answers at once and saves right after (big campaigns take a moment to write)
+  await new Promise(r => setImmediate(r));
 
   // Verify leads.json was updated with outbound message
   const savedLeads = JSON.parse(fs.readFileSync(leadsFile, 'utf8'));
   assert.equal(savedLeads.length >= 1, true);
 
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('daily sent counts start again on a new Pakistan day; stop hands back unsent Auto Data numbers', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
+  const usersFile = path.join(tmpDir, 'users.json');
+  // yesterday's count must not carry over (and must not swallow today's sends)
+  fs.writeFileSync(usersFile, JSON.stringify([{ id: 'TM-1', name: 'TM One', company_id: 'COMP-001', role: 'member', status: 'active',
+    messages_sent_today: 57, quota_reset_date: '2000-01-01' }]));
+  const leadsFile = path.join(tmpDir, 'leads.json');
+  fs.writeFileSync(leadsFile, '[]');
+  let sends = 0;
+  const mgr = createCampaignManager({
+    send: async () => ({ success: true, message_id: 'wa_' + (++sends) }),
+    dataDir: tmpDir, getLeadsPath: () => leadsFile, getUsersPath: () => usersFile, mainStatus: () => ({ ready: true })
+  });
+  const audience = Array.from({ length: 6 }, (_, i) => ({ phone: '92300111111' + i }));
+  mgr.start({ message: 'Hi', audience, auto_data: true, minDelay: 6, maxDelay: 9,
+    senders: [{ id: 'TM-1', name: 'TM One', phone: '923000000001', roleType: 'member' }] });
+  assert.deepEqual(mgr.leftover().phones, [], 'nothing handed back while running');
+  await new Promise(r => setTimeout(r, 400));          // first send only (then a 6 s+ gap)
+  mgr.stop();
+  await new Promise(r => setImmediate(r));
+  const left = mgr.leftover().phones;
+  assert.equal(left.length, audience.length - sends, 'every number not sent comes back');
+  const tm = JSON.parse(fs.readFileSync(usersFile, 'utf8'))[0];
+  const pkToday = new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 10);
+  assert.equal(tm.quota_reset_date, pkToday);
+  assert.equal(tm.messages_sent_today, sends);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

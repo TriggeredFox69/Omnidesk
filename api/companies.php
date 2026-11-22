@@ -25,6 +25,7 @@ $companiesFile = __DIR__ . '/../data/companies.json';
 $usersFile     = __DIR__ . '/../data/users.json';
 $auditFile     = __DIR__ . '/../data/audit_logs.json';
 require_once __DIR__ . '/tenant_manager.php';
+require_once __DIR__ . '/quota.php';
 
 function getCompanies($file) {
     $comps = [];
@@ -209,7 +210,7 @@ switch ($action) {
             $totalEmployees++;
             if (($u['role'] ?? '') === 'lead') $totalTLs++;
             if (($u['role'] ?? '') === 'member') $totalTMs++;
-            $totalMessagesToday += (int)($u['messages_sent_today'] ?? 0);
+            $totalMessagesToday += chatlyQuotaSentToday($u);
             if (!empty($u['phone']) && ($u['status'] ?? '') === 'active') $activeSessions++;
         }
 
@@ -510,7 +511,7 @@ switch ($action) {
             $comp['employee_count'] = count($compUsers);
             $comp['tl_count']       = count(array_filter($compUsers, fn($u) => ($u['role'] ?? '') === 'lead'));
             $comp['tm_count']       = count(array_filter($compUsers, fn($u) => ($u['role'] ?? '') === 'member'));
-            $comp['messages_today'] = array_sum(array_column($compUsers, 'messages_sent_today'));
+            $comp['messages_today'] = array_sum(array_map('chatlyQuotaSentToday', $compUsers));
             $result[] = $comp;
         }
 
@@ -1024,7 +1025,7 @@ switch ($action) {
         $wontPayLeads = count(array_filter($leads, fn($l) => in_array(strtolower($l['leadState'] ?? ($l['status'] ?? '')), ['wont_pay', 'rejected', 'lost'], true)));
         $conversionRate = $totalLeads > 0 ? round(($paidLeads / $totalLeads) * 100, 1) : 0;
 
-        $totalSentToday = array_sum(array_column($compUsers, 'messages_sent_today'));
+        $totalSentToday = array_sum(array_map('chatlyQuotaSentToday', $compUsers));
 
         echo json_encode([
             'success' => true,
@@ -1046,7 +1047,7 @@ switch ($action) {
                     'role' => $u['role'],
                     'phone' => $u['phone'] ?? '',
                     'status' => $u['status'] ?? 'active',
-                    'messages_today' => (int)($u['messages_sent_today'] ?? 0),
+                    'messages_today' => chatlyQuotaSentToday($u),
                     'message_limit' => (int)($u['message_limit'] ?? 150)
                 ], $compUsers)
             ]

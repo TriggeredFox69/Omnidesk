@@ -673,9 +673,10 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
       <div class="box-header">
         <div>
           <div class="box-title"><span>👥</span> Closer Roster &amp; Daily Message Limiter Control</div>
-          <div class="box-desc">Control how many WhatsApp messages each closer can dispatch per day. Set to <strong>-1</strong> for Unlimited.</div>
+          <div class="box-desc">Control how many WhatsApp messages each closer can dispatch per day. Set to <strong>-1</strong> for Unlimited. Every count starts again at <strong>12:00 AM</strong> (Pakistan time).</div>
         </div>
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <span id="quotaResetChip" title="When every closer's daily count goes back to 0 and closers who hit their limit can send again" style="display:inline-flex; align-items:center; gap:6px; padding:7px 12px; border-radius:999px; font-size:12px; font-weight:750; background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.3); white-space:nowrap;">🔄 Limits reset in <span id="quotaResetCountdown">--</span></span>
           <input type="text" id="closerSearch" oninput="filterCloserTable()" placeholder="Search closer by name or phone..." class="form-control" style="width:260px; padding:8px 12px; font-size:12.5px;">
         </div>
       </div>
@@ -1690,6 +1691,7 @@ async function loadEmployees() {
     const res = await fetch('api/tenant_manager.php?action=list_company_employees&company_id=<?php echo urlencode($activeCompany['id']); ?>');
     const data = await res.json();
     if (data.success && Array.isArray(data.employees)) {
+      if (typeof data.quota_resets_in === 'number') setQuotaResetCountdown(data.quota_resets_in);
       currentEmployees = data.employees;
       renderEmployeeTable(data.employees);
       updateMetrics(data.employees);
@@ -1697,6 +1699,29 @@ async function loadEmployees() {
   } catch (err) {
     console.error('Error loading employees:', err);
   }
+}
+
+// Daily limits start again at 12:00 AM Pakistan time. The server says how many seconds are
+// left; this counts down locally and reloads the roster when the new day starts.
+let quotaResetAt = 0, quotaResetTimer = null;
+function formatQuotaWait(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : (m > 0 ? `${m}m` : `${sec}s`);
+}
+function quotaSecondsLeft() { return Math.max(0, (quotaResetAt - Date.now()) / 1000); }
+function setQuotaResetCountdown(seconds) {
+  quotaResetAt = Date.now() + seconds * 1000;
+  const tick = () => {
+    const left = quotaSecondsLeft();
+    const el = document.getElementById('quotaResetCountdown');
+    if (el) el.textContent = formatQuotaWait(left);
+    document.querySelectorAll('[data-quota-wait]').forEach(n => { n.textContent = formatQuotaWait(left); });
+    if (left <= 0) { clearInterval(quotaResetTimer); quotaResetTimer = null; setTimeout(loadEmployees, 3000); }
+  };
+  if (quotaResetTimer) clearInterval(quotaResetTimer);
+  tick();
+  quotaResetTimer = setInterval(tick, 15000);
 }
 
 function updateMetrics(employees) {
@@ -1769,6 +1794,7 @@ function renderEmployeeTable(employees) {
         <td>
           <div style="font-weight:700;">${sent} <span style="font-size:11px; color:var(--text-muted);">/ ${isUnlimited ? '∞' : limit}</span></div>
           <div class="progress-track"><div class="progress-fill ${fillClass}" style="width:${pct}%;"></div></div>
+          ${(!isUnlimited && limit > 0 && sent >= limit) ? `<div style="margin-top:4px; font-size:10.5px; font-weight:750; color:#f87171; white-space:nowrap;">Limit reached · can send again in <span data-quota-wait>${formatQuotaWait(quotaSecondsLeft())}</span></div>` : ''}
         </td>
         <td>
           <div class="limiter-ctrl-group">

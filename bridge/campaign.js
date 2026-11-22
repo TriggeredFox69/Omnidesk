@@ -3,6 +3,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
+// Today's date in Pakistan (UTC+5, no daylight saving), Y-m-d. Daily message counts belong
+// to this day, the same day api/quota.php uses, so they reset at 12:00 AM PKT.
+function pakistanDay(now = Date.now()) {
+  return new Date(now + 5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 function resolveSpintax(text) {
   if (!text) return '';
   return text.replace(/\{([^{}]+)\}/g, (match, contents) => {
@@ -282,9 +288,16 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       const users = JSON.parse(fs.readFileSync(usersFile, 'utf8') || '[]');
       if (!Array.isArray(users)) return;
       let changed = false;
+      const today = pakistanDay();
       for (const user of users) {
         const n = counts.get(user.id);
-        if (n) { user.messages_sent_today = (Number(user.messages_sent_today) || 0) + n; changed = true; }
+        if (!n) continue;
+        // A count from an earlier day starts again at 0 (daily limits reset at 12:00 AM PKT).
+        // Without this, yesterday's count kept growing, and a later reset elsewhere wiped
+        // today's sends with it.
+        if (user.quota_reset_date !== today) { user.messages_sent_today = 0; user.quota_reset_date = today; }
+        user.messages_sent_today = (Number(user.messages_sent_today) || 0) + n;
+        changed = true;
       }
       if (changed) {
         const tmp = usersFile + '.tmp.' + process.pid;
@@ -680,6 +693,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     lane.offlineSince = null;
 
     laneBusy.add(laneId);
+    let notOnWhatsApp = false;
     contact.status = 'sending';
     contact.requestId = contact.requestId || randomUUID();
     contact.senderId = lane.id;
@@ -734,6 +748,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
         lane.offlineSince = lane.offlineSince || Date.now();
         log(`📴 ${lane.name}'s WhatsApp dropped. ${contact.display || contact.phone} will be retried.`, 'warn');
       } else {
+        notOnWhatsApp = /not registered on WhatsApp/i.test(msg);
         contact.status = 'failed';
         contact.error = err.message;
         state.totalFailed++;
@@ -755,7 +770,10 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     // also applies to campaigns saved before the 6 s floor existed (e.g. resumed after a restart)
     const minSec = Math.max(MIN_DELAY_S, state.minDelay || 8);
     const maxSec = Math.max(minSec, state.maxDelay || 15);
-    const jitter = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+    // No message went out when the number is not on WhatsApp (only a lookup), so the next
+    // number follows after a short pause (3-5 s) instead of the full gap between messages.
+    const jitter = notOnWhatsApp ? 3 + Math.floor(Math.random() * 3)
+      : Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
     lane.nextAt = Date.now() + jitter * 1000;
     lane.status = 'waiting';
     saveState();
@@ -836,6 +854,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.companyName = companyName;
     state.messageTemplate = params.message || '';
     state.variation = params.variation || 'text';
+    state.autoData = Boolean(params.auto_data);   // numbers came from the Auto Data pool
     state.media = storeCampaignMedia(companyId, state.id, params.media || null);
     if (params.image_url && !state.media) state.media = { mimetype: 'image/jpeg', filename: 'flyer.jpg', url: params.image_url };
     if (params.audio_url && !state.media) state.media = { mimetype: 'audio/ogg', filename: 'voice_pitch.ogg', url: params.audio_url };
@@ -904,9 +923,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     if (state.status !== 'running') return getStatus();
     clearLaneTimers();
     state.status = 'paused';
+    (state.lanes || []).forEach(l => { l.nextAt = null; });
     log(`⏸️ Campaign paused. ${doneCount} of ${state.audience.length} done.`, 'warn');
-    flushCrm();
-    writeStateNow();
+    persistSoon();
     return getStatus();
   }
 
@@ -923,14 +942,21 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     return getStatus();
   }
 
+  // Saving a big campaign (tens of thousands of numbers) takes a moment, so stop and pause
+  // answer at once and save right after the reply has gone out. Nothing more is sent either
+  // way: lane timers are cleared now, and a send already in flight sees the new status.
+  function persistSoon() {
+    setImmediate(() => { try { flushCrm(); } catch (_) {} writeStateNow(); });
+  }
+
   function stop() {
     state.resumeAfterRestart = false;
     clearLaneTimers();
     state.status = 'stopped';
     state.remainingSeconds = 0;
+    (state.lanes || []).forEach(l => { l.nextAt = null; });
     log(`⏹️ Campaign halted. ${state.totalSent} of ${state.audience.length} messages sent.`, 'warn');
-    flushCrm();
-    writeStateNow();
+    persistSoon();
     return getStatus();
   }
 
@@ -948,6 +974,18 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     recount();
     writeStateNow();
     return getStatus();
+  }
+
+  // Numbers an Auto Data campaign never got to (it was stopped or paused early). The next
+  // Auto Data campaign of the company uses them first, so stopping wastes no numbers.
+  function leftover() {
+    if (!state.autoData || state.status === 'running') return { success: true, phones: [] };
+    const phones = [];
+    for (const c of state.audience || []) {
+      if (c.status === 'pending') phones.push(c.phone);
+      if (phones.length >= 50000) break;
+    }
+    return { success: true, phones };
   }
 
   function firstMatching(list, test, limit) {
@@ -1029,6 +1067,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     resume,
     stop,
     clear,
+    leftover,
     getStatus
   };
 }

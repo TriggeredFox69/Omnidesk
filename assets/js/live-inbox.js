@@ -47,35 +47,11 @@
 
     function merge(item) {
       const itemPhone = cleanDigits(item.phone);
-      let lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
-      if (!lead) {
-        const isTM = isTMUser();
-        const isTL = isTLUser();
-        const ownerId = (isTL || isTM) ? (state.currentUser?.id || null) : null;
-        const ownerName = (isTL || isTM) ? (state.currentUser?.name || null) : null;
-        const ownerUsername = (isTL || isTM) ? (state.currentUser?.username || null) : null;
-        const leadState = (isTL || isTM) ? 'ongoing' : 'fresh';
-
-        const defaultNumber = itemPhone ? ('+' + itemPhone) : (item.phone ? '+' + cleanDigits(item.phone) : '');
-        lead = {
-          id: 'wa_lead_' + (itemPhone || item.phone),
-          phone: itemPhone || item.phone,
-          display: defaultNumber,
-          name: item.name || defaultNumber,
-          city: '',
-          network: '',
-          ownerId: ownerId,
-          ownerName: ownerName,
-          ownerUsername: ownerUsername,
-          leadState: leadState,
-          status: 'unread',
-          unreadCount: 0,
-          interest: isTL ? 'TL Cold Outreach' : (isTM ? 'TM Closer Chat' : ''),
-          notes: 'Conversation synced from connected WhatsApp',
-          messages: []
-        };
-        state.leads.unshift(lead);
-      }
+      const lead = state.leads.find(l => cleanDigits(l.phone) === itemPhone);
+      // Chats exist only for numbers that are already leads (a campaign send creates the lead
+      // on the server, and the leads poll brings it here with its messages). A chat event for
+      // any other number is a personal chat on a linked phone: it is never turned into a lead.
+      // (This used to create "Unassigned Pool" chats named after the phone owner, e.g. "Askari".)
       if (!lead) return null;
       let previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
       // A text this browser just sent shows at once with a clock icon (no WhatsApp id yet).
