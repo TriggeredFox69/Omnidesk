@@ -746,7 +746,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       };
     });
 
-    syncAudienceToCrm(state.audience, state.companyId, state.messageTemplate, state.name);
+    // Note: Do NOT dump 10k-100k raw cold audience into CRM leads.json upfront!
+    // Contacts are automatically registered as CRM leads in updateCrmLead() when a message is actually sent.
 
     state.currentIndex = 0;
     state.totalSent = 0;

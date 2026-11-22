@@ -4189,50 +4189,56 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (els.clearAudienceBtn) {
-    els.clearAudienceBtn.addEventListener('click', () => {
-      if (campaignState.isRunning) {
-        showToast('⚠️ Cannot clear while campaign is active. Stop it first.');
-        return;
-      }
-      campaignState.audience = [];
-      campaignState.currentIndex = 0;
-      campaignState.totalSent = 0;
-      campaignState.totalFailed = 0;
-      campaignState.audienceCleared = true;
+  function executeClearAudience() {
+    campaignState.audience = [];
+    campaignState.currentIndex = 0;
+    campaignState.totalSent = 0;
+    campaignState.totalFailed = 0;
+    campaignState.audienceCleared = true;
+    campaignDuplicatesFiltered = 0;
+    campaignAudiencePage = 1;
+    campaignState.isRunning = false;
+    campaignState.isPaused = false;
 
-      if (els.campaignPasteArea) els.campaignPasteArea.value = '';
-      if (els.campaignAudienceSummary) els.campaignAudienceSummary.style.display = 'none';
-      if (els.campaignAudienceList) {
-        els.campaignAudienceList.innerHTML = '';
-        els.campaignAudienceList.style.display = 'none';
-      }
-      if (els.campaignLoadedCountText) els.campaignLoadedCountText.textContent = '0 Numbers';
-      if (els.campaignAudienceBadge) els.campaignAudienceBadge.textContent = '0 Contacts';
-      if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'none';
-      if (els.campaignStatusBadge) {
-        els.campaignStatusBadge.style.color = '#8696a0';
-        els.campaignStatusBadge.style.background = 'transparent';
-        els.campaignStatusBadge.style.borderColor = 'var(--border-subtle)';
-        els.campaignStatusBadge.innerHTML = '⚪ Ready to Launch';
-      }
+    if (els.campaignPasteArea) els.campaignPasteArea.value = '';
+    const audienceCard = document.getElementById('campaignAudienceCard');
+    if (audienceCard) audienceCard.style.display = 'none';
 
-      renderCampaignAudienceUI();
+    const listEl = els.campaignAudienceList || document.getElementById('campaignAudienceList');
+    if (listEl) listEl.innerHTML = '';
 
-      // Tell backend bridge to clear campaign queue as well
-      fetch('api/direct_sender.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear_campaign' })
-      }).catch(() => {});
+    if (els.campaignLoadedCountText) els.campaignLoadedCountText.textContent = '0 Numbers';
+    if (els.campaignAudienceBadge) els.campaignAudienceBadge.textContent = '0 Contacts';
+    if (els.campaignProgressCard) els.campaignProgressCard.style.display = 'none';
+    if (els.campaignStatusBadge) {
+      els.campaignStatusBadge.style.color = '#8696a0';
+      els.campaignStatusBadge.style.background = 'transparent';
+      els.campaignStatusBadge.style.borderColor = 'var(--border-subtle)';
+      els.campaignStatusBadge.innerHTML = '⚪ Ready to Launch';
+    }
 
-      const compId = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
-      fetch(`api/tenant_manager.php?action=clear_campaign_draft&company_id=${encodeURIComponent(compId)}`, { method: 'POST' }).catch(() => {});
+    renderCampaignAudienceUI();
 
-      logCampaignTerminal('🗑️ Target audience list cleared by operator.', 'info');
-      showToast('Audience list cleared.');
-    });
+    // Tell backend bridge to clear campaign queue as well
+    fetch('api/direct_sender.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'clear_campaign' })
+    }).catch(() => {});
+
+    const compId = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    fetch(`api/tenant_manager.php?action=clear_campaign_draft&company_id=${encodeURIComponent(compId)}`, { method: 'POST' }).catch(() => {});
+
+    logCampaignTerminal('🗑️ Target audience list cleared by operator.', 'info');
+    showToast('Audience list cleared.');
   }
+
+  document.querySelectorAll('#clearAudienceBtn, [data-action="clear-audience"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      executeClearAudience();
+    });
+  });
 
   // Pagination & Search in High-Capacity Audience Widget (Supports up to 100k numbers)
   const searchInput = document.getElementById('campaignAudienceSearchInput');
