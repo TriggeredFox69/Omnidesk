@@ -1161,37 +1161,37 @@
     </div>
 
     <!-- ═══════════════ STEP 1: Connected WhatsApps Widget (All Admin Portals) ═══════════════ -->
-    <div class="panel" id="campaignSendersPoolCard" style="margin-bottom: 20px; padding: 18px 20px; border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.03);">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+    <div class="panel" id="campaignSendersPoolCard" style="margin-bottom: 22px; padding: 22px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(165deg, rgba(17, 24, 39, 0.8), rgba(10, 15, 29, 0.95)); backdrop-filter: blur(16px); box-shadow: 0 12px 35px -8px rgba(0,0,0,0.5);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
         <div>
-          <div style="font-weight:800; font-size:15px; color:#fff; display:flex; align-items:center; gap:8px;">
-            <span>📱</span> Connected WhatsApp Numbers (TMs &amp; TLs)
+          <div style="font-weight:800; font-size:16px; color:#fff; display:flex; align-items:center; gap:9px; letter-spacing:-0.01em;">
+            <span style="font-size:18px;">📱</span> Connected WhatsApp Numbers (TMs &amp; TLs)
           </div>
-          <p class="text-xs text-muted" style="margin:3px 0 0; line-height:1.45;">
-            All registered WhatsApp numbers of active Team Members and Team Leaders. All devices send <strong>simultaneously per batch</strong>. Click <strong>Refresh</strong> after onboarding new TMs or TLs.
+          <p class="text-xs text-muted" style="margin:4px 0 0; line-height:1.5;">
+            All registered WhatsApp devices of active Team Members and Team Leaders. All devices send <strong>simultaneously per batch</strong> in an equal round-robin split.
           </p>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
-          <span id="campaignPoolCountBadge" class="panel-badge" style="color:var(--emerald); background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.35); font-size:12px; font-weight:750; padding:5px 12px;">
+          <span id="campaignPoolCountBadge" class="panel-badge" style="color:#10b981; background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.3); font-size:12px; font-weight:800; padding:6px 14px; border-radius:8px;">
             Loading devices…
           </span>
-          <button type="button" class="btn btn-warning btn-xs" id="campaignScanQrBtn" style="padding:7px 14px; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <button type="button" class="btn btn-warning btn-xs" id="campaignScanQrBtn" style="padding:7px 15px; font-weight:800; font-size:12px; display:flex; align-items:center; gap:6px; cursor:pointer; border-radius:8px;">
             <span>📱</span> Link Phone / Scan QR
           </button>
-          <button type="button" class="btn btn-emerald btn-xs" id="refreshCampaignSendersBtn" style="padding:7px 14px; font-weight:700; font-size:12px; display:flex; align-items:center; gap:6px;">
+          <button type="button" class="btn btn-emerald btn-xs" id="refreshCampaignSendersBtn" style="padding:7px 15px; font-weight:800; font-size:12px; display:flex; align-items:center; gap:6px; border-radius:8px;">
             <span>🔄</span> Refresh WhatsApps
           </button>
         </div>
       </div>
 
       <!-- Senders Cards Grid -->
-      <div id="campaignSendersPoolContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:12px; margin-bottom:14px;">
-        <div class="text-xs text-muted" style="padding:12px;">Loading connected team WhatsApp numbers…</div>
+      <div id="campaignSendersPoolContainer" style="display:block; margin-bottom:14px;">
+        <div class="text-xs text-muted" style="padding:16px; text-align:center;">Loading connected team WhatsApp numbers…</div>
       </div>
 
       <!-- Batch Send Explanation -->
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:rgba(16,185,129,0.06); border:1px dashed rgba(16,185,129,0.3); border-radius:8px; padding:10px 14px;">
-        <div id="campaignRotationFlowPreview" style="font-size:12px; color:var(--cyan); font-family:monospace; font-weight:600;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 16px;">
+        <div id="campaignRotationFlowPreview" style="font-size:12px; color:#38bdf8; font-family:'JetBrains Mono', monospace; font-weight:700;">
           ⚡ Batch Dispatch: All connected WhatsApps send simultaneously
         </div>
         <div id="campaignCycleMathInfo" style="font-size:11.5px; color:var(--text-muted);">
@@ -1242,7 +1242,46 @@
           <span>👥 <strong id="campaignLoadedCountText">0 Numbers</strong> loaded</span>
           <button type="button" class="btn btn-ghost btn-xs" id="clearAudienceBtn" style="color:var(--red);">Clear</button>
         </div>
-        <div id="campaignAudienceList" class="campaign-audience-list" style="display:none;"></div>
+
+        <!-- High-Capacity 100k Audience Stats & Inspector Widget -->
+        <div id="campaignAudienceCard" style="display:none;background:rgba(16,185,129,0.03);border:1px solid rgba(16,185,129,0.2);border-radius:12px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:16px;">👥</span>
+              <strong id="campaignAudienceTotalStat" style="font-size:14px;color:#10b981;font-family:monospace;font-weight:800;">0 Numbers</strong>
+            </div>
+            <span id="campaignSavedCloudBadge" style="font-size:10.5px;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:6px;font-weight:700;border:1px solid rgba(56,189,248,0.25);">☁️ Cloud Saved</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;font-size:11px;color:var(--text-muted);">
+            <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+              <div style="font-size:10px;opacity:0.8;">Format &amp; Network:</div>
+              <strong style="color:#fff;" id="campaignValidFormatCount">100% Valid</strong>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+              <div style="font-size:10px;opacity:0.8;">Cleaned Duplicates:</div>
+              <strong style="color:#eab308;" id="campaignDupesFilteredCount">0 Duplicates</strong>
+            </div>
+          </div>
+
+          <!-- Fast Paginated / Windowed Inspector -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <input type="text" id="campaignAudienceSearchInput" class="form-input form-input-xs" placeholder="🔍 Search numbers in list..." style="font-size:11px;padding:4px 8px;border-radius:6px;">
+          </div>
+          <div id="campaignAudienceList" class="campaign-audience-list" style="max-height:160px;overflow-y:auto;border-radius:8px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.05);padding:4px;"></div>
+          <div id="campaignAudiencePagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:10.5px;color:var(--text-muted);">
+            <span id="campaignAudiencePageInfo">Showing 1–25</span>
+            <div style="display:flex;gap:4px;">
+              <button type="button" class="btn btn-ghost btn-xs" id="campaignAudiencePrevBtn" style="padding:1px 6px;">◀ Prev</button>
+              <button type="button" class="btn btn-ghost btn-xs" id="campaignAudienceNextBtn" style="padding:1px 6px;">Next ▶</button>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+            <button type="button" class="btn btn-ghost btn-xs" id="clearAudienceBtn" style="color:#ef4444;font-size:11px;">🗑️ Clear Numbers</button>
+            <button type="button" class="btn btn-ghost btn-xs" id="saveDraftBtn" style="color:var(--cyan);font-size:11px;">💾 Saved on Server ✓</button>
+          </div>
+        </div>
 
         <div class="form-group" style="margin:0;">
           <label class="form-label">Assign Created Leads To</label>

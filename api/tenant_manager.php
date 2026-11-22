@@ -536,4 +536,48 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         echo json_encode(['success' => true, 'message' => 'Configuration saved successfully.', 'config' => $config]);
         exit;
     }
+
+    if ($action === 'get_campaign_draft') {
+        $draftFile = ($companyId === 'COMP-001')
+            ? __DIR__ . '/../data/campaign_draft.json'
+            : __DIR__ . '/../data/tenants/' . $companyId . '/campaign_draft.json';
+        if (file_exists($draftFile)) {
+            $draft = json_decode(file_get_contents($draftFile), true);
+            echo json_encode(['success' => true, 'draft' => is_array($draft) ? $draft : null]);
+        } else {
+            echo json_encode(['success' => true, 'draft' => null]);
+        }
+        exit;
+    }
+
+    if ($action === 'save_campaign_draft' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $draftDir = ($companyId === 'COMP-001')
+            ? __DIR__ . '/../data'
+            : __DIR__ . '/../data/tenants/' . $companyId;
+        if (!is_dir($draftDir)) @mkdir($draftDir, 0775, true);
+        $draftFile = $draftDir . '/campaign_draft.json';
+        $payload = [
+            'updated_at' => time(),
+            'company_id' => $companyId,
+            'name'       => trim((string)($input['name'] ?? 'OmniDesk campaign')),
+            'message'    => (string)($input['message'] ?? ''),
+            'variation'  => (string)($input['variation'] ?? 'text'),
+            'minDelay'   => max(1, (int)($input['minDelay'] ?? 3)),
+            'maxDelay'   => max(2, (int)($input['maxDelay'] ?? 6)),
+            'audience'   => is_array($input['audience'] ?? null) ? $input['audience'] : []
+        ];
+        file_put_contents($draftFile . '.tmp', json_encode($payload, JSON_UNESCAPED_UNICODE));
+        rename($draftFile . '.tmp', $draftFile);
+        echo json_encode(['success' => true, 'message' => 'Campaign draft saved.', 'count' => count($payload['audience'])]);
+        exit;
+    }
+
+    if ($action === 'clear_campaign_draft' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $draftFile = ($companyId === 'COMP-001')
+            ? __DIR__ . '/../data/campaign_draft.json'
+            : __DIR__ . '/../data/tenants/' . $companyId . '/campaign_draft.json';
+        if (file_exists($draftFile)) @unlink($draftFile);
+        echo json_encode(['success' => true, 'message' => 'Campaign draft cleared.']);
+        exit;
+    }
 }

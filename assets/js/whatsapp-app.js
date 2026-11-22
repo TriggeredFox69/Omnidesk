@@ -2965,27 +2965,102 @@ document.addEventListener('DOMContentLoaded', () => {
     els.campaignBubblePreview.innerHTML = html;
   }
 
+  // --- High-Capacity (100k) Audience Manager & Cloud Draft Persistence ---
+  let campaignAudiencePage = 1;
+  const CAMPAIGN_PAGE_SIZE = 25;
+  let campaignAudienceSearchQuery = '';
+  let campaignDuplicatesFiltered = 0;
+  let _saveDraftDebounceTimer = null;
+
+  function scheduleSaveCampaignDraft() {
+    clearTimeout(_saveDraftDebounceTimer);
+    _saveDraftDebounceTimer = setTimeout(saveCampaignDraftToServer, 1200);
+  }
+
+  async function saveCampaignDraftToServer() {
+    const compId = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    if (!campaignState.audience || campaignState.audience.length === 0) return;
+    try {
+      const payload = {
+        name: (els.campaignNameInput?.value || '').trim() || 'OmniDesk campaign',
+        message: els.campaignCustomMsg?.value || '',
+        variation: campaignState.variation || 'text',
+        minDelay: parseInt(els.campaignDelayMin?.value || 3, 10),
+        maxDelay: parseInt(els.campaignDelayMax?.value || 6, 10),
+        audience: campaignState.audience
+      };
+      const res = await fetch(`api/tenant_manager.php?action=save_campaign_draft&company_id=${encodeURIComponent(compId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        const badge = document.getElementById('campaignSavedCloudBadge');
+        if (badge) {
+          badge.textContent = `☁️ Saved on Cloud (${campaignState.audience.length})`;
+          badge.style.display = 'inline-block';
+        }
+      }
+    } catch (_) {}
+  }
+
+  async function loadCampaignDraftFromServer() {
+    const compId = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    try {
+      const res = await fetch(`api/tenant_manager.php?action=get_campaign_draft&company_id=${encodeURIComponent(compId)}`);
+      const data = await res.json();
+      if (data && data.success && data.draft && Array.isArray(data.draft.audience) && data.draft.audience.length > 0) {
+        if (!campaignState.audience || campaignState.audience.length === 0) {
+          campaignState.audience = data.draft.audience;
+          if (data.draft.name && els.campaignNameInput) els.campaignNameInput.value = data.draft.name;
+          if (data.draft.message && els.campaignCustomMsg) {
+            els.campaignCustomMsg.value = data.draft.message;
+            updateCampaignPreview();
+          }
+          if (data.draft.minDelay && els.campaignDelayMin) els.campaignDelayMin.value = data.draft.minDelay;
+          if (data.draft.maxDelay && els.campaignDelayMax) els.campaignDelayMax.value = data.draft.maxDelay;
+          renderCampaignAudienceUI();
+          logCampaignTerminal(`☁️ Loaded ${data.draft.audience.length} saved campaign contacts from company cloud storage. Ready to launch.`, 'info');
+        }
+      }
+    } catch (_) {}
+  }
+
   function parseContactsFromText(text) {
     if (!text) return 0;
     campaignState.audienceCleared = false;
     const lines = text.split(/[\r\n]+/);
     let added = 0;
-    lines.forEach((line, idx) => {
-      line = line.trim();
-      if (!line) return;
+    let dupes = 0;
+    const seenPhones = new Set();
+    // Pre-populate seen set with existing audience for O(1) instant duplicate checks
+    for (let i = 0; i < campaignState.audience.length; i++) {
+      seenPhones.add(campaignState.audience[i].phone);
+    }
+
+    const batch = [];
+    const now = Date.now();
+    for (let idx = 0; idx < lines.length; idx++) {
+      const line = lines[idx].trim();
+      if (!line) continue;
       const parts = line.split(/[,\t;|]+/);
       const rawPhone = parts[0] ? parts[0].trim() : '';
       const clean = cleanNumber(rawPhone);
-      if (!clean) return;
+      if (!clean) continue;
+
+      if (seenPhones.has(clean)) {
+        dupes++;
+        continue;
+      }
+      seenPhones.add(clean);
 
       const formattedNumber = `+92 ${clean.substring(2, 5)} ${clean.substring(5)}`;
       const rawName = (parts[1] && parts[1].trim() && parts[1].trim().toLowerCase() !== 'trader') ? parts[1].trim() : formattedNumber;
       const rawCity = parts[2] ? parts[2].trim() : 'Pakistan';
 
-      if (campaignState.audience.some(c => c.phone === clean)) return;
-
-      campaignState.audience.push({
-        id: `c_lead_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 4)}`,
+      batch.push({
+        id: `c_lead_${now}_${idx}`,
         name: rawName,
         phone: clean,
         display: formattedNumber,
@@ -2995,11 +3070,16 @@ document.addEventListener('DOMContentLoaded', () => {
         sentAt: null
       });
       added++;
-    });
+    }
 
+    campaignDuplicatesFiltered += dupes;
+    campaignState.audience.push(...batch);
+    campaignAudiencePage = 1;
     renderCampaignAudienceUI();
+
     if (added > 0) {
-      logCampaignTerminal(`✅ Parsed & queued ${added} valid target numbers into campaign. Total audience: ${campaignState.audience.length}.`, 'success');
+      logCampaignTerminal(`✅ Parsed & queued ${added} valid target numbers into campaign (filtered ${dupes} duplicates). Total audience: ${campaignState.audience.length}.`, 'success');
+      scheduleSaveCampaignDraft();
     }
     return added;
   }
@@ -3013,35 +3093,64 @@ document.addEventListener('DOMContentLoaded', () => {
       els.campaignLoadedCountText.textContent = `${count} Numbers`;
     }
 
-    if (count > 0) {
-      if (els.campaignAudienceSummary) els.campaignAudienceSummary.style.display = 'flex';
-      if (els.campaignAudienceList) els.campaignAudienceList.style.display = 'flex';
-    } else {
-      if (els.campaignAudienceSummary) els.campaignAudienceSummary.style.display = 'none';
-      if (els.campaignAudienceList) els.campaignAudienceList.style.display = 'none';
-    }
+    const totalStatEl = document.getElementById('campaignAudienceTotalStat');
+    if (totalStatEl) totalStatEl.textContent = `${count.toLocaleString()} Numbers`;
 
-    if (els.campaignAudienceList) {
-      els.campaignAudienceList.innerHTML = campaignState.audience.map((c) => {
+    const dupesEl = document.getElementById('campaignDupesFilteredCount');
+    if (dupesEl) dupesEl.textContent = `${campaignDuplicatesFiltered.toLocaleString()} Filtered`;
+
+    const validStatEl = document.getElementById('campaignValidFormatCount');
+    if (validStatEl) validStatEl.textContent = count > 0 ? `${count.toLocaleString()} (100% Valid)` : '100% Valid';
+
+    const audienceCard = document.getElementById('campaignAudienceCard');
+    if (audienceCard) audienceCard.style.display = count > 0 ? 'block' : 'none';
+
+    if (els.campaignAudienceSummary) els.campaignAudienceSummary.style.display = 'none';
+
+    // Windowed / Paginated rendering: prevents freezing even with 100,000 numbers!
+    const listEl = els.campaignAudienceList || document.getElementById('campaignAudienceList');
+    if (listEl && count > 0) {
+      let filtered = campaignState.audience;
+      if (campaignAudienceSearchQuery) {
+        const q = campaignAudienceSearchQuery.toLowerCase();
+        filtered = campaignState.audience.filter(c => c.phone.includes(q) || c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q));
+      }
+
+      const totalFiltered = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(totalFiltered / CAMPAIGN_PAGE_SIZE));
+      if (campaignAudiencePage > totalPages) campaignAudiencePage = totalPages;
+      if (campaignAudiencePage < 1) campaignAudiencePage = 1;
+
+      const startIndex = (campaignAudiencePage - 1) * CAMPAIGN_PAGE_SIZE;
+      const pageSlice = filtered.slice(startIndex, startIndex + CAMPAIGN_PAGE_SIZE);
+
+      const pageInfo = document.getElementById('campaignAudiencePageInfo');
+      if (pageInfo) {
+        pageInfo.textContent = `Showing ${startIndex + 1}–${Math.min(startIndex + CAMPAIGN_PAGE_SIZE, totalFiltered)} of ${totalFiltered.toLocaleString()}`;
+      }
+
+      listEl.innerHTML = pageSlice.map((c) => {
         const delivered = c.status === 'delivered' || c.status === 'read';
-        const dotBg = delivered ? '#10b981' : (c.status === 'sending' ? '#eab308' : (c.status === 'failed' ? '#ef4444' : (c.status === 'accepted' || c.status === 'sent' ? '#b7791f' : '#64748b')));
+        const dotBg = delivered ? '#10b981' : (c.status === 'sending' ? '#f59e0b' : (c.status === 'failed' ? '#ef4444' : (c.status === 'accepted' || c.status === 'sent' ? '#b7791f' : '#64748b')));
         const statusLabel = delivered
-          ? `<span style="color:#10b981;font-weight:700;">✓ ${c.status === 'read' ? 'Read' : 'Delivered'} (${c.sentAt || ''})</span>`
-          : (c.status === 'sent' ? '<span style="color:#b7791f;font-weight:700;">✓ Sent by WhatsApp; awaiting recipient</span>' : (c.status === 'accepted' ? '<span style="color:#b7791f;font-weight:700;">⏳ API accepted; awaiting delivery receipt</span>' : (c.status === 'sending' ? '<span style="color:#eab308;">⏳ Sending...</span>' : (c.status === 'failed' ? `<span style="color:#ef4444;font-weight:700;">✕ Failed${c.deliveryError ? `: ${escapeHtml(c.deliveryError)}` : ''}</span>` : '<span style="color:#8696a0;">Pending</span>'))));
+          ? `<span style="color:#10b981;font-weight:700;">✓ ${c.status === 'read' ? 'Read' : 'Delivered'}</span>`
+          : (c.status === 'sent' ? '<span style="color:#b7791f;font-weight:700;">✓ Sent</span>' : (c.status === 'accepted' ? '<span style="color:#b7791f;font-weight:700;">⏳ Accepted</span>' : (c.status === 'sending' ? '<span style="color:#f59e0b;font-weight:700;">⏳ Sending...</span>' : (c.status === 'failed' ? `<span style="color:#ef4444;font-weight:700;">✕ Failed</span>` : '<span style="color:#64748b;">Pending</span>'))));
 
         return `
-          <div class="campaign-audience-item" id="c_item_${c.id}">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="width:8px;height:8px;border-radius:50%;background:${dotBg};"></div>
-              <div>
-                <div style="font-weight:700;color:#ffffff;font-size:12px;">${escapeHtml(c.name)} <span class="mono text-muted text-xs">(${escapeHtml(c.display)})</span></div>
-                <div class="text-xs text-muted" style="font-size:10.5px;">📍 ${escapeHtml(c.city)} • <span style="color:#00a884;font-weight:600;">${escapeHtml(c.network)}</span></div>
+          <div class="campaign-audience-item" id="c_item_${c.id}" style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+              <div style="width:7px;height:7px;border-radius:50%;background:${dotBg};flex-shrink:0;"></div>
+              <div style="min-width:0;">
+                <div style="font-weight:700;color:#ffffff;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(c.name)} <span class="mono text-muted" style="font-size:10.5px;">(${escapeHtml(c.display)})</span></div>
+                <div class="text-xs text-muted" style="font-size:10px;">📍 ${escapeHtml(c.city)} • <span style="color:#10b981;font-weight:600;">${escapeHtml(c.network)}</span></div>
               </div>
             </div>
-            <div style="font-size:11px;" id="c_status_${c.id}">${statusLabel}</div>
+            <div style="font-size:10.5px;flex-shrink:0;" id="c_status_${c.id}">${statusLabel}</div>
           </div>
         `;
       }).join('');
+    } else if (listEl) {
+      listEl.innerHTML = '';
     }
 
     updateCampaignPreview();
@@ -4117,10 +4226,44 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ action: 'clear_campaign' })
       }).catch(() => {});
 
+      const compId = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+      fetch(`api/tenant_manager.php?action=clear_campaign_draft&company_id=${encodeURIComponent(compId)}`, { method: 'POST' }).catch(() => {});
+
       logCampaignTerminal('🗑️ Target audience list cleared by operator.', 'info');
       showToast('Audience list cleared.');
     });
   }
+
+  // Pagination & Search in High-Capacity Audience Widget (Supports up to 100k numbers)
+  const searchInput = document.getElementById('campaignAudienceSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      campaignAudienceSearchQuery = (e.target.value || '').trim();
+      campaignAudiencePage = 1;
+      renderCampaignAudienceUI();
+    });
+  }
+
+  document.getElementById('campaignAudiencePrevBtn')?.addEventListener('click', () => {
+    if (campaignAudiencePage > 1) {
+      campaignAudiencePage--;
+      renderCampaignAudienceUI();
+    }
+  });
+
+  document.getElementById('campaignAudienceNextBtn')?.addEventListener('click', () => {
+    const total = campaignState.audience.length;
+    const totalPages = Math.ceil(total / CAMPAIGN_PAGE_SIZE);
+    if (campaignAudiencePage < totalPages) {
+      campaignAudiencePage++;
+      renderCampaignAudienceUI();
+    }
+  });
+
+  document.getElementById('saveDraftBtn')?.addEventListener('click', async () => {
+    await saveCampaignDraftToServer();
+    showToast('💾 Campaign numbers & draft saved to server! You can resume tomorrow.');
+  });
 
   if (els.quickAddMyNumberBtn) {
     els.quickAddMyNumberBtn.addEventListener('click', () => {
@@ -4326,6 +4469,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateCampaignPreview();
       renderCampaignAudienceUI();
       loadCampaignSenders();
+      loadCampaignDraftFromServer();
     } else if (tabName === 'employee') {
       if (els.tabEmployee) els.tabEmployee.classList.add('active', 'tab-wa');
       if (els.viewEmployee) els.viewEmployee.style.display = 'block';
@@ -9028,6 +9172,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCampaignPreview();
   renderCampaignAudienceUI();
   loadCampaignSenders();
+  loadCampaignDraftFromServer();
   syncServerCampaignStatus();
   startCampaignStatusPolling();
 });
