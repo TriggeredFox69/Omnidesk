@@ -3491,8 +3491,9 @@ document.addEventListener('DOMContentLoaded', () => {
           badge.style.color = senders.length > 0 ? '#10b981' : '#ef4444';
         }
 
-        if (container) {
-          // Each card is a TM whose own WhatsApp is linked for campaigns (the server only returns those).
+        if (container && !window.ChatlyWaWidget) {
+          // Fallback cards, only if wa-widget.js did not load. Each card is a TM whose own
+          // WhatsApp is linked for campaigns (the server only returns those).
           container.innerHTML = senders.map(s => {
             const isBridgeLive = s.connected !== false;
             const isTL = (s.roleType === 'lead');
@@ -3531,12 +3532,12 @@ document.addEventListener('DOMContentLoaded', () => {
           }).join('');
         }
 
-        if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, senders, window.lastCampaignStatus || null);
+        if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, senders, window.lastCampaignStatus || null, { layout: 'list' });
         updateCampaignLaunchSummary();
 
         if (preview) {
-          const flow = senders.map(s => `<strong>${escapeHtml(s.name.split(' ')[0])}</strong>`).join(' · ');
-          preview.innerHTML = `<strong>⚖️ Equal split:</strong> the numbers are divided equally between ${flow}; each sends their share from their own WhatsApp, in parallel.`;
+          // A count, not every name: with hundreds of linked WhatsApps a name list would be unreadable.
+          preview.innerHTML = `<strong>Equal split:</strong> the numbers are divided equally between the <strong>${senders.length}</strong> connected WhatsApp${senders.length === 1 ? '' : 's'}; each sends its share at the same time.`;
         }
 
         if (mathInfo) {
@@ -3555,7 +3556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderConnectedNumber();
       } else {
         window.currentCampaignSenders = [];
-        if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, [], null);
+        if (container && window.ChatlyWaWidget) window.ChatlyWaWidget.render(container, [], null, { layout: 'list' });
         else if (container) {
           container.innerHTML = `<div class="text-xs text-muted" style="padding:10px;text-align:center;">No Team Member WhatsApp is linked yet.</div>`;
         }
@@ -3604,7 +3605,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.lastCampaignStatus = data;
     const waContainer = els.campaignSendersPoolContainer || document.getElementById('campaignSendersPoolContainer');
     if (waContainer && window.ChatlyWaWidget && Array.isArray(window.currentCampaignSenders) && window.currentCampaignSenders.length) {
-      window.ChatlyWaWidget.render(waContainer, window.currentCampaignSenders, data);
+      window.ChatlyWaWidget.render(waContainer, window.currentCampaignSenders, data, { layout: 'list' });
     }
     const isRunning = data.status === 'running';
     const isPaused = data.status === 'paused';

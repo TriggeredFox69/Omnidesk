@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.5">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.6">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=15.1">
   <script>
     (function() {
@@ -1139,36 +1139,6 @@
         <div id="campaignStatusBadge" class="panel-badge cs-status">⚪ Ready to Launch</div>
       </header>
 
-      <!-- Team WhatsApps: who sends -->
-      <section class="cs-card cs-team" id="campaignSendersPoolCard">
-        <div class="cs-team-head">
-          <div>
-            <h3 class="cs-card-title">Your team's WhatsApps</h3>
-            <p class="cs-card-sub">Every linked Team Member and Team Leader sends <strong>an equal share</strong> of the numbers from their own WhatsApp, all at the same time.</p>
-          </div>
-          <div class="cs-team-actions">
-            <span id="campaignPoolCountBadge" class="panel-badge cs-count-badge">Loading devices…</span>
-            <button type="button" class="cs-btn" id="campaignScanQrBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-              Link a phone
-            </button>
-            <button type="button" class="cs-btn" id="refreshCampaignSendersBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        <div id="campaignSendersPoolContainer" class="cs-team-list">
-          <div class="cs-team-loading">Loading connected team WhatsApp numbers…</div>
-        </div>
-
-        <div class="cs-team-foot">
-          <div id="campaignRotationFlowPreview">Numbers are shared equally between the connected WhatsApps</div>
-          <div id="campaignCycleMathInfo">Each WhatsApp sends one message, waits a few seconds, then sends the next</div>
-        </div>
-      </section>
-
       <div class="campaign-grid">
 
         <!-- STEP 1: Numbers -->
@@ -1437,6 +1407,36 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
         </section>
 
       </div>
+
+      <!-- Team WhatsApps: who sends (compact list, built for hundreds of linked numbers) -->
+      <section class="cs-card cs-team" id="campaignSendersPoolCard">
+        <div class="cs-team-head">
+          <div>
+            <h3 class="cs-card-title">Team WhatsApps</h3>
+            <p class="cs-card-sub">Every linked Team Member and Team Leader sends <strong>an equal share</strong> of the numbers from their own WhatsApp, at the same time.</p>
+          </div>
+          <div class="cs-team-actions">
+            <span id="campaignPoolCountBadge" class="panel-badge cs-count-badge">Loading devices…</span>
+            <button type="button" class="cs-btn" id="campaignScanQrBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+              Link a phone
+            </button>
+            <button type="button" class="cs-btn" id="refreshCampaignSendersBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div id="campaignSendersPoolContainer" class="cs-team-list">
+          <div class="cs-team-loading">Loading connected team WhatsApp numbers…</div>
+        </div>
+
+        <div class="cs-team-foot">
+          <div id="campaignRotationFlowPreview">Numbers are shared equally between the connected WhatsApps</div>
+          <div id="campaignCycleMathInfo">Each WhatsApp sends one message, waits a few seconds, then sends the next</div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -2520,7 +2520,7 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
 
   <script src="assets/js/offline-preview.js?v=15.1"></script>
   <script src="assets/js/live-inbox.js?v=15.1"></script>
-  <script src="assets/js/wa-widget.js?v=15.1"></script>
-  <script src="assets/js/whatsapp-app.js?v=15.5"></script>
+  <script src="assets/js/wa-widget.js?v=15.6"></script>
+  <script src="assets/js/whatsapp-app.js?v=15.6"></script>
 </body>
 </html>

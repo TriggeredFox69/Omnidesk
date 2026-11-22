@@ -5459,6 +5459,13 @@ body:not(.theme-dark) #viewCampaign .log-error { color: #b91c1c; }
   #companyContextBadge { padding: 3px !important; }
   #companyContextName { display: none; }
   .header-quota-pill { padding: 4px 8px !important; }
+  /* admins: the "Team WhatsApps (N Connected)" pill shrinks to its status dot */
+  #connectedNumberText { display: none; }
+  #connectedNumberPill { padding: 8px !important; }
+  /* header buttons whose icon is an emoji label keep that icon (only the text is hidden) */
+  .btn-header-admin > span:first-child { display: inline; }
+  .topbar-actions { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .topbar-actions::-webkit-scrollbar { display: none; }
 }
 
 /* Metalink (COMP-004): the chat header keeps only the contact's name, number and Edit Name.
