@@ -5461,6 +5461,12 @@ body:not(.theme-dark) #viewCampaign .log-error { color: #b91c1c; }
   .header-quota-pill { padding: 4px 8px !important; }
 }
 
+/* Metalink (COMP-004): the chat header keeps only the contact's name, number and Edit Name.
+   Mark Paid / Takeover / Won't Handle / Won't Pay / Delete Chat / Lead CRM and the status
+   pill are hidden. Other companies are unchanged. */
+body[data-company="COMP-004"] .chat-header-actions,
+body[data-company="COMP-004"] #chatLeadStatusBadge { display: none !important; }
+
 /* Daily quota pill: its inline colour is meant for the dark header */
 body:not(.theme-dark) .header-quota-pill { color: #067a4a !important; background: rgba(15, 169, 104, 0.1) !important; border-color: rgba(15, 169, 104, 0.3) !important; }
 

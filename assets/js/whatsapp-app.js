@@ -688,6 +688,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlComp = new URLSearchParams(window.location.search).get('company_id');
     const compId = companyId || urlComp || state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
     state.currentCompanyId = compId;
+    // Lets the stylesheet adjust per company (e.g. Metalink's simplified chat header).
+    document.body.dataset.company = compId;
     let brand = COMPANY_BRAND_CATALOG[compId] || {
       name: state.currentUser?.company_name || 'Metalink',
       short_name: (state.currentUser?.company_name || 'Metalink').split(' ')[0],

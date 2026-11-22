@@ -1411,15 +1411,6 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
     </div>
   </div>
 
-  <div style="margin-top:64px;">
-    <span class="lp-eyebrow">Brands on Chatly</span>
-    <div class="lp-brands">
-      <div class="lp-brand-tile"><img src="assets/images/nunno-logo.svg" alt="">Nunno</div>
-      <div class="lp-brand-tile"><img src="assets/images/apex-logo.svg" alt="">Apex</div>
-      <div class="lp-brand-tile"><img src="assets/images/paktrade-logo.svg" alt="">PakTrade</div>
-      <div class="lp-brand-tile more" style="cursor:pointer;" onclick="openPromoteProductModal();" title="Promote your product on Chatly">+ your brand</div>
-    </div>
-  </div>
 </section>
 
 <!-- ═══════════ LANDING: FINAL CTA + FOOTER ═══════════ -->
