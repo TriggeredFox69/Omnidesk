@@ -357,6 +357,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       }
       if (url.pathname === '/device/adopt') { reply(200, await devicePool.adopt(body.from, body.to, body.name)); return; }
       if (url.pathname === '/device/send') { reply(200, await devicePool.send(body.id, body)); return; }
+      if (url.pathname === '/device/pair') { reply(200, await devicePool.pairWithPhone(body.id, body.phone, body.name)); return; }
       if (url.pathname === '/device/connect') { reply(200, devicePool.connect(body.id, body.name, Boolean(body.force))); return; }
       if (url.pathname === '/device/reset') {
         await devicePool.disconnect(body.id, true);

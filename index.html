@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.6">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.7">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=15.1">
   <script>
     (function() {
@@ -355,11 +355,30 @@
           <li>Keep your phone online during campaigns</li>
         </ol>
       </div>
+      <!-- Link with phone number instead of a QR (closers who only have this one phone) -->
+      <div id="campDevPairBox" class="cdp-box" style="display:none;">
+        <button type="button" id="campDevPairToggle" class="cdp-toggle">📱 Only have this phone? <strong>Link with phone number instead</strong></button>
+        <div id="campDevPairPane" class="cdp-pane" hidden>
+          <div class="cdp-row">
+            <input type="tel" id="campDevPairPhone" class="cdp-input" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="Your WhatsApp number, e.g. 03001234567">
+            <button type="button" id="campDevPairBtn" class="cdp-btn">Get code</button>
+          </div>
+          <div id="campDevPairResult" hidden>
+            <div class="cdp-code" id="campDevPairCode">----</div>
+            <ol class="cdp-steps">
+              <li>Open <strong>WhatsApp</strong> on this phone</li>
+              <li>Tap <strong>⋮ / Settings → Linked devices → Link a device</strong></li>
+              <li>Tap <strong>Link with phone number instead</strong> and type this code</li>
+            </ol>
+          </div>
+          <div id="campDevPairStatus" class="cdp-status" role="status" aria-live="polite"></div>
+        </div>
+      </div>
     </section>
     <script>
     (function () {
       const $ = (id) => document.getElementById(id);
-      let timer = null, lastState = '';
+      let timer = null, lastState = '', pairShown = false;
       async function call(action, body) {
         const r = await fetch('api/direct_sender.php?action=' + action, {
           method: 'POST', credentials: 'same-origin',
@@ -380,6 +399,16 @@
         connect.style.display = 'inline-flex';
         connect.disabled = false;
         connect.style.opacity = '1';
+        // Phone-number linking is offered whenever this WhatsApp is not linked.
+        const pairBox = $('campDevPairBox');
+        if (pairBox) pairBox.style.display = (d && d.is_connected) || st === 'offline' ? 'none' : 'block';
+        if (d && d.is_connected && pairShown) { pairShown = false; $('campDevPairResult').hidden = true; $('campDevPairStatus').textContent = ''; }
+        if (pairShown && d && !d.is_connected && !d.pairing_code && st !== 'starting') {
+          pairShown = false;
+          $('campDevPairResult').hidden = true;
+          $('campDevPairStatus').textContent = 'That code expired. Tap "Get code" for a new one.';
+          $('campDevPairStatus').className = 'cdp-status err';
+        }
         if (d && d.is_connected) {
           set('● CONNECTED', 'rgba(16,185,129,0.18)', darkTheme ? '#34d399' : '#067a4a');
           text.innerHTML = 'Linked to <strong style="color:var(--text-primary);font-family:monospace;">+' + (d.connected_number || '') + '</strong>. Your campaign messages and replies use this WhatsApp.';
@@ -436,6 +465,36 @@
             refresh();
           }
         });
+        // Link with phone number: WhatsApp gives a code to type into Linked devices >
+        // Link a device > Link with phone number instead. Empty number = the account's phone.
+        $('campDevPairToggle').addEventListener('click', () => {
+          const pane = $('campDevPairPane');
+          pane.hidden = !pane.hidden;
+          if (!pane.hidden) $('campDevPairPhone').focus();
+        });
+        const getCode = async () => {
+          const btn = $('campDevPairBtn'), status = $('campDevPairStatus');
+          const phone = ($('campDevPairPhone').value || '').replace(/\D/g, '');
+          if (phone && phone.length < 10) { status.textContent = 'Enter your full WhatsApp number, e.g. 03001234567.'; status.className = 'cdp-status err'; return; }
+          btn.disabled = true; btn.textContent = 'Getting code…';
+          status.textContent = 'Asking WhatsApp for your code…'; status.className = 'cdp-status';
+          try {
+            const r = await call('campaign_device_pair', { phone });
+            if (!r.success || !r.pairing_code) throw new Error(r.message || 'Could not get a code. Try again.');
+            $('campDevPairCode').textContent = r.pairing_code;
+            $('campDevPairResult').hidden = false;
+            pairShown = true;
+            status.textContent = 'Enter the code in WhatsApp within about 2 minutes. This card updates by itself once linked.';
+            status.className = 'cdp-status ok';
+            refresh();
+          } catch (err) {
+            status.textContent = err.message; status.className = 'cdp-status err';
+          } finally {
+            btn.disabled = false; btn.textContent = pairShown ? 'New code' : 'Get code';
+          }
+        };
+        $('campDevPairBtn').addEventListener('click', getCode);
+        $('campDevPairPhone').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); getCode(); } });
         refresh();
       });
     })();

@@ -64,7 +64,7 @@ if ($action === 'register_bridge') {
 
 // Regular WhatsApp via a linked device is the default. Cloud API remains opt-in.
 if ((getenv('WHATSAPP_SEND_MODE') ?: 'whatsapp_web') !== 'cloud_api' &&
-    in_array($action, ['get_sender_info', 'connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'get_send_status', 'get_events', 'get_media', 'get_presence', 'send_presence', 'sync_chat', 'start_campaign', 'pause_campaign', 'resume_campaign', 'stop_campaign', 'clear_campaign', 'get_campaign_status', 'campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'list_campaign_devices', 'login_qr_start', 'login_qr_status', 'login_qr_reset'], true)) {
+    in_array($action, ['get_sender_info', 'connect_whatsapp', 'reconnect_whatsapp', 'reset_whatsapp', 'send_direct', 'get_send_status', 'get_events', 'get_media', 'get_presence', 'send_presence', 'sync_chat', 'start_campaign', 'pause_campaign', 'resume_campaign', 'stop_campaign', 'clear_campaign', 'get_campaign_status', 'campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'campaign_device_pair', 'list_campaign_devices', 'login_qr_start', 'login_qr_status', 'login_qr_reset', 'login_qr_pair'], true)) {
     require_once __DIR__ . '/whatsapp_bridge.php';
     handleWhatsAppBridge($action, $input);
 }

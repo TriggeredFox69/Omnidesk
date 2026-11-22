@@ -252,6 +252,7 @@ function whatsappBridgeRequest(string $path, ?array $body = null): array {
     $timeout = match(true) {
         $path === '/send', $path === '/device/send' => 60,
         $path === '/device/adopt' => 20,
+        $path === '/device/pair' => 25,   // may wait for the session to be ready for a login
         str_starts_with($path, '/media') => 20,
         str_starts_with($path, '/campaign') => 15,
         default => 4
@@ -478,11 +479,11 @@ function handleWhatsAppBridge(string $action, array $input): void {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
-    if (in_array($action, ['campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'list_campaign_devices'], true)) {
+    if (in_array($action, ['campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'campaign_device_pair', 'list_campaign_devices'], true)) {
         handleCampaignDevice($action, $input);
     }
-    if (in_array($action, ['login_qr_start', 'login_qr_status', 'login_qr_reset'], true)) {
-        handleLoginQr($action);
+    if (in_array($action, ['login_qr_start', 'login_qr_status', 'login_qr_reset', 'login_qr_pair'], true)) {
+        handleLoginQr($action, $input);
     }
     // Everything below needs a real sign-in. (Visitors used to get an automatic
     // "System Administrator" here, which let anyone read every company's chats.)
@@ -803,6 +804,16 @@ function handleCampaignDevice(string $action, array $input): void {
         $result = whatsappBridgeRequest('/device/status?id=' . rawurlencode($targetId));
     } elseif ($action === 'campaign_device_connect') {
         $result = whatsappBridgeRequest('/device/connect', ['id' => $targetId, 'name' => (string) ($user['name'] ?? $targetId), 'force' => !empty($input['force'])]);
+    } elseif ($action === 'campaign_device_pair') {
+        // Link with a phone-number code instead of a QR (people with only one phone).
+        // Empty number = the account's own phone.
+        if (($wait = chatlyPairingThrottle()) > 0) {
+            http_response_code(429);
+            echo json_encode(['success' => false, 'message' => "Please wait {$wait} seconds before asking for another code."]);
+            exit;
+        }
+        $phone = trim((string) ($input['phone'] ?? '')) ?: (string) ((chatlyUsersById()[$targetId]['phone'] ?? '') ?: ($user['phone'] ?? ''));
+        $result = whatsappBridgeRequest('/device/pair', ['id' => $targetId, 'phone' => $phone, 'name' => (string) ($user['name'] ?? $targetId)]);
     } else {
         $result = whatsappBridgeRequest('/device/reset', ['id' => $targetId, 'name' => (string) ($user['name'] ?? $targetId), 'relink' => !empty($input['relink'])]);
     }
@@ -852,7 +863,25 @@ function findUserByWhatsApp(string $phone): ?array {
  * account, that session becomes the TM's linked WhatsApp (campaigns, chats). The
  * verified phone is stored in this PHP session so qr_login / tm_register can trust it.
  */
-function handleLoginQr(string $action): void {
+/**
+ * Phone-number linking codes make WhatsApp show a "link a device" notification on that
+ * number's phone, so they are rate-limited per browser session: 20 s apart, 6 per 10 min.
+ * Returns the seconds to wait (0 = allowed, and the request is counted).
+ */
+function chatlyPairingThrottle(bool $closeSession = true): int {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    $now = time();
+    $hist = array_values(array_filter((array) ($_SESSION['pairing_requests'] ?? []), fn($t) => $now - (int) $t < 600));
+    $wait = 0;
+    if ($hist && $now - (int) end($hist) < 20) $wait = 20 - ($now - (int) end($hist));
+    elseif (count($hist) >= 6) $wait = 600 - ($now - (int) $hist[0]);
+    if ($wait <= 0) { $hist[] = $now; $wait = 0; }
+    $_SESSION['pairing_requests'] = $hist;
+    if ($closeSession) session_write_close();
+    return $wait;
+}
+
+function handleLoginQr(string $action, array $input = []): void {
     if (!bridgePortOpen()) {
         ensureBridgeRunning(false);
         for ($i = 0; $i < 6; $i++) {
@@ -874,6 +903,32 @@ function handleLoginQr(string $action): void {
         whatsappBridgeRequest('/device/reset', ['id' => $loginId]);
         $loginId = '';
     }
+    if ($action === 'login_qr_pair') {
+        // "Link with phone number instead": same private login session as the QR, linked by
+        // typing a code into WhatsApp. Once linked, login_qr_status takes over as for a scan.
+        if (($wait = chatlyPairingThrottle(false)) > 0) {
+            session_write_close();
+            http_response_code(429);
+            echo json_encode(['success' => false, 'message' => "Please wait {$wait} seconds before asking for another code."]);
+            exit;
+        }
+        if (!$loginId) {
+            $loginId = 'login_' . bin2hex(random_bytes(8));
+            $_SESSION['qr_login_id'] = $loginId;
+            unset($_SESSION['qr_verified_phone'], $_SESSION['qr_verified_at'], $_SESSION['qr_pending_device']);
+        }
+        session_write_close();
+        $snap = whatsappBridgeRequest('/device/pair', ['id' => $loginId, 'phone' => (string) ($input['phone'] ?? ''), 'name' => 'Login']);
+        if (empty($snap['success']) || empty($snap['pairing_code'])) http_response_code(($snap['state'] ?? '') === 'offline' ? 503 : 400);
+        echo json_encode([
+            'success' => !empty($snap['success']) && !empty($snap['pairing_code']),
+            'pairing_code' => $snap['pairing_code'] ?? null,
+            'pairing_phone' => $snap['pairing_phone'] ?? null,
+            'state' => $snap['state'] ?? 'offline',
+            'message' => $snap['message'] ?? 'Could not get a code. Try again.',
+        ]);
+        exit;
+    }
     if ($action !== 'login_qr_status' || !$loginId) {
         if (!$loginId) {
             $loginId = 'login_' . bin2hex(random_bytes(8));
@@ -894,6 +949,7 @@ function handleLoginQr(string $action): void {
         'mode' => 'whatsapp_web',
         'state' => $snap['state'] ?? 'offline',
         'qr' => $snap['qr'] ?? null,
+        'pairing_code' => $snap['pairing_code'] ?? null,   // lets the page see when a code expired
         'is_connected' => false,
         'connected_number' => '',
         'message' => $snap['message'] ?? '',

@@ -1057,6 +1057,23 @@ class BaileysClient extends EventEmitter {
     return null;
   }
 
+  // "Link with phone number instead": an 8-character code the person types into WhatsApp >
+  // Linked devices > Link a device > Link with phone number instead. Lets someone with only
+  // one phone link it (no second screen to scan a QR from). Only valid while this socket is
+  // waiting for a login, i.e. after it has produced a QR; the code dies with that socket.
+  async requestPairingCode(phone) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (!this.sock || typeof this.sock.requestPairingCode !== 'function') {
+      throw Object.assign(new Error('WhatsApp is not ready to link yet. Try again in a moment.'), { status: 409 });
+    }
+    if (this._auth?.state?.creds?.me?.id) {
+      throw Object.assign(new Error('This WhatsApp is already linked.'), { status: 409 });
+    }
+    const code = await this.sock.requestPairingCode(digits);
+    if (!code) throw Object.assign(new Error('WhatsApp did not return a code. Try again.'), { status: 502 });
+    return String(code).toUpperCase();
+  }
+
   // WhatsApp only forwards a contact's typing / recording state to (and shows ours from) a
   // session that is "available". Linked phones connect with markOnlineOnConnect:false so the
   // phone keeps its notifications; while someone is working a chat in Chatly the session

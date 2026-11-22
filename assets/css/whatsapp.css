@@ -5474,6 +5474,26 @@ body:not(.theme-dark) #viewCampaign .log-error { color: #b91c1c; }
 body[data-company="COMP-004"] .chat-header-actions,
 body[data-company="COMP-004"] #chatLeadStatusBadge { display: none !important; }
 
+/* "My WhatsApp for Campaigns": link with phone number instead of a QR */
+.cdp-box { margin-top: 12px; }
+.cdp-toggle { width: 100%; padding: 10px 12px; border-radius: 12px; cursor: pointer; font-size: 12.5px; font-weight: 600; text-align: center;
+  color: var(--text-secondary); background: transparent; border: 1px dashed var(--accent-wa-border); }
+.cdp-toggle strong { color: var(--accent-wa); }
+.cdp-toggle:hover { background: var(--glass-surface-hover); }
+.cdp-pane { margin-top: 10px; }
+.cdp-pane[hidden], #campDevPairResult[hidden] { display: none !important; }
+.cdp-row { display: flex; gap: 8px; }
+.cdp-input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 11px; font-size: 14px; color: var(--text-primary);
+  background: var(--glass-surface-elevated); border: 1px solid var(--glass-border); outline: none; }
+.cdp-input:focus { border-color: var(--accent-wa); }
+.cdp-btn { flex-shrink: 0; padding: 0 16px; border: 0; border-radius: 11px; cursor: pointer; font-size: 13px; font-weight: 800; color: var(--on-accent); background: var(--accent-wa); }
+.cdp-btn:disabled { opacity: 0.6; cursor: wait; }
+.cdp-code { margin: 12px 0 6px; font-family: var(--font-mono); font-size: 28px; font-weight: 800; letter-spacing: 0.12em; text-align: center; color: var(--text-primary); }
+.cdp-steps { margin: 0; padding-left: 20px; font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); }
+.cdp-status { min-height: 16px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+.cdp-status.ok { color: var(--accent-wa); }
+.cdp-status.err { color: var(--status-fresh-text); }
+
 /* Daily quota pill: its inline colour is meant for the dark header */
 body:not(.theme-dark) .header-quota-pill { color: #067a4a !important; background: rgba(15, 169, 104, 0.1) !important; border-color: rgba(15, 169, 104, 0.3) !important; }
 

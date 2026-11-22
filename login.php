@@ -986,6 +986,31 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
       background-size: 200% auto; -webkit-background-clip: text; background-clip: text; }
     @keyframes lpShine { to { background-position: 200% center; } }
 
+    /* Link with phone number (pairing code) */
+    .pair-switch-btn { display: block; width: 100%; margin-top: 12px; padding: 11px 12px; border-radius: 12px; cursor: pointer; text-align: center;
+      font-size: 12.5px; font-weight: 600; line-height: 1.4; color: var(--wa-text-secondary); background: transparent; border: 1px dashed rgba(31, 224, 138, 0.45); }
+    .pair-switch-btn strong { color: var(--wa-accent); }
+    .pair-switch-btn:hover { background: rgba(31, 224, 138, 0.08); }
+    .pair-switch-btn[hidden], .pair-pane[hidden], .pair-code-box[hidden] { display: none !important; }
+    .pair-pane { margin-top: 10px; padding: 14px; border-radius: 14px; background: rgba(31, 224, 138, 0.06); border: 1px solid rgba(31, 224, 138, 0.25); text-align: left; }
+    .pair-label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--wa-text-primary); }
+    .pair-row { display: flex; gap: 8px; }
+    .pair-input { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 11px; font-size: 15px; font-weight: 600; letter-spacing: 0.02em;
+      color: var(--wa-text-primary); background: var(--wa-card-bg, #fff); border: 1px solid rgba(31, 224, 138, 0.35); outline: none; }
+    .pair-input:focus { border-color: var(--wa-accent); box-shadow: 0 0 0 3px rgba(31, 224, 138, 0.18); }
+    .pair-get-btn { flex-shrink: 0; padding: 0 16px; border: 0; border-radius: 11px; cursor: pointer; font-size: 13.5px; font-weight: 800; color: #03130c;
+      background: linear-gradient(135deg, #4cecab, #1fe08a 50%, #0fa968); }
+    .pair-get-btn:disabled { opacity: 0.6; cursor: wait; }
+    .pair-code-box { margin-top: 14px; padding: 14px; border-radius: 12px; text-align: center; background: var(--wa-card-bg, #fff); border: 1px solid rgba(31, 224, 138, 0.3); }
+    .pair-code-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--wa-text-muted); }
+    .pair-code { margin: 6px 0 10px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 30px; font-weight: 800; letter-spacing: 0.12em; color: var(--wa-text-primary); }
+    .pair-copy-btn { padding: 7px 14px; border-radius: 999px; cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--wa-accent); background: rgba(31, 224, 138, 0.1); border: 1px solid rgba(31, 224, 138, 0.35); }
+    .pair-steps { margin: 12px 0 0; padding-left: 20px; text-align: left; font-size: 12.5px; line-height: 1.6; color: var(--wa-text-secondary); }
+    .pair-status { min-height: 18px; margin-top: 10px; font-size: 12px; line-height: 1.45; color: var(--wa-text-secondary); }
+    .pair-status.ok { color: var(--wa-accent); }
+    .pair-status.err { color: #ef4444; }
+    .pair-back-btn { margin-top: 8px; padding: 0; border: 0; background: none; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--wa-accent); }
+
     /* Reveal on scroll (only when the script has switched it on, so nothing hides without JS) */
     html.lp-anim .lp-reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
     html.lp-anim .lp-reveal.is-in { opacity: 1; transform: none; }
@@ -1209,6 +1234,31 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
           <span style="font-size:12px;">Keep me signed in</span>
         </label>
         <a href="javascript:void(0)" onclick="refreshQRCode(false)" class="footer-link" style="font-size:11.5px;">🔄 Refresh</a>
+      </div>
+
+      <!-- Link with phone number (people with only one phone cannot scan a QR on that same phone) -->
+      <button type="button" class="pair-switch-btn" id="pairOpenBtn" onclick="togglePairPane(true)">
+        📱 Only have this phone? <strong>Link with phone number instead</strong>
+      </button>
+      <div class="pair-pane" id="pairPane" hidden>
+        <label class="pair-label" for="pairPhoneInput">Your WhatsApp number</label>
+        <div class="pair-row">
+          <input type="tel" id="pairPhoneInput" class="pair-input" inputmode="tel" autocomplete="tel" placeholder="03001234567" maxlength="20" onkeydown="if (event.key === 'Enter') { event.preventDefault(); requestPairingCode(); }">
+          <button type="button" class="pair-get-btn" id="pairGetBtn" onclick="requestPairingCode()">Get code</button>
+        </div>
+        <div class="pair-code-box" id="pairCodeBox" hidden>
+          <span class="pair-code-label">Your linking code</span>
+          <div class="pair-code" id="pairCodeText" aria-live="polite">----</div>
+          <button type="button" class="pair-copy-btn" id="pairCopyBtn" onclick="copyPairingCode()">Copy code</button>
+          <ol class="pair-steps">
+            <li>Open <strong>WhatsApp</strong> on this phone</li>
+            <li>Tap <strong>⋮ / Settings → Linked devices → Link a device</strong></li>
+            <li>Tap <strong>Link with phone number instead</strong></li>
+            <li>Type this code. Chatly opens by itself once it is linked.</li>
+          </ol>
+        </div>
+        <div class="pair-status" id="pairStatus" role="status" aria-live="polite"></div>
+        <button type="button" class="pair-back-btn" onclick="togglePairPane(false)">← Scan a QR code instead</button>
       </div>
 
       <!-- Connected WhatsApp Closer Card -->
@@ -1465,6 +1515,8 @@ function switchPasswordRole(role) {
 
 function focusHeroQR() {
   toggleHeroLoginMode('qr');
+  // On a phone the big QR is useless (it cannot scan its own screen): go to phone-number linking.
+  if (window.matchMedia && matchMedia('(max-width: 768px)').matches && typeof openPairOnCard === 'function') { openPairOnCard(); return; }
   if (typeof openQrFocus === 'function') openQrFocus();
   else window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1598,8 +1650,11 @@ async function refreshQRCode(force = false) {
     const data = await res.json();
     if (data.is_connected && data.connected_number) {
       lastKnownState = 'connected';
+      if (pairCodeShown) { pairCodeShown = false; togglePairPane(false); }
       showConnectedCloserBox(data.connected_number);
     } else if (data.qr) {
+      // A shown linking code dies with its session (about 2-3 minutes): say so.
+      if (pairCodeShown && !data.pairing_code) markPairingExpired();
       if (qrImg) { qrImg.src = data.qr; qrImg.style.display = 'block'; }
       if (box) box.style.display = 'none';
       if (scanLine) scanLine.style.display = 'block';
@@ -1802,6 +1857,90 @@ async function disconnectWhatsAppBridge() {
 async function handleConnectedPhone(phone) {
   await showConnectedCloserBox(phone);
 }
+
+// ── Link with phone number instead of a QR ──
+// WhatsApp gives an 8-character code that the person types into WhatsApp > Linked devices >
+// Link a device > Link with phone number instead. Needs only the one phone. Once linked,
+// the status poll above sees the connection exactly as after a QR scan.
+let pairCodeShown = false;
+const isPhoneScreen = () => window.matchMedia && matchMedia('(max-width: 768px)').matches;
+
+function togglePairPane(open) {
+  const pane = document.getElementById('pairPane');
+  const openBtn = document.getElementById('pairOpenBtn');
+  const frame = document.querySelector('#heroQrView .wa-qr-frame');
+  const title = document.querySelector('#heroQrView .hero-qr-title');
+  if (!pane) return;
+  pane.hidden = !open;
+  if (openBtn) openBtn.hidden = open;
+  if (frame) frame.style.display = open ? 'none' : '';
+  if (title) title.textContent = open ? 'Link with phone number' : 'Scan QR with WhatsApp';
+  const qrStatus = document.getElementById('qrStatusText');   // "Preparing your QR code…" means nothing here
+  if (qrStatus) qrStatus.style.display = open ? 'none' : 'block';
+  if (open && !pairCodeShown) setTimeout(() => document.getElementById('pairPhoneInput')?.focus({ preventScroll: true }), 50);
+}
+
+function openPairOnCard() {
+  toggleHeroLoginMode('qr');
+  togglePairPane(true);
+  document.getElementById('heroLoginCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function requestPairingCode() {
+  const input = document.getElementById('pairPhoneInput');
+  const btn = document.getElementById('pairGetBtn');
+  const status = document.getElementById('pairStatus');
+  const digits = String(input?.value || '').replace(/\D/g, '');
+  if (digits.length < 10) {
+    if (status) { status.textContent = 'Enter your full WhatsApp number, e.g. 03001234567.'; status.className = 'pair-status err'; }
+    input?.focus();
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Getting code…'; }
+  if (status) { status.textContent = 'Asking WhatsApp for your code…'; status.className = 'pair-status'; }
+  try {
+    const res = await fetch('api/direct_sender.php?action=login_qr_pair', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login_qr_pair', phone: digits })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!data.success || !data.pairing_code) throw new Error(data.message || 'Could not get a code. Try again.');
+    document.getElementById('pairCodeText').textContent = data.pairing_code;
+    document.getElementById('pairCodeBox').hidden = false;
+    pairCodeShown = true;
+    if (status) { status.textContent = 'Waiting for you to enter the code in WhatsApp… the code works for about 2 minutes.'; status.className = 'pair-status ok'; }
+  } catch (err) {
+    if (status) { status.textContent = err.message; status.className = 'pair-status err'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = pairCodeShown ? 'New code' : 'Get code'; }
+  }
+}
+
+function markPairingExpired() {
+  pairCodeShown = false;
+  const box = document.getElementById('pairCodeBox');
+  if (box) box.hidden = true;
+  const status = document.getElementById('pairStatus');
+  if (status) { status.textContent = 'That code expired. Tap "Get code" for a new one.'; status.className = 'pair-status err'; }
+  const btn = document.getElementById('pairGetBtn');
+  if (btn) btn.textContent = 'Get code';
+}
+
+function copyPairingCode() {
+  const code = (document.getElementById('pairCodeText')?.textContent || '').replace(/[^A-Z0-9]/gi, '');
+  const btn = document.getElementById('pairCopyBtn');
+  const done = () => { if (btn) { btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = 'Copy code'; }, 1800); } };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(code).then(done).catch(() => {});
+  else {
+    const t = document.createElement('textarea'); t.value = code; document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); done(); } catch (_) {}
+    t.remove();
+  }
+}
+
+// On a phone, a QR on the same screen cannot be scanned: start with the phone-number option.
+if (isPhoneScreen()) togglePairPane(true);
 
 // Polling interval
 qrPollTimer = setInterval(refreshQRCode, 3500);
@@ -2729,6 +2868,7 @@ function toggleTheme() {
         <li><b>3</b> Tap <strong>&nbsp;Link a device</strong> and point at this code</li>
       </ol>
       <div class="qf-status" id="qrFocusStatus">Getting a fresh code…</div>
+      <button type="button" class="qf-alt" style="display:block;margin-bottom:10px;" onclick="closeQrFocus(); openPairOnCard();">Only have one phone? Link with phone number instead →</button>
       <button type="button" class="qf-alt" onclick="closeQrFocus(); toggleHeroLoginMode('password');">Have an account? Sign in with username &amp; password →</button>
     </div>
   </div>

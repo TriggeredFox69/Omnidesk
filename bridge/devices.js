@@ -43,13 +43,39 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
     } catch (_) {}
   }
 
+  const PAIRING_TTL_MS = 3 * 60 * 1000;
   function snapshot(d) {
     if (!d) return { success: true, state: 'disconnected', is_connected: false, connected_number: '', qr: null };
+    const pairing = d.pairing && d.phase === 'qr' && Date.now() - d.pairing.at < PAIRING_TTL_MS ? d.pairing : null;
     return {
       success: true, user_id: d.id, name: d.name, state: d.phase, is_connected: d.phase === 'ready',
       connected_number: d.number, qr: d.phase === 'qr' ? d.qr : null, message: d.error || '',
       linked_at: d.linkedAt || null, sent: d.sent || 0, claimed: !d.id.startsWith(LOGIN_PREFIX),
+      pairing_code: pairing ? pairing.code : null, pairing_phone: pairing ? pairing.phone : null,
     };
+  }
+
+  // Link a device with a phone-number code instead of a QR. Starts the device if needed,
+  // waits until it is ready for a login (it has produced a QR), then asks WhatsApp for a code.
+  async function pairWithPhone(id, phone, name) {
+    id = safeId(id);
+    const digits = normalizePhone(phone);
+    if (!/^\d{10,15}$/.test(digits)) {
+      throw Object.assign(new Error('Enter your WhatsApp number with country code, e.g. 923001234567 or 03001234567.'), { status: 400 });
+    }
+    let d = devices.get(id);
+    if (d && d.phase === 'ready') throw Object.assign(new Error('This WhatsApp is already linked.'), { status: 409 });
+    if (!d || !['qr', 'starting'].includes(d.phase) || !d.client) { connect(id, name, true); d = devices.get(id); }
+    for (let i = 0; i < 40 && d.phase !== 'qr'; i++) {
+      if (['error', 'disconnected', 'ready'].includes(d.phase)) break;
+      await new Promise(r => setTimeout(r, 400));
+    }
+    if (d.phase !== 'qr' || !d.client || typeof d.client.requestPairingCode !== 'function') {
+      throw Object.assign(new Error(d.error || 'WhatsApp is still starting. Try again in a few seconds.'), { status: 409 });
+    }
+    const code = await d.client.requestPairingCode(digits);
+    d.pairing = { code: code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code, phone: digits, at: Date.now() };
+    return snapshot(d);
   }
 
   function get(id) { return devices.get(safeId(id)) || null; }
@@ -71,7 +97,7 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
   }
 
   function start(d) {
-    d.phase = 'starting'; d.qr = null; d.error = '';
+    d.phase = 'starting'; d.qr = null; d.error = ''; d.pairing = null;
     const dir = path.join(root, d.dir);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     d.starting = (async () => {
@@ -250,7 +276,7 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
   // The live client of one TM's linked WhatsApp (for presence), or null if it is not connected.
   const clientOf = id => { const d = get(id); return d && d.phase === 'ready' && d.client ? d.client : null; };
 
-  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll, clients, clientOf };
+  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll, clients, clientOf, pairWithPhone };
 }
 
 module.exports = { createDevicePool, normalizePhone, samePhone };
