@@ -185,11 +185,20 @@ function getUsers($usersFile) {
         saveUsers($usersFile, $users);
     }
 
-    // Ensure Super Admin account exists
+    // Ensure the "sadmin" Super Admin login exists and is usable (sadmin / sadmin123).
+    // TEMPORARY by owner's request: to be replaced with strong credentials + Google
+    // Authenticator. (It used to be skipped whenever any other super admin existed, so
+    // "sadmin" could not log in.)
     $hasSadmin = false;
-    foreach ($users as $u) {
-        if (($u['username'] ?? '') === 'sadmin' || ($u['role'] ?? '') === 'superadmin') {
+    foreach ($users as $i => $u) {
+        if (strtolower($u['username'] ?? '') === 'sadmin') {
             $hasSadmin = true;
+            if (($u['role'] ?? '') !== 'superadmin' || ($u['status'] ?? 'active') !== 'active') {
+                $users[$i]['role'] = 'superadmin';
+                $users[$i]['status'] = 'active';
+                $users[$i]['company_id'] = 'GLOBAL';
+                saveUsers($usersFile, $users);
+            }
             break;
         }
     }
