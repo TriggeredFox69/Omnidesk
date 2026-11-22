@@ -845,11 +845,17 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       assignMode: state.assignMode,
       startedAt: state.startedAt, updatedAt: state.updatedAt,
       logs: state.logs.slice(-60),
-      audience: state.audience.map(c => ({
-        id: c.id, phone: c.phone, display: c.display, name: c.name, city: c.city, network: c.network,
-        status: c.status, laneId: c.laneId, senderId: c.senderId, senderName: c.senderName || c.assignedOwnerName,
-        senderRole: c.senderRole, senderPhone: c.senderPhone, cycle: c.cycle, sentAt: c.sentAt, error: c.error
-      }))
+      audience: state.audience.length > 60
+        ? state.audience.filter(c => c.status === 'sending' || c.status === 'failed').slice(0, 60).map(c => ({
+            id: c.id, phone: c.phone, display: c.display, name: c.name, city: c.city, network: c.network,
+            status: c.status, laneId: c.laneId, senderId: c.senderId, senderName: c.senderName || c.assignedOwnerName,
+            senderRole: c.senderRole, senderPhone: c.senderPhone, cycle: c.cycle, sentAt: c.sentAt, error: c.error
+          }))
+        : state.audience.map(c => ({
+            id: c.id, phone: c.phone, display: c.display, name: c.name, city: c.city, network: c.network,
+            status: c.status, laneId: c.laneId, senderId: c.senderId, senderName: c.senderName || c.assignedOwnerName,
+            senderRole: c.senderRole, senderPhone: c.senderPhone, cycle: c.cycle, sentAt: c.sentAt, error: c.error
+          }))
     };
   }
 

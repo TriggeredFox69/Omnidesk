@@ -12,6 +12,7 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
   const statusRank = { accepted: 0, sent: 1, delivered: 2, read: 3, failed: -1 };
   let revision = 0, saveTimer;
   const epoch = require('node:crypto').randomUUID();
+  const inboxStartTime = Math.floor(Date.now() / 1000);
   if (storageFile && fs.existsSync(storageFile)) {
     try { for (const item of JSON.parse(fs.readFileSync(storageFile, 'utf8'))) messages.set(item.waMessageId, { ...item, revision: ++revision }); } catch (_) {}
   }
@@ -87,6 +88,9 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     const phone = opts.phone || resolvedRemotePhone || knownPhone || await phoneFor(fromMe ? message.to : message.from);
     const debug = why => { if (process.env.WHATSAPP_BRIDGE_DEBUG) console.log(`[Inbox:debug] ${id} phone=${phone || '?'} ${why}`); };
     if (!phone || !/^\d{10,18}$/.test(phone)) { debug('dropped: no phone number for this chat'); return; }
+    // Never backfill or import old WhatsApp chats sent before session initialization
+    const msgTs = Number(message.timestamp || 0);
+    if (msgTs > 0 && msgTs < (inboxStartTime - 30)) { debug('dropped: historical message prior to connection'); return; }
     // Keep the inbox limited to Chatly lead conversations. Inbound personal
     // chats from a linked phone are ignored unless Chatly already knows the lead.
     // A reply is kept only if it is a lead of the company that owns this WhatsApp;

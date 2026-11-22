@@ -3364,8 +3364,12 @@ document.addEventListener('DOMContentLoaded', () => {
       campaignState.audience = data.audience;
       renderCampaignAudienceUI();
     } else if (data.audience && data.audience.length > 0 && !campaignState.audienceCleared) {
+      const localMap = new Map();
+      for (let i = 0; i < campaignState.audience.length; i++) {
+        localMap.set(campaignState.audience[i].phone, campaignState.audience[i]);
+      }
       for (const sa of data.audience) {
-        const local = campaignState.audience.find(c => c.phone === sa.phone);
+        const local = localMap.get(sa.phone);
         if (local) {
           local.status = sa.status;
           local.sentAt = sa.sentAt;

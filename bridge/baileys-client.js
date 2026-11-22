@@ -79,6 +79,7 @@ class BaileysClient extends EventEmitter {
     this._numberCache = new Map();
     this._sentTo = new Map();   // message id -> chat it was sent to (answers resend requests)
     this._rawStoreLoaded = false;
+    this._connectedAt = Math.floor(Date.now() / 1000);
     this._loadLidMap();
   }
 
@@ -433,6 +434,7 @@ class BaileysClient extends EventEmitter {
         }
       } else if (connection === 'open') {
         this._reconnectAttempts = 0;
+        this._connectedAt = Math.floor(Date.now() / 1000);
         if (this._reconnectTimer) {
           clearTimeout(this._reconnectTimer);
           this._reconnectTimer = null;
@@ -630,6 +632,11 @@ class BaileysClient extends EventEmitter {
     };
     const emitMessages = async messages => {
       for (const msg of messages || []) {
+        // Chatly strictly ignores historical messages sent before WhatsApp connected
+        const msgTs = Number(msg?.messageTimestamp || 0);
+        if (this._connectedAt && msgTs > 0 && msgTs < (this._connectedAt - 15)) {
+          continue;
+        }
         const remote = msg?.key?.remoteJid || '';
         if (remote.endsWith('@lid') && !msg.key.remoteJidAlt && !msg.key.senderPn) {
           const lidClean = remote.split('@')[0].split(':')[0];
