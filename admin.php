@@ -1404,7 +1404,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   </div>
 </div>
 
-<script src="assets/js/wa-widget.js?v=1"></script>
+<script src="assets/js/wa-widget.js?v=15.7"></script>
 <script>
 function escapeHtml(text) {
   if (text === null || text === undefined) return '';

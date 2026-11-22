@@ -103,3 +103,57 @@ test('daily sent counts start again on a new Pakistan day; stop hands back unsen
   assert.equal(tm.messages_sent_today, sends);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('a number WhatsApp refuses twice stops for 24 h; its numbers are not pushed onto teammates', async t => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
+  fs.writeFileSync(path.join(tmpDir, 'leads.json'), '[]');
+  fs.writeFileSync(path.join(tmpDir, 'users.json'), '[]');
+  // TM-1 gets numbers 0, 2, 4 and TM-2 gets 1, 3, 5. TM-1's second send is refused outright.
+  const sentTo = [];
+  const mgr = createCampaignManager({
+    send: async p => {
+      if (p.phone === '923002222222') throw new Error('WhatsApp server error 463');
+      sentTo.push(p.phone);
+      return { success: true, message_id: 'R' + p.phone.slice(-1) };
+    },
+    dataDir: tmpDir, getLeadsPath: () => path.join(tmpDir, 'leads.json'), getUsersPath: () => path.join(tmpDir, 'users.json'),
+    mainStatus: () => ({ ready: true })
+  });
+  t.after(() => { mgr.stop(); fs.rmSync(tmpDir, { recursive: true, force: true }); });
+  mgr.start({ message: 'Hi', audience: Array.from({ length: 6 }, (_, i) => ({ phone: '92300222222' + i })), minDelay: 6, maxDelay: 6,
+    senders: [{ id: 'TM-1', name: 'One', phone: '923000000001', roleType: 'member' }, { id: 'TM-2', name: 'Two', phone: '923000000002', roleType: 'member' }] });
+  await new Promise(r => setTimeout(r, 900));          // first send of each lane
+  mgr.noteAck('R0', -1);                               // WhatsApp refuses TM-1's first message
+  mgr.noteAck('R0', -1);                               // the same receipt twice counts once
+  let lane = mgr.getStatus().lanes.find(l => l.id === 'TM-1');
+  assert.ok(!lane.pausedUntil, 'one refusal is not enough');
+  assert.equal(mgr.getStatus().totalFailed, 1, 'the refused message counts as failed');
+  await new Promise(r => setTimeout(r, 7000));         // TM-1's next send (6 s later) is refused too
+  lane = mgr.getStatus().lanes.find(l => l.id === 'TM-1');
+  assert.equal(lane.pauseReason, 'restricted');
+  assert.ok(lane.pausedUntil - Date.now() > 23 * 3600e3, 'paused for 24 hours');
+  const tm2 = mgr.getStatus().lanes.find(l => l.id === 'TM-2');
+  assert.equal(tm2.assigned, 3, "TM-1's numbers were not moved onto TM-2");
+  assert.ok(!sentTo.includes('923002222224'), 'nothing more sent from the paused number');
+});
+
+test('a closer at their daily limit is paused until 12 AM instead of sending', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
+  fs.writeFileSync(path.join(tmpDir, 'leads.json'), '[]');
+  const pkToday = new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 10);
+  fs.writeFileSync(path.join(tmpDir, 'users.json'), JSON.stringify([{ id: 'TM-1', message_limit: 20, messages_sent_today: 20, quota_reset_date: pkToday }]));
+  let sends = 0;
+  const mgr = createCampaignManager({
+    send: async () => ({ success: true, message_id: 'D' + (++sends) }),
+    dataDir: tmpDir, getLeadsPath: () => path.join(tmpDir, 'leads.json'), getUsersPath: () => path.join(tmpDir, 'users.json'),
+    mainStatus: () => ({ ready: true })
+  });
+  mgr.start({ message: 'Hi', audience: [{ phone: '923003333331' }], minDelay: 6, maxDelay: 9, senders: [{ id: 'TM-1', name: 'One', phone: '923000000001', roleType: 'member' }] });
+  await new Promise(r => setTimeout(r, 500));
+  assert.equal(sends, 0, 'nothing sent over the limit');
+  const lane = mgr.getStatus().lanes[0];
+  assert.equal(lane.pauseReason, 'daily_limit');
+  assert.ok(lane.pausedUntil > Date.now());
+  mgr.stop();
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});

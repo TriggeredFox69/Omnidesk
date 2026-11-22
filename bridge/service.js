@@ -55,7 +55,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         await inbox.ingest(message, phone, { phone, agentName: device.name, viaUserId: device.id, viaNumber: device.number, fromChatly: Boolean(knownPhone) });
       })().catch(err => console.error('Device inbox:', err.message));
     },
-    onAck: (_device, _devClient, message, ack) => inbox.ack(message, ack)
+    onAck: (_device, _devClient, message, ack) => { inbox.ack(message, ack); campaignAck(message, ack); }
   });
   devicePoolRef = devicePool;
 
@@ -96,6 +96,12 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
     return campaignManagers.get(id);
   }
   const campaignManager = campaignFor('COMP-001');
+  // "WhatsApp refused this message" receipts let a campaign pause a number WhatsApp is limiting.
+  function campaignAck(message, ack) {
+    if (Number(ack) !== -1) return;
+    const id = message && message.id && message.id._serialized;
+    for (const mgr of campaignManagers.values()) { try { mgr.noteAck(id, ack); } catch (_) {} }
+  }
   // Bring back other companies' campaigns after a restart (they come back paused).
   try {
     for (const f of require('node:fs').readdirSync(bridgeDataDir)) {
@@ -172,6 +178,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       client.on('message_ack', (message, ack) => {
         if (message.id?.fromMe) remember(receipts, message.id._serialized, { status: ackStatus(ack), error: ack < 0 ? 'WhatsApp reported delivery failure.' : null });
         inbox.ack(message, ack);
+        campaignAck(message, ack);
       });
       client.on('message_create', message => { inbox.ingest(message).catch(err => console.error('Inbox message:', err.message)); });
       await client.initialize();

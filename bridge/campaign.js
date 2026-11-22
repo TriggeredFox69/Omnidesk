@@ -706,6 +706,77 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     return true;
   }
 
+  // ── Protecting the team's numbers ──────────────────────────────────────────────
+  // 1. WhatsApp refusing a number's messages means it is limiting (restricting) that number.
+  //    After REFUSALS_TO_PAUSE refusals within an hour the number stops sending for 24 hours.
+  //    Sending on regardless is how a 24-hour restriction becomes a permanent ban. Its unsent
+  //    numbers wait; they are NOT moved to other closers (that pushes the same volume onto
+  //    them and gets them limited too).
+  // 2. Each closer's daily message limit (admin panel; resets 12:00 AM PKT) applies to
+  //    campaigns too, not only to messages typed in the Sales Desk.
+  const REFUSALS_TO_PAUSE = 2;
+  const REFUSAL_WINDOW_MS = 3600 * 1000;
+  const RESTRICT_PAUSE_MS = 24 * 3600 * 1000;
+  const sentBy = new Map();   // WhatsApp message id -> { laneId, contact } (recent campaign sends)
+  const nextPakistanMidnight = (now = Date.now()) => (Math.floor((now + 5 * 3600e3) / 86400e3) + 1) * 86400e3 - 5 * 3600e3;
+  let laneUsers = { at: 0, byId: new Map() };
+  function laneUser(id) {
+    if (Date.now() - laneUsers.at > 10000) {
+      const byId = new Map();
+      try {
+        const usersFile = typeof getUsersPath === 'function' ? getUsersPath() : path.join(dataDir, '../users.json');
+        for (const u of JSON.parse(fs.readFileSync(usersFile, 'utf8') || '[]')) if (u && u.id) byId.set(String(u.id), u);
+      } catch (_) {}
+      laneUsers = { at: Date.now(), byId };
+    }
+    return laneUsers.byId.get(String(id)) || null;
+  }
+  function dailyLimitReached(laneId) {
+    const u = laneUser(laneId);
+    const limit = Number(u && u.message_limit);
+    if (!u || !(limit > 0)) return false;   // -1 / missing = unlimited
+    const today = u.quota_reset_date === pakistanDay() ? (Number(u.messages_sent_today) || 0) : 0;
+    return today + (pendingUserCounts.get(laneId) || 0) >= limit;
+  }
+  function pauseLane(lane, reason, until, message) {
+    lane.pausedUntil = until;
+    lane.pauseReason = reason;
+    lane.status = 'limited';
+    lane.nextAt = null;
+    if (laneTimers.has(lane.id)) { clearTimeout(laneTimers.get(lane.id)); laneTimers.delete(lane.id); }
+    log(message, 'warn');
+    saveState();
+  }
+  function recordRefusal(lane) {
+    const now = Date.now();
+    lane.refusals = (lane.refusals || []).filter(t => now - t < REFUSAL_WINDOW_MS);
+    lane.refusals.push(now);
+    if (lane.refusals.length >= REFUSALS_TO_PAUSE && !(lane.pausedUntil > now)) {
+      pauseLane(lane, 'restricted', now + RESTRICT_PAUSE_MS,
+        `🛑 WhatsApp refused ${lane.refusals.length} messages from ${lane.name} (${lane.display}): it is limiting this number. ` +
+        `Chatly stopped sending from it for 24 hours to protect it from a ban. Its remaining numbers wait.`);
+      if (state.status === 'running') scheduleLane(lane, 10 * 60 * 1000);
+    }
+  }
+  // Delivery receipts from the bridge: -1 = WhatsApp refused the message.
+  function noteAck(messageId, ack) {
+    if (Number(ack) !== -1 || !messageId) return;
+    const hit = sentBy.get(messageId);
+    if (!hit) return;
+    sentBy.delete(messageId);
+    const lane = laneOf(hit.laneId);
+    const c = hit.contact;
+    if (c && c.status !== 'failed') {
+      c.status = 'failed';
+      c.error = 'Refused by WhatsApp';
+      state.totalSent = Math.max(0, state.totalSent - 1);
+      state.totalFailed++;
+      if (lane) { lane.sent = Math.max(0, (lane.sent || 0) - 1); lane.failed = (lane.failed || 0) + 1; }
+    }
+    if (lane) recordRefusal(lane);
+    saveState();
+  }
+
   function checkFinish() {
     if (state.status !== 'running') return;
     if (state.audience.length && doneCount >= state.audience.length) {
@@ -719,6 +790,24 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     if (!lane || state.status !== 'running' || laneBusy.has(laneId)) return;
     const contact = nextPendingFor(laneId);
     if (!contact) { lane.status = 'done'; saveState(); checkFinish(); return; }
+
+    // Paused to protect the number (WhatsApp limiting it, or its daily limit): wait it out.
+    const nowMs = Date.now();
+    if (lane.pausedUntil && nowMs < lane.pausedUntil) {
+      lane.status = 'limited';
+      scheduleLane(lane, Math.min(lane.pausedUntil - nowMs, 10 * 60 * 1000));
+      return;
+    }
+    if (lane.pausedUntil) {
+      log(`▶️ ${lane.name}'s pause is over. Sending from their number again.`, 'info');
+      lane.pausedUntil = null; lane.pauseReason = null; lane.refusals = [];
+    }
+    if (dailyLimitReached(lane.id)) {
+      pauseLane(lane, 'daily_limit', nextPakistanMidnight(nowMs),
+        `⏸️ ${lane.name} reached their daily message limit. Their remaining numbers continue after 12:00 AM.`);
+      scheduleLane(lane, Math.min(lane.pausedUntil - nowMs, 10 * 60 * 1000));
+      return;
+    }
 
     if (!deviceOnline(lane)) {
       if (lane.status !== 'offline') {
@@ -761,6 +850,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       lane.sent++;
       lane.lastSentAt = contact.sentAt;
       incrementUserMessageCount(lane.id);
+      sentBy.set(contact.messageId, { laneId: lane.id, contact });   // a later "refused" receipt pauses the number
+      if (sentBy.size > 5000) sentBy.delete(sentBy.keys().next().value);
       updateCrmLead(contact, {
         id: `msg_c_${Date.now()}`, waMessageId: contact.messageId, timestamp: Math.floor(Date.now() / 1000), deliveryStatus: 'accepted', sender: 'agent',
         agentName: lane.name, senderPhone: lane.phone, senderRole: lane.role, text: personalizedMsg, time: contact.sentAt
@@ -799,6 +890,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
         lane.failed++;
         log(`❌ ${lane.name} ➔ ${contact.display || contact.phone}: ${err.message}`, 'error');
         // No CRM message for a send that never happened.
+        // A number that is not on WhatsApp says nothing about this closer's number; any other
+        // refusal may mean WhatsApp is limiting it.
+        if (!notOnWhatsApp) recordRefusal(lane);
       }
     } finally {
       laneBusy.delete(laneId);
@@ -811,13 +905,13 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     checkFinish();
     if (state.status !== 'running') return;
     if (lane.status === 'offline') { scheduleLane(lane, 5000); return; }
+    if (lane.pausedUntil && Date.now() < lane.pausedUntil) return;   // recordRefusal already scheduled the re-check
     // also applies to campaigns saved before the 6 s floor existed (e.g. resumed after a restart)
     const minSec = Math.max(MIN_DELAY_S, state.minDelay || 8);
     const maxSec = Math.max(minSec, state.maxDelay || 15);
-    // No message went out when the number is not on WhatsApp (only a lookup), so the next
-    // number follows after a short pause (3-5 s) instead of the full gap between messages.
-    const jitter = notOnWhatsApp ? 3 + Math.floor(Math.random() * 3)
-      : Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+    // The full gap applies after every attempt, including numbers that turned out not to be on
+    // WhatsApp: rapid-fire number lookups look like scraping and get numbers restricted.
+    const jitter = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
     lane.nextAt = Date.now() + jitter * 1000;
     lane.status = 'waiting';
     saveState();
@@ -1113,6 +1207,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     stop,
     clear,
     leftover,
+    noteAck,
     getStatus
   };
 }

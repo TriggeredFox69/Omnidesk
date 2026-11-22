@@ -118,6 +118,14 @@
     const failed = Number(lane.failed || 0);
     const left = Number(lane.remaining ?? Math.max(0, total - sent - failed));
 
+    // Paused to protect the number: WhatsApp is limiting it, or the closer's daily limit is used up.
+    if (lane.pausedUntil && Number(lane.pausedUntil) > Date.now() && !isStopped) {
+      const hrs = Math.max(1, Math.ceil((Number(lane.pausedUntil) - Date.now()) / 3600e3));
+      return lane.pauseReason === 'daily_limit'
+        ? { cls: 'cw-red', label: 'Daily limit reached · continues 12 AM', sent, total }
+        : { cls: 'cw-red', label: `Limited by WhatsApp · paused ${hrs}h`, sent, total };
+    }
+
     // If device is actively sending right now
     if ((isRunning || isStopped || isPaused) && lane.status === 'sending') {
       return { cls: 'cw-orange', label: 'Sending right now…', sent, total };
