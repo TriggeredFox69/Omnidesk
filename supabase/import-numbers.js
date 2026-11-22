@@ -27,6 +27,12 @@ const args = process.argv.slice(2);
 const folder = args.find(a => !a.startsWith('--'));
 const dry = args.includes('--dry');
 const force = args.includes('--force');
+// --real-only: skip generated lists (files that are mostly a consecutive block such as
+// 0302612-0000, 0001, 0002 ...). Those are random numbers, mostly strangers or not on WhatsApp.
+const realOnly = args.includes('--real-only');
+// --reset-cursors: every company starts from the top of the new list (Auto Data still skips
+// numbers that already have a chat with the company).
+const resetCursors = args.includes('--reset-cursors');
 if (!folder || !fs.existsSync(folder)) {
   console.error('Usage: node supabase/import-numbers.js "<numbers folder>" [--dry] [--force]');
   process.exit(1);
@@ -88,23 +94,38 @@ function push(ten) {
   values[count++] = v;
 }
 
+// A generated list: more than half of its numbers directly follow another number in it.
+function isGeneratedBlock(vals) {
+  if (vals.length <= 50) return false;
+  const sorted = Uint32Array.from(vals).sort();
+  let consecutive = 0;
+  for (let i = 1; i < sorted.length; i++) if (sorted[i] - sorted[i - 1] === 1) consecutive++;
+  return consecutive / sorted.length > 0.5;
+}
+
 const files = listFiles(folder);
-console.log(`Reading ${files.length} files…`);
+let skippedFiles = 0;
+console.log(`Reading ${files.length} files…${realOnly ? ' (real numbers only)' : ''}`);
 for (const f of files) {
   const text = fs.readFileSync(f, 'latin1');
+  const fileVals = [];
+  const collect = ten => fileVals.push(ten);
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     lines++;
-    const before = count;
+    const before = fileVals.length;
     // Split on anything that is not part of a phone number (commas, tabs, letters, …), then
     // drop spaces / dashes / dots / brackets / + inside each piece.
     for (const seg of line.split(/[^0-9+\-\s().]+/)) {
       const d = seg.replace(/\D+/g, '');
-      if (d.length >= 10) numbersIn(d, push);
+      if (d.length >= 10) numbersIn(d, collect);
     }
-    if (count === before) skipped++;
+    if (fileVals.length === before) skipped++;
   }
+  if (realOnly && isGeneratedBlock(fileVals.map(t => Number(t) - 3000000000))) { skippedFiles++; continue; }
+  fileVals.forEach(push);
 }
+if (realOnly) console.log(`Skipped ${skippedFiles} generated block files.`);
 
 // ---- 2. dedupe ----
 const all = values.subarray(0, count).sort();
@@ -175,7 +196,11 @@ async function rest(method, pathAndQuery, body, extra = {}) {
   // rows beyond the new end (only if an older, longer list was uploaded before)
   await rest('DELETE', `chatly_numbers?chunk=gte.${rows}`, undefined, { Prefer: 'return=minimal' });
   // the pool is usable only once every row is in
-  await rest('POST', 'chatly_pool_meta?on_conflict=id', [{ id: 1, total: pool.length, chunk_size: CHUNK, imported_at: new Date().toISOString(), source: path.basename(folder) }],
+  await rest('POST', 'chatly_pool_meta?on_conflict=id', [{ id: 1, total: pool.length, chunk_size: CHUNK, imported_at: new Date().toISOString(), source: path.basename(folder) + (realOnly ? ' (real only)' : '') }],
     { Prefer: 'resolution=merge-duplicates,return=minimal' });
+  if (resetCursors) {
+    await rest('DELETE', 'chatly_pool_cursors?company_id=neq.__none__', undefined, { Prefer: 'return=minimal' });
+    console.log('\nEvery company starts from the top of the new list.');
+  }
   console.log(`\nDone in ${Math.round((Date.now() - started) / 1000)} s: ${pool.length.toLocaleString()} numbers in the pool.`);
 })().catch(err => { console.error('\nUpload failed:', err.message); process.exit(1); });
