@@ -5258,3 +5258,189 @@ body:not(.theme-dark) .profile-company-badge span { color: var(--text-primary); 
 .campaign-launch-summary .cls-row.todo { color: #fbbf24; }
 .campaign-launch-summary .cls-eta { margin-top: 2px; padding-top: 8px; border-top: 1px dashed rgba(255, 255, 255, 0.1); color: #38bdf8; }
 #startCampaignBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ─── CAMPAIGN PAGE (v2 layout) ───────────────────────────────
+   Presentation only. Everything is scoped to #viewCampaign and built on the theme
+   tokens, so it follows light and dark. Element ids are owned by whatsapp-app.js;
+   some of that script's output carries inline colours written for a dark page,
+   which is why a few rules below use !important. */
+#viewCampaign {
+  --cs-surface: var(--glass-surface-elevated);
+  --cs-soft: var(--glass-surface-subtle);
+  --cs-line: var(--glass-border-subtle);
+  --cs-line-strong: var(--glass-border);
+  padding: 24px 28px 48px;
+}
+#viewCampaign .cs-shell { max-width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+/* Header */
+#viewCampaign .cs-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px 24px; flex-wrap: wrap; }
+#viewCampaign .cs-title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-primary); }
+#viewCampaign .cs-steps { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+#viewCampaign .cs-steps li { display: inline-flex; align-items: center; gap: 7px; }
+#viewCampaign .cs-steps li + li::before { content: ''; width: 14px; height: 1px; background: var(--cs-line-strong); margin-right: 3px; }
+#viewCampaign .cs-steps li span { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 800; background: var(--accent-wa-glass); color: var(--accent-wa); }
+/* The script sets this badge's text colour per state; background and border follow it. */
+#viewCampaign .cs-status { font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: var(--radius-pill); white-space: nowrap;
+  background: color-mix(in srgb, currentColor 10%, transparent) !important; border: 1px solid color-mix(in srgb, currentColor 32%, transparent) !important; }
+body:not(.theme-dark) #viewCampaign .cs-status { filter: brightness(0.8) saturate(1.25); }
+
+/* Cards */
+#viewCampaign .cs-card { background: var(--cs-surface); border: 1px solid var(--cs-line); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-card); }
+#viewCampaign .cs-card-title { margin: 0; font-size: 15px; font-weight: 750; letter-spacing: -0.01em; color: var(--text-primary); }
+#viewCampaign .cs-card-sub { margin: 4px 0 0; max-width: 64ch; font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+#viewCampaign .cs-hint { font-size: 11.5px; color: var(--text-muted); }
+#viewCampaign .cs-label-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+/* Buttons */
+#viewCampaign .cs-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 14px; border-radius: 10px; font-size: 12.5px; font-weight: 650;
+  color: var(--text-primary); background: transparent; border: 1px solid var(--cs-line-strong); cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
+#viewCampaign .cs-btn:hover { background: var(--glass-surface-hover); border-color: var(--accent-wa-border); }
+#viewCampaign .cs-btn-block { width: 100%; justify-content: center; text-align: center; }
+#viewCampaign .cs-btn-solid { background: var(--accent-wa); border-color: var(--accent-wa); color: var(--on-accent); }
+#viewCampaign .cs-btn-solid:hover { background: var(--accent-wa-hover); border-color: var(--accent-wa-hover); }
+#viewCampaign .cs-link-btn { padding: 2px 0; background: none; border: 0; font-size: 12px; font-weight: 650; color: var(--accent-wa); cursor: pointer; }
+#viewCampaign .cs-link-btn:hover { text-decoration: underline; }
+#viewCampaign .cs-link-btn.cs-danger { color: var(--status-fresh-text); }
+
+/* Team WhatsApps */
+#viewCampaign .cs-team { display: flex; flex-direction: column; gap: 14px; }
+#viewCampaign .cs-team-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px 20px; flex-wrap: wrap; }
+#viewCampaign .cs-team-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#viewCampaign .cs-count-badge { font-size: 12px; font-weight: 700; padding: 6px 12px; }
+#viewCampaign .cs-team-loading { padding: 18px; text-align: center; font-size: 12.5px; color: var(--text-muted); }
+#viewCampaign .cs-team-foot { display: flex; justify-content: space-between; gap: 6px 24px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--cs-line); font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
+#viewCampaign #campaignCycleMathInfo { color: var(--text-muted); }
+#viewCampaign #campaignNotConnectedNote { margin: 0 !important; color: var(--status-ongoing-text) !important; }
+#viewCampaign #campaignNotConnectedNote:empty { display: none; }
+#viewCampaign #campaignNotConnectedNote:not(:empty) { padding: 9px 12px; border-radius: 10px; background: var(--status-ongoing-glass); border: 1px solid var(--status-ongoing-border); }
+
+/* Sender cards (markup and base styles come from wa-widget.js, which the admin portal shares) */
+#viewCampaign .cw-legend { display: none; }
+#viewCampaign .cw-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+#viewCampaign .cw-card { padding: 14px 16px; border-radius: 14px; background: var(--cs-soft); border: 1px solid var(--cs-line); box-shadow: none; backdrop-filter: none; }
+#viewCampaign .cw-card:hover { transform: none; border-color: var(--cs-line-strong); box-shadow: none; }
+#viewCampaign .cw-card::before { display: none; }
+#viewCampaign .cw-card.cw-orange, #viewCampaign .cw-card.cw-green { border-color: color-mix(in srgb, var(--cw-c) 45%, transparent); box-shadow: none; }
+#viewCampaign .cw-avatar { width: 38px; height: 38px; border-radius: 50%; font-size: 15px; border: 0; box-shadow: none; background: var(--accent-wa-glass); color: var(--accent-wa); }
+#viewCampaign .cw-avatar.tl { background: rgba(139, 92, 246, 0.16); color: #8b5cf6; box-shadow: none; }
+#viewCampaign .cw-name { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+#viewCampaign .cw-role { font-weight: 600; color: var(--text-muted); }
+#viewCampaign .cw-role > span:not(.role-pill) { display: none; }
+#viewCampaign .cw-role .role-pill { padding: 0; background: none; font-size: 10.5px; letter-spacing: 0.03em; color: var(--text-muted); }
+#viewCampaign .cw-num { margin-top: 10px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--text-secondary); }
+#viewCampaign .cw-light { padding: 0; background: none; border: 0; box-shadow: none; }
+#viewCampaign .cw-bulb { display: none; width: 10px; height: 10px; }
+#viewCampaign .cw-red .cw-bulb.r, #viewCampaign .cw-orange .cw-bulb.o, #viewCampaign .cw-green .cw-bulb.g { display: block; box-shadow: 0 0 0 4px color-mix(in srgb, var(--cw-c) 18%, transparent); }
+#viewCampaign .cw-state { margin-top: 10px; flex-wrap: wrap; }
+#viewCampaign .cw-tag { white-space: nowrap; }
+#viewCampaign .cw-count { font-size: 11.5px; font-weight: 600; white-space: nowrap; color: var(--text-muted); }
+#viewCampaign .cw-bar { height: 4px; margin-top: 10px; background: var(--glass-surface-hover); }
+#viewCampaign .cw-bar i { box-shadow: none; }
+#viewCampaign .cw-empty { border-color: var(--cs-line-strong); background: var(--cs-soft); color: var(--text-secondary); }
+
+/* Three steps */
+#viewCampaign .campaign-grid { max-width: none; margin: 0; gap: 18px; align-items: start;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.25fr) minmax(300px, 0.9fr); }
+#viewCampaign .cs-step { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+#viewCampaign .cs-step-head { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--cs-line); }
+#viewCampaign .cs-step-num { width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; background: var(--accent-wa); color: var(--on-accent); }
+#viewCampaign .cs-step-head .cs-pill { margin-left: auto; font-size: 11px; font-weight: 650; padding: 3px 10px; }
+#viewCampaign .cs-grow { flex: 1; }
+
+/* Fields */
+#viewCampaign .form-group { margin: 0; gap: 7px; }
+#viewCampaign .form-label { margin: 0; font-size: 12px; }
+#viewCampaign .form-input, #viewCampaign .form-select, #viewCampaign .form-textarea { padding: 9px 12px; border-radius: 10px; font-size: 13px; background: var(--cs-surface); border-color: var(--cs-line-strong); }
+#viewCampaign #campaignCustomMsg { min-height: 190px; line-height: 1.55; resize: vertical; }
+#viewCampaign .cs-paste-area { min-height: 96px; margin-top: 8px; }
+#viewCampaign #applyPasteNumbersBtn { margin-top: 8px; }
+
+/* Step 1: phone list */
+#viewCampaign .campaign-drop-zone { padding: 22px 16px; border: 1.5px dashed var(--cs-line-strong); border-radius: 14px; background: var(--cs-soft); transition: border-color 0.15s ease, background 0.15s ease; }
+#viewCampaign .campaign-drop-zone:hover, #viewCampaign .campaign-drop-zone.drag-active { border-color: var(--accent-wa); background: var(--accent-wa-glass); }
+#viewCampaign .drop-zone-icon { width: 42px; height: 42px; margin: 0 auto 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0; background: var(--accent-wa-glass); color: var(--accent-wa); }
+#viewCampaign .drop-zone-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+#viewCampaign .drop-zone-sub { margin-top: 2px; }
+#viewCampaign .drop-zone-hint { margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+
+#viewCampaign .cs-audience { padding: 14px; border-radius: 14px; background: var(--cs-soft); border: 1px solid var(--cs-line); }
+#viewCampaign .cs-audience > * + * { margin-top: 10px; }
+#viewCampaign .cs-audience-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#viewCampaign .cs-audience-total { font-size: 15px; font-weight: 800; color: var(--text-primary); }
+#viewCampaign .cs-saved-badge { font-size: 11px; font-weight: 650; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--glass-surface-hover); color: var(--text-secondary); }
+#viewCampaign .cs-stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#viewCampaign .cs-stat { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--cs-surface); border: 1px solid var(--cs-line); }
+#viewCampaign .cs-stat span { font-size: 10.5px; color: var(--text-muted); }
+#viewCampaign .cs-stat strong { font-size: 12.5px; color: var(--text-primary); }
+#viewCampaign .cs-audience-search { padding: 7px 10px; font-size: 12px; }
+#viewCampaign .campaign-audience-list { max-height: 190px; overflow-y: auto; padding: 4px; border-radius: 10px; background: var(--cs-surface); border: 1px solid var(--cs-line); }
+#viewCampaign .campaign-audience-list:empty { display: none; }
+#viewCampaign .campaign-audience-item { border-bottom-color: var(--cs-line) !important; }
+#viewCampaign .campaign-audience-item:last-child { border-bottom: 0 !important; }
+#viewCampaign .campaign-audience-item > div:first-child > div:nth-child(2) > div:first-child { color: var(--text-primary) !important; }
+#viewCampaign .cs-pagination { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted); }
+#viewCampaign .cs-pagination-btns { display: flex; gap: 12px; }
+#viewCampaign .cs-audience-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--cs-line); }
+
+/* Step 2: message */
+#viewCampaign .campaign-variation-bar { gap: 8px; }
+#viewCampaign .btn-var-select { flex-direction: row; gap: 8px; padding: 10px 8px; border-radius: 12px; font-size: 12.5px; font-weight: 650; background: transparent; border: 1px solid var(--cs-line-strong); color: var(--text-secondary); }
+#viewCampaign .btn-var-select:hover { background: var(--glass-surface-hover); color: var(--text-primary); }
+#viewCampaign .btn-var-select.active { box-shadow: none; }
+#viewCampaign .cs-attach { padding: 14px; border-radius: 14px; background: var(--cs-soft); border: 1px dashed var(--cs-line-strong); }
+#viewCampaign .cs-attach .form-select { margin-top: 8px; }
+#viewCampaign .cs-image-drop { margin-top: 8px; padding: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-radius: 10px; background: var(--cs-surface); border: 1px solid var(--cs-line); cursor: pointer; }
+#viewCampaign .cs-image-drop:hover { border-color: var(--accent-wa-border); }
+#viewCampaign .cs-image-drop-title { font-size: 12.5px; font-weight: 700; color: var(--text-primary); }
+#viewCampaign .cs-image-drop-sub { margin-top: 2px; font-size: 11px; color: var(--text-muted); }
+#viewCampaign .cs-image-drop img { max-height: 140px; border-radius: 8px; object-fit: cover; }
+#viewCampaign .cs-audio-player { margin-top: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; border-radius: 12px; background: var(--cs-surface); border: 1px solid var(--cs-line); }
+#viewCampaign .cs-audio-play { width: 34px; height: 34px; flex-shrink: 0; border: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; background: var(--accent-wa); color: var(--on-accent); cursor: pointer; }
+#viewCampaign .cs-audio-body { flex: 1; min-width: 0; }
+#viewCampaign .cs-audio-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 650; color: var(--text-primary); }
+#viewCampaign .cs-audio-track { height: 4px; margin-top: 6px; border-radius: 2px; overflow: hidden; background: var(--glass-surface-hover); }
+#viewCampaign #campaignAudioBar { height: 100%; background: var(--accent-wa); }
+#viewCampaign .tag-chips { gap: 6px; }
+#viewCampaign .tag-chip { padding: 4px 10px; font-size: 11.5px; background: var(--cs-soft); border-color: var(--cs-line-strong); color: var(--accent-wa); }
+#viewCampaign .cs-pace { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--cs-line); }
+#viewCampaign .cs-pace-select { width: auto; max-width: 62%; padding: 6px 10px; font-size: 12px; }
+#viewCampaign .cs-pace-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#viewCampaign .cs-pace-fields label { display: block; margin-bottom: 4px; }
+
+/* Step 3: preview, start, progress, log */
+#viewCampaign .campaign-preview-stage { min-height: 200px; max-height: 420px; overflow-y: auto; padding: 16px 14px; border-radius: 14px; border-color: var(--cs-line); }
+#viewCampaign .campaign-message-bubble { margin: 0 0 0 auto; max-width: 92%; border-radius: 12px 12px 4px 12px; }
+body:not(.theme-dark) #viewCampaign .campaign-message-bubble { background: #d9fdd3; }
+#viewCampaign .cs-launch-actions { display: flex; flex-direction: column; gap: 10px; }
+#viewCampaign .campaign-launch-summary { background: var(--cs-soft); border-color: var(--cs-line); }
+#viewCampaign .campaign-launch-summary .cls-row { color: var(--text-secondary); }
+#viewCampaign .campaign-launch-summary .cls-row.ok > span:first-child { color: var(--accent-wa); }
+#viewCampaign .campaign-launch-summary .cls-row.todo { color: var(--status-ongoing-text); }
+#viewCampaign .campaign-launch-summary .cls-eta { border-top-color: var(--cs-line-strong); color: var(--text-secondary); }
+#viewCampaign .cs-start { width: 100%; justify-content: center; padding: 13px 20px; border-radius: 12px; font-size: 14.5px; font-weight: 750; }
+#viewCampaign .cs-run-controls { display: flex; gap: 8px; }
+#viewCampaign .cs-run-controls .btn { justify-content: center; padding: 9px 14px; border-radius: 10px; }
+#viewCampaign .campaign-progress-wrap { padding: 14px; border-radius: 12px; background: var(--cs-soft); border-color: var(--cs-line); }
+#viewCampaign .campaign-progress-wrap .campaign-progress-bar { margin: 8px 0; }
+#viewCampaign .cs-progress-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+#viewCampaign .cs-progress-sub { font-size: 11.5px; color: var(--text-muted); }
+#viewCampaign #campaignCountdown { color: var(--accent-wa); }
+#viewCampaign .campaign-terminal-log { height: 150px; padding: 12px; border-radius: 12px; line-height: 1.6; border: 1px solid rgba(255, 255, 255, 0.06); }
+body:not(.theme-dark) #viewCampaign .campaign-terminal-log { background: #f5faf7; border-color: var(--cs-line); }
+body:not(.theme-dark) #viewCampaign .log-line { color: #475569; }
+body:not(.theme-dark) #viewCampaign .log-info { color: #0369a1; }
+body:not(.theme-dark) #viewCampaign .log-success { color: #047857; }
+body:not(.theme-dark) #viewCampaign .log-warning { color: #b45309; }
+body:not(.theme-dark) #viewCampaign .log-error { color: #b91c1c; }
+
+@media (max-width: 1180px) {
+  #viewCampaign .campaign-grid { grid-template-columns: 1fr 1fr; }
+  #viewCampaign .cs-launch { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  #viewCampaign { padding: 16px 14px 40px; }
+  #viewCampaign .campaign-grid { grid-template-columns: 1fr; }
+  #viewCampaign .cs-card { padding: 16px; }
+  #viewCampaign .cs-pace-select { max-width: 100%; }
+}

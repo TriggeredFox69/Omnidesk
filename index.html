@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.1">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=15.3">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=15.1">
   <script>
     (function() {
@@ -817,45 +817,6 @@
       </div>
     </section>
 
-    <!-- 5. Assigned Pipeline Lead Directory -->
-    <section class="employee-board">
-      <div class="employee-board-heading">
-        <div>
-          <span class="workspace-eyebrow">MY PIPELINE</span>
-          <h2>Assigned Customer Conversations (<span id="profileAssignedCount">0</span>)</h2>
-        </div>
-        <div class="board-filters">
-          <button type="button" class="profile-filter-btn active" data-pipeline-filter="all">All</button>
-          <button type="button" class="profile-filter-btn" data-pipeline-filter="ongoing">Ongoing</button>
-          <button type="button" class="profile-filter-btn" data-pipeline-filter="pending_verification">In Review</button>
-          <button type="button" class="profile-filter-btn" data-pipeline-filter="paid">Paid</button>
-          <button type="button" class="profile-filter-btn" data-pipeline-filter="useless">Won't Pay</button>
-          <button type="button" class="profile-filter-btn" data-pipeline-filter="takeover" id="pipelineFilterTakeover" style="display:none;background:rgba(245,158,11,0.12);color:#f59e0b;border-color:rgba(245,158,11,0.35);font-weight:700;">⚡ Takeover</button>
-          <button type="button" class="btn btn-xs btn-trash-toggle" id="pipelineDeleteToggleBtn" style="margin-left:6px;">
-            🗑️ Delete Chats
-          </button>
-        </div>
-      </div>
-
-      <!-- Pipeline Batch Delete Toolbar -->
-      <div id="pipelineBatchBar" class="admin-batch-bar" style="display:none;margin:10px 0 14px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.22);border-radius:12px;padding:10px 16px;align-items:center;justify-content:space-between;">
-        <label class="batch-select-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;">
-          <input type="checkbox" id="pipelineSelectAllCheckbox" style="width:18px;height:18px;accent-color:#ef4444;cursor:pointer;">
-          <span>Select All Pipeline Chats</span>
-        </label>
-        <div class="batch-actions" style="display:flex;align-items:center;gap:10px;">
-          <span id="pipelineSelectedCount" style="color:var(--text-muted);font-weight:700;">0 selected</span>
-          <button type="button" id="pipelineDeleteBtn" class="btn btn-rose btn-sm" style="background:#ef4444;color:#fff;font-weight:750;padding:6px 14px;border-radius:8px;border:none;cursor:pointer;">
-            🗑️ Permanently Delete Selected
-          </button>
-          <button type="button" id="pipelineCancelDeleteBtn" class="btn btn-ghost btn-sm" style="padding:6px 10px;border-radius:8px;">
-            Done
-          </button>
-        </div>
-      </div>
-
-      <div class="employee-lead-list" id="employeeLeadList"></div>
-    </section>
   </main>
 
   <!-- ════════════════════════════════════════════════════════
@@ -1166,274 +1127,231 @@
        VIEW 2: CAMPAIGN STUDIO
   ════════════════════════════════════════════════════════ -->
   <div class="view-container" id="viewCampaign">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <div>
-        <h2 style="font-size:20px;font-weight:800;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:22px;">📣</span>
-          <span class="grad-text">Send a campaign</span>
-        </h2>
-        <p class="text-xs text-muted" style="margin-top:4px;"><strong>① Add numbers</strong> → <strong>② Write the message</strong> → <strong>③ Press Start.</strong> The numbers are shared equally between your team's connected WhatsApps.</p>
-      </div>
-      <div id="campaignStatusBadge" class="panel-badge">⚪ Ready to Launch</div>
-    </div>
+    <div class="cs-shell">
 
-    <!-- ═══════════════ STEP 1: Connected WhatsApps Widget (All Admin Portals) ═══════════════ -->
-    <div class="panel" id="campaignSendersPoolCard" style="margin-bottom: 22px; padding: 22px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(165deg, rgba(17, 24, 39, 0.8), rgba(10, 15, 29, 0.95)); backdrop-filter: blur(16px); box-shadow: 0 12px 35px -8px rgba(0,0,0,0.5);">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+      <!-- Page header -->
+      <header class="cs-head">
         <div>
-          <div style="font-weight:800; font-size:16px; color:#fff; display:flex; align-items:center; gap:9px; letter-spacing:-0.01em;">
-            <span style="font-size:18px;">📱</span> Who sends: your team's WhatsApps
+          <h2 class="cs-title">Send a campaign</h2>
+          <ol class="cs-steps" aria-label="How a campaign works">
+            <li><span>1</span>Add numbers</li>
+            <li><span>2</span>Write the message</li>
+            <li><span>3</span>Press Start</li>
+          </ol>
+        </div>
+        <div id="campaignStatusBadge" class="panel-badge cs-status">⚪ Ready to Launch</div>
+      </header>
+
+      <!-- Team WhatsApps: who sends -->
+      <section class="cs-card cs-team" id="campaignSendersPoolCard">
+        <div class="cs-team-head">
+          <div>
+            <h3 class="cs-card-title">Your team's WhatsApps</h3>
+            <p class="cs-card-sub">Every linked Team Member and Team Leader sends <strong>an equal share</strong> of the numbers from their own WhatsApp, all at the same time.</p>
           </div>
-          <p class="text-xs text-muted" style="margin:4px 0 0; line-height:1.5;">
-            Every Team Member and Team Leader whose WhatsApp is linked sends <strong>an equal share</strong> of the numbers from their own WhatsApp, all at the same time.
-          </p>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <span id="campaignPoolCountBadge" class="panel-badge" style="color:#10b981; background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.3); font-size:12px; font-weight:800; padding:6px 14px; border-radius:8px;">
-            Loading devices…
-          </span>
-          <button type="button" class="btn btn-warning btn-xs" id="campaignScanQrBtn" style="padding:7px 15px; font-weight:800; font-size:12px; display:flex; align-items:center; gap:6px; cursor:pointer; border-radius:8px;">
-            <span>📱</span> Link Phone / Scan QR
-          </button>
-          <button type="button" class="btn btn-emerald btn-xs" id="refreshCampaignSendersBtn" style="padding:7px 15px; font-weight:800; font-size:12px; display:flex; align-items:center; gap:6px; border-radius:8px;">
-            <span>🔄</span> Refresh WhatsApps
-          </button>
-        </div>
-      </div>
-
-      <!-- Senders Cards Grid -->
-      <div id="campaignSendersPoolContainer" style="display:block; margin-bottom:14px;">
-        <div class="text-xs text-muted" style="padding:16px; text-align:center;">Loading connected team WhatsApp numbers…</div>
-      </div>
-
-      <!-- Batch Send Explanation -->
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 16px;">
-        <div id="campaignRotationFlowPreview" style="font-size:12px; color:#38bdf8; font-family:'JetBrains Mono', monospace; font-weight:700;">
-          ⚖️ Numbers are shared equally between the connected WhatsApps
-        </div>
-        <div id="campaignCycleMathInfo" style="font-size:11.5px; color:var(--text-muted);">
-          Each WhatsApp sends one message, waits a few seconds, then sends the next
-        </div>
-      </div>
-    </div>
-
-    <div class="campaign-grid">
-      <!-- COL 1: Audience -->
-      <aside class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>① Numbers</span>
-          </div>
-          <span id="campaignAudienceBadge" class="panel-badge">0 Contacts</span>
-        </div>
-
-        <div class="form-group" style="margin:0;">
-          <label class="form-label" for="campaignNameInput">Campaign Name</label>
-          <input type="text" id="campaignNameInput" class="form-input" value="OmniDesk campaign" placeholder="e.g. October product update">
-        </div>
-
-        <div class="form-group" style="margin:0;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <label class="form-label" style="margin:0;">Drop Phone Numbers (.txt / .csv)</label>
-            <button type="button" class="btn btn-ghost btn-xs" id="quickAddMyNumberBtn" style="color:var(--cyan);font-size:10px;padding:2px 7px;">⚡ Load My #</button>
-          </div>
-          <input type="file" id="campaignFileInput" accept=".txt,.csv" style="display:none;">
-          <div class="campaign-drop-zone" id="campaignDropZone">
-            <div class="drop-zone-icon">📥</div>
-            <div class="drop-zone-title">Drop your .txt phone list here</div>
-            <div class="drop-zone-sub">or <span class="drop-zone-browse">browse files</span></div>
-            <div class="drop-zone-hint">Format: 03001234567, Ali, Lahore (1 per line)</div>
+          <div class="cs-team-actions">
+            <span id="campaignPoolCountBadge" class="panel-badge cs-count-badge">Loading devices…</span>
+            <button type="button" class="cs-btn" id="campaignScanQrBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+              Link a phone
+            </button>
+            <button type="button" class="cs-btn" id="refreshCampaignSendersBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
           </div>
         </div>
 
-        <div>
-          <button type="button" class="btn btn-ghost btn-xs" id="togglePasteAreaBtn" style="width:100%;justify-content:center;">
-            ✏️ Or Paste Phone Numbers Manually
-          </button>
-          <textarea id="campaignPasteArea" class="form-textarea mono text-xs" style="display:none;min-height:80px;margin-top:6px;" placeholder="03001234567, Ali, Lahore&#10;03214567890, Bilal, Karachi"></textarea>
-          <button type="button" class="btn btn-secondary btn-xs" id="applyPasteNumbersBtn" style="display:none;width:100%;margin-top:4px;justify-content:center;">Parse & Add Numbers</button>
+        <div id="campaignSendersPoolContainer" class="cs-team-list">
+          <div class="cs-team-loading">Loading connected team WhatsApp numbers…</div>
         </div>
 
-        <!-- High-Capacity 100k Audience Stats & Inspector Widget -->
-        <div id="campaignAudienceCard" style="display:none;background:rgba(16,185,129,0.03);border:1px solid rgba(16,185,129,0.2);border-radius:12px;padding:12px 14px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:16px;">👥</span>
-              <strong id="campaignAudienceTotalStat" style="font-size:14px;color:#10b981;font-family:monospace;font-weight:800;">0 Numbers</strong>
+        <div class="cs-team-foot">
+          <div id="campaignRotationFlowPreview">Numbers are shared equally between the connected WhatsApps</div>
+          <div id="campaignCycleMathInfo">Each WhatsApp sends one message, waits a few seconds, then sends the next</div>
+        </div>
+      </section>
+
+      <div class="campaign-grid">
+
+        <!-- STEP 1: Numbers -->
+        <section class="cs-card cs-step">
+          <div class="cs-step-head">
+            <span class="cs-step-num">1</span>
+            <h3 class="cs-card-title">Numbers</h3>
+            <span id="campaignAudienceBadge" class="panel-badge cs-pill">0 Contacts</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="campaignNameInput">Campaign name</label>
+            <input type="text" id="campaignNameInput" class="form-input" value="OmniDesk campaign" placeholder="e.g. October product update">
+          </div>
+
+          <div class="form-group">
+            <div class="cs-label-row">
+              <label class="form-label">Phone list (.txt / .csv)</label>
+              <button type="button" class="cs-link-btn" id="quickAddMyNumberBtn">Add my number</button>
             </div>
-            <span id="campaignSavedCloudBadge" style="font-size:10.5px;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:6px;font-weight:700;border:1px solid rgba(56,189,248,0.25);">☁️ Cloud Saved</span>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;font-size:11px;color:var(--text-muted);">
-            <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-              <div style="font-size:10px;opacity:0.8;">Format &amp; Network:</div>
-              <strong style="color:#fff;" id="campaignValidFormatCount">100% Valid</strong>
-            </div>
-            <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-              <div style="font-size:10px;opacity:0.8;">Cleaned Duplicates:</div>
-              <strong style="color:#eab308;" id="campaignDupesFilteredCount">0 Duplicates</strong>
+            <input type="file" id="campaignFileInput" accept=".txt,.csv" style="display:none;">
+            <div class="campaign-drop-zone" id="campaignDropZone">
+              <div class="drop-zone-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <div class="drop-zone-title">Drop your phone list here</div>
+              <div class="drop-zone-sub">or <span class="drop-zone-browse">browse files</span></div>
+              <div class="drop-zone-hint">One per line: 03001234567, Ali, Lahore</div>
             </div>
           </div>
 
-          <!-- Fast Paginated / Windowed Inspector -->
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <input type="text" id="campaignAudienceSearchInput" class="form-input form-input-xs" placeholder="🔍 Search numbers in list..." style="font-size:11px;padding:4px 8px;border-radius:6px;">
+          <div>
+            <button type="button" class="cs-btn cs-btn-block" id="togglePasteAreaBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Paste numbers instead
+            </button>
+            <textarea id="campaignPasteArea" class="form-textarea mono text-xs cs-paste-area" style="display:none;" placeholder="03001234567, Ali, Lahore&#10;03214567890, Bilal, Karachi"></textarea>
+            <button type="button" class="cs-btn cs-btn-block cs-btn-solid" id="applyPasteNumbersBtn" style="display:none;">Add these numbers</button>
           </div>
-          <div id="campaignAudienceList" class="campaign-audience-list" style="max-height:160px;overflow-y:auto;border-radius:8px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.05);padding:4px;"></div>
-          <div id="campaignAudiencePagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:10.5px;color:var(--text-muted);">
-            <span id="campaignAudiencePageInfo">Showing 1–25</span>
-            <div style="display:flex;gap:4px;">
-              <button type="button" class="btn btn-ghost btn-xs" id="campaignAudiencePrevBtn" style="padding:1px 6px;">◀ Prev</button>
-              <button type="button" class="btn btn-ghost btn-xs" id="campaignAudienceNextBtn" style="padding:1px 6px;">Next ▶</button>
+
+          <!-- Loaded numbers: stats and inspector (shown once numbers are added) -->
+          <div id="campaignAudienceCard" class="cs-audience" style="display:none;">
+            <div class="cs-audience-head">
+              <strong id="campaignAudienceTotalStat" class="cs-audience-total">0 Numbers</strong>
+              <span id="campaignSavedCloudBadge" class="cs-saved-badge">☁️ Cloud Saved</span>
+            </div>
+
+            <div class="cs-stat-row">
+              <div class="cs-stat">
+                <span>Valid format</span>
+                <strong id="campaignValidFormatCount">100% Valid</strong>
+              </div>
+              <div class="cs-stat">
+                <span>Duplicates removed</span>
+                <strong id="campaignDupesFilteredCount">0 Duplicates</strong>
+              </div>
+            </div>
+
+            <input type="text" id="campaignAudienceSearchInput" class="form-input form-input-xs cs-audience-search" placeholder="Search numbers…">
+            <div id="campaignAudienceList" class="campaign-audience-list"></div>
+            <div id="campaignAudiencePagination" class="cs-pagination">
+              <span id="campaignAudiencePageInfo">Showing 1–25</span>
+              <div class="cs-pagination-btns">
+                <button type="button" class="cs-link-btn" id="campaignAudiencePrevBtn">Prev</button>
+                <button type="button" class="cs-link-btn" id="campaignAudienceNextBtn">Next</button>
+              </div>
+            </div>
+
+            <div class="cs-audience-foot">
+              <button type="button" class="cs-link-btn cs-danger" id="clearAudienceBtn">Clear numbers</button>
+              <button type="button" class="cs-link-btn" id="saveDraftBtn">Saved on server ✓</button>
             </div>
           </div>
 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
-            <button type="button" class="btn btn-ghost btn-xs" id="clearAudienceBtn" style="color:#ef4444;font-size:11px;">🗑️ Clear Numbers</button>
-            <button type="button" class="btn btn-ghost btn-xs" id="saveDraftBtn" style="color:var(--cyan);font-size:11px;">💾 Saved on Server ✓</button>
-          </div>
-        </div>
-
-        <!-- Replies always belong to the team member whose WhatsApp sent the message, so this choice is hidden. -->
-        <div class="form-group" style="margin:0;display:none;">
-          <label class="form-label">Assign Created Leads To</label>
-          <select id="campaignAssignSelect" class="form-select form-select-sm">
-            <option value="round_robin" selected>🔄 Multi-Device Round-Robin (Assigned to Sender TL/TM)</option>
-            <option value="pool">🟢 Open Pool (Shared access)</option>
-            <option value="mine">🔒 Myself (Current Closer)</option>
-          </select>
-        </div>
-      </aside>
-
-      <!-- COL 2: Message Content -->
-      <section class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>② Message &amp; speed</span>
-          </div>
-          <span class="panel-badge" style="color:var(--cyan);">Personalized messages</span>
-        </div>
-
-        <div class="campaign-delay-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-weight:700;font-size:12px;color:var(--text-secondary);">⏱️ Delivery pace</span>
-            <select id="campaignPresetSelect" class="form-select form-select-sm" style="width:auto;padding:3px 8px;font-size:11px;">
-              <option value="fast">⚡ Fast (6s – 10s)</option>
-              <option value="recommended" selected>🛡️ Safe (8s – 15s), recommended</option>
-              <option value="human">👤 Very safe (15s – 30s), new numbers</option>
-              <option value="custom">⚙️ Custom</option>
+          <!-- Replies always belong to the team member whose WhatsApp sent the message, so this choice is hidden. -->
+          <div class="form-group" style="margin:0;display:none;">
+            <label class="form-label">Assign Created Leads To</label>
+            <select id="campaignAssignSelect" class="form-select form-select-sm">
+              <option value="round_robin" selected>🔄 Multi-Device Round-Robin (Assigned to Sender TL/TM)</option>
+              <option value="pool">🟢 Open Pool (Shared access)</option>
+              <option value="mine">🔒 Myself (Current Closer)</option>
             </select>
           </div>
-          <div style="display:flex;gap:10px;margin-top:8px;">
-            <div style="flex:1;">
-              <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Min Delay (s)</label>
-              <input type="number" id="campaignDelayMin" class="form-input form-input-sm" value="8" min="6" max="180">
+        </section>
+
+        <!-- STEP 2: Message -->
+        <section class="cs-card cs-step">
+          <div class="cs-step-head">
+            <span class="cs-step-num">2</span>
+            <h3 class="cs-card-title">Message</h3>
+            <span class="panel-badge cs-pill">Personalized per contact</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Message type</label>
+            <div class="campaign-variation-bar">
+              <button type="button" class="btn-var-select active" id="btnVarText" data-variation="text">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>Text only</span>
+              </button>
+              <button type="button" class="btn-var-select" id="btnVarTextImage" data-variation="text_image">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Text + image</span>
+              </button>
+              <button type="button" class="btn-var-select" id="btnVarAudio" data-variation="audio">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <span>Voice note</span>
+              </button>
             </div>
-            <div style="flex:1;">
-              <label class="text-xs text-muted" style="display:block;margin-bottom:2px;">Max Delay (s)</label>
-              <input type="number" id="campaignDelayMax" class="form-input form-input-sm" value="15" min="9" max="300">
+          </div>
+
+          <!-- Image attachment (Text + image) -->
+          <div id="campaignImageContainer" class="cs-attach" style="display:none;">
+            <div class="cs-label-row">
+              <label class="form-label">Image to send</label>
+              <button type="button" class="cs-link-btn cs-danger" id="clearCampaignImgBtn" style="display:none;">Remove</button>
+            </div>
+            <input type="file" id="campaignImageInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
+            <div id="campaignImageDrop" class="cs-image-drop">
+              <div id="campaignImagePlaceholder">
+                <div class="cs-image-drop-title">Click to choose an image</div>
+                <div class="cs-image-drop-sub">PNG, JPG or WebP, up to 10 MB</div>
+              </div>
+              <img id="campaignImagePreviewThumb" src="" alt="Image preview" style="display:none;">
             </div>
           </div>
-        </div>
 
-
-        <!-- 3 Campaign Starting Variations -->
-        <div class="form-group" style="margin:0;">
-          <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
-            <span>Campaign Starting Variation</span>
-            <span class="badge-role-admin" style="font-size:9.5px;padding:1px 6px;">3 Formats</span>
-          </label>
-          <div class="campaign-variation-bar" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
-            <button type="button" class="btn-var-select active" id="btnVarText" data-variation="text">
-              <span style="font-size:16px;">💬</span>
-              <span style="font-size:11px;font-weight:750;">Text Only</span>
-            </button>
-            <button type="button" class="btn-var-select" id="btnVarTextImage" data-variation="text_image">
-              <span style="font-size:16px;">🖼️</span>
-              <span style="font-size:11px;font-weight:750;">Text + Image</span>
-            </button>
-            <button type="button" class="btn-var-select" id="btnVarAudio" data-variation="audio">
-              <span style="font-size:16px;">🎙️</span>
-              <span style="font-size:11px;font-weight:750;">Just Audio</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Variation 2 Container: Image Attachment -->
-        <div id="campaignImageContainer" style="display:none;background:rgba(31, 224, 138,0.04);border:1px dashed rgba(31, 224, 138,0.3);border-radius:10px;padding:10px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <label class="form-label" style="margin:0;font-size:11.5px;font-weight:700;">Promotional Flyer / Image</label>
-            <button type="button" class="btn btn-ghost btn-xs" id="clearCampaignImgBtn" style="color:#ef4444;font-size:10px;display:none;">✕ Remove</button>
-          </div>
-          <input type="file" id="campaignImageInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
-          <div id="campaignImageDrop" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;background:rgba(255,255,255,0.03);border-radius:8px;cursor:pointer;border:1px solid var(--border-subtle);text-align:center;">
-            <div id="campaignImagePlaceholder">
-              <span style="font-size:24px;">📁</span>
-              <div style="font-size:11.5px;font-weight:700;margin-top:4px;">Click to select promotional flyer image</div>
-              <div style="font-size:10px;color:var(--text-muted);">PNG, JPG, WebP up to 10MB</div>
+          <!-- Voice note attachment -->
+          <div id="campaignAudioContainer" class="cs-attach" style="display:none;">
+            <div class="cs-label-row">
+              <label class="form-label">Voice note</label>
+              <span class="cs-hint">Sent as a native WhatsApp voice note</span>
             </div>
-            <img id="campaignImagePreviewThumb" src="" alt="Flyer Preview" style="display:none;max-height:120px;border-radius:6px;object-fit:cover;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-          </div>
-        </div>
-
-        <!-- Variation 3 Container: Audio Attachment -->
-        <div id="campaignAudioContainer" style="display:none;background:rgba(16,185,129,0.05);border:1px dashed rgba(16,185,129,0.3);border-radius:10px;padding:10px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <label class="form-label" style="margin:0;font-size:11.5px;font-weight:700;color:var(--emerald);">WhatsApp Voice Note (PTT) Audio</label>
-            <span style="font-size:10px;color:var(--emerald);font-weight:700;">🎙️ Native Voice</span>
-          </div>
-          <select id="campaignAudioPreset" class="form-select form-select-sm" style="margin-bottom:8px;">
+            <select id="campaignAudioPreset" class="form-select form-select-sm">
             <option value="preset_alpha">🎙️ Preset: Crypto Scalper Intro Voice Note (0:24)</option>
             <option value="preset_starter">🎙️ Preset: Nunno Starter 1700 Pitch (0:32)</option>
             <option value="preset_whale">🎙️ Preset: Whale VIP Private Invite (0:45)</option>
             <option value="custom_audio">📁 Upload Custom Voice Note Audio (.mp3, .ogg, .wav)</option>
           </select>
-          <input type="file" id="campaignAudioFileInput" accept="audio/*" style="display:none;">
-          <div id="campaignAudioPlayerBox" style="display:flex;align-items:center;gap:10px;background:rgba(16,185,129,0.08);padding:8px 12px;border-radius:8px;">
-            <button type="button" class="btn btn-emerald btn-xs" id="campaignAudioPlayBtn" style="border-radius:50%;width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;">▶</button>
-            <div style="flex:1;">
-              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;">
-                <span id="campaignAudioTitle">Crypto Scalper Intro Voice Note</span>
-                <span id="campaignAudioDuration">0:24</span>
-              </div>
-              <div style="height:4px;background:rgba(16,185,129,0.25);border-radius:2px;margin-top:4px;overflow:hidden;">
-                <div id="campaignAudioBar" style="width:35%;height:100%;background:var(--emerald);"></div>
+            <input type="file" id="campaignAudioFileInput" accept="audio/*" style="display:none;">
+            <div id="campaignAudioPlayerBox" class="cs-audio-player">
+              <button type="button" class="cs-audio-play" id="campaignAudioPlayBtn">▶</button>
+              <div class="cs-audio-body">
+                <div class="cs-audio-meta">
+                  <span id="campaignAudioTitle">Crypto Scalper Intro Voice Note</span>
+                  <span id="campaignAudioDuration">0:24</span>
+                </div>
+                <div class="cs-audio-track">
+                  <div id="campaignAudioBar" style="width:35%;"></div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="form-group" style="margin:0;" id="campaignPitchPresetGroup">
-          <label class="form-label">Pitch Template</label>
-          <select id="campaignPitchPreset" class="form-select form-select-sm">
+          <div class="form-group" id="campaignPitchPresetGroup">
+            <label class="form-label">Template</label>
+            <select id="campaignPitchPreset" class="form-select form-select-sm">
             <option value="custom">✍️ Custom Message (Write Your Own)</option>
             <option value="pro_liquidation_urdu" selected>💎 Crypto Liquidation Alert (Roman Urdu)</option>
             <option value="starter_scalper">⚡ Nunno Starter (Rs. 1,700 Scalper)</option>
             <option value="flash_discount">🔥 Flash 48-Hour Discount</option>
             <option value="whale_institutional">🐋 Whale Institutional Alpha</option>
           </select>
-        </div>
-
-        <div class="form-group" style="margin:0;">
-          <label class="form-label" style="display:flex;justify-content:space-between;">
-            <span>Personalization Tags</span>
-            <span class="text-xs text-muted">Click to insert</span>
-          </label>
-          <div class="tag-chips">
-            <span class="tag-chip" data-insert="{name}">{name}</span>
-            <span class="tag-chip" data-insert="{phone}">{phone}</span>
-            <span class="tag-chip" data-insert="{city}">{city}</span>
-            <span class="tag-chip" data-insert="{plan}">{plan}</span>
-            <span class="tag-chip" data-insert="{price}">{price}</span>
-            <span class="tag-chip" data-insert="{coupon}">{coupon}</span>
-            <span class="tag-chip" data-insert="{link}">{link}</span>
           </div>
-        </div>
 
-        <div class="form-group" style="margin:0;flex:1;">
-          <textarea id="campaignCustomMsg" class="form-textarea" style="min-height:150px;font-size:12.5px;" placeholder="Write your campaign message…">{Salam|AoA|Hello} {name|Bhai|Trader}!
+          <div class="form-group cs-grow">
+            <div class="cs-label-row">
+              <label class="form-label" for="campaignCustomMsg">Your message</label>
+              <span class="cs-hint">Click a tag to insert it</span>
+            </div>
+            <div class="tag-chips">
+              <span class="tag-chip" data-insert="{name}">{name}</span>
+              <span class="tag-chip" data-insert="{phone}">{phone}</span>
+              <span class="tag-chip" data-insert="{city}">{city}</span>
+              <span class="tag-chip" data-insert="{plan}">{plan}</span>
+              <span class="tag-chip" data-insert="{price}">{price}</span>
+              <span class="tag-chip" data-insert="{coupon}">{coupon}</span>
+              <span class="tag-chip" data-insert="{link}">{link}</span>
+            </div>
+            <textarea id="campaignCustomMsg" class="form-textarea" placeholder="Write your campaign message…">{Salam|AoA|Hello} {name|Bhai|Trader}!
 
 Kya aap bar bar market ke sudden wick ya stop-loss hunt se liquid ho rahe hain? 📉❌
 
@@ -1447,59 +1365,81 @@ Kya aap bar bar market ke sudden wick ya stop-loss hunt se liquid ho rahe hain? 
 Live Demo: https://nunno.cloud
 
 _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
-        </div>
-      </section>
+          </div>
 
-      <!-- COL 3: Preview & Launch -->
-      <aside class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            <span>③ Check &amp; start</span>
+          <div class="cs-pace">
+            <div class="cs-label-row">
+              <label class="form-label" for="campaignPresetSelect">Sending speed</label>
+              <select id="campaignPresetSelect" class="form-select form-select-sm cs-pace-select">
+                <option value="fast">Fast (6s – 10s)</option>
+                <option value="recommended" selected>Safe (8s – 15s), recommended</option>
+                <option value="human">Very safe (15s – 30s), new numbers</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div class="cs-pace-fields">
+              <div>
+                <label class="cs-hint" for="campaignDelayMin">Shortest wait (seconds)</label>
+                <input type="number" id="campaignDelayMin" class="form-input form-input-sm" value="8" min="6" max="180">
+              </div>
+              <div>
+                <label class="cs-hint" for="campaignDelayMax">Longest wait (seconds)</label>
+                <input type="number" id="campaignDelayMax" class="form-input form-input-sm" value="15" min="9" max="300">
+              </div>
+            </div>
           </div>
-          <span class="panel-badge">Preview</span>
-        </div>
+        </section>
 
-        <div class="campaign-preview-stage" aria-label="WhatsApp message preview">
-          <div id="campaignBubblePreview" class="campaign-message-bubble"></div>
-        </div>
+        <!-- STEP 3: Check & start -->
+        <section class="cs-card cs-step cs-launch">
+          <div class="cs-step-head">
+            <span class="cs-step-num">3</span>
+            <h3 class="cs-card-title">Check &amp; start</h3>
+            <span class="panel-badge cs-pill">Preview</span>
+          </div>
 
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div id="campaignLaunchSummary" class="campaign-launch-summary" aria-live="polite"></div>
-          <button type="button" class="btn btn-wa btn-lg" id="startCampaignBtn" style="width:100%;justify-content:center;font-weight:700;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            <span>Start campaign</span>
-          </button>
-          <div style="display:flex;gap:6px;">
-            <button type="button" class="btn btn-secondary btn-sm" id="pauseCampaignBtn" style="flex:1;display:none;">⏸️ Pause</button>
-            <button type="button" class="btn btn-rose btn-sm" id="stopCampaignBtn" style="flex:1;display:none;">⏹️ Stop</button>
+          <div class="campaign-preview-stage" aria-label="WhatsApp message preview">
+            <div id="campaignBubblePreview" class="campaign-message-bubble"></div>
           </div>
-        </div>
 
-        <div id="campaignProgressCard" class="campaign-progress-wrap" style="display:none;">
-          <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-secondary);">
-            <span>Progress: <strong id="campaignProgressCount">0 / 0</strong></span>
-            <span id="campaignProgressPct">0%</span>
+          <div class="cs-launch-actions">
+            <div id="campaignLaunchSummary" class="campaign-launch-summary" aria-live="polite"></div>
+            <button type="button" class="btn btn-wa btn-lg cs-start" id="startCampaignBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Start campaign</span>
+            </button>
+            <div class="cs-run-controls">
+              <button type="button" class="btn btn-secondary btn-sm" id="pauseCampaignBtn" style="flex:1;display:none;">⏸️ Pause</button>
+              <button type="button" class="btn btn-rose btn-sm" id="stopCampaignBtn" style="flex:1;display:none;">⏹️ Stop</button>
+            </div>
           </div>
-          <div class="campaign-progress-bar">
-            <div id="campaignProgressFill" class="campaign-progress-fill"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
-            <span>Next in: <strong id="campaignCountdown" style="color:var(--cyan);">--</strong></span>
-            <span>Speed: <span id="campaignCurrentPace">--</span></span>
-          </div>
-        </div>
 
-        <div class="form-group" style="margin:0;">
-          <label class="form-label" style="display:flex;justify-content:space-between;">
-            <span>Live Dispatch Log</span>
-            <span class="text-xs text-muted" id="campaignLogCount">0 events</span>
-          </label>
-          <div id="campaignTerminalLog" class="campaign-terminal-log">
-            <div class="log-line log-info">System ready. Drop a .txt list or paste numbers to begin.</div>
+          <div id="campaignProgressCard" class="campaign-progress-wrap" style="display:none;">
+            <div class="cs-progress-row">
+              <span>Progress: <strong id="campaignProgressCount">0 / 0</strong></span>
+              <span id="campaignProgressPct">0%</span>
+            </div>
+            <div class="campaign-progress-bar">
+              <div id="campaignProgressFill" class="campaign-progress-fill"></div>
+            </div>
+            <div class="cs-progress-row cs-progress-sub">
+              <span>Next in: <strong id="campaignCountdown">--</strong></span>
+              <span>Speed: <span id="campaignCurrentPace">--</span></span>
+            </div>
           </div>
-        </div>
-      </aside>
+
+          <div class="form-group">
+            <div class="cs-label-row">
+              <label class="form-label">Activity log</label>
+              <span class="cs-hint" id="campaignLogCount">0 events</span>
+            </div>
+            <div id="campaignTerminalLog" class="campaign-terminal-log">
+              <div class="log-line log-info">System ready. Drop a .txt list or paste numbers to begin.</div>
+            </div>
+          </div>
+        </section>
+
+      </div>
     </div>
   </div>
 
