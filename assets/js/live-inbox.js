@@ -92,7 +92,9 @@
       lead.messages.sort((a,b) => (a.timestamp || 0)-(b.timestamp || 0));
       lead.lastMessageAt = Math.max(lead.lastMessageAt || 0, item.timestamp);
       // Message time is not last-seen presence.
-      if (!state.activeLeadId) state.activeLeadId = lead.id;
+      if (!state.activeLeadId && (typeof isMyAllottedLead !== 'function' || isMyAllottedLead(lead))) {
+        state.activeLeadId = lead.id;
+      }
       if (!previous || previousStatus !== fields.deliveryStatus) {
         const entry = pendingSync.get(lead.id) || { lead, messages: [] };
         entry.messages.push(fields);
@@ -201,7 +203,10 @@
         type, text: caption || (type === 'audio' ? 'Voice note' : (type === 'image' ? 'Image' : (type === 'video' ? 'Video' : filename || 'Document'))), deliveryStatus: 'sending',
         timestamp: Math.floor(Date.now()/1000), time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
         durationSeconds: duration, [type === 'audio' ? 'audioUrl' : (type === 'image' ? 'imageUrl' : (type === 'video' ? 'videoUrl' : 'docUrl'))]: dataUrl, filename };
-      lead.messages.push(message); sendingMedia = true; renderList(); renderChat();
+      lead.messages.push(message); sendingMedia = true;
+      lead.lastMessageAt = message.timestamp;
+      lead.status = 'replied';
+      renderList(); renderChat();
       try {
         const result = await api('send_direct', { phone: lead.phone, message: caption || '', request_id: message.id,
           media: { mimetype: match[1], data: match[2], filename, voice } });

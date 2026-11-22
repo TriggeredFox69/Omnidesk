@@ -981,6 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
       notes: lead.notes,
       unreadCount: lead.unreadCount,
       lastActive: lead.lastActive,
+      lastMessageAt: lead.lastMessageAt || Math.floor(Date.now() / 1000),
       ...extraData
     };
     fetch('api/leads_sync.php', {
@@ -1024,6 +1025,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return false;
   }
 
+  let _initialChatRestored = false;
   function fetchServerLeads(silent = false) {
     if (window.NUNNO_LOCAL_LIVE) return;
     const urlParams = new URLSearchParams(window.location.search);
@@ -1053,6 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
               if (l.phone) existingMap.set(normalizePhone(l.phone), l);
             });
 
+            let activeLeadHadNewMessages = false;
             state.leads = data.leads.map(l => {
               const raw = (l.name || '').trim();
               const lower = raw.toLowerCase();
@@ -1065,20 +1068,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 const missing = local.messages.filter(m => !serverMsgIds.has(m.id || m.waMessageId));
                 l.messages = [...(l.messages || []), ...missing];
               }
+              if (local && (local.id === state.activeLeadId || normalizePhone(local.phone || '') === normalizePhone(state.activeLeadId || ''))) {
+                if ((l.messages?.length || 0) !== (local.messages?.length || 0)) {
+                  activeLeadHadNewMessages = true;
+                }
+              }
               return l;
             });
             const myAllotted = state.leads.filter(isMyAllottedLead);
-            const urlChat = urlParams.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
-            if (urlChat) {
-              const cleanTarget = normalizePhone(urlChat);
-              const matched = state.leads.find(l => normalizePhone(l.phone || '') === cleanTarget || l.id === urlChat);
-              if (matched && isMyAllottedLead(matched)) state.activeLeadId = matched.id;
-              else state.activeLeadId = myAllotted.length ? myAllotted[0].id : null;
-            } else if (!state.activeLeadId || !myAllotted.some(l => l.id === state.activeLeadId)) {
-              state.activeLeadId = myAllotted.length ? myAllotted[0].id : null;
+            if (!_initialChatRestored) {
+              _initialChatRestored = true;
+              const urlChat = urlParams.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
+              if (urlChat) {
+                const cleanTarget = normalizePhone(urlChat);
+                const matched = state.leads.find(l => normalizePhone(l.phone || '') === cleanTarget || l.id === urlChat);
+                if (matched && isMyAllottedLead(matched)) {
+                  state.activeLeadId = matched.id;
+                } else {
+                  state.activeLeadId = myAllotted.length ? myAllotted[0].id : null;
+                }
+              } else if (!state.activeLeadId) {
+                state.activeLeadId = myAllotted.length ? myAllotted[0].id : null;
+              }
+              if (window.history && window.history.replaceState && urlParams.get('chat')) {
+                try {
+                  const cleanUrl = new URL(window.location.href);
+                  cleanUrl.searchParams.delete('chat');
+                  window.history.replaceState({}, '', cleanUrl.toString());
+                } catch (_) {}
+              }
+            } else {
+              // Background poll: NEVER override the user's active chat unless it was removed
+              if (state.activeLeadId) {
+                const stillExists = state.leads.some(l => l.id === state.activeLeadId);
+                if (!stillExists) {
+                  state.activeLeadId = myAllotted.length ? myAllotted[0].id : null;
+                }
+              } else if (myAllotted.length) {
+                state.activeLeadId = myAllotted[0].id;
+              }
             }
             renderConversationsList();
-            if (!silent || (document.activeElement !== els.chatInput)) {
+            if (!silent || (activeLeadHadNewMessages && document.activeElement !== els.chatInput)) {
               renderActiveChat();
             }
             renderAgentProfile();
@@ -1650,7 +1681,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Cache the latest-message timestamp extractor outside the sort to avoid closure allocations
-  const _latestTs = lead => Number(lead.lastMessageAt || lead.messages?.[lead.messages.length - 1]?.timestamp || 0);
+  const _latestTs = lead => {
+    let ts = Number(lead.lastMessageAt || 0);
+    if (Array.isArray(lead.messages) && lead.messages.length > 0) {
+      for (let i = lead.messages.length - 1; i >= 0; i--) {
+        const m = lead.messages[i];
+        const mTs = Number(m.timestamp || 0);
+        if (mTs > 0) {
+          if (mTs > ts) ts = mTs;
+          break;
+        }
+      }
+    }
+    if (ts > 1e11) ts = Math.floor(ts / 1000);
+    return ts;
+  };
 
   function renderConversationsList() {
     if (!els.conversationsScroll) return;
@@ -1815,9 +1860,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const canImpersonateThisTm = isCompanyAdmin && !assignedTm.isUnassigned && assignedTm.username && assignedTm.username !== state.currentUser?.username;
       const isLeadChecked = selectedLeadIds.has(lead.id);
 
-      const item = document.createElement('div');
+      const phoneKey = normalizePhone(lead.phone);
+      newPhoneSet.add(phoneKey);
+
+      let item = existingMap.get(phoneKey);
+      if (!item) {
+        item = document.createElement('div');
+        item.dataset.leadPhone = phoneKey;
+      }
       item.className = `conv-item state-${leadState} ${isSelected ? 'active' : ''} ${isLeadChecked ? 'batch-selected' : ''}`;
-      item.dataset.leadPhone = normalizePhone(lead.phone);
       item.onclick = async (e) => {
         if (adminDeleteMode) {
           e.preventDefault();
@@ -1890,8 +1941,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      els.conversationsScroll.appendChild(item);
-      newPhoneSet.add(normalizePhone(lead.phone));
+      fragment.appendChild(item);
     });
 
     // Remove items that are no longer in the filtered set
@@ -1899,31 +1949,22 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!newPhoneSet.has(phone)) el.remove();
     });
 
-    // Re-order: ensure DOM order matches filtered order
-    const currentChildren = Array.from(els.conversationsScroll.querySelectorAll('.conv-item[data-lead-phone]'));
-    const desiredOrder = filtered.map(l => normalizePhone(l.phone));
-    let needsReorder = currentChildren.length !== desiredOrder.length;
-    if (!needsReorder) {
-      for (let i = 0; i < currentChildren.length; i++) {
-        if (currentChildren[i].dataset.leadPhone !== desiredOrder[i]) { needsReorder = true; break; }
-      }
-    }
-    if (needsReorder) {
-      for (let i = 0; i < desiredOrder.length; i++) {
-        const target = els.conversationsScroll.querySelector(`.conv-item[data-lead-phone="${desiredOrder[i]}"]`);
-        if (target && target !== els.conversationsScroll.children[i]) {
-          els.conversationsScroll.insertBefore(target, els.conversationsScroll.children[i]);
-        }
-      }
-    }
+    els.conversationsScroll.appendChild(fragment);
   }
 
   // Select Lead
   function selectLead(leadId) {
     state.activeLeadId = leadId;
     const lead = getLead(leadId);
-    if (lead && lead.unreadCount > 0) {
-      lead.unreadCount = 0;
+    if (lead) {
+      if (lead.unreadCount > 0) {
+        lead.unreadCount = 0;
+      }
+      if (lead.phone) {
+        try {
+          localStorage.setItem('omnidesk_active_chat_phone', normalizePhone(lead.phone));
+        } catch (_) {}
+      }
     }
     // On mobile screens, activate full-screen chat thread and collapse header chrome
     if (els.viewInbox) {
@@ -2518,6 +2559,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lead.ownerName = myName;
     }
 
+    const nowTs = Math.floor(Date.now() / 1000);
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const crmMessage = {
@@ -2527,12 +2569,14 @@ document.addEventListener('DOMContentLoaded', () => {
       sender: 'agent',
       agentName: myName,
       text: text,
+      timestamp: nowTs,
       time: now
     };
     if (!lead.messages.some(m => m.waMessageId === crmMessage.waMessageId)) lead.messages.push(crmMessage);
 
     lead.status = 'replied';
     lead.lastActive = 'Just now';
+    lead.lastMessageAt = nowTs;
 
     els.chatInput.value = '';
     els.chatInput.style.height = '38px';
@@ -2543,7 +2587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderConversationsList();
     renderActiveChat();
-    syncLeadToServer(lead, { newMessage: crmMessage });
+    syncLeadToServer(lead, { newMessage: crmMessage, lastMessageAt: nowTs });
     watchCampaignDelivery({
       id: crmMessage.id,
       phone: lead.phone,

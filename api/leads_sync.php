@@ -1138,6 +1138,7 @@ if ($action === 'update_lead') {
             if (isset($input['rejectionReason'])) $lead['rejectionReason'] = $input['rejectionReason'];
             if (isset($input['unreadCount'])) $lead['unreadCount'] = (int)$input['unreadCount'];
             if (isset($input['lastActive'])) $lead['lastActive'] = $input['lastActive'];
+            if (isset($input['lastMessageAt'])) $lead['lastMessageAt'] = (int)$input['lastMessageAt'];
             if (isset($input['newMessage'])) {
                 if (!isset($lead['messages'])) $lead['messages'] = [];
                 $newMsg = $input['newMessage'];
@@ -1153,6 +1154,7 @@ if ($action === 'update_lead') {
                 if (!$exists) {
                     $lead['messages'][] = $newMsg;
                 }
+                $lead['lastMessageAt'] = max($lead['lastMessageAt'] ?? 0, (int)($newMsg['timestamp'] ?? time()));
             }
             if (isset($input['updateMessage']) && is_array($input['updateMessage'])) {
                 $update = $input['updateMessage'];
