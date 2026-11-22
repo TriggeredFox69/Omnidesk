@@ -284,14 +284,27 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       if (req.method === 'GET' && url.pathname === '/status') { reply(200, snapshot()); return; }
       if (req.method === 'GET' && url.pathname === '/events') {
         const ev = inbox.events(url.searchParams.get('after'));
-        if (client && typeof client.getRecentPresences === 'function') {
-          ev.presences = client.getRecentPresences();
+        // Typing / recording states from the main number and from the TM phones the caller
+        // chats through (PHP passes them), newest state per contact wins.
+        const sources = [client, ...String(url.searchParams.get('devices') || '').split(',').filter(Boolean).slice(0, 500).map(id => devicePool.clientOf(id))];
+        const presences = {};
+        for (const c of sources) {
+          if (!c || typeof c.getRecentPresences !== 'function') continue;
+          for (const [phone, p] of Object.entries(c.getRecentPresences())) {
+            if (!presences[phone] || (p.timestamp || 0) > (presences[phone].timestamp || 0)) presences[phone] = p;
+          }
         }
+        ev.presences = presences;
         reply(200, ev);
         return;
       }
       if (req.method === 'GET' && url.pathname === '/media') { reply(200, await inbox.media(url.searchParams.get('id'))); return; }
-      if (req.method === 'GET' && url.pathname === '/presence') { reply(200, await readPresence(client, url.searchParams.get('phone') || '')); return; }
+      if (req.method === 'GET' && url.pathname === '/presence') {
+        // A closer's chats run on their own linked WhatsApp: subscribe / read presence there.
+        const devClient = url.searchParams.get('device') ? devicePool.clientOf(url.searchParams.get('device')) : null;
+        reply(200, await readPresence(devClient || client, url.searchParams.get('phone') || ''));
+        return;
+      }
       if (req.method === 'GET' && url.pathname === '/receipt') {
         const id = url.searchParams.get('id');
         let receipt = receipts.get(id);
@@ -334,8 +347,10 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       if (url.pathname === '/presence') {
         const phone = body.phone || '';
         const type = body.type || 'composing';
-        if (client && typeof client.sendPresence === 'function') {
-          await client.sendPresence(phone, type);
+        // "typing…" / "recording audio…" must come from the number the contact is chatting with.
+        const target = (body.device && devicePool.clientOf(body.device)) || client;
+        if (target && typeof target.sendPresence === 'function') {
+          await target.sendPresence(phone, type);
         }
         reply(200, { success: true });
         return;

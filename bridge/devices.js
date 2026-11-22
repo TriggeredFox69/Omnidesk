@@ -247,8 +247,10 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
   }
 
   const clients = () => [...devices.values()].filter(d => d.client && d.phase === 'ready').map(d => d.client);
+  // The live client of one TM's linked WhatsApp (for presence), or null if it is not connected.
+  const clientOf = id => { const d = get(id); return d && d.phase === 'ready' && d.client ? d.client : null; };
 
-  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll, clients };
+  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll, clients, clientOf };
 }
 
 module.exports = { createDevicePool, normalizePhone, samePhone };

@@ -77,7 +77,14 @@
         state.leads.unshift(lead);
       }
       if (!lead) return null;
-      const previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
+      let previous = lead.messages.find(m => m.waMessageId === item.waMessageId);
+      // A text this browser just sent shows at once with a clock icon (no WhatsApp id yet).
+      // When its echo arrives first, adopt it instead of drawing a second bubble.
+      if (!previous && item.sender === 'agent') {
+        previous = lead.messages.find(m => m.deliveryStatus === 'sending' && !m.waMessageId && m.type !== 'audio'
+          && String(m.text || '').trim() === String(item.text || '').trim());
+        if (previous) previous.waMessageId = item.waMessageId;
+      }
       const previousStatus = previous ? previous.deliveryStatus : undefined;
       // Contact names are user-managed only; do not auto-override with WhatsApp push names
       const fields = { ...item, time: new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -168,7 +175,7 @@
           // Poll presence for active chat at a responsive cadence (every 5s)
           if (Date.now() - lastPresenceAt > 5000) {
             lastPresenceAt = Date.now();
-            api('get_presence', { phone: lead.phone }).then(presence => {
+            api('get_presence', { phone: lead.phone, owner_id: lead.ownerId || '' }).then(presence => {
               if (typeof window.onContactPresenceUpdate === 'function') {
                 window.onContactPresenceUpdate(lead.phone, presence);
               } else {

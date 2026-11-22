@@ -526,6 +526,23 @@ document.addEventListener('DOMContentLoaded', () => {
     return state.agents.find(a => a.id === id);
   }
 
+  // Team Inbox badge = total unread MESSAGES in the chats this user can see (it showed the
+  // number of chats). Hidden at 0, "99+" above 99. Chat rows use the same rule with "9+".
+  const unreadLabel = (n, cap) => (n > cap ? `${cap}+` : String(n));
+  function updateUnreadBadge() {
+    if (!els.unreadGlobalBadge) return;
+    const role = String(state.currentUser?.role || '').toLowerCase();
+    const seeAll = role === 'admin' || role === 'superadmin';
+    let total = 0;
+    for (const l of state.leads || []) {
+      if (!seeAll && !isMyAllottedLead(l)) continue;
+      total += Math.max(0, Number(l.unreadCount) || 0);
+    }
+    els.unreadGlobalBadge.textContent = unreadLabel(total, 99);
+    els.unreadGlobalBadge.style.display = total > 0 ? '' : 'none';
+    els.unreadGlobalBadge.title = `${total} unread message${total === 1 ? '' : 's'}`;
+  }
+
   function canAccessCampaignStudio() {
     const role = String(state.currentUser?.role || state.currentAgent?.role || '').trim().toLowerCase();
     return role === 'admin' || role === 'master admin';
@@ -586,12 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Update global counters
-    const unreadCount = state.leads.filter(l => l.status === 'unread' || (l.unreadCount && l.unreadCount > 0)).length;
-    if (els.unreadGlobalBadge) {
-      els.unreadGlobalBadge.textContent = unreadCount > 0 ? unreadCount : state.leads.length;
-      els.unreadGlobalBadge.title = unreadCount > 0 ? `${unreadCount} unread message(s)` : `${state.leads.length} conversation(s)`;
-    }
+    updateUnreadBadge();
 
     const activeId = user ? user.id : state.currentAgent.id;
     const activeUsername = (user?.username || '').toLowerCase();
@@ -1122,6 +1134,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const myAllotted = state.leads.filter(isMyAllottedLead);
             const openLead = state.activeLeadId ? getLead(state.activeLeadId) : null;
             if (openLead) ensureFullHistory(openLead);
+            // A chat that is open on screen has nothing unread: clear what the server counted.
+            if (openLead && openLead.unreadCount > 0 && state.currentTab === 'inbox' && !document.hidden) markLeadRead(openLead);
             if (!_initialChatRestored) {
               _initialChatRestored = true;
               const urlChat = urlParams.get('chat') || localStorage.getItem('omnidesk_active_chat_phone');
@@ -1155,7 +1169,11 @@ document.addEventListener('DOMContentLoaded', () => {
               }
             }
             renderConversationsList();
-            if (!silent || (activeLeadHadNewMessages && document.activeElement !== els.chatInput)) {
+            // Always refresh the open chat: renderActiveChat() only rebuilds the thread when a
+            // message, tick or attachment changed, and never touches the typing box. (It used to
+            // be skipped while the typing box had focus, i.e. right after sending, so new
+            // messages only appeared after a page refresh.)
+            if (!silent || activeLeadHadNewMessages || state.currentTab === 'inbox') {
               renderActiveChat();
             }
             renderAgentProfile();
@@ -1521,6 +1539,7 @@ document.addEventListener('DOMContentLoaded', () => {
       body: JSON.stringify({
         action: 'send_presence',
         phone: lead.phone,
+        owner_id: lead.ownerId || '',
         type: type
       })
     }).catch(() => {});
@@ -1548,20 +1567,24 @@ document.addEventListener('DOMContentLoaded', () => {
         </svg>
       </span>`;
     }
-    if (tickState === 'sent') {
+    // 'accepted' = WhatsApp's server has it: one grey tick, like WhatsApp (was a clock).
+    if (tickState === 'sent' || tickState === 'accepted') {
       return `<span title="Sent" style="display:inline-flex;align-items:center;margin-left:3px;vertical-align:middle;">
         <svg width="12" height="11" viewBox="0 0 12 11" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M10.55 0.7L4.4 6.85L1.75 4.2L0.3 5.65L4.4 9.75L12 2.15L10.55 0.7Z" fill="#8696a0"/>
         </svg>
       </span>`;
     }
-    if (['sending', 'accepted'].includes(tickState)) {
+    if (tickState === 'sending') {
       return `<span title="Sending" style="display:inline-flex;align-items:center;margin-left:3px;vertical-align:middle;">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </span>`;
     }
     if (tickState === 'failed') {
       return `<span title="Sending failed" style="color:#ef4444;font-size:12px;font-weight:bold;margin-left:3px;">!</span>`;
+    }
+    if (tickState === 'unknown') {
+      return `<span title="Not confirmed: check WhatsApp before resending" style="color:#f59e0b;font-size:12px;font-weight:bold;margin-left:3px;">?</span>`;
     }
     return `<span title="Delivered" style="display:inline-flex;align-items:center;margin-left:3px;vertical-align:middle;">
       <svg width="16" height="11" viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1790,6 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Keep the inbox ordered by the latest message, including updates on an
     // existing chat, so active conversations rise immediately after sync.
     state.leads.sort((a, b) => _latestTs(b) - _latestTs(a));
+    updateUnreadBadge();
 
     const currentUser = state.currentUser || state.currentAgent;
     const userRole = (currentUser?.role || '').toLowerCase();
@@ -1992,7 +2016,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="conv-avatar-wrap">
           <span class="avatar-initials">${initials}</span>
           <div class="lead-status-dot status-${leadState}" title="${leadState === 'fresh' ? '🔴 Fresh (No one claimed)' : leadState === 'ongoing' ? '🟡 Ongoing (In Progress)' : leadState === 'pending_verification' ? '⚪ In Review (Awaiting Admin Verification)' : leadState === 'paid' ? '🟢 Closed (Client Paid)' : '🔵 Won\'t Pay'}"></div>
-          ${lead.unreadCount > 0 ? `<div class="unread-badge">${lead.unreadCount}</div>` : ''}
+          ${lead.unreadCount > 0 && lead.id !== state.activeLeadId ? `<div class="unread-badge" title="${lead.unreadCount} unread">${unreadLabel(Number(lead.unreadCount) || 0, 9)}</div>` : ''}
         </div>
         <div class="conv-body">
           <div class="conv-top-row">
@@ -2096,14 +2120,21 @@ document.addEventListener('DOMContentLoaded', () => {
     finally { lead._loadingHistory = false; }
   }
 
+  // Opening a chat reads it. The count is saved too: it used to be cleared only in this
+  // browser, so the next refresh brought the old unread number back.
+  function markLeadRead(lead) {
+    if (!lead) return;
+    lead.unreadCount = 0;
+    if (lead.status === 'unread') lead.status = 'read';
+    syncLeadToServer(lead, { unreadCount: 0 });
+  }
+
   function selectLead(leadId) {
     state.activeLeadId = leadId;
     const lead = getLead(leadId);
     if (lead) ensureFullHistory(lead);
     if (lead) {
-      if (lead.unreadCount > 0) {
-        lead.unreadCount = 0;
-      }
+      if (lead.unreadCount > 0) markLeadRead(lead);
       if (lead.phone) {
         try {
           localStorage.setItem('omnidesk_active_chat_phone', normalizePhone(lead.phone));
@@ -2145,6 +2176,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let _lastRenderedChatId = null;
   let _lastRenderedMsgCount = 0;
   let _lastRenderedMsgTimestamp = 0;
+  let _lastRenderedSig = '';
 
   function renderActiveChat() {
     const lead = getLead(state.activeLeadId);
@@ -2379,10 +2411,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render Messages Thread — skip full rebuild if same chat and no new messages
     const curMsgCount = lead.messages.length;
     const curLastTs = curMsgCount ? (lead.messages[curMsgCount - 1].timestamp || 0) : 0;
-    const chatChanged = lead.id !== _lastRenderedChatId || curMsgCount !== _lastRenderedMsgCount || curLastTs !== _lastRenderedMsgTimestamp;
+    // Ticks changing and attachments finishing loading also need a redraw; the count alone
+    // missed them (images and voice notes stayed on "Loading…" until the next message).
+    const curSig = lead.messages.slice(-40).map(m => `${m.deliveryStatus || ''}${(m.audioUrl || m.imageUrl || m.videoUrl || m.docUrl) ? '+' : ''}${m.mediaError ? '!' : ''}`).join('|');
+    const sameChatSameCount = lead.id === _lastRenderedChatId && curMsgCount === _lastRenderedMsgCount;
+    const chatChanged = lead.id !== _lastRenderedChatId || curMsgCount !== _lastRenderedMsgCount || curLastTs !== _lastRenderedMsgTimestamp || curSig !== _lastRenderedSig;
     _lastRenderedChatId = lead.id;
     _lastRenderedMsgCount = curMsgCount;
     _lastRenderedMsgTimestamp = curLastTs;
+    _lastRenderedSig = curSig;
+    // A redraw for a tick / attachment keeps the reader where they are, unless they were at the bottom.
+    const area = els.chatMessagesArea;
+    const keepScroll = !!area && sameChatSameCount && (area.scrollHeight - area.scrollTop - area.clientHeight > 80);
+    const keptScrollTop = area ? area.scrollTop : 0;
 
     if (els.chatMessagesArea && (!isLockedOngoing || isAdmin) && chatChanged) {
       els.chatMessagesArea.innerHTML = `
@@ -2509,10 +2550,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
 
-      els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
-      requestAnimationFrame(() => {
-        if (els.chatMessagesArea) els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
-      });
+      if (keepScroll) {
+        els.chatMessagesArea.scrollTop = keptScrollTop;
+      } else {
+        els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
+        requestAnimationFrame(() => {
+          if (els.chatMessagesArea) els.chatMessagesArea.scrollTop = els.chatMessagesArea.scrollHeight;
+        });
+      }
     }
 
     updateActiveChatPresenceUI();
@@ -2668,56 +2713,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const text = els.chatInput.value.trim();
     if (!text) return;
 
-    if (els.sendMsgBtn) els.sendMsgBtn.disabled = true;
-    let sendResult;
-    try {
-      const response = await fetch('api/direct_sender.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send_direct', phone: lead.phone, message: text, request_id: crypto.randomUUID() })
-      });
-      sendResult = await response.json();
-      if (!response.ok || !sendResult.success) {
-        if (sendResult && sendResult.quota_exceeded) {
-          showToast(`⚠️ Quota Blocked: ${sendResult.message}`, 6000);
-          return;
-        }
-        throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
-      }
-      if (sendResult && sendResult.quota_metrics) {
-        const countEl = document.getElementById('headerQuotaCount');
-        const limitEl = document.getElementById('headerQuotaLimit');
-        if (countEl) countEl.textContent = sendResult.quota_metrics.sent;
-        if (limitEl) limitEl.textContent = sendResult.quota_metrics.limit < 0 ? '∞' : sendResult.quota_metrics.limit;
-      }
-    } catch (error) {
-      showToast(`❌ WhatsApp message was not sent: ${describeSendError(error)}`);
-      return;
-    } finally {
-      if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
-    }
-
-    // Associate lead with closer
+    // Like WhatsApp: the message appears at once with a clock icon and the box is cleared;
+    // sending happens in the background and the icon becomes ticks (or "failed").
+    // (It used to wait for WhatsApp's confirmation first, so the text sat in the box for
+    // seconds, and a slow confirmation meant it only showed after a refresh.)
     if (!lead.ownerId) {
       lead.ownerId = myId;
       lead.ownerName = myName;
     }
-
+    const requestId = crypto.randomUUID();
     const nowTs = Math.floor(Date.now() / 1000);
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
     const crmMessage = {
-      id: `msg_${Date.now()}`,
-      waMessageId: sendResult.message_id,
-      deliveryStatus: 'accepted',
+      id: `msg_${requestId}`,
+      deliveryStatus: 'sending',
       sender: 'agent',
       agentName: myName,
       text: text,
       timestamp: nowTs,
-      time: now
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
-    if (!lead.messages.some(m => m.waMessageId === crmMessage.waMessageId)) lead.messages.push(crmMessage);
-
+    lead.messages.push(crmMessage);
     lead.status = 'replied';
     lead.lastActive = 'Just now';
     lead.lastMessageAt = nowTs;
@@ -2731,16 +2746,58 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderConversationsList();
     renderActiveChat();
+
+    let sendResult;
+    try {
+      const response = await fetch('api/direct_sender.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_direct', phone: lead.phone, message: text, request_id: requestId })
+      });
+      sendResult = await response.json();
+      if (!response.ok || !sendResult.success) {
+        if (sendResult && sendResult.quota_exceeded) {
+          crmMessage.deliveryStatus = 'failed';
+          crmMessage.deliveryError = sendResult.message;
+          showToast(`⚠️ Quota Blocked: ${sendResult.message}`, 6000);
+          renderActiveChat();
+          return;
+        }
+        throw new Error(sendResult.message || `WhatsApp API returned HTTP ${response.status}`);
+      }
+      if (sendResult && sendResult.quota_metrics) {
+        const countEl = document.getElementById('headerQuotaCount');
+        const limitEl = document.getElementById('headerQuotaLimit');
+        if (countEl) countEl.textContent = sendResult.quota_metrics.sent;
+        if (limitEl) limitEl.textContent = sendResult.quota_metrics.limit < 0 ? '∞' : sendResult.quota_metrics.limit;
+      }
+    } catch (error) {
+      const why = describeSendError(error);
+      crmMessage.deliveryStatus = /unconfirmed|unknown|did not respond/i.test(why) ? 'unknown' : 'failed';
+      crmMessage.deliveryError = why;
+      showToast(`❌ WhatsApp message was not sent: ${why}`);
+      renderActiveChat();
+      return;
+    }
+
+    // The live feed may already have delivered this message's echo (and even its ticks):
+    // keep one bubble, with the best status seen so far.
+    const sentId = sendResult.message_id;
+    const echo = lead.messages.find(m => m !== crmMessage && m.waMessageId === sentId);
+    crmMessage.waMessageId = sentId;
+    if (crmMessage.deliveryStatus === 'sending') crmMessage.deliveryStatus = (echo && echo.deliveryStatus) || 'accepted';
+    if (echo) lead.messages = lead.messages.filter(m => m === crmMessage || m.waMessageId !== sentId);
+
+    if (state.activeLeadId === lead.id) renderActiveChat();
     syncLeadToServer(lead, { newMessage: crmMessage, lastMessageAt: nowTs });
     watchCampaignDelivery({
       id: crmMessage.id,
       phone: lead.phone,
       display: lead.display || lead.phone,
       name: lead.name,
-      messageId: sendResult.message_id,
+      messageId: sentId,
       isCampaign: false
     }, 0);
-    showToast('WhatsApp accepted the message; waiting for delivery confirmation.');
   }
 
   // Quick Macro Chips
@@ -8681,19 +8738,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         audio.addEventListener('error', () => {
-          playSyntheticVoice(msgId, durSec);
+          voiceNoteUnavailable(msg, msgId, durSec);
         });
 
         audio.play().catch(err => {
-          playSyntheticVoice(msgId, durSec);
+          voiceNoteUnavailable(msg, msgId, durSec);
         });
       } catch (e) {
-        playSyntheticVoice(msgId, durSec);
+        voiceNoteUnavailable(msg, msgId, durSec);
       }
     } else {
-      // Pleasant audible speech-cadence synthesizer for demo & simulated voice notes
-      playSyntheticVoice(msgId, durSec);
+      voiceNoteUnavailable(msg, msgId, durSec);
     }
+  }
+
+  // A real WhatsApp voice note that cannot be loaded says so. (It used to play a made-up
+  // synthesized sound instead, which hid the failure.) Demo messages without a WhatsApp id
+  // keep the synthesized preview.
+  function voiceNoteUnavailable(msg, msgId, durSec) {
+    if (msg && msg.waMessageId) {
+      stopCurrentAudio();
+      showToast(`⚠️ ${msg.mediaError || 'This voice note could not be loaded. Ask the sender to send it again.'}`, 5000);
+      return;
+    }
+    playSyntheticVoice(msgId, durSec);
   }
 
   function playSyntheticVoice(msgId, durationSec) {

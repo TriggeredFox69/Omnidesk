@@ -126,6 +126,15 @@ function chatlyCompanySenderIds(string $companyId): array {
     return $ids;
 }
 
+// Which linked WhatsApp shows / receives "typing…" and "recording audio…" for a chat:
+// a closer always uses their own phone; an admin may name the chat owner's phone if it
+// belongs to their company. '' means the company's main number.
+function chatlyPresenceDevice(array $user, bool $admin, string $companyId, array $input): string {
+    if (!$admin) return preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($user['id'] ?? ''));
+    $owner = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($input['owner_id'] ?? ''));
+    return ($owner !== '' && isset(chatlyCompanySenderIds($companyId)[$owner])) ? $owner : '';
+}
+
 function chatlyCompanyName(string $companyId): string {
     $companies = json_decode((string) @file_get_contents(__DIR__ . '/../data/companies.json'), true);
     foreach ((is_array($companies) ? $companies : []) as $c) if (($c['id'] ?? '') === $companyId) return (string) ($c['name'] ?? $companyId);
@@ -530,7 +539,11 @@ function handleWhatsAppBridge(string $action, array $input): void {
             $result = ['success' => true, 'status' => 'delivered'];
         }
     } elseif ($action === 'get_events') {
-        $result = whatsappBridgeRequest('/events?after=' . (int) ($input['after'] ?? 0));
+        // Typing / recording states come from the WhatsApps this user chats through: a closer's
+        // own linked phone, or (for an admin) the company's linked phones, plus the main number.
+        $presenceDevices = $admin ? array_keys(chatlyCompanySenderIds($myCompany)) : [(string) ($user['id'] ?? '')];
+        $presenceDevices = array_slice(array_filter(array_map(fn($d) => preg_replace('/[^A-Za-z0-9_-]/', '', (string) $d), $presenceDevices)), 0, 500);
+        $result = whatsappBridgeRequest('/events?after=' . (int) ($input['after'] ?? 0) . '&devices=' . rawurlencode(implode(',', $presenceDevices)));
         if (empty($result['success']) || ($result['state'] ?? '') === 'offline') {
             $result = ['success' => true, 'epoch' => 'online', 'cursor' => (int) ($input['after'] ?? 0), 'messages' => []];
         }
@@ -538,7 +551,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
     } elseif ($action === 'get_media') {
         $result = whatsappBridgeRequest('/media?id=' . rawurlencode((string) ($input['message_id'] ?? '')));
     } elseif ($action === 'get_presence') {
-        $result = whatsappBridgeRequest('/presence?phone=' . rawurlencode((string) ($input['phone'] ?? '')));
+        $result = whatsappBridgeRequest('/presence?phone=' . rawurlencode((string) ($input['phone'] ?? '')) . '&device=' . rawurlencode(chatlyPresenceDevice($user, $admin, $myCompany, $input)));
         if (empty($result['success'])) {
             $result = ['success' => true, 'state' => 'unknown', 'label' => 'Online / last seen unavailable'];
         }
@@ -548,7 +561,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
         elseif (str_starts_with($phone, '03') && strlen($phone) === 11) $phone = '92' . substr($phone, 1);
         elseif (str_starts_with($phone, '3') && strlen($phone) === 10) $phone = '92' . $phone;
         $type = (string) ($input['type'] ?? 'composing');
-        $result = whatsappBridgeRequest('/presence', ['phone' => $phone, 'type' => $type]);
+        $result = whatsappBridgeRequest('/presence', ['phone' => $phone, 'type' => $type, 'device' => chatlyPresenceDevice($user, $admin, $myCompany, $input)]);
         if (empty($result['success'])) {
             $result = ['success' => true];
         }
@@ -592,27 +605,10 @@ function handleWhatsAppBridge(string $action, array $input): void {
         unset($input['closer']);
         $result = whatsappBridgeRequest('/campaign/start', $input);
         if (!empty($result['success'])) {
-            // Mirror the bridge's equal split into the CRM: each number belongs to the TM who messages it.
-            try {
-                $lanes = is_array($result['lanes'] ?? null) ? $result['lanes'] : [];
-                $byId = [];
-                foreach ($lanes as $l) $byId[$l['id'] ?? ''] = $l;
-                $audience = [];
-                foreach (($result['audience'] ?? []) as $c) {
-                    $l = $byId[$c['laneId'] ?? ''] ?? null;
-                    if (!$l) continue;
-                    $audience[] = ['phone' => $c['phone'], 'name' => $c['name'] ?? '', 'city' => $c['city'] ?? 'Pakistan', '_owner' => $l];
-                }
-                if ($audience) {
-                    $syncInput = $input;
-                    $syncInput['audience'] = array_map(fn($a) => array_diff_key($a, ['_owner' => 1]), $audience);
-                    $syncInput['closers'] = array_map(fn($a) => $a['_owner'], $audience);
-                    $syncInput['closer_per_contact'] = true;
-                    syncCampaignAudienceToCrm($syncInput);
-                }
-            } catch (Throwable $e) {
-                error_log('[CRM Campaign Lead Sync Error]: ' . $e->getMessage());
-            }
+            // The audience is NOT copied into the CRM here any more. That created a
+            // "Queued for outreach" lead for every number of every campaign (14,000+ leads that
+            // were never messaged, and a huge leads.json). The bridge creates each lead, owned by
+            // the TM who sent it, when its message is actually sent (campaign.js applyCrmItem).
             unset($result['allocations']);
         } elseif (empty($result['message'])) {
             $result['message'] = 'The WhatsApp bridge did not accept the campaign. Check that the bridge is online.';

@@ -1057,8 +1057,30 @@ class BaileysClient extends EventEmitter {
     return null;
   }
 
+  // WhatsApp only forwards a contact's typing / recording state to (and shows ours from) a
+  // session that is "available". Linked phones connect with markOnlineOnConnect:false so the
+  // phone keeps its notifications; while someone is working a chat in Chatly the session
+  // announces itself available, and goes back to unavailable after a minute of no activity
+  // (what WhatsApp Web does too).
+  _presenceActive() {
+    const sock = this.sock;
+    if (!sock || typeof sock.sendPresenceUpdate !== 'function') return;
+    const now = Date.now();
+    if (now - (this._lastAvailablePing || 0) > 30000) {
+      this._lastAvailablePing = now;
+      Promise.resolve(sock.sendPresenceUpdate('available')).catch(() => {});
+    }
+    clearTimeout(this._unavailableTimer);
+    this._unavailableTimer = setTimeout(() => {
+      this._lastAvailablePing = 0;
+      if (this.sock === sock) Promise.resolve(sock.sendPresenceUpdate('unavailable')).catch(() => {});
+    }, 60000);
+    if (this._unavailableTimer.unref) this._unavailableTimer.unref();
+  }
+
   async subscribePresence(phone) {
     if (!this.sock || !phone) return;
+    this._presenceActive();
     try {
       const clean = String(phone).replace(/\D/g, '');
       let norm = clean;
@@ -1112,6 +1134,7 @@ class BaileysClient extends EventEmitter {
 
   async sendPresence(phone, type = 'composing') {
     if (!this.sock) return;
+    this._presenceActive();
     const clean = String(phone).replace(/\D/g, '');
     let norm = clean;
     if (norm.startsWith('0092')) norm = norm.slice(2);
