@@ -1642,15 +1642,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Debounce renderConversationsList so rapid-fire poll merges don't thrash the DOM
+  let _renderListRAF = 0;
+  function scheduleRenderConversationsList() {
+    if (_renderListRAF) return;
+    _renderListRAF = requestAnimationFrame(() => { _renderListRAF = 0; renderConversationsList(); });
+  }
+
+  // Cache the latest-message timestamp extractor outside the sort to avoid closure allocations
+  const _latestTs = lead => Number(lead.lastMessageAt || lead.messages?.[lead.messages.length - 1]?.timestamp || 0);
+
   function renderConversationsList() {
     if (!els.conversationsScroll) return;
 
     // Keep the inbox ordered by the latest message, including updates on an
     // existing chat, so active conversations rise immediately after sync.
-    state.leads.sort((a, b) => {
-      const latest = lead => Number(lead.lastMessageAt || lead.messages?.[lead.messages.length - 1]?.timestamp || 0);
-      return latest(b) - latest(a);
-    });
+    state.leads.sort((a, b) => _latestTs(b) - _latestTs(a));
 
     const currentUser = state.currentUser || state.currentAgent;
     const userRole = (currentUser?.role || '').toLowerCase();
@@ -1696,14 +1703,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.inboxFilterTakeover) els.inboxFilterTakeover.style.display = isMasterRole ? 'inline-flex' : 'none';
     if (els.pipelineFilterTakeover) els.pipelineFilterTakeover.style.display = isMasterRole ? 'inline-block' : 'none';
 
-    // Update Subbar KPI widgets and badges
+    // Update Subbar KPI widgets and badges (compute state once per lead)
     const baseLeads = isAdmin ? state.leads : state.leads.filter(isMyAllottedLead);
     const countAll = baseLeads.length;
-    const countFresh = baseLeads.filter(l => getLeadState(l) === 'fresh').length;
-    const countOngoing = baseLeads.filter(l => getLeadState(l) === 'ongoing').length;
-    const countPending = baseLeads.filter(l => getLeadState(l) === 'pending_verification').length;
-    const countPaid = baseLeads.filter(l => getLeadState(l) === 'paid').length;
-    const countUseless = baseLeads.filter(l => getLeadState(l) === 'useless').length;
+    let countFresh = 0, countOngoing = 0, countPending = 0, countPaid = 0, countUseless = 0;
+    for (let i = 0; i < baseLeads.length; i++) {
+      const s = getLeadState(baseLeads[i]);
+      if (s === 'fresh') countFresh++;
+      else if (s === 'ongoing') countOngoing++;
+      else if (s === 'pending_verification') countPending++;
+      else if (s === 'paid') countPaid++;
+      else if (s === 'useless') countUseless++;
+    }
     const countMine = baseLeads.length;
 
     if (els.kpiCountAll) els.kpiCountAll.textContent = countAll;
@@ -1739,7 +1750,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    els.conversationsScroll.innerHTML = '';
+    // === Differential DOM update: reuse existing conv-items instead of clearing innerHTML ===
+    const existingItems = els.conversationsScroll.querySelectorAll('.conv-item[data-lead-phone]');
+    const existingMap = new Map();
+    existingItems.forEach(el => existingMap.set(el.dataset.leadPhone, el));
 
     if (!filtered.length) {
       els.conversationsScroll.innerHTML = `
@@ -1750,6 +1764,9 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       return;
     }
+
+    const newPhoneSet = new Set();
+    const fragment = document.createDocumentFragment();
 
     filtered.forEach(lead => {
       const isSelected = lead.id === state.activeLeadId;
@@ -1874,7 +1891,31 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       els.conversationsScroll.appendChild(item);
+      newPhoneSet.add(normalizePhone(lead.phone));
     });
+
+    // Remove items that are no longer in the filtered set
+    existingMap.forEach((el, phone) => {
+      if (!newPhoneSet.has(phone)) el.remove();
+    });
+
+    // Re-order: ensure DOM order matches filtered order
+    const currentChildren = Array.from(els.conversationsScroll.querySelectorAll('.conv-item[data-lead-phone]'));
+    const desiredOrder = filtered.map(l => normalizePhone(l.phone));
+    let needsReorder = currentChildren.length !== desiredOrder.length;
+    if (!needsReorder) {
+      for (let i = 0; i < currentChildren.length; i++) {
+        if (currentChildren[i].dataset.leadPhone !== desiredOrder[i]) { needsReorder = true; break; }
+      }
+    }
+    if (needsReorder) {
+      for (let i = 0; i < desiredOrder.length; i++) {
+        const target = els.conversationsScroll.querySelector(`.conv-item[data-lead-phone="${desiredOrder[i]}"]`);
+        if (target && target !== els.conversationsScroll.children[i]) {
+          els.conversationsScroll.insertBefore(target, els.conversationsScroll.children[i]);
+        }
+      }
+    }
   }
 
   // Select Lead
@@ -1915,9 +1956,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // ACTIVE CHAT & LEAD DOSSIER
   // ==========================================
 
+  // Track last-rendered active chat to skip redundant full redraws
+  let _lastRenderedChatId = null;
+  let _lastRenderedMsgCount = 0;
+  let _lastRenderedMsgTimestamp = 0;
+
   function renderActiveChat() {
     const lead = getLead(state.activeLeadId);
     if (!lead) {
+      _lastRenderedChatId = null;
+      _lastRenderedMsgCount = 0;
+      _lastRenderedMsgTimestamp = 0;
       if (els.chatLeadName) els.chatLeadName.textContent = 'Select a conversation';
       if (els.chatLeadPhone) els.chatLeadPhone.textContent = '';
       if (els.chatMessagesArea) els.chatMessagesArea.textContent = 'Connect WhatsApp to sync recent conversations, or start a campaign.';
@@ -2142,8 +2191,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
 
-    // Render Messages Thread
-    if (els.chatMessagesArea && (!isLockedOngoing || isAdmin)) {
+    // Render Messages Thread — skip full rebuild if same chat and no new messages
+    const curMsgCount = lead.messages.length;
+    const curLastTs = curMsgCount ? (lead.messages[curMsgCount - 1].timestamp || 0) : 0;
+    const chatChanged = lead.id !== _lastRenderedChatId || curMsgCount !== _lastRenderedMsgCount || curLastTs !== _lastRenderedMsgTimestamp;
+    _lastRenderedChatId = lead.id;
+    _lastRenderedMsgCount = curMsgCount;
+    _lastRenderedMsgTimestamp = curLastTs;
+
+    if (els.chatMessagesArea && (!isLockedOngoing || isAdmin) && chatChanged) {
       els.chatMessagesArea.innerHTML = `
         <div class="msg-date-divider">TODAY • ENCRYPTED WHATSAPP THREAD</div>
       `;
@@ -8668,7 +8724,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }
 
-  const liveInbox = window.NunnoLiveInbox({ state, getLead, renderList: renderConversationsList, renderChat: renderActiveChat, toast: showToast, stopAudio: stopCurrentAudio });
+  const liveInbox = window.NunnoLiveInbox({ state, getLead, renderList: scheduleRenderConversationsList, renderChat: renderActiveChat, toast: showToast, stopAudio: stopCurrentAudio });
   if (!window.NUNNO_OFFLINE_PREVIEW && els.simClientAudioBtn) { els.simClientAudioBtn.hidden = true; els.simClientAudioBtn.style.display = 'none'; }
   const photoInput = document.createElement('input');
   photoInput.type = 'file'; photoInput.accept = 'image/*'; photoInput.hidden = true;

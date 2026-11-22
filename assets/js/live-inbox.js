@@ -216,7 +216,12 @@
       } finally { sendingMedia = false; renderList(); if (state.activeLeadId === lead.id) renderChat(); }
     }
     // Poll every 2 seconds for instant real-time live WhatsApp sync
-    setInterval(poll, 2000);
+    // Slow down when the tab is hidden to save CPU + network
+    let _pollInterval = setInterval(poll, 2000);
+    document.addEventListener('visibilitychange', () => {
+      clearInterval(_pollInterval);
+      _pollInterval = setInterval(poll, document.hidden ? 10000 : 2000);
+    });
     return { poll, loadMedia, sendMedia };
   };
 })();

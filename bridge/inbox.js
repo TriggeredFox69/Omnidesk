@@ -230,22 +230,12 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     }
   }
   async function syncChat(phone) {
-    if (!/^\d{10,18}$/.test(phone)) throw new Error('Invalid phone number.');
-    const client = getClient();
-    const id = await client.getNumberId(phone);
-    if (!id) return;
-    const chat = await client.getChatById(id._serialized);
-    for (const message of await chat.fetchMessages({ limit: 50 })) await ingest(message);
+    // Historical per-chat sync disabled: Chatly only keeps messages created after WhatsApp is connected.
+    return;
   }
   async function syncRecent() {
-    if (!getClient().getChats) return;
-    const chats = (await getClient().getChats()).filter(c => !c.isGroup && /@(c\.us|lid|s\.whatsapp\.net)$/.test(c.id?._serialized || '')).sort((a,b) => b.timestamp-a.timestamp).slice(0,20);
-    for (const chat of chats) {
-      try {
-        const phone = await phoneFor(chat.id._serialized);
-        if (phone) for (const m of await chat.fetchMessages({ limit: 30 })) await ingest(m, phone);
-      } catch (_) { /* One unavailable chat must not stop inbox synchronization. */ }
-    }
+    // Historical recent-chats sync disabled: Chatly only keeps messages created after WhatsApp is connected.
+    return;
   }
   // The company number, then every closer's linked WhatsApp: an attachment lives
   // on whichever one received it.
