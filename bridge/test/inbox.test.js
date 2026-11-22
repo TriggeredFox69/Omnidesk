@@ -5,23 +5,44 @@ const { readPresence } = require('../presence');
 const { createService } = require('../service');
 const { EventEmitter } = require('node:events');
 
+// A number Chatly just messaged (campaign / Sales Desk), so its replies count as a lead's
+// even before the campaign's batched CRM write lands. Uses a number no real CRM has.
+const TEST_PHONE = '923009990001';
+const chatlySend = (id, phone = TEST_PHONE) => ({ id: { _serialized: id, remote: phone + '@c.us', fromMe: true }, fromMe: true, body: 'hi', timestamp: Math.floor(Date.now() / 1000) });
+
 test('incoming text, audio and images are deduplicated and mapped from LID to a phone', async () => {
-  const inbox = createInbox({ getClient: () => ({ getContactLidAndPhone: async () => [{ pn: '923001234567@c.us' }] }) });
+  const inbox = createInbox({ getClient: () => ({ getContactLidAndPhone: async () => [{ pn: TEST_PHONE + '@c.us' }] }) });
+  await inbox.ingest(chatlySend('first-send'), TEST_PHONE, { fromChatly: true });
   for (const type of ['chat','ptt','image']) {
     const message = { id: { _serialized: 'id-' + type, remote: '123@lid', fromMe: false }, body: 'hello', type, hasMedia: type !== 'chat', timestamp: Math.floor(Date.now() / 1000) };
     await inbox.ingest(message); await inbox.ingest(message);
   }
   const result = inbox.events(0);
-  assert.equal(result.messages.length, 3);
-  assert.deepEqual(result.messages.map(m => m.type), ['text','audio','image']);
-  assert.ok(result.messages.every(m => m.phone === '923001234567' && m.sender === 'lead'));
+  const replies = result.messages.filter(m => m.sender === 'lead');
+  assert.equal(replies.length, 3);
+  assert.deepEqual(replies.map(m => m.type), ['text','audio','image']);
+  assert.ok(replies.every(m => m.phone === TEST_PHONE));
   assert.equal(inbox.events(result.cursor).messages.length, 0);
+});
+
+test('personal chats on a linked phone are never stored: messages typed to, or received from, non-leads', async () => {
+  const inbox = createInbox({ getClient: () => ({}) });
+  const now = Math.floor(Date.now() / 1000);
+  // typed on the closer's own phone to a friend (not a lead, not sent by Chatly)
+  await inbox.ingest({ id: { _serialized: 'typed-on-phone', remote: '923009990002@c.us', fromMe: true }, fromMe: true, body: 'dinner?', timestamp: now });
+  // a friend writing to the closer
+  await inbox.ingest({ id: { _serialized: 'friend-writes', remote: '923009990003@c.us', fromMe: false }, body: 'hey', timestamp: now });
+  assert.equal(inbox.events(0).messages.length, 0);
+  // a Chatly send to the same friend's number IS kept, and so is the reply after it
+  await inbox.ingest(chatlySend('chatly-send', '923009990003'), '923009990003', { fromChatly: true });
+  await inbox.ingest({ id: { _serialized: 'reply', remote: '923009990003@c.us', fromMe: false }, body: 'interested', timestamp: now });
+  assert.deepEqual(inbox.events(0).messages.map(m => m.waMessageId), ['chatly-send', 'reply']);
 });
 
 test('ACKs distinguish a single sent tick, delivered double tick and read double tick', async () => {
   const inbox = createInbox({ getClient: () => ({}) });
-  const message = { id: { _serialized: 'outgoing', remote: '923001234567@c.us', fromMe: true }, body: 'hi', timestamp: Math.floor(Date.now() / 1000) };
-  await inbox.ingest(message);
+  const message = chatlySend('outgoing');
+  await inbox.ingest(message, TEST_PHONE, { fromChatly: true });
   for (const [ack, status] of [[1,'sent'],[2,'delivered'],[3,'read']]) {
     inbox.ack(message, ack); assert.equal(inbox.events(0).messages[0].deliveryStatus, status);
   }

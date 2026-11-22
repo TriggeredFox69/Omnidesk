@@ -4857,6 +4857,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   els.employeeLeadList?.addEventListener('click', event => {
+    if (event.target.closest('[data-pipeline-more]')) {
+      pipelineRenderLimit += PIPELINE_PAGE_SIZE;
+      renderEmployeeWorkspace();
+      return;
+    }
     const leadButton = event.target.closest('[data-employee-lead]');
     if (!leadButton) return;
     const leadId = leadButton.dataset.employeeLead;
@@ -4926,6 +4931,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Profile & Workspace Pipeline Filter State
   let currentPipelineFilter = 'all';
+  // The pipeline list draws this many rows, plus a "Show more" button. Drawing every lead
+  // (14k+ on big CRMs) on each 5 s refresh froze the Team Stats page.
+  const PIPELINE_PAGE_SIZE = 150;
+  let pipelineRenderLimit = PIPELINE_PAGE_SIZE;
 
   // Smooth Count-Up Animation Engine for Stats & Bento Widgets
   function animateCount(elementId, targetValue, duration = 850, prefix = '', suffix = '') {
@@ -5234,7 +5243,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const isPipelineDelete = pipelineDeleteMode;
     const stateLabel = { ongoing: 'Ongoing', fresh: 'New', pending_verification: 'In Review', paid: 'Paid', useless: "Won't Pay", takeover: 'Takeover' };
-    els.employeeLeadList.innerHTML = sorted.map(lead => {
+    const shown = sorted.slice(0, pipelineRenderLimit);
+    const hiddenCount = sorted.length - shown.length;
+    const moreHtml = hiddenCount > 0
+      ? `<button type="button" class="employee-lead-row" data-pipeline-more style="justify-content:center;font-weight:700;">Show ${Math.min(PIPELINE_PAGE_SIZE, hiddenCount)} more (${hiddenCount.toLocaleString()} not shown)</button>`
+      : '';
+    els.employeeLeadList.innerHTML = shown.map(lead => {
       const status = getLeadState(lead);
       const lastMessage = [...(lead.messages || [])].reverse().find(message => message.sender === 'lead')?.text || lead.notes || 'No message preview yet.';
       const rawName = getContactDisplayName(lead);
@@ -5255,7 +5269,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ` : '';
 
       return `<button class="employee-lead-row ${isChecked ? 'selected-delete' : ''}" type="button" data-employee-lead="${escapeHtml(lead.id)}">${checkHtml}<span class="employee-lead-avatar">${escapeHtml(avatarInitials)}</span><span class="employee-lead-main"><strong>${escapeHtml(displayName)}</strong><small>${escapeHtml(String(lastMessage).slice(0, 90))}</small></span><span class="employee-lead-product">${escapeHtml(lead.interest || 'Nunno Pro')}</span><span class="employee-lead-status ${escapeHtml(status)}">${escapeHtml(stateLabel[status] || status)}</span>${trashBtnHtml}<span aria-hidden="true" class="employee-lead-arrow">↗</span></button>`;
-    }).join('');
+    }).join('') + moreHtml;
   }
 
   // Filter Buttons in Pipeline
@@ -5265,6 +5279,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-pipeline-filter]').forEach(b => b.classList.remove('active'));
     filterBtn.classList.add('active');
     currentPipelineFilter = filterBtn.getAttribute('data-pipeline-filter') || 'all';
+    pipelineRenderLimit = PIPELINE_PAGE_SIZE;
     renderEmployeeWorkspace();
   });
 

@@ -80,6 +80,20 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     if (companyOfMessageId.size > 5000) companyOfMessageId.delete(companyOfMessageId.keys().next().value);
   }
 
+  // Numbers Chatly messaged in the last few minutes. A campaign's CRM lead is written a few
+  // seconds after the send (batched), so a very quick reply must not be taken for a personal chat.
+  const chatlySentTo = new Map();   // "<company>:<last 9 digits>" -> time
+  const CHATLY_SENT_TTL_MS = 10 * 60 * 1000;
+  const sentKey = (companyId, phone) => { const d = tenants.digits(phone); return `${companyId}:${d.length >= 9 ? d.slice(-9) : d}`; };
+  function rememberChatlyPhone(companyId, phone) {
+    chatlySentTo.set(sentKey(companyId, phone), Date.now());
+    if (chatlySentTo.size > 5000) chatlySentTo.delete(chatlySentTo.keys().next().value);
+  }
+  function sentByChatlyRecently(companyId, phone) {
+    const at = chatlySentTo.get(sentKey(companyId, phone));
+    return at !== undefined && Date.now() - at < CHATLY_SENT_TTL_MS;
+  }
+
   async function ingest(message, knownPhone, opts = {}) {
     const id = message.id?._serialized;
     if (!id) return;
@@ -99,7 +113,13 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     // A reply is kept only if it is a lead of the company that owns this WhatsApp;
     // anything else on a closer's phone is a personal chat and stays private.
     const companyId = tenants.companyOfDevice(opts.viaUserId);
-    if (!fromMe && !tenants.isLeadOf(companyId, phone)) { debug(`dropped: not a ${companyId} lead (personal chat)`); return; }
+    if (fromMe && opts.fromChatly) rememberChatlyPhone(companyId, phone);
+    const known = tenants.isLeadOf(companyId, phone) || sentByChatlyRecently(companyId, phone);
+    if (!fromMe && !known) { debug(`dropped: not a ${companyId} lead (personal chat)`); return; }
+    // Messages typed on a closer's own phone to someone who is not a lead are personal
+    // chats too: never stored, never turned into leads. Chatly's own sends (campaigns,
+    // the Sales Desk) are flagged fromChatly; replies to real leads are always kept.
+    if (fromMe && !opts.fromChatly && !known && !messages.has(id)) { debug('dropped: sent from the phone to a non-lead (personal chat)'); return; }
     debug(fromMe ? 'kept: sent by us' : 'kept: reply from a lead');
     const previous = messages.get(id);
     const pendingAck = pendingAcks.get(id);
@@ -166,32 +186,10 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
             }
             modified = true;
           }
-        } else if (!ackStatusOnly && item.viaUserId && item.sender === 'agent' && cleanPhone.length >= 10) {
-          // A closer started a chat from their own phone: it becomes THEIR lead in
-          // THEIR company (cold outreach). Nothing is created for the main number.
-          const owner = tenants.usersById().get(String(item.viaUserId)) || {};
-          leads.push({
-            id: 'lead_wa_' + cleanPhone,
-            company_id: companyId,
-            name: item.name && item.name !== cleanPhone ? item.name : '+' + cleanPhone,
-            phone: cleanPhone,
-            display: '+' + cleanPhone,
-            city: '',
-            network: 'WhatsApp',
-            ownerId: item.viaUserId,
-            ownerName: owner.name || item.agentName || '',
-            ownerUsername: owner.username || '',
-            leadState: 'ongoing',
-            status: 'replied',
-            unreadCount: 0,
-            interest: 'WhatsApp outreach',
-            lastActive: 'Just now',
-            lastMessageAt: item.timestamp || Math.floor(Date.now() / 1000),
-            notes: 'Started from the closer’s connected WhatsApp',
-            messages: [leadMessage(item, null)]
-          });
-          modified = true;
         }
+        // No lead is ever created here. Leads come from Chatly itself (campaign sends are
+        // written by the campaign's CRM sync; the Sales Desk adds them explicitly). Creating
+        // one for every chat a closer started on their phone filled the CRM with personal chats.
         if (modified) tenants.writeLeads(companyId, leads);
         if (targetLead || modified) break;
       }
@@ -225,7 +223,9 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
         const current = pendingAcks.get(id);
         if (current === undefined || Number(value) === -1 || Number(value) > current) pendingAcks.set(id, Number(value));
         if (pendingAcks.size > 2000) pendingAcks.delete(pendingAcks.keys().next().value);
-        syncToLeadsFile({ waMessageId: id, deliveryStatus: nextStatus }, true);
+        // Only Chatly messages have a CRM lead to tick. Ticks for a closer's personal
+        // messages used to read every company's leads.json looking for them.
+        if (companyOfMessageId.has(id)) syncToLeadsFile({ waMessageId: id, deliveryStatus: nextStatus }, true);
       }
       return;
     }

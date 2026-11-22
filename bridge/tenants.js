@@ -88,8 +88,27 @@ function writeLeads(companyId, leads) {
   if (clean(companyId) === 'COMP-001' && file !== legacy && fs.existsSync(legacy)) put(legacy);
 }
 
+// Phone index per leads file, rebuilt only when the file changes. isLeadOf runs for every
+// message on every linked phone (personal chats included), and parsing a 10 MB leads.json
+// each time was a major source of bridge lag. Keys match samePhone(): numbers of 9+ digits
+// compare on their last 9, shorter ones exactly.
+const phoneKey = d => (d.length >= 9 ? d.slice(-9) : d);
+const phoneIndex = new Map();   // leads file -> { sig, keys }
+function leadPhoneKeys(companyId) {
+  const file = leadsFile(companyId);
+  let sig = '';
+  try { const st = fs.statSync(file); sig = `${st.mtimeMs}:${st.size}`; } catch (_) { return new Set(); }
+  const hit = phoneIndex.get(file);
+  if (hit && hit.sig === sig) return hit.keys;
+  const keys = new Set();
+  for (const l of readLeads(companyId)) { const d = digits(l && l.phone); if (d) keys.add(phoneKey(d)); }
+  phoneIndex.set(file, { sig, keys });
+  return keys;
+}
+
 function isLeadOf(companyId, phone) {
-  return readLeads(companyId).some(l => samePhone(l.phone, phone));
+  const d = digits(phone);
+  return !!d && leadPhoneKeys(companyId).has(phoneKey(d));
 }
 
 module.exports = { DATA_DIR, MAIN_COMPANY, digits, samePhone, usersById, companyOfUser, companyOfDevice, leadsFile, companyIds, readLeads, writeLeads, isLeadOf };

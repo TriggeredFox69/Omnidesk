@@ -50,7 +50,9 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
         const remote = message.id?.remote?._serialized || message.id?.remote || (fromMe ? message.to : message.from);
         const phone = knownPhone || await devicePhoneFor(devClient, remote);
         if (!phone || !/^\d{10,18}$/.test(phone)) return;
-        await inbox.ingest(message, phone, { phone, agentName: device.name, viaUserId: device.id, viaNumber: device.number });
+        // knownPhone is only passed by devicePool.send (a message Chatly sent); messages
+        // from the phone itself (message_create) come without it.
+        await inbox.ingest(message, phone, { phone, agentName: device.name, viaUserId: device.id, viaNumber: device.number, fromChatly: Boolean(knownPhone) });
       })().catch(err => console.error('Device inbox:', err.message));
     },
     onAck: (_device, _devClient, message, ack) => inbox.ack(message, ack)
@@ -257,7 +259,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       }
       const sent = await submitOnce(client, recipient._serialized, content, 60000,
         body.media ? { sendAudioAsVoice: Boolean(body.media.voice && body.media.mimetype.startsWith('audio/')), caption: body.message } : {});
-      await inbox.ingest(sent, body.phone);
+      await inbox.ingest(sent, body.phone, { fromChatly: true });
       const id = sent.id._serialized;
       if (!receipts.has(id)) remember(receipts, id, { status: ackStatus(sent.ack || 0), error: null });
       return { success: true, dispatch_mode: 'whatsapp_web', from_number: number, to_number: body.phone, message_id: id };

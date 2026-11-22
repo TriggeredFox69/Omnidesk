@@ -1134,10 +1134,20 @@ switch ($action) {
         $leads = file_exists($leadsFile) ? json_decode(file_get_contents($leadsFile), true) : [];
         if (!is_array($leads)) $leads = [];
 
+        // The lead board only shows name, phone, owner and state: send no chat history
+        // (it was every message of every lead, megabytes on each load).
+        $board = [];
+        foreach ($leads as $l) {
+            if (!is_array($l)) continue;
+            $l['messageCount'] = is_array($l['messages'] ?? null) ? count($l['messages']) : 0;
+            unset($l['messages']);
+            $board[] = $l;
+        }
+
         echo json_encode([
             'success' => true,
             'company_id' => $companyId,
-            'leads' => array_values($leads)
+            'leads' => $board
         ]);
         exit;
 

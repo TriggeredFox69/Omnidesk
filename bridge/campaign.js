@@ -712,7 +712,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
           body: personalizedMsg,
           timestamp: Math.floor(Date.now() / 1000),
           ack: 0
-        }, cleanPhone, { phone: cleanPhone, agentName: lane.name, viaUserId: lane.id, viaNumber: lane.phone }).catch(() => {});
+        }, cleanPhone, { phone: cleanPhone, agentName: lane.name, viaUserId: lane.id, viaNumber: lane.phone, fromChatly: true }).catch(() => {});
       }
       log(`✅ ${lane.name} (${lane.display}) ➔ ${contact.display || contact.phone}  [${lane.sent + lane.failed}/${lane.assigned}]`, 'success');
     } catch (err) {

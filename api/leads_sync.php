@@ -152,36 +152,11 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
         $via = (string) ($m['viaUserId'] ?? '');
         if ($via !== '' && ($userCompany[$via] ?? 'COMP-001') !== $activeCompanyId) continue;
 
+        // Only messages on an existing lead are merged; no lead is ever created from the
+        // WhatsApp feed. Leads come from Chatly itself (campaign sends, Sales Desk). Creating
+        // one for every chat a closer had on their phone filled the CRM with personal chats.
         $targetIdx = $leadMap[$mPhone] ?? null;
-        if ($targetIdx === null && $via === '') continue;   // main number: existing leads only
-        if ($targetIdx === null && ($m['sender'] ?? '') !== 'agent') continue;   // unknown inbound: personal chat
-        if ($targetIdx === null) {
-            $defaultDisplay = '+' . $mPhone;
-            $newLead = [
-                'id' => 'lead_wa_' . $mPhone,
-                'company_id' => $activeCompanyId,
-                'name' => $m['name'] ?? $defaultDisplay,
-                'phone' => $mPhone,
-                'display' => $defaultDisplay,
-                'city' => '',
-                'network' => 'WhatsApp',
-                'ownerId' => $via,
-                'ownerName' => $m['agentName'] ?? '',
-                'ownerUsername' => '',
-                'leadState' => 'ongoing',
-                'status' => ($m['sender'] === 'lead') ? 'unread' : 'replied',
-                'unreadCount' => ($m['sender'] === 'lead') ? 1 : 0,
-                'interest' => 'WhatsApp Direct Sync',
-                'lastActive' => 'Just now',
-                'lastMessageAt' => $m['timestamp'] ?? time(),
-                'notes' => 'Synced from connected WhatsApp account',
-                'messages' => []
-            ];
-            $leads[] = $newLead;
-            $targetIdx = count($leads) - 1;
-            $leadMap[$mPhone] = $targetIdx;
-            $modified = true;
-        }
+        if ($targetIdx === null) continue;
 
         $lead = &$leads[$targetIdx];
         if (!isset($lead['messages']) || !is_array($lead['messages'])) {
