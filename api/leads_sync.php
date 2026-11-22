@@ -81,13 +81,29 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
         $dataRoot . '/whatsapp-bridge/whatsapp-bridge/inbox.json',
         $dataRoot . '/inbox.json'
     ];
+
+    // High performance mtime cache: skip file I/O & loops completely if no new messages were written
+    $cacheFile = sys_get_temp_dir() . '/chatly_inbox_mtime_' . md5($dataFile);
+    $maxMtime = 0;
+    foreach ($inboxFiles as $f) {
+        if (file_exists($f)) {
+            $mt = @filemtime($f);
+            if ($mt > $maxMtime) $maxMtime = $mt;
+        }
+    }
+    if ($maxMtime > 0 && file_exists($cacheFile) && (int)@file_get_contents($cacheFile) >= $maxMtime) {
+        return false;
+    }
+
     $inboxMessages = [];
     foreach ($inboxFiles as $f) {
         if (file_exists($f)) {
             $raw = @file_get_contents($f);
             $parsed = json_decode($raw, true);
             if (is_array($parsed)) {
-                foreach ($parsed as $m) {
+                // If inbox file has thousands of items, only take the most recent 150
+                $slice = count($parsed) > 150 ? array_slice($parsed, -150) : $parsed;
+                foreach ($slice as $m) {
                     $waId = $m['waMessageId'] ?? ($m['id'] ?? '');
                     if ($waId && !isset($inboxMessages[$waId])) {
                         $inboxMessages[$waId] = $m;
@@ -96,6 +112,7 @@ function syncInboxMessagesIntoLeads(&$leads, $dataFile) {
             }
         }
     }
+    @file_put_contents($cacheFile, (string)$maxMtime);
     if (empty($inboxMessages)) return false;
 
     $cleanDigits = function($p) {

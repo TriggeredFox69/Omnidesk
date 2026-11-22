@@ -1026,8 +1026,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   let _initialChatRestored = false;
+  let _leadsFetchBusy = false;
   function fetchServerLeads(silent = false) {
-    if (window.NUNNO_LOCAL_LIVE) return;
+    if (window.NUNNO_LOCAL_LIVE || _leadsFetchBusy) return;
+    _leadsFetchBusy = true;
     const urlParams = new URLSearchParams(window.location.search);
     const compParam = urlParams.get('company_id') || state.currentCompanyId || '';
     const myId = state.currentUser?.id || '';
@@ -1119,7 +1121,8 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { _leadsFetchBusy = false; });
   }
 
   // Assign Lead -> Associates lead with active closer without locking barriers
@@ -1697,6 +1700,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return ts;
   };
 
+  let inboxDisplayLimit = 50;
   function renderConversationsList() {
     if (!els.conversationsScroll) return;
 
@@ -1812,8 +1816,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const newPhoneSet = new Set();
     const fragment = document.createDocumentFragment();
+    const totalFiltered = filtered.length;
+    const visibleSlice = filtered.slice(0, inboxDisplayLimit);
 
-    filtered.forEach(lead => {
+    visibleSlice.forEach(lead => {
       const isSelected = lead.id === state.activeLeadId;
       const lastMsg = lead.messages.length ? lead.messages[lead.messages.length - 1] : { text: 'No messages', time: '' };
       const owner = lead.ownerId ? getAgent(lead.ownerId) : null;
@@ -1944,12 +1950,36 @@ document.addEventListener('DOMContentLoaded', () => {
       fragment.appendChild(item);
     });
 
+    if (totalFiltered > inboxDisplayLimit) {
+      const loadMoreEl = document.createElement('div');
+      loadMoreEl.className = 'conv-load-more-btn';
+      loadMoreEl.style.cssText = 'padding:14px;text-align:center;color:#00a884;cursor:pointer;font-weight:600;font-size:13px;border-top:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);border-radius:8px;margin:8px;';
+      loadMoreEl.textContent = `Load more conversations (${inboxDisplayLimit} of ${totalFiltered} shown)...`;
+      loadMoreEl.onclick = () => {
+        inboxDisplayLimit += 50;
+        renderConversationsList();
+      };
+      fragment.appendChild(loadMoreEl);
+    }
+
     // Remove items that are no longer in the filtered set
     existingMap.forEach((el, phone) => {
       if (!newPhoneSet.has(phone)) el.remove();
     });
 
     els.conversationsScroll.appendChild(fragment);
+
+    if (!els.conversationsScroll._scrollBound) {
+      els.conversationsScroll._scrollBound = true;
+      els.conversationsScroll.addEventListener('scroll', () => {
+        if (els.conversationsScroll.scrollTop + els.conversationsScroll.clientHeight >= els.conversationsScroll.scrollHeight - 120) {
+          if (inboxDisplayLimit < filtered.length) {
+            inboxDisplayLimit += 50;
+            scheduleRenderConversationsList();
+          }
+        }
+      }, { passive: true });
+    }
   }
 
   // Select Lead
@@ -2649,6 +2679,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Search Filter Input
   if (els.convSearchInput) {
     els.convSearchInput.addEventListener('input', (e) => {
+      inboxDisplayLimit = 50;
       state.searchQuery = e.target.value;
       renderConversationsList();
     });
@@ -2657,6 +2688,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Inbox Filter Buttons
   els.inboxFilterBtns.forEach(btn => {
     btn.addEventListener('click', () => {
+      inboxDisplayLimit = 50;
       state.inboxFilter = btn.getAttribute('data-filter');
       renderConversationsList();
     });
@@ -2666,6 +2698,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.kpiFilterBtns) {
     els.kpiFilterBtns.forEach(pill => {
       pill.addEventListener('click', () => {
+        inboxDisplayLimit = 50;
         state.inboxFilter = pill.getAttribute('data-filter');
         renderConversationsList();
       });
@@ -3376,8 +3409,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function startCampaignStatusPolling() {
     if (campaignPollTimer) clearInterval(campaignPollTimer);
     campaignPollTimer = setInterval(() => {
-      syncServerCampaignStatus();
-    }, 3500);
+      if (campaignState.isRunning || (els.viewCampaign && els.viewCampaign.style.display !== 'none')) {
+        syncServerCampaignStatus();
+      }
+    }, 4000);
   }
 
   function applyServerCampaignState(data) {
