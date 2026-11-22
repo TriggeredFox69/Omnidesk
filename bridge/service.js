@@ -383,6 +383,10 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
     } catch (err) { reply(err.status || 502, { success: false, message: err.message }); }
   });
   return { server, connect, snapshot, campaignManager, devicePool, close: async () => {
+    // Chats still waiting for Supabase are written now (if it fails they are kept in a file
+    // and written after the restart).
+    const chatStore = require('./store').store();
+    if (chatStore.queuedCount()) await Promise.race([chatStore.flush(), new Promise(r => setTimeout(r, 4000))]).catch(() => {});
     if (client) { client.removeAllListeners(); await client.destroy().catch(() => {}); }
     await devicePool.closeAll().catch(() => {});
     server.closeAllConnections();

@@ -92,7 +92,15 @@ function chatlyFilterEvents(array $messages, array $user): array {
     $myUsername = strtolower((string) ($user['username'] ?? ''));
     $users = chatlyUsersById();
     $phones = [];
-    foreach (chatlyCompanyLeads($company) as $l) {
+    require_once __DIR__ . '/supabase.php';
+    if (chatlyLeadStoreOn()) {
+        // chats in Supabase: a locally cached copy of the company's lead numbers + owners
+        require_once __DIR__ . '/lead_store.php';
+        foreach (chatlyLeadKeyIndex($company) as $k => [$owner, $ownerUser]) {
+            if (!$isAdmin && $owner !== $myId && !($myUsername && $ownerUser === $myUsername)) continue;
+            $phones[(string) $k] = true;
+        }
+    } else foreach (chatlyCompanyLeads($company) as $l) {
         if (!$isAdmin) {
             $owner = (string) ($l['ownerId'] ?? ($l['assignedOwnerId'] ?? ''));
             $ownerUser = strtolower((string) ($l['ownerUsername'] ?? ''));

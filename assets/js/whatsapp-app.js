@@ -1078,7 +1078,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (myName) query += '&user_name=' + encodeURIComponent(myName);
     // Background polls send the last revision; the server answers "unchanged" when the CRM,
     // the inbox and the user are the same, instead of re-sending every lead every 5 seconds.
-    if (silent && state.leadsRev && state.leadsRevCompany === compParam) query += '&rev=' + encodeURIComponent(state.leadsRev);
+    // With chats in Supabase the server answers only what changed after revision "since".
+    if (state.leadsStore === 'supabase' && state.leadsRev && state.leadsRevCompany === compParam) query += '&since=' + encodeURIComponent(state.leadsRev);
+    else if (silent && state.leadsRev && state.leadsRevCompany === compParam) query += '&rev=' + encodeURIComponent(state.leadsRev);
     // Light sync: leads arrive with only their latest messages; a chat's full history is
     // loaded when it is opened (ensureFullHistory).
     query += '&summary=1';
@@ -1089,6 +1091,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data && data.success && data.unchanged) return;
         if (data && data.success) {
           if (data.rev) { state.leadsRev = data.rev; state.leadsRevCompany = compParam; }
+          state.leadsStore = data.store || 'file';
+          // Nothing changed since the last poll: nothing to redraw.
+          if (data.delta && Array.isArray(data.leads) && data.leads.length === 0) return;
           if (data.company_id) state.currentCompanyId = data.company_id;
           if (data.company_config) state.companyConfig = data.company_config;
           renderCompanyContextPill();
@@ -1101,7 +1106,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             let activeLeadHadNewMessages = false;
-            state.leads = data.leads.map(l => {
+            // A delta carries only changed leads; deleted ones come as {id, _deleted}.
+            const removedIds = new Set(data.leads.filter(l => l && l._deleted).map(l => l.id));
+            const merged = data.leads.filter(l => l && !l._deleted).map(l => {
               const raw = (l.name || '').trim();
               const lower = raw.toLowerCase();
               if (!raw || lower === 'trader' || lower === 'alishba' || lower === 'new contact' || lower === 'unknown') {
@@ -1110,9 +1117,16 @@ document.addEventListener('DOMContentLoaded', () => {
               const local = existingMap.get(l.id) || existingMap.get(normalizePhone(l.phone || ''));
               const msgKey = m => m.id || m.waMessageId;
               if (l.summary && local && local._fullHistory && Array.isArray(local.messages)) {
-                // Keep the full history this browser already loaded; add only what is new.
-                const have = new Set(local.messages.map(msgKey));
-                const added = (l.messages || []).filter(m => !have.has(msgKey(m)));
+                // Keep the full history this browser already loaded; add only what is new, and
+                // move ticks forward on messages it already has.
+                const have = new Map(local.messages.map(m => [msgKey(m), m]));
+                const tickRank = s => ({ sending: 0, accepted: 1, sent: 2, delivered: 3, read: 4, played: 5 })[s] ?? (s === 'failed' ? 2.5 : -1);
+                const added = [];
+                for (const m of (l.messages || [])) {
+                  const old = have.get(msgKey(m));
+                  if (!old) added.push(m);
+                  else if (m.deliveryStatus && tickRank(m.deliveryStatus) > tickRank(old.deliveryStatus)) old.deliveryStatus = m.deliveryStatus;
+                }
                 l.messages = added.length ? [...local.messages, ...added] : local.messages;
                 l._fullHistory = true;
               } else if (local && Array.isArray(local.messages) && local.messages.length > (l.messages?.length || 0)) {
@@ -1132,6 +1146,17 @@ document.addEventListener('DOMContentLoaded', () => {
               }
               return l;
             });
+            if (data.delta) {
+              const changed = new Map(merged.map(l => [l.id, l]));
+              const kept = (state.leads || []).filter(l => !removedIds.has(l.id)).map(l => {
+                const next = changed.get(l.id);
+                if (next) changed.delete(l.id);
+                return next || l;
+              });
+              state.leads = [...changed.values(), ...kept];
+            } else {
+              state.leads = merged;
+            }
             const myAllotted = state.leads.filter(isMyAllottedLead);
             const openLead = state.activeLeadId ? getLead(state.activeLeadId) : null;
             if (openLead) ensureFullHistory(openLead);

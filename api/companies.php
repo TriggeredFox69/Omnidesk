@@ -26,6 +26,7 @@ $usersFile     = __DIR__ . '/../data/users.json';
 $auditFile     = __DIR__ . '/../data/audit_logs.json';
 require_once __DIR__ . '/tenant_manager.php';
 require_once __DIR__ . '/quota.php';
+require_once __DIR__ . '/lead_store.php';
 
 function getCompanies($file) {
     $comps = [];
@@ -344,7 +345,7 @@ switch ($action) {
         foreach (getCompanies($companiesFile) as $comp) {
             $cid = $comp['id'] ?? '';
             if ($cid === '') continue;
-            foreach (earningsCompanyLeads($cid) as $l) {
+            foreach (earningsCompanyLeads($cid, true) as $l) {
                 $phone = preg_replace('/\D+/', '', (string) ($l['phone'] ?? ''));
                 if (strlen($phone) < 8) continue;
                 $replies = 0; $sent = 0; $failed = 0; $delivered = 0; $lastReply = 0; $lastAny = 0; $firstAt = 0;
@@ -403,7 +404,21 @@ switch ($action) {
 
         $stream = [];
         $tenantsDir = __DIR__ . '/../data/tenants';
-        if (is_dir($tenantsDir)) {
+        if (chatlyLeadStoreOn()) {
+            // chats in Supabase: same stream, read from there (no tenant files to scan)
+            foreach ($companyMap as $cid => $cname) {
+                foreach (chatlyLeadsAll((string) $cid, true) as $lead) {
+                    foreach (($lead['messages'] ?? []) as $m) {
+                        $stream[] = ['id' => ($lead['id'] ?? '') . '-' . rand(1000, 9999), 'company_id' => $cid, 'company_name' => $cname,
+                            'lead_name' => $lead['name'] ?? ($lead['display'] ?? 'Contact'), 'lead_phone' => $lead['phone'] ?? '',
+                            'closer_name' => $lead['ownerName'] ?? 'Closer', 'sender' => $m['sender'] ?? 'lead', 'text' => $m['text'] ?? '',
+                            'time' => $m['time'] ?? 'Just now', 'state' => $lead['leadState'] ?? 'ongoing'];
+                    }
+                }
+            }
+            $tenantsDir = '';   // skip the file scan below
+        }
+        if ($tenantsDir !== '' && is_dir($tenantsDir)) {
             $tenantFolders = scandir($tenantsDir);
             foreach ($tenantFolders as $folder) {
                 if ($folder === '.' || $folder === '..') continue;
@@ -438,7 +453,7 @@ switch ($action) {
 
         // Also include root data/leads.json if exists
         $rootLeadsPath = __DIR__ . '/../data/leads.json';
-        if (file_exists($rootLeadsPath)) {
+        if (!chatlyLeadStoreOn() && file_exists($rootLeadsPath)) {
             $rootLeads = @json_decode(file_get_contents($rootLeadsPath), true);
             if (is_array($rootLeads)) {
                 foreach ($rootLeads as $lead) {
@@ -1011,9 +1026,7 @@ switch ($action) {
         requireSuperAdmin($currentUser);
         $companyId = trim($_GET['company_id'] ?? ($_POST['company_id'] ?? 'COMP-001'));
         
-        $leadsFile = getTenantLeadsFile($companyId);
-        $leads = file_exists($leadsFile) ? json_decode(file_get_contents($leadsFile), true) : [];
-        if (!is_array($leads)) $leads = [];
+        $leads = chatlyLeadsAll($companyId);   // leads.json, or Supabase when chats are stored there
 
         $users = file_exists($usersFile) ? json_decode(file_get_contents($usersFile), true) : [];
         if (!is_array($users)) $users = [];
@@ -1131,16 +1144,14 @@ switch ($action) {
     case 'get_company_leads':
         requireCompanyAdmin($currentUser);
         $companyId = resolveActiveCompanyId();
-        $leadsFile = getTenantLeadsFile($companyId);
-        $leads = file_exists($leadsFile) ? json_decode(file_get_contents($leadsFile), true) : [];
-        if (!is_array($leads)) $leads = [];
+        $leads = chatlyLeadsAll($companyId);   // leads.json, or Supabase when chats are stored there
 
         // The lead board only shows name, phone, owner and state: send no chat history
         // (it was every message of every lead, megabytes on each load).
         $board = [];
         foreach ($leads as $l) {
             if (!is_array($l)) continue;
-            $l['messageCount'] = is_array($l['messages'] ?? null) ? count($l['messages']) : 0;
+            $l['messageCount'] = is_array($l['messages'] ?? null) ? count($l['messages']) : (int) ($l['messageCount'] ?? 0);
             unset($l['messages']);
             $board[] = $l;
         }
@@ -1163,6 +1174,33 @@ switch ($action) {
         if (!$leadPhone) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Lead phone number is required.']);
+            exit;
+        }
+
+        if (chatlyLeadStoreOn()) {
+            // chats in Supabase: change just this lead
+            require_once __DIR__ . '/lead_store.php';
+            try {
+                $cur = chatlyStoreFindLead($companyId, '', $leadPhone);
+                if (!$cur) {
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'error' => 'Lead not found in company pipeline.']);
+                    exit;
+                }
+                $origOwner = $cur['ownerName'] ?? 'Assigned Closer';
+                $targetLead = chatlyStorePatchLead($companyId, (string) $cur['id'], '', [
+                    'isTakeover' => true, 'originalOwnerName' => $origOwner, 'originalOwnerId' => $cur['ownerId'] ?? '',
+                    'takenOverBy' => $currentUser['name'], 'takenOverById' => $currentUser['id'], 'takenOverAt' => date('Y-m-d H:i:s'),
+                    'commissionProtected' => true, 'commissionNote' => "Full closer commission guaranteed to $origOwner upon completion.",
+                    'ownerName' => $currentUser['name'] . ' (Admin Takeover)', 'ownerId' => $currentUser['id'],
+                ]) ?: $cur;
+            } catch (Throwable $e) {
+                http_response_code(503);
+                echo json_encode(['success' => false, 'error' => 'Chats are temporarily unavailable. Please try again.']);
+                exit;
+            }
+            logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'lead_takeover', "Admin took over lead {$targetLead['name']} ({$leadPhone}). Closer commission preserved for {$targetLead['originalOwnerName']}.");
+            echo json_encode(['success' => true, 'message' => "Lead {$targetLead['name']} taken over successfully! Closer commission remains 100% protected.", 'lead' => $targetLead]);
             exit;
         }
 

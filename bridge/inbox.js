@@ -4,8 +4,10 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { downloadAttachment } = require('./media');
 const tenants = require('./tenants');
+const { store: chatStore } = require('./store');
 const statusOf = ack => ack < 0 ? 'failed' : ack >= 3 ? 'read' : ack === 2 ? 'delivered' : ack === 1 ? 'sent' : 'accepted';
-function createInbox({ getClient, storageFile, getMediaClients }) {
+function createInbox({ getClient, storageFile, getMediaClients, store: storeOverride }) {
+  const st = storeOverride || chatStore();   // chats in Supabase while its switch is on
   const messages = new Map();
   const aliases = new Map();
   const pendingAcks = new Map();
@@ -114,7 +116,8 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
     // anything else on a closer's phone is a personal chat and stays private.
     const companyId = tenants.companyOfDevice(opts.viaUserId);
     if (fromMe && opts.fromChatly) rememberChatlyPhone(companyId, phone);
-    const known = tenants.isLeadOf(companyId, phone) || sentByChatlyRecently(companyId, phone);
+    const known = sentByChatlyRecently(companyId, phone)
+      || (st.enabled() ? await st.isLead(companyId, phone) : tenants.isLeadOf(companyId, phone));
     if (!fromMe && !known) { debug(`dropped: not a ${companyId} lead (personal chat)`); return; }
     // Messages typed on a closer's own phone to someone who is not a lead are personal
     // chats too: never stored, never turned into leads. Chatly's own sends (campaigns,
@@ -157,6 +160,15 @@ function createInbox({ getClient, storageFile, getMediaClients }) {
       const waId = item.waMessageId || item.id;
       const cleanPhone = tenants.digits(item.phone);
       if (!cleanPhone && !waId) return;
+      // Chats in Supabase: one queued row write instead of rewriting the company's leads.json.
+      if (st.enabled()) {
+        if (ackStatusOnly) {
+          if (item.deliveryStatus) st.queueStatus(item.companyId || companyOfMessageId.get(waId) || null, waId, item.deliveryStatus);
+        } else if (item.companyId && cleanPhone) {
+          st.queueMessage(item.companyId, cleanPhone, leadMessage(item, null), true);
+        }
+        return;
+      }
       // Ticks: the company remembered for this message, else whichever company has it.
       const companies = item.companyId ? [item.companyId]
         : (companyOfMessageId.has(waId) ? [companyOfMessageId.get(waId)] : tenants.companyIds());

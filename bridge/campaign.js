@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
+const { store: chatStore, key9 } = require('./store');
 
 // Today's date in Pakistan (UTC+5, no daylight saving), Y-m-d. Daily message counts belong
 // to this day, the same day api/quota.php uses, so they reset at 12:00 AM PKT.
@@ -55,8 +56,9 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption }) {
+function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption, store: storeOverride }) {
   const digits = v => String(v || '').replace(/\D/g, '');
+  const chatStoreRef = storeOverride || chatStore();   // chats in Supabase while its switch is on
   const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
   const isMainOnline = () => { const m = typeof mainStatus === 'function' ? mainStatus() : null; return !!(m && m.ready); };
   const viaMain = s => isMainOnline();
@@ -501,10 +503,51 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     byPhone.set(cleanPhone, newLead);
   }
 
+  // Chats in Supabase: the batch's leads are looked up in one call, changed / created in memory
+  // with the same rules (applyCrmItem), then saved with their new messages. If Supabase is
+  // unreachable the batch goes back in the queue and is retried.
+  let crmStoreBusy = false, crmStoreFailures = 0;
+  async function flushCrmToStore(byCompany) {
+    crmStoreBusy = true;
+    try {
+      for (const [cleanId, items] of byCompany) {
+        try {
+          const phones = [...new Set(items.map(i => digits(i.contact.phone)).filter(Boolean))];
+          const found = await chatStoreRef.findLeads(cleanId, phones);
+          const byKey = new Map();
+          for (const l of found) { const k = key9(l.phone); if (k && !byKey.has(k)) byKey.set(k, l); }
+          const byPhone = new Map();
+          for (const p of phones) { const l = byKey.get(key9(p)); if (l) { l.messages = []; byPhone.set(p, l); } }
+          const created = [];
+          for (const item of items) applyCrmItem(created, byPhone, cleanId, item);
+          const leads = [...new Set(byPhone.values())];
+          const msgItems = [];
+          for (const l of leads) {
+            for (const m of l.messages || []) msgItems.push({ phone: digits(l.phone), msg: m, touch: false });
+            delete l.messages; delete l.messageCount;
+          }
+          await chatStoreRef.saveLeads(cleanId, leads);
+          if (msgItems.length) await chatStoreRef.addMessagesNow(cleanId, msgItems);
+          crmStoreFailures = 0;
+        } catch (err) {
+          crmStoreFailures++;
+          if (crmStoreFailures === 1 || crmStoreFailures % 20 === 0) console.warn('[Campaign] Saving chats to Supabase failed, will retry:', err.message);
+          crmQueue.unshift(...items);
+        }
+      }
+    } finally {
+      crmStoreBusy = false;
+      if (crmQueue.length) {
+        if (!crmTimer) crmTimer = setTimeout(flushCrm, crmStoreFailures ? Math.min(30000, 1000 * 2 ** Math.min(crmStoreFailures, 5)) : CRM_FLUSH_MS);
+      }
+    }
+  }
+
   function flushCrm() {
     if (crmTimer) { clearTimeout(crmTimer); crmTimer = null; }
     flushUserCounts();
     if (!crmQueue.length) return;
+    if (chatStoreRef.enabled() && crmStoreBusy) { scheduleCrmFlush(); return; }
     const batch = crmQueue.splice(0, crmQueue.length);
     const byCompany = new Map();
     for (const item of batch) {
@@ -512,6 +555,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       if (!byCompany.has(id)) byCompany.set(id, []);
       byCompany.get(id).push(item);
     }
+    if (chatStoreRef.enabled()) { flushCrmToStore(byCompany); return; }
     for (const [cleanId, items] of byCompany) {
       try {
         // The company's CRM file (service.js passes getLeadsPath; same tenant path as below).
@@ -824,7 +868,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
 
     // 2. Audience: the dropped numbers (or the company's leads)
     let rawAudience = Array.isArray(params.audience) && params.audience.length > 0 ? params.audience : [];
-    if (!rawAudience.length) {
+    // (the old "message my existing leads" fallback reads leads.json, which is not used while chats are in Supabase)
+    if (!rawAudience.length && !chatStoreRef.enabled()) {
       try {
         const leadsFile = typeof getLeadsPath === 'function' ? getLeadsPath(companyId) : null;
         if (leadsFile && fs.existsSync(leadsFile)) {

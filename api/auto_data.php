@@ -17,59 +17,13 @@
 
 const CHATLY_AUTO_DATA_MAX = 50000;
 
-function chatlySupabaseConfig(): ?array {
-    static $cfg = false;
-    if ($cfg !== false) return $cfg;
-    $url = (string) (getenv('SUPABASE_URL') ?: '');
-    $key = (string) (getenv('SUPABASE_SECRET_KEY') ?: (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: ''));
-    $file = __DIR__ . '/../data/supabase.php';
-    if (($url === '' || $key === '') && is_readable($file)) {
-        $c = require $file;
-        if (is_array($c)) {
-            if ($url === '') $url = (string) ($c['url'] ?? '');
-            if ($key === '') $key = (string) ($c['key'] ?? '');
-        }
-    }
-    $url = rtrim(trim($url), '/');
-    $key = trim($key);
-    $cfg = (preg_match('#^https://[a-z0-9-]+\.supabase\.co$#i', $url) && $key !== '') ? ['url' => $url, 'key' => $key] : null;
-    return $cfg;
-}
-
-/** Calls a Postgres function through the Supabase REST API. */
-function chatlySupabaseRpc(string $fn, array $args, int $timeout = 25): array {
-    $cfg = chatlySupabaseConfig();
-    if (!$cfg) return ['ok' => false, 'setup' => false, 'error' => 'Auto Data is not set up on the server yet (Supabase is not connected).'];
-    if (!function_exists('curl_init')) return ['ok' => false, 'error' => 'PHP cURL is disabled on this server.'];
-    $headers = ['apikey: ' . $cfg['key'], 'Content-Type: application/json', 'Accept: application/json'];
-    // New-style secret keys (sb_secret_…) go in "apikey" only; legacy service_role keys are JWTs.
-    if (!str_starts_with($cfg['key'], 'sb_')) $headers[] = 'Authorization: Bearer ' . $cfg['key'];
-    $ch = curl_init($cfg['url'] . '/rest/v1/rpc/' . rawurlencode($fn));
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($args),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_CONNECTTIMEOUT => 6,
-        CURLOPT_TIMEOUT        => $timeout,
-    ]);
-    $raw = curl_exec($ch);
-    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err = curl_error($ch);
-    curl_close($ch);
-    if ($raw === false) return ['ok' => false, 'error' => 'Could not reach the number pool (' . $err . ').'];
-    $data = json_decode((string) $raw, true);
-    if ($code < 200 || $code >= 300) {
-        $msg = is_array($data) ? ($data['message'] ?? $data['hint'] ?? ('HTTP ' . $code)) : ('HTTP ' . $code);
-        return ['ok' => false, 'error' => 'Number pool error: ' . $msg];
-    }
-    return ['ok' => true, 'data' => $data];
-}
+require_once __DIR__ . '/supabase.php';
 
 /** total / used / remaining for a company. */
 function chatlyAutoDataStatus(string $companyId): array {
     $r = chatlySupabaseRpc('chatly_pool_status', ['p_company' => $companyId], 10);
-    if (!$r['ok']) return ['success' => false, 'setup' => $r['setup'] ?? true, 'message' => $r['error']];
+    if (!$r['ok']) return ['success' => false, 'setup' => $r['setup'] ?? true,
+        'message' => ($r['setup'] ?? true) ? $r['error'] : 'Auto Data is not set up on the server yet (Supabase is not connected).'];
     $d = is_array($r['data']) ? $r['data'] : [];
     if (empty($d['total'])) return ['success' => false, 'message' => 'The number pool is empty. The numbers have not been uploaded yet.'];
     return ['success' => true, 'total' => (int) $d['total'], 'used' => (int) ($d['used'] ?? 0), 'remaining' => (int) ($d['remaining'] ?? 0)];
@@ -92,6 +46,10 @@ function chatlyAutoDataRelease(string $companyId, int $from, int $to): void {
 
 /** Last-9-digit keys of a company's existing leads (to skip numbers that already have a chat). */
 function chatlyAutoDataLeadKeys(string $companyId): array {
+    if (chatlyLeadStoreOn()) {
+        require_once __DIR__ . '/lead_store.php';
+        return array_fill_keys(array_keys(chatlyLeadKeyIndex($companyId)), true);
+    }
     $file = __DIR__ . '/../data/tenants/' . $companyId . '/leads.json';
     if (!is_file($file) && $companyId === 'COMP-001') $file = __DIR__ . '/../data/leads.json';
     $leads = is_file($file) ? json_decode((string) @file_get_contents($file), true) : [];

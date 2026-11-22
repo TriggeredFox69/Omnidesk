@@ -41,7 +41,9 @@ function earningsFindUser(string $userId): ?array {
 }
 
 /** All leads of a company (tenant file + the legacy global file for Nunno), de-duplicated. */
-function earningsCompanyLeads(string $companyId): array {
+function earningsCompanyLeads(string $companyId, bool $withMessages = false): array {
+    require_once __DIR__ . '/lead_store.php';
+    if (chatlyLeadStoreOn()) return chatlyLeadsAll($companyId, $withMessages);   // chats in Supabase
     $files = [getTenantLeadsFile($companyId)];
     if ($companyId === NUNNO_COMPANY_ID) $files[] = __DIR__ . '/../data/leads.json';
     $seen = [];

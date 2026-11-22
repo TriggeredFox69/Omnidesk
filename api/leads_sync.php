@@ -39,6 +39,14 @@ $companyConfig = getTenantConfig($activeCompanyId);
 // parallel startup/poll requests are not serialized behind each other (PHP file sessions).
 if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
 
+// Chats stored in Supabase (switch file data/leads_store_supabase.on): one row per lead and
+// per message instead of this company's leads.json. Everything below is the file version.
+require_once __DIR__ . '/supabase.php';
+if (chatlyLeadStoreOn()) {
+    require __DIR__ . '/leads_sync_db.php';
+    exit;
+}
+
 // Helper: Read current centralized leads
 function getStoredLeads($dataFile) {
     if (file_exists($dataFile)) {
