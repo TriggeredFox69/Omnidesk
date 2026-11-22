@@ -102,7 +102,8 @@ if [ "${1:-}" = "--reset-closer-whatsapp" ]; then
 fi
 rm -f /home/dailygol/chatly.pk/data/whatsapp-bridge/daemon.pid /home/dailygol/chatly.pk/data/whatsapp-bridge/daemon.lock /home/dailygol/chatly.pk/data/whatsapp-bridge/upgrade.lock 2>/dev/null || true
 if [ -f "/home/dailygol/chatly.pk/bridge/run-daemon.sh" ]; then
-    nohup /bin/bash /home/dailygol/chatly.pk/bridge/run-daemon.sh >/dev/null 2>&1 &
+    nohup /bin/bash /home/dailygol/chatly.pk/bridge/run-daemon.sh </dev/null >/dev/null 2>&1 &
+    disown 2>/dev/null || true
 fi
 sleep 2
 echo "Deployment complete! Checking bridge status..."
