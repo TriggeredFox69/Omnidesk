@@ -2664,35 +2664,11 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
     <span id="toastMsg">Ready</span>
   </div>
 
-  <script>
-  // Server-friendliness guard. The host's bot protection (LiteSpeed / Imunify) shows a "confirm you are
-  // not a robot" page when one internet address sends too many requests (an office or a mobile network
-  // shares one address between many people). If an API call gets a web page back instead of JSON, or a
-  // 403 / 429 / 503, every background poll pauses (30 s, then 60 s, up to 5 min) instead of hammering
-  // the server, which is what keeps the captcha going. Polls call window.chatlyBackingOff().
-  (function () {
-    var until = 0, step = 0, orig = window.fetch;
-    window.chatlyBackingOff = function () { return Date.now() < until; };
-    window.fetch = function (input, init) {
-      var url = typeof input === 'string' ? input : (input && input.url) || '';
-      return orig.apply(this, arguments).then(function (res) {
-        if (/(^|\/)api\/[^?]*\.php/.test(url)) {
-          var type = (res.headers.get('content-type') || '').toLowerCase();
-          var blocked = res.status === 429 || res.status === 503 || (type.indexOf('text/html') !== -1 && res.status !== 401) ||
-            (res.status === 403 && type.indexOf('json') === -1);
-          if (blocked) { step = Math.min(step + 1, 4); until = Date.now() + Math.min(300000, 30000 * Math.pow(2, step - 1)); }
-          else if (res.ok && step) step = 0;
-        }
-        return res;
-      });
-    };
-  })();
-  </script>
   <script src="assets/js/offline-preview.js?v=15.1"></script>
-  <script src="assets/js/live-inbox.js?v=15.9"></script>
+  <script src="assets/js/live-inbox.js?v=15.8"></script>
   <script src="assets/js/wa-widget.js?v=16.0"></script>
   <link rel="stylesheet" href="assets/css/chatly-tour.css?v=1">
   <script src="assets/js/chatly-tour.js?v=1"></script>
-  <script src="assets/js/whatsapp-app.js?v=16.4"></script>
+  <script src="assets/js/whatsapp-app.js?v=16.3"></script>
 </body>
 </html>

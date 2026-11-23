@@ -981,18 +981,7 @@ switch ($action) {
         if (isset($data['tl_commission_per_tm'])) {
             $config['tl_commission_per_tm'] = max(0, (int)$data['tl_commission_per_tm']);
         }
-        // The company's own link for {link} in campaigns. Never Chatly's domain: cold campaign
-        // messages carrying chatly.pk got it listed as "Spam URLs" by web filters (FortiGuard).
-        if (isset($data['campaign_link'])) {
-            $lk = trim((string) $data['campaign_link']);
-            if ($lk !== '' && !preg_match('#^https?://#i', $lk)) $lk = 'https://' . $lk;
-            if ($lk !== '' && (!filter_var($lk, FILTER_VALIDATE_URL) || preg_match('#^https?://([a-z0-9-]+\.)*chatly\.pk(/|$)#i', $lk))) {
-                echo json_encode(['success' => false, 'error' => 'Campaign link: enter your own website or WhatsApp link (not chatly.pk).']);
-                exit;
-            }
-            $config['campaign_link'] = mb_substr($lk, 0, 300);
-        }
-
+        
         $configFile = getTenantConfigFile($companyId);
         file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 

@@ -19,14 +19,6 @@ test('personalizeMessage injects contact details and fallback', () => {
   assert.equal(personalized, 'Hi Zeeshan, in Lahore!');
 });
 
-test('{link} is the company\'s own link, never chatly.pk; without one it is left out cleanly', () => {
-  const contact = { name: 'Ali', phone: '923001234567' };
-  assert.equal(personalizeMessage('Hi {name}, see {link} today', contact, 'Metalink', 'https://metalink.pk'), 'Hi Ali, see https://metalink.pk today');
-  const noLink = personalizeMessage('Hi {name}, see {link} today\nJoin: {link}', contact, 'Metalink');
-  assert.equal(noLink, 'Hi Ali, see today\nJoin:');
-  assert.ok(!/chatly\.pk/.test(noLink));
-});
-
 test('createCampaignManager starts, executes, pauses, and stops', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
   const sent = [];

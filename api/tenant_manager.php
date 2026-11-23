@@ -583,17 +583,6 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
         if (isset($input['company_name'])) $config['company_name'] = trim($input['company_name']);
         if (isset($input['products']) && is_array($input['products'])) $config['products'] = $input['products'];
         if (isset($input['default_pitch'])) $config['default_pitch'] = trim($input['default_pitch']);
-        // The company's own link for {link} in campaign messages (never Chatly's domain: cold messages
-        // carrying chatly.pk got the domain listed as "Spam URLs" by web filters like FortiGuard).
-        if (isset($input['campaign_link'])) {
-            $lk = trim((string) $input['campaign_link']);
-            if ($lk !== '' && !preg_match('#^https?://#i', $lk)) $lk = 'https://' . $lk;
-            if ($lk !== '' && (!filter_var($lk, FILTER_VALIDATE_URL) || preg_match('#^https?://([a-z0-9-]+\.)*chatly\.pk(/|$)#i', $lk))) {
-                echo json_encode(['success' => false, 'message' => 'Enter your own website or WhatsApp link (not chatly.pk).']);
-                exit;
-            }
-            $config['campaign_link'] = mb_substr($lk, 0, 300);
-        }
         if (isset($input['tl_commission_per_tm'])) {
             $config['tl_commission_per_tm'] = max(0, (int)$input['tl_commission_per_tm']);
         }

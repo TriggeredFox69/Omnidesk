@@ -2,7 +2,7 @@
 // Bump together with `version` in bridge/service.js. After a deploy, the first
 // request that sees the bridge still running the OLD code restarts it once, so the
 // person updating cPanel never has to restart anything by hand.
-const EXPECTED_BRIDGE_VERSION = '19.0';
+const EXPECTED_BRIDGE_VERSION = '18.9';
 
 function ensureBridgeCurrent(?array $status = null): void {
     static $checked = false;
@@ -350,7 +350,7 @@ function personalizeBridgeMessage(string $template, array $contact, string $comp
     $msg = resolveBridgeSpintax($msg);
     $msg = str_ireplace(
         ['{name}', '{phone}', '{city}', '{company}', '{plan}', '{price}', '{coupon}', '{link}'],
-        [$cName ?: $cPhone, $cPhone, $cCity, $companyName, 'Exclusive Business Plan', 'Rs. 5,000', 'NUNNO30', ''],   // {link}: never chatly.pk (spam listing); the bridge fills the company's own link
+        [$cName ?: $cPhone, $cPhone, $cCity, $companyName, 'Exclusive Business Plan', 'Rs. 5,000', 'NUNNO30', 'https://chatly.pk'],
         $msg
     );
     return $msg;
@@ -612,9 +612,6 @@ function handleWhatsAppBridge(string $action, array $input): void {
             }
         }
         unset($input['closer']);
-        // {link} in the message = this company's own link (admin portal setting), set here on the server.
-        require_once __DIR__ . '/tenant_manager.php';
-        $input['campaign_link'] = (string) (getTenantConfig($campaignCompany)['campaign_link'] ?? '');
 
         // Auto Data: the admin only chose how many messages; the numbers come from the
         // Supabase pool (first the ones a stopped Auto Data campaign never reached).
