@@ -96,6 +96,33 @@ function createInbox({ getClient, storageFile, getMediaClients, store: storeOver
     return at !== undefined && Date.now() - at < CHATLY_SENT_TTL_MS;
   }
 
+  function isNunnoTL(userId) {
+    const u = tenants.usersById().get(String(userId));
+    return !!u && String(u.role || '').toLowerCase() === 'lead' && (tenants.companyOfUser(userId) === 'COMP-001');
+  }
+  // A lead for a chat a Nunno TL started from their phone, owned by that TL. One per number
+  // (fixed id), so two quick messages never create two leads.
+  async function createTlOutreachLead(companyId, phone, tlId) {
+    const tl = tenants.usersById().get(String(tlId)) || {};
+    const digits = tenants.digits(phone);
+    const now = Math.floor(Date.now() / 1000);
+    const lead = {
+      id: 'lead_tl_' + digits, company_id: companyId, name: '+' + digits, phone: digits, display: '+' + digits,
+      city: '', network: 'WhatsApp', ownerId: tl.id || tlId, ownerName: tl.name || '', ownerUsername: tl.username || '',
+      leadState: 'ongoing', status: 'replied', unreadCount: 0, interest: 'TL Outreach', lastActive: 'Just now', lastMessageAt: now,
+      notes: `Started by ${tl.name || 'the Team Leader'} from their own WhatsApp (recruiting).`, messages: []
+    };
+    if (st.enabled()) {
+      await st.saveLeads(companyId, [lead]);
+    } else {
+      const leads = tenants.readLeads(companyId);
+      if (leads.some(l => tenants.samePhone(l.phone, digits))) return true;
+      leads.unshift(lead);
+      tenants.writeLeads(companyId, leads);
+    }
+    return true;
+  }
+
   async function ingest(message, knownPhone, opts = {}) {
     const id = message.id?._serialized;
     if (!id) return;
@@ -116,8 +143,14 @@ function createInbox({ getClient, storageFile, getMediaClients, store: storeOver
     // anything else on a closer's phone is a personal chat and stays private.
     const companyId = tenants.companyOfDevice(opts.viaUserId);
     if (fromMe && opts.fromChatly) rememberChatlyPhone(companyId, phone);
-    const known = sentByChatlyRecently(companyId, phone)
+    let known = sentByChatlyRecently(companyId, phone)
       || (st.enabled() ? await st.isLead(companyId, phone) : tenants.isLeadOf(companyId, phone));
+    // Nunno Team Leaders recruit new TMs outside Chatly (Telegram groups etc.) and then talk to
+    // them on WhatsApp: a chat a Nunno TL starts from their own phone becomes their lead, and the
+    // replies follow. (Team Members only ever get campaign chats.)
+    if (!known && fromMe && !opts.fromChatly && opts.viaUserId && isNunnoTL(opts.viaUserId)) {
+      known = await createTlOutreachLead(companyId, phone, opts.viaUserId).catch(err => { debug('TL lead failed: ' + err.message); return false; });
+    }
     if (!fromMe && !known) { debug(`dropped: not a ${companyId} lead (personal chat)`); return; }
     // Messages typed on a closer's own phone to someone who is not a lead are personal
     // chats too: never stored, never turned into leads. Chatly's own sends (campaigns,

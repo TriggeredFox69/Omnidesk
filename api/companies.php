@@ -339,6 +339,36 @@ switch ($action) {
         ]);
         exit;
 
+    // Nunno invoice (Super Admin): what Nunno collected through Chatly's TMs / TLs and what it
+    // owes Chatly for them (TM payouts: first Rs. 10,000 then plan commission; TL Rs. 500 per
+    // activated TM). Only these two totals and their lines; Nunno's own margin is not shown.
+    case 'get_nunno_invoice':
+        requireSuperAdmin($currentUser);
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+        require_once __DIR__ . '/earnings.php';
+        $lines = [];
+        $revenue = 0.0; $payable = 0.0; $tmPayable = 0.0; $tlPayable = 0.0; $tmCount = 0; $tlCount = 0; $activations = 0;
+        foreach (computeCompanyEarnings(NUNNO_COMPANY_ID) as $r) {
+            $isTL = ($r['role'] ?? 'member') === 'lead';
+            $owed = (float) $r['total_earned'];
+            if ($owed <= 0 && (float) $r['total_sales'] <= 0) continue;
+            $revenue += (float) $r['total_sales'];
+            $payable += $owed;
+            if ($isTL) { $tlPayable += $owed; $tlCount++; $activations += (int) $r['deals_count']; }
+            else { $tmPayable += $owed; $tmCount++; }
+            $lines[] = ['name' => $r['name'], 'role' => $isTL ? 'TL' : 'TM', 'deals' => (int) $r['deals_count'],
+                'revenue' => (float) $r['total_sales'], 'payable' => $owed, 'paid_out' => (float) $r['paid_out']];
+        }
+        usort($lines, fn($a, $b) => $b['payable'] <=> $a['payable']);
+        echo json_encode(['success' => true, 'generated_at' => date('c'), 'invoice' => [
+            'total_revenue_collected' => $revenue,
+            'total_payable_to_chatly' => $payable,
+            'tm_payable' => $tmPayable, 'tl_payable' => $tlPayable,
+            'tm_count' => $tmCount, 'tl_count' => $tlCount, 'tl_activations' => $activations,
+            'lines' => $lines,
+        ]]);
+        exit;
+
     // Record a confirmed Nunno sale that did not go through the inbox (counts toward earnings)
     case 'record_nunno_sale':
         requireSuperAdmin($currentUser);
@@ -524,36 +554,7 @@ switch ($action) {
             }
         }
 
-        // Fallback demo live events if empty
-        if (empty($stream)) {
-            $stream = [
-                [
-                    'id'           => 'LIVE-01',
-                    'company_id'   => 'COMP-001',
-                    'company_name' => 'Nunno Official',
-                    'lead_name'    => 'Ali Trader',
-                    'lead_phone'   => '+923001234567',
-                    'closer_name'  => 'Hamza Khan',
-                    'sender'       => 'agent',
-                    'text'         => 'Salam Ali bhai! Your Nunno Pro scalper license is active.',
-                    'time'         => date('h:i A'),
-                    'state'        => 'paid'
-                ],
-                [
-                    'id'           => 'LIVE-02',
-                    'company_id'   => 'COMP-002',
-                    'company_name' => 'Apex Crypto Signals',
-                    'lead_name'    => 'Waqas BTC',
-                    'lead_phone'   => '+923219988776',
-                    'closer_name'  => 'Daniyal Sheikh',
-                    'sender'       => 'lead',
-                    'text'         => 'Bro whats the monthly VIP pricing?',
-                    'time'         => date('h:i A', strtotime('-1 minute')),
-                    'state'        => 'ongoing'
-                ]
-            ];
-        }
-
+        // (No made-up demo lines: an empty stream means there are no messages yet.)
         echo json_encode(['success' => true, 'stream' => array_slice(array_reverse($stream), 0, 50)]);
         exit;
 

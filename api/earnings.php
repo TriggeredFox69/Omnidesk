@@ -7,8 +7,10 @@
  *
  * Nunno (COMP-001) special commission:
  *   - The first Rs. 10,000 of a TM's verified sales is paid to the TM in full
- *     (sell Rs. 10,000, earn Rs. 10,000). Counted rupee by rupee: a sale that
- *     crosses the line pays 100% up to 10,000 and the plan rate on the rest.
+ *     (sell Rs. 10,000, earn Rs. 10,000). The sale that crosses the line pays only up
+ *     to 10,000 (6 x 1,700 = 10,200 -> 10,000).
+ *   - A Nunno Team Leader earns Rs. 500 per recruited TM who bought the Rs. 1,000
+ *     Nunno x Chatly plan (the TL marks that lead paid; the admin verifies it).
  *   - After that, every plan pays its fixed commission:
  *       Rs. 1,700 -> Rs. 700 · Rs. 5,000 -> Rs. 2,000 · Rs. 15,000 -> Rs. 10,000
  *     (a custom amount uses the rate of the largest plan it covers).
@@ -24,6 +26,11 @@ const NUNNO_COMPANY_ID     = 'COMP-001';
 const NUNNO_FULL_PAY_LIMIT = 10000;
 const NUNNO_PLAN_COMMISSION = [15000 => 10000, 5000 => 2000, 1700 => 700];   // price => commission
 const MIN_WITHDRAWAL       = 500;
+// Nunno Team Leaders recruit TMs: each recruited TM who buys the Nunno x Chatly plan (Rs. 1,000),
+// marked paid by the TL and verified by the admin, earns the TL Rs. 500.
+const NUNNO_TL_PLAN_NAME   = 'Nunno x Chatly Special Plan';
+const NUNNO_TL_PLAN_PRICE  = 1000;
+const NUNNO_TL_COMMISSION  = 500;
 
 function earningsReadJson(string $file): array {
     if (!is_file($file)) return [];
@@ -152,16 +159,23 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
     $running = 0.0;
     $salesCommission = 0.0;
     $deals = [];
+    $isNunnoTL = $isNunno && strtolower((string) ($user['role'] ?? '')) === 'lead';
     foreach ($paid as $l) {
-        $amount = earningsSaleAmount($l);
+        $amount = $isNunnoTL ? NUNNO_TL_PLAN_PRICE : earningsSaleAmount($l);
         $before = $running;
         $running += $amount;
-        if ($isNunno) {
+        if ($isNunnoTL) {
+            // A Nunno TL's "sale" is a TM they recruited who bought the Nunno x Chatly plan.
+            $comm = NUNNO_TL_COMMISSION;
+            $rule = 'TM activated (Nunno x Chatly plan): Rs. ' . number_format(NUNNO_TL_COMMISSION);
+        } elseif ($isNunno) {
+            // The first Rs. 10,000 of sales is the TM's in full. The plan that crosses the line
+            // pays only up to 10,000 (6 x 1,700 = 10,200 -> 10,000; one 15,000 plan -> 10,000);
+            // every plan after that pays its plan commission.
             $fullPart = max(0, min($amount, NUNNO_FULL_PAY_LIMIT - $before));
-            $rest = $amount - $fullPart;
-            $restComm = $rest > 0 ? round(nunnoPlanCommission($amount) * ($rest / $amount)) : 0;
-            $comm = $fullPart + $restComm;
-            $rule = $rest <= 0 ? 'First Rs. 10,000 (100%)' : ($fullPart > 0 ? 'Crossed Rs. 10,000: part 100%, part plan commission' : 'Plan commission');
+            $comm = $before >= NUNNO_FULL_PAY_LIMIT ? nunnoPlanCommission($amount) : $fullPart;
+            $rule = $before >= NUNNO_FULL_PAY_LIMIT ? 'Plan commission'
+                : ($fullPart < $amount ? 'Reached Rs. 10,000 (capped)' : 'First Rs. 10,000 (100%)');
         } else {
             $comm = earningsProductCommission($companyId, $l, $amount);
             $rule = 'Product commission';

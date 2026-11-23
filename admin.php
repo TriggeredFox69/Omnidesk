@@ -1778,14 +1778,15 @@ function renderEmployeeTable(employees) {
     let planAction = '';
     if (isNunno && !isLead) {
       if (emp.has_nunno_plan) {
-        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">🟢 Plan Active (Rs. 1,000)</span></div>`;
+        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">🟢 Nunno x Chatly plan: activated</span></div>`;
         planAction = `<button class="btn btn-secondary" style="padding:5px 8px; font-size:11px; color:#ef4444;" onclick="toggleNunnoPlan('${emp.id}', false)" title="Revoke Nunno Collab Plan">🔒 Revoke</button>`;
       } else if (emp.nunno_plan_status === 'pending_verification') {
-        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);" title="Proof Submitted: Trx #${emp.nunno_plan_trx || ''}">⏳ Proof: #${emp.nunno_plan_trx || 'Review'}</span></div>`;
+        const proof = emp.nunno_plan_email ? `Nunno email: ${emp.nunno_plan_email}` : `Trx #${emp.nunno_plan_trx || 'Review'}`;
+        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);" title="Check this purchase on nunno.cloud, then activate">⏳ ${escapeHtml(proof)}</span></div>`;
         planAction = `<button class="btn btn-emerald" style="padding:5px 8px; font-size:11px; font-weight:800;" onclick="toggleNunnoPlan('${emp.id}', true)" title="Verify and Activate Nunno Special Plan">✓ Activate Plan</button>`;
       } else {
-        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">🔒 Unpaid (Rs. 1,000)</span></div>`;
-        planAction = `<button class="btn btn-emerald" style="padding:5px 8px; font-size:11px; font-weight:800;" onclick="toggleNunnoPlan('${emp.id}', true)" title="Activate Nunno Special Plan">⚡ Activate Plan</button>`;
+        planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">🔒 Nunno x Chatly plan: not activated</span></div>`;
+        planAction = `<button class="btn btn-emerald" style="padding:5px 8px; font-size:11px; font-weight:800;" onclick="toggleNunnoPlan('${emp.id}', true)" title="Unlock this TM without the plan purchase (for a talented TM who can't pay yet)">⚡ Force upgrade</button>`;
       }
     }
 

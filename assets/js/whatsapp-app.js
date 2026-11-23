@@ -4981,13 +4981,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (uname.includes('askari') || name.includes('askari') || uname.includes('nunno') || id.includes('ASKARI') || id === 'EMP-TM-MWMK43N9' || id === 'EMP-TM-ASKARI') {
       return false;
     }
-    if (user.role === 'admin' || user.role === 'superadmin' || user.role === 'lead') {
-      return false;
-    }
-    // Active team members must ALWAYS have full access to Team Inbox to chat with assigned leads
-    if (user.status === 'active' || user.has_nunno_plan) {
-      return false;
-    }
+    if (user.role !== 'member') return false;                      // admins and TLs are never locked
+    if ((user.company_id || 'COMP-001') !== 'COMP-001') return false; // Nunno only
+    if (user.has_nunno_plan) return false;                           // plan bought and verified
+    // New Nunno TMs (flagged at sign-up) must buy + verify the Rs. 1,000 Nunno x Chatly plan
+    // before the Team Inbox opens: to sell the product they first own it. TMs from before
+    // this rule (no flag) are not locked.
     return Boolean(user.plan_locked);
   }
   window.isNunnoPlanLocked = isNunnoPlanLocked;
@@ -5092,55 +5091,121 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.inbox-filter-btn[data-filter="useless"]')?.click();
   });
 
+  // Locked Nunno TM: they enter the email they bought the plan with on nunno.cloud; the admin
+  // verifies it there and activates. Meanwhile a 48-hour countdown and the live status show,
+  // and the page checks every 30 s so the inbox unlocks by itself once verified.
   async function handleNunnoPlanVerifySubmit(e) {
     if (e) e.preventDefault();
-    const trxInp = document.getElementById('nunnoTrxInput');
-    const methodSel = document.getElementById('nunnoMethodSelect');
+    const inp = document.getElementById('nunnoTrxInput');
     const btn = document.getElementById('nunnoSubmitProofBtn');
-    const trx = trxInp ? trxInp.value.trim() : '';
-    const method = methodSel ? methodSel.value : 'easypaisa';
-
-    if (!trx) {
-      showToast('Please enter your Transaction ID or Reference.');
-      return;
-    }
-
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<span>Submitting Proof...</span> <span>⏳</span>';
-    }
-
+    const email = inp ? inp.value.trim() : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Enter the email you used to buy the plan on nunno.cloud.'); return; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span>Sending…</span>'; }
     try {
       const res = await fetch('api/auth.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'submit_tm_plan_payment',
-          trx_id: trx,
-          payment_method: method
-        })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submit_tm_plan_payment', nunno_email: email })
       });
       const data = await res.json();
       if (data.success) {
         if (state.currentUser) {
           state.currentUser.nunno_plan_status = 'pending_verification';
-          state.currentUser.nunno_plan_trx = trx;
+          state.currentUser.nunno_plan_email = email.toLowerCase();
+          state.currentUser.nunno_plan_submitted_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
         }
-        showToast('✅ Payment proof submitted! Administration will verify and unlock your desk.');
+        showToast('✅ Sent for verification. Your Team Inbox unlocks as soon as it is verified.');
         renderEmployeeWorkspace();
       } else {
-        showToast(data.error || 'Failed to submit payment proof.');
+        showToast(data.error || 'Could not send. Please try again.');
       }
     } catch (err) {
-      showToast('Network error submitting payment proof.');
+      showToast('Network error. Please try again.');
     } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<span>Submit Proof for Instant Activation</span> <span>⚡</span>';
-      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span>Verify</span>'; }
     }
   }
   window.handleNunnoPlanVerifySubmit = handleNunnoPlanVerifySubmit;
+
+  let nunnoVerifyTimer = null, nunnoStatusPoll = null;
+  function renderNunnoVerifyStatus(user) {
+    const box = document.getElementById('nunnoVerifPendingMsg');
+    const form = document.getElementById('nunnoPlanVerifyForm');
+    const pending = user && user.nunno_plan_status === 'pending_verification';
+    if (box) box.style.display = pending ? 'block' : 'none';
+    if (form) form.style.display = pending ? 'none' : '';
+    const span = document.getElementById('submittedTrxSpan');
+    if (span) span.textContent = user?.nunno_plan_email || String(user?.nunno_plan_trx || '').replace(/^email:/, '') || '';
+    clearInterval(nunnoVerifyTimer); nunnoVerifyTimer = null;
+    if (!pending) { clearInterval(nunnoStatusPoll); nunnoStatusPoll = null; return; }
+    // server time "Y-m-d H:i:s" (Pakistan); 48 h from the request
+    const sent = Date.parse(String(user.nunno_plan_submitted_at || '').replace(' ', 'T') + '+05:00') || Date.now();
+    const due = sent + 48 * 3600e3;
+    const tick = () => {
+      const left = Math.max(0, due - Date.now());
+      const h = Math.floor(left / 3600e3), m = Math.floor((left % 3600e3) / 60e3), s = Math.floor((left % 60e3) / 1000);
+      const el = document.getElementById('nunnoVerifTimer');
+      if (el) el.textContent = left > 0 ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : 'Any moment now';
+    };
+    tick();
+    nunnoVerifyTimer = setInterval(tick, 1000);
+    if (!nunnoStatusPoll) nunnoStatusPoll = setInterval(refreshNunnoPlanStatus, 30000);
+  }
+  async function refreshNunnoPlanStatus() {
+    try {
+      const res = await fetch('api/auth.php?action=check', { cache: 'no-store' });
+      const data = await res.json();
+      if (!data || !data.user || !state.currentUser) return;
+      const wasLocked = isNunnoPlanLocked(state.currentUser);
+      Object.assign(state.currentUser, data.user);
+      if (wasLocked && !isNunnoPlanLocked(state.currentUser)) {
+        clearInterval(nunnoStatusPoll); nunnoStatusPoll = null;
+        showNunnoPlanSuccess();
+      }
+      renderEmployeeWorkspace();
+    } catch (_) {}
+  }
+  // One-time "verified" screen: right when it happens, or on the next sign-in.
+  function showNunnoPlanSuccess() {
+    if (document.getElementById('nunnoPlanSuccess')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'nunnoPlanSuccess';
+    wrap.className = 'nunno-success-overlay';
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-modal', 'true');
+    wrap.innerHTML = `<div class="nunno-success-card">
+        <div class="nunno-success-check" aria-hidden="true">✓</div>
+        <h2>Plan verified!</h2>
+        <p>Your Nunno x Chatly plan is active and your Team Inbox is unlocked. Time to start closing.</p>
+        <button type="button" class="btn-nunno-buy" id="nunnoSuccessGo"><span>Open Team Inbox →</span></button>
+      </div>`;
+    document.body.appendChild(wrap);
+    fetch('api/auth.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark_seen', flag: 'nunno_plan_success_seen' }) }).catch(() => {});
+    if (state.currentUser) state.currentUser.nunno_plan_success_seen = true;
+    wrap.querySelector('#nunnoSuccessGo').addEventListener('click', () => {
+      wrap.remove();
+      switchTab('inbox');
+      maybeStartTour();
+    });
+  }
+  window.showNunnoPlanSuccess = showNunnoPlanSuccess;
+
+  // Guided tour of the Sales Desk for new TLs and TMs (a TM only once their plan is verified).
+  function maybeStartTour() {
+    const u = state.currentUser;
+    if (!u || u.tour_done || !window.ChatlyTour || isNunnoPlanLocked(u)) return;
+    const role = String(u.role || '').toLowerCase();
+    if (role !== 'member' && role !== 'lead') return;
+    // new accounts only (from the day the tour was added); existing closers already know the app
+    const created = String(u.created_at || u.applied_at || '');
+    if (!created || created < '2026-11-23') return;
+    if (document.getElementById('nunnoPlanSuccess')) return;   // after the success screen
+    u.tour_done = true;
+    setTimeout(() => window.ChatlyTour.start({
+      role,
+      onDone: () => fetch('api/auth.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark_seen', flag: 'tour_done' }) }).catch(() => {})
+    }), 900);
+  }
+  window.maybeStartTour = maybeStartTour;
 
   // Pipeline Multi-Select & Delete State
   let pipelineDeleteMode = false;
@@ -5344,16 +5409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const locked = isNunnoPlanLocked(user);
     if (lockCard) {
       lockCard.style.display = locked ? 'block' : 'none';
-      if (locked) {
-        const verifPendingMsg = document.getElementById('nunnoVerifPendingMsg');
-        const submittedTrxSpan = document.getElementById('submittedTrxSpan');
-        if (user.nunno_plan_status === 'pending_verification') {
-          if (verifPendingMsg) verifPendingMsg.style.display = 'block';
-          if (submittedTrxSpan) submittedTrxSpan.textContent = user.nunno_plan_trx || 'Pending Review';
-        } else {
-          if (verifPendingMsg) verifPendingMsg.style.display = 'none';
-        }
-      }
+      renderNunnoVerifyStatus(locked ? user : null);
     }
 
     const openInboxBtn = document.getElementById('employeeOpenInboxBtn');
@@ -5494,7 +5550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Monthly Target Quota Progress (For TM/TL only)
     if (!isAdmin) {
-      const targetQuota = 25000;
+      const targetQuota = 10000;   // sales target shown on the workspace
       const quotaPct = Math.min(Math.round((revenue / targetQuota) * 100), 100);
       const quotaFill = document.getElementById('revenueQuotaFill');
       if (quotaFill) quotaFill.style.width = `${quotaPct}%`;
@@ -5695,14 +5751,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (wdSectionEyebrow) wdSectionEyebrow.textContent = 'SETTLEMENTS & CLOSER DISBURSEMENTS';
       if (wdSectionTitle) wdSectionTitle.textContent = 'Withdrawals Requested & Approval Ledger';
       if (wdSectionSub) wdSectionSub.textContent = 'Review, audit and settle closer payout requests to EasyPaisa, JazzCash, or Bank.';
-      if (openWdModalBtn) {
-        openWdModalBtn.style.display = 'inline-flex';
-        openWdModalBtn.innerHTML = '<span>💳 Request Payout / Profit</span>';
-      }
-      if (cardQuickWithdrawBtn) {
-        cardQuickWithdrawBtn.style.display = 'inline-flex';
-        cardQuickWithdrawBtn.innerHTML = '<span>Payout →</span>';
-      }
+      // Admins pay closers out; they don't request payouts themselves (the server refuses it).
+      if (openWdModalBtn) openWdModalBtn.style.display = 'none';
+      if (cardQuickWithdrawBtn) cardQuickWithdrawBtn.style.display = 'none';
       if (adminWdFilterTabs) adminWdFilterTabs.style.display = 'inline-flex';
       if (wdHistoryTitle) wdHistoryTitle.textContent = 'Closer Withdrawal Requests Ledger';
 
@@ -5833,9 +5884,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 24-Hour Settlement Guarantee countdown clock for pending requests
       const timerPill = (isPending && !isAdmin) ? `
-        <div class="wd-timer-pill" data-created="${escapeHtml(wd.created_at || new Date().toISOString())}">
-          <span>⏳ Settling in:</span>
-          <span class="wd-timer-clock">24h 00m 00s remaining</span>
+        <div class="wd-timer-pill" data-created="${escapeHtml(wd.created_at || new Date().toISOString())}" data-due-ms="${wdDueAt(wd)}">
+          <span>⏳ Arrives within:</span>
+          <span class="wd-timer-clock">48h</span>
         </div>
       ` : '';
 
@@ -5907,12 +5958,13 @@ document.addEventListener('DOMContentLoaded', () => {
       pills.forEach(pill => {
         const createdStr = pill.getAttribute('data-created');
         const createdMs = createdStr ? new Date(createdStr).getTime() : now;
-        const deadlineMs = createdMs + (24 * 60 * 60 * 1000);
+        // 48 working hours (no weekends), as the server worked it out when the request was made
+        const deadlineMs = Number(pill.getAttribute('data-due-ms')) || (createdMs + 48 * 3600 * 1000);
         const diff = deadlineMs - now;
         const clockEl = pill.querySelector('.wd-timer-clock');
         if (!clockEl) return;
         if (diff <= 0) {
-          clockEl.textContent = '⚡ Processing Disbursement';
+          clockEl.textContent = 'Being sent now';
           pill.style.background = 'rgba(16, 185, 129, 0.15)';
           pill.style.borderColor = 'rgba(16, 185, 129, 0.35)';
           pill.style.color = '#10b981';
@@ -6084,7 +6136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openWithdrawModal() {
     if (!withdrawModal) return;
-    const effectiveBal = withdrawalAvailableBalance > 0 ? withdrawalAvailableBalance : 7500;
+    const effectiveBal = withdrawalAvailableBalance;   // the real balance from the server, never a made-up figure
     const modalBal = document.getElementById('modalWdAvailableBalance');
     if (modalBal) modalBal.textContent = effectiveBal.toLocaleString();
 
@@ -6147,7 +6199,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const amtInput = document.getElementById('wdAmountInput');
       if (!amtInput) return;
       const amt = chip.dataset.amt;
-      const effectiveBal = withdrawalAvailableBalance > 0 ? withdrawalAvailableBalance : 7500;
+      const effectiveBal = withdrawalAvailableBalance;
       if (amt === 'all') {
         amtInput.value = effectiveBal;
       } else {
@@ -6179,9 +6231,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const rawAmt = amtInput?.value?.trim();
     const amount = Number(rawAmt);
 
-    // 1. Validation: Amount >= 100
-    if (!rawAmt || isNaN(amount) || amount < 100) {
-      showWdError('⚠️ [ERR_INVALID_AMOUNT] Please specify a valid withdrawal amount (minimum PKR 100).');
+    // 1. Amount: at least Rs. 500 (same as the server) and not more than the balance
+    if (!rawAmt || isNaN(amount) || amount < 500) {
+      showWdError('⚠️ Enter an amount of at least Rs. 500.');
+      if (amtInput) amtInput.focus();
+      return;
+    }
+    if (amount > withdrawalAvailableBalance) {
+      showWdError(`⚠️ Insufficient funds. You can withdraw up to Rs. ${withdrawalAvailableBalance.toLocaleString()} right now.`);
       if (amtInput) amtInput.focus();
       return;
     }
@@ -6274,25 +6331,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          showToast(`🟢 PKR ${amount.toLocaleString()} requested. Your admin will transfer it and mark it paid.`);
-      // Dispatch withdrawal lodged email confirmation to closer
-      if (state.currentUser && state.currentUser.email) {
-        fetch('api/email_service.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'send_email',
-            target_type: 'custom',
-            target_custom_email: state.currentUser.email,
-            target_custom_name: state.currentUser.name,
-            template_id: 'withdrawal_lodged',
-            subject: `Withdrawal Lodged: PKR ${amount.toLocaleString()} Processing Notice`,
-            badge: 'Audit In Progress',
-            message_html: `<h3>Withdrawal Request Confirmed ⏱️</h3><p>Hello ${escapeHtml(state.currentUser.name)}, your withdrawal request of <strong>PKR ${amount.toLocaleString()}</strong> via <strong>${escapeHtml(institution)}</strong> has been lodged.</p><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin:16px 0;"><strong>Amount:</strong> PKR ${amount.toLocaleString()}<br><strong>Account:</strong> ${escapeHtml(accountTitle)} (${escapeHtml(accountNumber)})<br><strong>Destination:</strong> ${escapeHtml(institution)}<br><strong>Audit SLA:</strong> Within 24 Hours Guaranteed</div><p>Our accounts team will verify and transfer your funds within 24 hours.</p>`,
-            variables: { name: state.currentUser.name, amount: amount.toLocaleString(), method: institution }
-          })
-        }).catch(() => {});
-      }
+          showWithdrawalConfirmation(data.withdrawal || { amount, institution, created_at: new Date().toISOString() });
           await loadWithdrawals(payload.userId);
           renderEmployeeWorkspace();
           return;
@@ -6311,6 +6350,41 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('withdrawRequestForm')?.addEventListener('submit', handleWithdrawSubmit);
+
+  // Countdown to when a payout should arrive: the server's expected_by (48 working hours, no
+  // weekends), else 48 h after the request.
+  function wdDueAt(w) {
+    return Date.parse(w.expected_by || '') || ((Date.parse(w.created_at || '') || Date.now()) + 48 * 3600e3);
+  }
+  function wdCountdownText(due) {
+    const left = due - Date.now();
+    if (left <= 0) return 'any moment now';
+    const h = Math.floor(left / 3600e3), m = Math.floor((left % 3600e3) / 60e3);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  }
+  function showWithdrawalConfirmation(w) {
+    document.getElementById('wdConfirmOverlay')?.remove();
+    const due = wdDueAt(w);
+    const wrap = document.createElement('div');
+    wrap.id = 'wdConfirmOverlay';
+    wrap.className = 'nunno-success-overlay';
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-modal', 'true');
+    wrap.innerHTML = `<div class="nunno-success-card">
+        <div class="nunno-success-check" aria-hidden="true">✓</div>
+        <h2>Withdrawal requested</h2>
+        <p><strong style="color:#fff">PKR ${Number(w.amount || 0).toLocaleString()}</strong> to ${escapeHtml(w.institution || w.method || 'your account')}.</p>
+        <div class="wd-confirm-timer"><span>Arrives within</span><strong data-wd-due="${due}">${wdCountdownText(due)}</strong></div>
+        <p style="font-size:12.5px">You'll get an email as soon as it's sent. Withdrawals are off on Saturday and Sunday.</p>
+        <button type="button" class="btn-nunno-buy" id="wdConfirmOk"><span>Done</span></button>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.querySelector('#wdConfirmOk').addEventListener('click', () => wrap.remove());
+  }
+  // keep every visible payout countdown ticking
+  setInterval(() => {
+    document.querySelectorAll('[data-wd-due]').forEach(el => { el.textContent = wdCountdownText(Number(el.getAttribute('data-wd-due'))); });
+  }, 30000);
 
   // ==========================================
   // AUTHENTICATION & EMPLOYEE PROVISIONING MODULE
@@ -6563,6 +6637,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isNunnoPlanLocked(user) && (user.role === 'admin' || isImpersonated || hasChatParam)) switchTab('inbox');
     else switchTab('employee');
     bootStepDone('auth');
+    // First sign-in after the admin verified a locked TM's plan: show "Plan verified" once.
+    // Otherwise new TLs / unlocked TMs get the guided tour once.
+    if (!isImpersonated) {
+      if (user.plan_locked && user.has_nunno_plan && user.nunno_plan_success_seen === false) showNunnoPlanSuccess();
+      else maybeStartTour();
+    }
   }
 
   function showAccountSuspendedScreen(user) {
@@ -8119,6 +8199,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (els.paidPlanSelect && defPlan) els.paidPlanSelect.value = defPlan;
     if (els.paidAmountInput) els.paidAmountInput.value = defAmount;
+
+    // A Nunno Team Leader's "sale" is a recruit who bought the Nunno x Chatly plan: one locked
+    // option at Rs. 1,000 (the TL earns Rs. 500 once the admin verifies it).
+    const me = state.currentUser || {};
+    const nunnoTL = String(me.role || '').toLowerCase() === 'lead' && (me.company_id || state.currentCompanyId || 'COMP-001') === 'COMP-001';
+    if (els.paidPlanSelect) {
+      if (nunnoTL) {
+        els.paidPlanSelect.innerHTML = '<option value="Nunno x Chatly Special Plan" data-amount="1000" data-commission="500" selected>🔒 Nunno x Chatly Special Plan (Rs. 1,000)</option>';
+        els.paidPlanSelect.value = 'Nunno x Chatly Special Plan';
+      }
+      els.paidPlanSelect.disabled = nunnoTL;
+    }
+    if (els.paidAmountInput) {
+      if (nunnoTL) els.paidAmountInput.value = 1000;
+      els.paidAmountInput.readOnly = nunnoTL;
+    }
     if (els.paidMethodSelect) {
       els.paidMethodSelect.value = (lead.paidDetails && lead.paidDetails.method) ? lead.paidDetails.method : 'EasyPaisa';
     }

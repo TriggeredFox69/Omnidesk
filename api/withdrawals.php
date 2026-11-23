@@ -44,6 +44,46 @@ function writeWithdrawalsLocked($file, $handle, array $data) {
     } catch (Throwable $e) {}
 }
 
+/**
+ * When a payout should arrive: 48 working hours after the request, Pakistan time.
+ * Saturdays and Sundays are not working days (no payouts at weekends).
+ */
+function wdExpectedBy(int $from): int {
+    $tz = new DateTimeZone('Asia/Karachi');
+    $t = (new DateTimeImmutable('@' . $from))->setTimezone($tz);
+    $left = 48 * 3600;
+    while ($left > 0) {
+        $dow = (int) $t->format('N');                       // 6 = Saturday, 7 = Sunday
+        $nextMidnight = $t->setTime(0, 0)->modify('+1 day');
+        $span = $nextMidnight->getTimestamp() - $t->getTimestamp();
+        if ($dow >= 6) { $t = $nextMidnight; continue; }
+        if ($span >= $left) { $t = $t->modify("+{$left} seconds"); $left = 0; }
+        else { $left -= $span; $t = $nextMidnight; }
+    }
+    return $t->getTimestamp();
+}
+
+/** Email the person that their payout was sent (best effort; never blocks the payout). */
+function wdNotifyPaid(array $w): void {
+    $email = '';
+    foreach (earningsUsers() as $u) if (($u['id'] ?? '') === ($w['userId'] ?? '')) { $email = (string) ($u['email'] ?? ''); break; }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return;
+    $cfg = earningsReadJson(__DIR__ . '/../data/email_config.json');
+    $from = filter_var($cfg['sender_email'] ?? '', FILTER_VALIDATE_EMAIL) ? $cfg['sender_email'] : 'no-reply@chatly.pk';
+    $fromName = preg_replace('/[\r\n]+/', ' ', (string) ($cfg['sender_name'] ?? 'Chatly'));
+    $h = fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+    $amount = number_format((float) ($w['amount'] ?? 0));
+    $body = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px">'
+        . '<h2 style="color:#059669;margin:0 0 10px">Your payout has been sent ✅</h2>'
+        . '<p>Hello ' . $h($w['userName'] ?? '') . ',</p>'
+        . '<p><strong>PKR ' . $amount . '</strong> has been sent to your ' . $h($w['institution'] ?? $w['method'] ?? 'account')
+        . ' (' . $h($w['accountTitle'] ?? '') . ', ' . $h($w['accountNumber'] ?? '') . ').</p>'
+        . (!empty($w['txRef']) ? '<p>Payment reference: <strong>' . $h($w['txRef']) . '</strong></p>' : '')
+        . '<p style="color:#6b7280;font-size:13px">Request ' . $h($w['id'] ?? '') . ' · Chatly</p></div>';
+    $headers = ['MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', 'From: ' . $fromName . ' <' . $from . '>'];
+    @mail($email, 'Payout sent: PKR ' . $amount, $body, implode("\r\n", $headers));
+}
+
 function wdFail(int $code, string $msg) {
     http_response_code($code);
     echo json_encode(['success' => false, 'error' => $msg]);
@@ -104,7 +144,7 @@ if ($action === 'request_withdrawal') {
     $earn = computeEarnings($me['id'], null, null, $all);   // balance checked against the locked file
     if ($amount > $earn['available']) {
         flock($h, LOCK_UN); fclose($h);
-        wdFail(400, 'You can withdraw up to Rs. ' . number_format($earn['available']) . ' right now (earned Rs. ' . number_format($earn['total_earned']) . ', already paid Rs. ' . number_format($earn['paid_out']) . ', pending Rs. ' . number_format($earn['pending_withdrawals']) . ').');
+        wdFail(400, 'Insufficient funds: you can withdraw up to Rs. ' . number_format($earn['available']) . ' right now (earned Rs. ' . number_format($earn['total_earned']) . ', already paid Rs. ' . number_format($earn['paid_out']) . ', pending Rs. ' . number_format($earn['pending_withdrawals']) . ').');
     }
     $companyName = 'Company';
     foreach (earningsReadJson(__DIR__ . '/../data/companies.json') as $c) if (($c['id'] ?? '') === $myCompany) $companyName = $c['name'] ?? $companyName;
@@ -125,6 +165,7 @@ if ($action === 'request_withdrawal') {
         'status' => 'pending',
         'balance_at_request' => $earn['available'],
         'created_at' => date('c'),
+        'expected_by' => date('c', wdExpectedBy(time())),   // 48 working hours (no weekends)
     ];
     array_unshift($all, $new);
     writeWithdrawalsLocked($wdFile, $h, $all);
@@ -162,6 +203,9 @@ if ($action === 'update_status') {
     unset($w);
     if (!$found) { flock($h, LOCK_UN); fclose($h); wdFail(404, 'Withdrawal request not found.'); }
     writeWithdrawalsLocked($wdFile, $h, $all);
+    if ($status === 'approved') {
+        foreach ($all as $w) if (($w['id'] ?? '') === $id) { wdNotifyPaid($w); break; }
+    }
     $visible = $isSuper ? $all : array_values(array_filter($all, fn($w) => ($w['company_id'] ?? NUNNO_COMPANY_ID) === $myCompany));
     echo json_encode(['success' => true, 'withdrawals' => $visible]);
     exit;

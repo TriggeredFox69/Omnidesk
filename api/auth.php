@@ -500,6 +500,12 @@ switch ($action) {
         } elseif ($referredByTL) {
             $newAccount['joined_via_tl'] = $referredByTL;
         }
+        // A new Nunno TM must own the product before selling it: Team Inbox stays locked until
+        // they buy the Rs. 1,000 Nunno x Chatly plan and the admin verifies it.
+        if (!$isTL && $companyId === 'COMP-001') {
+            $newAccount['plan_locked'] = true;
+            $newAccount['nunno_plan_status'] = 'unpaid';
+        }
 
         $users[] = $newAccount;
         saveUsers($usersFile, $users);
@@ -603,7 +609,9 @@ switch ($action) {
         // If an approved member was brought by a TL, credit the sponsoring TL!
         if ($found && $approvedUser && ($approvedUser['role'] ?? '') === 'member') {
             $tlIdToCredit = $attributedTL ?: ($approvedUser['joined_via_tl'] ?? '');
-            if ($tlIdToCredit) {
+            // Nunno TLs are paid Rs. 500 when the recruited TM's Nunno x Chatly plan sale is
+            // verified (api/earnings.php), not on approval: crediting here too would pay twice.
+            if ($tlIdToCredit && ($approvedUser['company_id'] ?? 'COMP-001') !== 'COMP-001') {
                 $companyId = $approvedUser['company_id'] ?? 'COMP-001';
                 $commRate = 500;
                 $compsFile = __DIR__ . '/../data/companies.json';
@@ -689,14 +697,25 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => 'Authentication required.']);
             exit;
         }
+        // The TM bought the Nunno x Chatly plan on nunno.cloud and gives the email they used there;
+        // the admin checks it on Nunno and activates. (A transaction id is still accepted.)
+        $nunnoEmail = strtolower(trim((string) ($data['nunno_email'] ?? '')));
         $trxId = trim($data['trx_id'] ?? ($data['transaction_id'] ?? ''));
-        $paymentMethod = trim($data['payment_method'] ?? 'easypaisa');
+        $paymentMethod = trim($data['payment_method'] ?? ($nunnoEmail !== '' ? 'nunno.cloud' : 'easypaisa'));
         $senderPhone = trim($data['sender_phone'] ?? '');
         $notes = trim($data['notes'] ?? '');
+        if ($nunnoEmail !== '') {
+            if (!filter_var($nunnoEmail, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Enter a valid email address (the one you used on nunno.cloud).']);
+                exit;
+            }
+            $trxId = $trxId ?: ('email:' . $nunnoEmail);
+        }
 
         if (!$trxId) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Transaction ID or Payment Reference is required.']);
+            echo json_encode(['success' => false, 'error' => 'Enter the email you used to buy the plan on nunno.cloud.']);
             exit;
         }
 
@@ -706,6 +725,7 @@ switch ($action) {
         foreach ($users as &$u) {
             if ($u['id'] === $currentUser['id'] || strcasecmp($u['username'], $currentUser['username']) === 0) {
                 $u['nunno_plan_status'] = 'pending_verification';
+                if ($nunnoEmail !== '') $u['nunno_plan_email'] = $nunnoEmail;
                 $u['nunno_plan_trx'] = $trxId;
                 $u['nunno_plan_method'] = $paymentMethod;
                 $u['nunno_plan_sender_phone'] = $senderPhone;
@@ -731,6 +751,27 @@ switch ($action) {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'User account not found.']);
         }
+        exit;
+
+    // Remember one-time screens for the signed-in user: the guided tour, the "plan verified" success.
+    case 'mark_seen':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $me = getCurrentUser($usersFile);
+        $flag = (string) ($data['flag'] ?? '');
+        if (!$me || !in_array($flag, ['tour_done', 'nunno_plan_success_seen'], true)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid request.']);
+            exit;
+        }
+        require_once __DIR__ . '/quota.php';
+        chatlyUsersUpdate($usersFile, function (array &$users) use ($me, $flag) {
+            foreach ($users as &$u) {
+                if (($u['id'] ?? '') === ($me['id'] ?? '')) { $u[$flag] = true; return true; }
+            }
+            return false;
+        });
+        echo json_encode(['success' => true]);
         exit;
 
     // 0e-2. Activate or Deactivate TM Nunno Plan (Company Admin or Superadmin)
@@ -762,6 +803,7 @@ switch ($action) {
                 $u['nunno_plan_status'] = $activate ? 'active' : 'unpaid';
                 if ($activate) {
                     $u['nunno_plan_activated_at'] = date('Y-m-d H:i:s');
+                    $u['nunno_plan_success_seen'] = false;   // the TM sees a "verified" screen once
                 }
                 $found = true;
                 $updatedUser = sanitizeUser($u);
@@ -1012,6 +1054,12 @@ switch ($action) {
                 if (isset($su['message_limit'])) $checkUser['message_limit'] = $su['message_limit'];
                 $checkUser['messages_sent_today'] = chatlyQuotaSentToday($su);
                 $checkUser['quota_metrics'] = chatlyQuotaMetrics($su);
+                // Plan lock / tour state changes on the server (admin verifies the plan), so the
+                // page always gets the current values, not the copy from sign-in.
+                foreach (['has_nunno_plan', 'nunno_plan_status', 'plan_locked', 'nunno_plan_email', 'nunno_plan_submitted_at',
+                          'nunno_plan_activated_at', 'nunno_plan_success_seen', 'tour_done', 'status', 'campaign_paused'] as $f) {
+                    if (array_key_exists($f, $su)) $checkUser[$f] = $su[$f]; else unset($checkUser[$f]);
+                }
                 break;
             }
             echo json_encode([
@@ -1600,8 +1648,10 @@ switch ($action) {
             'last_login'          => null
         ];
 
-        // Award 500 PKR commission to the recruiting TL
-        $commissionEarned = 500;
+        // Award 500 PKR commission to the recruiting TL (other companies). Nunno TLs earn it when
+        // the TM's Nunno x Chatly plan sale is verified (api/earnings.php), so not here.
+        $commissionEarned = ($companyId === 'COMP-001') ? 0 : 500;
+        if ($companyId === 'COMP-001') $newTM['plan_locked'] = true;   // must buy + verify the plan first
         foreach ($users as &$u) {
             if ($u['id'] === $currentUser['id']) {
                 $u['tl_commission_balance'] = ((int)($u['tl_commission_balance'] ?? 0)) + $commissionEarned;

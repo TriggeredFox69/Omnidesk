@@ -3682,6 +3682,32 @@ body.theme-dark .campaign-image-bubble {
 .btn-cart-icon {
   font-size: 24px;
 }
+/* Locked Nunno TM: email + Verify, then a countdown and live status; one-time success screen */
+.nunno-email-row { display: flex; gap: 8px; }
+.nunno-email-row .form-control { flex: 1; min-width: 0; min-height: 44px; font-size: 14px; }
+.nunno-email-row .btn-verify-proof { width: auto; min-width: 96px; min-height: 44px; margin: 0; justify-content: center; }
+.nunno-verif-status { margin-bottom: 10px; padding: 14px; border-radius: 12px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; }
+.nunno-verif-status .nvs-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.nunno-verif-status .nvs-dot { width: 9px; height: 9px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 8px #f59e0b; animation: nvsPulse 1.2s ease-in-out infinite; }
+@keyframes nvsPulse { 50% { opacity: 0.35; } }
+.nunno-verif-status .nvs-timer { margin: 8px 0 6px; font: 800 28px/1 'JetBrains Mono', ui-monospace, monospace; letter-spacing: 1px; color: #fde68a; }
+.nunno-verif-status .nvs-sub { font-size: 11.5px; line-height: 1.5; color: rgba(253, 230, 138, 0.85); }
+.nunno-verif-status code { color: #fff; font-weight: 700; word-break: break-all; }
+.nunno-success-overlay { position: fixed; inset: 0; z-index: 10050; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(4px); }
+.nunno-success-card { width: min(420px, 100%); padding: 28px 22px; border-radius: 20px; text-align: center; background: #0b1220; color: #e2e8f0;
+  border: 1px solid rgba(16, 185, 129, 0.45); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
+.nunno-success-card h2 { margin: 12px 0 6px; font-size: 22px; color: #fff; }
+.nunno-success-card p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: #94a3b8; }
+.nunno-success-check { width: 64px; height: 64px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 32px; font-weight: 900; color: #fff; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.18); }
+.nunno-success-card .btn-nunno-buy { width: 100%; justify-content: center; border: 0; cursor: pointer; }
+.wd-confirm-timer { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0 0 14px; padding: 12px; border-radius: 12px;
+  background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); }
+.wd-confirm-timer span { font-size: 11.5px; color: #fbbf24; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.wd-confirm-timer strong { font: 800 26px/1.1 'JetBrains Mono', ui-monospace, monospace; color: #fde68a; }
+@media (prefers-reduced-motion: reduce) { .nunno-verif-status .nvs-dot { animation: none; } }
+
 .nunno-verification-box {
   background: rgba(0, 0, 0, 0.38);
   border: 1px solid rgba(255, 255, 255, 0.1);

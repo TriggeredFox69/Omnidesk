@@ -1699,7 +1699,7 @@ async function showConnectedCloserBox(phone) {
 
     if (data.exists && data.user) {
       const u = data.user;
-      const compName = u.company_name || u.company_id || 'Company';
+      const compName = String(u.company_name || u.company_id || 'Company').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const isTL = (u.role === 'lead' || (u.designation && u.designation.toLowerCase().includes('lead')));
 
       if (u.status === 'pending') {
@@ -2133,59 +2133,217 @@ async function handleSadminLogin(e) {
   </div>
 </div>
 
-<!-- MODAL: New TM / TL Closer Registration (shown right after the QR scan) -->
+<!-- MODAL: New TM / TL Closer Registration (shown right after the QR scan or the phone-number pairing) -->
 <style>
-  #modalTMRegister { display:none; position:fixed; inset:0; z-index:999999; align-items:flex-start; justify-content:center; overflow-y:auto; padding:32px 16px; background:radial-gradient(1200px 600px at 50% -10%, rgba(31,224,138,0.18), transparent 60%), rgba(3,10,7,0.86); backdrop-filter:blur(10px); }
-  .reg-card { width:100%; max-width:560px; background:var(--wa-card-bg); border:1px solid rgba(31,224,138,0.28); border-radius:24px; box-shadow:0 30px 80px rgba(0,0,0,0.55); overflow:hidden; animation:regIn .28s cubic-bezier(.2,.8,.2,1); }
-  @keyframes regIn { from { opacity:0; transform:translateY(14px) scale(.98); } to { opacity:1; transform:none; } }
-  .reg-head { position:relative; padding:24px 26px 18px; background:linear-gradient(180deg, rgba(31,224,138,0.12), transparent); border-bottom:1px solid rgba(255,255,255,0.06); }
-  .reg-head-top { display:flex; align-items:center; gap:12px; }
-  .reg-logo { width:44px; height:44px; border-radius:12px; background:#07140f; border:1px solid rgba(31,224,138,0.4); padding:4px; object-fit:contain; flex-shrink:0; }
-  .reg-eyebrow { font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--wa-accent); }
-  .reg-title { margin:2px 0 0; font-size:21px; font-weight:800; color:var(--wa-text-primary); letter-spacing:-.01em; }
-  .reg-close { position:absolute; top:16px; right:16px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--wa-text-muted); font-size:20px; line-height:1; cursor:pointer; }
-  .reg-close:hover { color:var(--wa-text-primary); border-color:rgba(255,255,255,0.25); }
-  .reg-verified { margin-top:14px; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:rgba(31,224,138,0.08); border:1px solid rgba(31,224,138,0.25); font-size:12.5px; color:var(--wa-text-secondary); }
-  .reg-verified strong { color:var(--wa-text-primary); font-family:'JetBrains Mono',monospace; }
-  .reg-verified .tick { margin-left:auto; font-size:10.5px; font-weight:800; padding:3px 8px; border-radius:999px; background:var(--wa-accent); color:#03130c; }
-  .reg-body { padding:20px 26px 24px; }
-  .reg-section { margin-bottom:18px; }
-  .reg-label { display:block; font-size:12px; font-weight:750; color:var(--wa-text-secondary); margin-bottom:7px; }
-  .reg-label .opt { font-weight:600; color:var(--wa-text-muted); }
-  .reg-roles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .reg-role { position:relative; padding:14px; border-radius:14px; border:1.5px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.025); cursor:pointer; transition:all .15s ease; }
-  .reg-role:hover { border-color:rgba(31,224,138,0.45); }
-  .reg-role .ico { font-size:20px; }
-  .reg-role .t { margin-top:6px; font-size:13.5px; font-weight:800; color:var(--wa-text-primary); }
-  .reg-role .d { margin-top:3px; font-size:11.5px; line-height:1.45; color:var(--wa-text-muted); }
-  .reg-role .dot { position:absolute; top:12px; right:12px; width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,0.25); }
-  .reg-role.is-active { border-color:var(--wa-accent); background:rgba(31,224,138,0.1); box-shadow:0 0 0 3px rgba(31,224,138,0.12); }
-  .reg-role.is-active .dot { border-color:var(--wa-accent); background:radial-gradient(circle, var(--wa-accent) 45%, transparent 50%); }
-  .reg-role.is-tl.is-active { border-color:#a855f7; background:rgba(168,85,247,0.12); box-shadow:0 0 0 3px rgba(168,85,247,0.15); }
-  .reg-role.is-tl.is-active .dot { border-color:#a855f7; background:radial-gradient(circle, #a855f7 45%, transparent 50%); }
-  .reg-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .reg-input { width:100%; box-sizing:border-box; padding:12px 13px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:rgba(0,0,0,0.25); color:var(--wa-text-primary); font-size:14px; outline:none; transition:border-color .15s ease, box-shadow .15s ease; }
-  .reg-input:focus { border-color:var(--wa-accent); box-shadow:0 0 0 3px rgba(31,224,138,0.15); }
-  html.theme-light .reg-input, body.light .reg-input { background:#fff; }
+  /* Mobile-first signup sheet. Colours come from the page's --wa-* tokens; the --reg-* tokens
+     below only cover lines, fields and tints that need a different value on the light theme. */
+  #modalTMRegister {
+    --reg-line: rgba(255,255,255,0.12);
+    --reg-line-strong: rgba(255,255,255,0.26);
+    --reg-field: rgba(0,0,0,0.28);
+    --reg-soft: rgba(255,255,255,0.04);
+    --reg-ok-soft: rgba(31,224,138,0.10);
+    --reg-ok-line: rgba(31,224,138,0.32);
+    --reg-tl: #c084fc;
+    --reg-tl-soft: rgba(168,85,247,0.12);
+    --reg-tl-line: rgba(168,85,247,0.45);
+    --reg-err: #fb7185;
+    --reg-badge-text: #4cecab;
+    display:none; position:fixed; inset:0; z-index:999999;
+    align-items:flex-start; justify-content:center;
+    overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    padding:0;
+    background:radial-gradient(1200px 600px at 50% -10%, rgba(31,224,138,0.18), transparent 60%), rgba(3,10,7,0.86);
+    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  }
+  html.theme-light #modalTMRegister, body.light #modalTMRegister {
+    --reg-line: rgba(7,20,15,0.14);
+    --reg-line-strong: rgba(7,20,15,0.32);
+    --reg-field: #ffffff;
+    --reg-soft: rgba(7,20,15,0.03);
+    --reg-ok-soft: rgba(15,169,104,0.08);
+    --reg-ok-line: rgba(15,169,104,0.30);
+    --reg-tl: #7e22ce;
+    --reg-tl-soft: rgba(168,85,247,0.08);
+    --reg-tl-line: rgba(126,34,206,0.40);
+    --reg-err: #be123c;
+    --reg-badge-text: #047857;
+    background:radial-gradient(1200px 600px at 50% -10%, rgba(15,169,104,0.16), transparent 60%), rgba(7,20,15,0.5);
+  }
+  .reg-card {
+    width:100%; min-height:100vh; min-height:100dvh;
+    background:var(--wa-card-bg); color:var(--wa-text-primary);
+    font-size:15px; line-height:1.4;
+    animation:regIn .28s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes regIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+
+  /* Header */
+  .reg-head {
+    position:relative;
+    padding:calc(16px + env(safe-area-inset-top, 0px)) 16px 16px;
+    background:linear-gradient(180deg, var(--reg-ok-soft), transparent);
+    border-bottom:1px solid var(--reg-line);
+  }
+  .reg-head-top { display:flex; align-items:center; gap:12px; padding-right:52px; }
+  .reg-head-text { min-width:0; }
+  .reg-logo { width:40px; height:40px; border-radius:12px; background:#07140f; border:1px solid rgba(31,224,138,0.4); padding:4px; object-fit:contain; flex-shrink:0; }
+  .reg-eyebrow { font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--wa-accent); }
+  .reg-title { margin:2px 0 0; font-size:20px; line-height:1.25; font-weight:800; color:var(--wa-text-primary); letter-spacing:-.01em; }
+  .reg-close {
+    position:absolute; top:calc(12px + env(safe-area-inset-top, 0px)); right:12px;
+    width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+    border-radius:12px; border:1px solid var(--reg-line); background:var(--reg-soft);
+    color:var(--wa-text-secondary); font-size:26px; line-height:1; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .reg-close:hover { color:var(--wa-text-primary); border-color:var(--reg-line-strong); }
+  .reg-verified {
+    margin-top:14px; display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px;
+    padding:10px 12px; border-radius:12px;
+    background:var(--reg-ok-soft); border:1px solid var(--reg-ok-line);
+    font-size:14px; color:var(--wa-text-secondary);
+  }
+  .reg-verified-txt { min-width:0; }
+  .reg-verified strong { color:var(--wa-text-primary); font-family:'JetBrains Mono',monospace; font-size:13.5px; word-break:break-all; }
+  .reg-verified .tick { margin-left:auto; font-size:12px; font-weight:800; padding:4px 10px; border-radius:999px; background:var(--wa-accent); color:#03130c; white-space:nowrap; }
+
+  /* Body + fields */
+  .reg-body { padding:20px 16px 0; }
+  .reg-section { margin-bottom:24px; }
+  .reg-group-title { margin:0 0 12px; font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--wa-text-muted); }
+  .reg-field + .reg-field { margin-top:16px; }
+  .reg-label { display:block; margin-bottom:8px; font-size:14px; font-weight:700; color:var(--wa-text-primary); }
+  .reg-label .opt { font-weight:500; color:var(--wa-text-muted); }
+  .reg-input {
+    display:block; width:100%; min-height:50px; margin:0;
+    padding:12px 14px; border-radius:12px;
+    border:1.5px solid var(--reg-line); background-color:var(--reg-field);
+    color:var(--wa-text-primary); font:inherit; font-size:16px; line-height:1.3;
+    outline:none; -webkit-appearance:none; appearance:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .reg-input::placeholder { color:var(--wa-text-muted); opacity:1; }
+  .reg-input:hover { border-color:var(--reg-line-strong); }
+  .reg-input:focus { border-color:var(--wa-accent); box-shadow:0 0 0 3px rgba(31,224,138,0.18); }
+  .reg-input[aria-invalid="true"] { border-color:var(--reg-err); }
+  .reg-input[aria-invalid="true"]:focus { box-shadow:0 0 0 3px rgba(244,63,94,0.2); }
+  select.reg-input {
+    padding-right:44px; cursor:pointer; font-weight:600;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238aa398' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center; background-size:16px 16px;
+  }
+  select.reg-input option { background:var(--wa-card-bg); color:var(--wa-text-primary); }
+  .reg-hint { margin-top:8px; font-size:13px; line-height:1.45; color:var(--wa-text-muted); }
+  .reg-err { margin-top:6px; font-size:13px; font-weight:600; line-height:1.4; color:var(--reg-err); }
+  .reg-err[hidden] { display:none; }
+
+  /* Password show / hide */
   .reg-pass { position:relative; }
-  .reg-pass button { position:absolute; right:8px; top:50%; transform:translateY(-50%); border:none; background:none; color:var(--wa-text-muted); font-size:12px; font-weight:700; cursor:pointer; padding:6px; }
-  .reg-hint { margin-top:5px; font-size:11px; color:var(--wa-text-muted); }
-  .reg-company { margin-top:10px; display:flex; align-items:center; gap:12px; padding:11px 13px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); }
-  .reg-company img { width:40px; height:40px; border-radius:10px; object-fit:contain; background:#07140f; border:1px solid rgba(255,255,255,0.14); padding:3px; flex-shrink:0; }
-  .reg-tl-note { display:none; margin-bottom:18px; padding:11px 13px; border-radius:12px; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.3); font-size:12px; line-height:1.5; color:#d8b4fe; }
-  .reg-optional summary { cursor:pointer; list-style:none; font-size:12.5px; font-weight:750; color:var(--wa-text-secondary); padding:10px 0; }
+  .reg-pass .reg-input { padding-right:96px; }
+  .reg-eye {
+    position:absolute; right:3px; top:50%; transform:translateY(-50%);
+    min-width:44px; height:44px; padding:0 12px;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    border:0; border-radius:10px; background:transparent;
+    color:var(--wa-text-secondary); font:inherit; font-size:13px; font-weight:700; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .reg-eye:hover { color:var(--wa-text-primary); background:var(--reg-soft); }
+  .reg-eye svg { width:18px; height:18px; flex-shrink:0; }
+  .reg-eye .eye-off { display:none; }
+  .reg-eye[aria-pressed="true"] .eye-on { display:none; }
+  .reg-eye[aria-pressed="true"] .eye-off { display:block; }
+
+  /* Role choice: two selectable cards */
+  .reg-roles { display:grid; grid-template-columns:1fr; gap:10px; }
+  .reg-role {
+    position:relative; display:flex; align-items:center; gap:12px;
+    min-height:68px; padding:14px; border-radius:14px;
+    border:1.5px solid var(--reg-line); background:var(--reg-soft);
+    cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent;
+    transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+  }
+  .reg-role:hover { border-color:var(--reg-line-strong); }
+  .reg-role .ico { flex-shrink:0; width:42px; height:42px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:var(--reg-soft); border:1px solid var(--reg-line); font-size:20px; }
+  .reg-role-text { flex:1; min-width:0; }
+  .reg-role .t { display:block; font-size:15px; font-weight:800; color:var(--wa-text-primary); }
+  .reg-role .d { display:block; margin-top:3px; font-size:13px; line-height:1.4; color:var(--wa-text-secondary); }
+  .reg-role .dot { flex-shrink:0; width:22px; height:22px; border-radius:50%; border:2px solid var(--reg-line-strong); }
+  .reg-role.is-active { border-color:var(--wa-accent); background:var(--reg-ok-soft); box-shadow:0 0 0 3px rgba(31,224,138,0.14); }
+  .reg-role.is-active .dot { border-color:var(--wa-accent); background:radial-gradient(circle, var(--wa-accent) 0 5px, transparent 6px); }
+  .reg-role.is-tl.is-active { border-color:var(--reg-tl); background:var(--reg-tl-soft); box-shadow:0 0 0 3px rgba(168,85,247,0.16); }
+  .reg-role.is-tl.is-active .dot { border-color:var(--reg-tl); background:radial-gradient(circle, var(--reg-tl) 0 5px, transparent 6px); }
+  .reg-role:focus-visible, .reg-close:focus-visible, .reg-eye:focus-visible, .reg-optional summary:focus-visible { outline:2px solid var(--wa-accent); outline-offset:2px; }
+  .reg-tl-note { display:none; margin:-8px 0 24px; padding:12px 14px; border-radius:12px; background:var(--reg-tl-soft); border:1px solid var(--reg-tl-line); font-size:13.5px; line-height:1.5; color:var(--wa-text-primary); }
+
+  /* Company preview */
+  .reg-company { margin-top:10px; display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:var(--reg-soft); border:1px solid var(--reg-line); }
+  .reg-company img { width:40px; height:40px; border-radius:10px; object-fit:contain; background:#07140f; border:1px solid var(--reg-line); padding:3px; flex-shrink:0; }
+  .reg-company-main { min-width:0; flex:1; }
+  .reg-company-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .reg-company-name { color:var(--wa-text-primary); font-size:14px; font-weight:700; }
+  .reg-company-badge { font-size:11px; font-weight:750; padding:2px 8px; border-radius:999px; background:rgba(31,224,138,0.16); color:var(--reg-badge-text); }
+  .reg-company-tag { font-size:12.5px; color:var(--wa-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Optional extras */
+  .reg-optional { margin-bottom:20px; border:1px solid var(--reg-line); border-radius:12px; background:var(--reg-soft); }
+  .reg-optional summary {
+    min-height:50px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:0 14px; cursor:pointer; list-style:none; border-radius:12px;
+    font-size:14px; font-weight:700; color:var(--wa-text-secondary);
+  }
   .reg-optional summary::-webkit-details-marker { display:none; }
-  .reg-optional summary::after { content:' ▾'; color:var(--wa-text-muted); }
-  .reg-optional[open] summary::after { content:' ▴'; }
-  .reg-submit { width:100%; margin-top:6px; padding:15px; border:none; border-radius:14px; background:linear-gradient(135deg, #2de89a, #0fa968); color:#03130c; font-size:15px; font-weight:850; cursor:pointer; box-shadow:0 10px 30px rgba(31,224,138,0.28); transition:transform .12s ease, filter .12s ease; }
-  .reg-submit:hover { filter:brightness(1.05); transform:translateY(-1px); }
-  .reg-submit:disabled { opacity:.6; cursor:wait; transform:none; }
-  .reg-foot { margin-top:10px; text-align:center; font-size:11.5px; line-height:1.5; color:var(--wa-text-muted); }
-  @media (max-width: 560px) {
-    #modalTMRegister { padding:0; }
-    .reg-card { border-radius:0; min-height:100vh; border:none; }
-    .reg-head, .reg-body { padding-left:18px; padding-right:18px; }
-    .reg-roles, .reg-grid { grid-template-columns:1fr; }
+  .reg-optional summary::after { content:''; width:9px; height:9px; margin-right:4px; border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(45deg) translateY(-3px); transition:transform .15s ease; flex-shrink:0; }
+  .reg-optional[open] summary::after { transform:rotate(-135deg) translateY(-3px); }
+  .reg-optional-body { padding:4px 14px 16px; }
+  .reg-optional-body .reg-section { margin-bottom:16px; }
+  .reg-optional-body .reg-section:last-child { margin-bottom:0; }
+
+  /* Sticky primary action */
+  .reg-actions {
+    position:sticky; bottom:0; z-index:2;
+    margin:8px -16px 0; padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    background:var(--wa-card-bg); border-top:1px solid var(--reg-line);
+  }
+  #modalTMRegister .error-box { margin:0 0 10px; padding:12px 14px; border-radius:12px; font-size:14px; line-height:1.45; color:var(--reg-err); }
+  .reg-submit {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; min-height:54px; margin:0; padding:14px 18px;
+    border:0; border-radius:14px;
+    background:linear-gradient(135deg, #2de89a, #0fa968); color:#03130c;
+    font:inherit; font-size:16px; font-weight:800; cursor:pointer;
+    box-shadow:0 10px 28px rgba(31,224,138,0.28);
+    -webkit-tap-highlight-color:transparent;
+    transition:transform .12s ease, filter .12s ease, opacity .12s ease;
+  }
+  .reg-submit:hover { filter:brightness(1.05); }
+  .reg-submit:active { transform:scale(.99); }
+  .reg-submit:focus-visible { outline:3px solid var(--wa-text-primary); outline-offset:2px; }
+  .reg-submit:disabled { cursor:progress; opacity:.85; box-shadow:none; filter:none; transform:none; }
+  .reg-submit:disabled::before {
+    content:''; flex-shrink:0; width:18px; height:18px; border-radius:50%;
+    border:2.5px solid rgba(3,19,12,0.25); border-top-color:#03130c;
+    animation:regSpin .7s linear infinite;
+  }
+  @keyframes regSpin { to { transform:rotate(360deg); } }
+  .reg-foot { padding:12px 0 24px; text-align:center; font-size:13px; line-height:1.5; color:var(--wa-text-muted); }
+
+  /* Tablet / desktop: centred card */
+  @media (min-width: 600px) {
+    #modalTMRegister { padding:40px 24px; }
+    .reg-card { max-width:520px; min-height:0; border:1px solid var(--reg-ok-line); border-radius:24px; box-shadow:0 30px 80px rgba(0,0,0,0.45); }
+    .reg-head { padding:24px 24px 18px; border-radius:24px 24px 0 0; }
+    .reg-close { top:14px; right:14px; }
+    .reg-title { font-size:22px; }
+    .reg-body { padding:22px 24px 0; }
+    .reg-actions { margin:8px -24px 0; padding:14px 24px; }
+    .reg-foot { padding-bottom:22px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reg-card { animation:none; }
+    .reg-input, .reg-role, .reg-submit, .reg-optional summary::after { transition:none; }
+    .reg-submit:disabled::before { animation-duration:1.6s; }
   }
 </style>
 <div id="modalTMRegister">
@@ -2194,33 +2352,37 @@ async function handleSadminLogin(e) {
       <button type="button" class="reg-close" onclick="closeTMRegisterModal()" aria-label="Close">&times;</button>
       <div class="reg-head-top">
         <img class="reg-logo" src="assets/images/chatly-icon.png" alt="Chatly">
-        <div>
+        <div class="reg-head-text">
           <div class="reg-eyebrow">Last step &middot; takes 1 minute</div>
           <h3 class="reg-title" id="regModalTitle">Create your closer account</h3>
         </div>
       </div>
       <div class="reg-verified">
-        <span>📱</span>
-        <span>WhatsApp <strong id="regDisplayPhone">+92 300 1234567</strong></span>
-        <span class="tick">✓ VERIFIED</span>
+        <span aria-hidden="true">📱</span>
+        <span class="reg-verified-txt">WhatsApp <strong id="regDisplayPhone">+92 300 1234567</strong></span>
+        <span class="tick">✓ Verified</span>
       </div>
     </div>
 
     <form id="formTMRegisterSubmit" class="reg-body" onsubmit="handleTMRegisterSubmit(event)">
       <div class="reg-section">
-        <span class="reg-label">I want to join as</span>
-        <div class="reg-roles">
-          <div class="reg-role is-active" id="roleCardTM" onclick="selectOnboardingRole('member')" role="button" tabindex="0">
-            <span class="dot" id="roleRadioTM"></span>
-            <div class="ico">🎯</div>
-            <div class="t">Sales Closer (TM)</div>
-            <div class="d">Chat with customers on WhatsApp and close sales. Earn on every sale.</div>
+        <span class="reg-label" id="regRoleLabel">I want to join as</span>
+        <div class="reg-roles" role="radiogroup" aria-labelledby="regRoleLabel">
+          <div class="reg-role is-active" id="roleCardTM" onclick="selectOnboardingRole('member')" role="radio" aria-checked="true" tabindex="0">
+            <span class="ico" aria-hidden="true">🎯</span>
+            <span class="reg-role-text">
+              <span class="t">Sales Closer (TM)</span>
+              <span class="d">Chat with customers on WhatsApp and close sales. Earn on every sale.</span>
+            </span>
+            <span class="dot" id="roleRadioTM" aria-hidden="true"></span>
           </div>
-          <div class="reg-role is-tl" id="roleCardTL" onclick="selectOnboardingRole('lead')" role="button" tabindex="0">
-            <span class="dot" id="roleRadioTL"></span>
-            <div class="ico">🚀</div>
-            <div class="t">Team Leader (TL)</div>
-            <div class="d">Recruit closers to Chatly. Earn a bonus for every closer you bring.</div>
+          <div class="reg-role is-tl" id="roleCardTL" onclick="selectOnboardingRole('lead')" role="radio" aria-checked="false" tabindex="-1">
+            <span class="ico" aria-hidden="true">🚀</span>
+            <span class="reg-role-text">
+              <span class="t">Team Leader (TL)</span>
+              <span class="d">Recruit closers to Chatly. Earn a bonus for every closer you bring.</span>
+            </span>
+            <span class="dot" id="roleRadioTL" aria-hidden="true"></span>
           </div>
         </div>
         <input type="hidden" id="regOnboardingRole" value="member">
@@ -2231,11 +2393,20 @@ async function handleSadminLogin(e) {
       </div>
 
       <div class="reg-section">
-        <span class="reg-label">About you</span>
-        <input type="text" id="regTMFullName" class="reg-input" placeholder="Full name (e.g. Ali Ahmed)" required autocomplete="name">
-        <div class="reg-grid" style="margin-top:12px;">
-          <input type="text" id="regTMCity" class="reg-input" placeholder="City (e.g. Lahore)" required autocomplete="address-level2">
-          <select id="regTMGender" class="reg-input" style="cursor:pointer;">
+        <h4 class="reg-group-title">About you</h4>
+        <div class="reg-field">
+          <label class="reg-label" for="regTMFullName">Full name</label>
+          <input type="text" id="regTMFullName" class="reg-input" placeholder="e.g. Ali Ahmed" required autocomplete="name" enterkeyhint="next" aria-describedby="regTMFullNameErr">
+          <div class="reg-err" id="regTMFullNameErr" aria-live="polite" hidden></div>
+        </div>
+        <div class="reg-field">
+          <label class="reg-label" for="regTMCity">City</label>
+          <input type="text" id="regTMCity" class="reg-input" placeholder="e.g. Lahore" required autocomplete="address-level2" enterkeyhint="next" aria-describedby="regTMCityErr">
+          <div class="reg-err" id="regTMCityErr" aria-live="polite" hidden></div>
+        </div>
+        <div class="reg-field">
+          <label class="reg-label" for="regTMGender">Gender</label>
+          <select id="regTMGender" class="reg-input">
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
@@ -2243,54 +2414,167 @@ async function handleSadminLogin(e) {
       </div>
 
       <div class="reg-section">
-        <span class="reg-label">Your login</span>
-        <div class="reg-grid">
-          <input type="text" id="regTMUsername" class="reg-input" placeholder="Username" required autocomplete="username" autocapitalize="off" spellcheck="false">
-          <div class="reg-pass">
-            <input type="password" id="regTMPassword" class="reg-input" placeholder="Password (6+ characters)" required minlength="6" autocomplete="new-password">
-            <button type="button" onclick="const i=document.getElementById('regTMPassword'); i.type = i.type === 'password' ? 'text' : 'password'; this.textContent = i.type === 'password' ? 'Show' : 'Hide';">Show</button>
-          </div>
+        <h4 class="reg-group-title">Your login</h4>
+        <div class="reg-field">
+          <label class="reg-label" for="regTMUsername">Username</label>
+          <input type="text" id="regTMUsername" class="reg-input" placeholder="e.g. ali_ahmed" required autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next" aria-describedby="regTMUsernameErr">
+          <div class="reg-err" id="regTMUsernameErr" aria-live="polite" hidden></div>
         </div>
-        <div class="reg-hint">You'll use these to sign in next time, without scanning the QR.</div>
+        <div class="reg-field">
+          <label class="reg-label" for="regTMPassword">Password</label>
+          <div class="reg-pass">
+            <input type="password" id="regTMPassword" class="reg-input" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password" enterkeyhint="next" aria-describedby="regLoginHint regTMPasswordErr">
+            <button type="button" class="reg-eye" onclick="regTogglePass(this)" aria-controls="regTMPassword" aria-pressed="false" aria-label="Show password">
+              <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>
+              <span class="reg-eye-txt">Show</span>
+            </button>
+          </div>
+          <div class="reg-err" id="regTMPasswordErr" aria-live="polite" hidden></div>
+        </div>
+        <div class="reg-hint" id="regLoginHint">You'll use these to sign in next time, without scanning the QR.</div>
       </div>
 
       <div class="reg-section">
         <label class="reg-label" id="regCompanyLabel" for="regTMCompany">Company you're applying to</label>
-        <select id="regTMCompany" class="reg-input" required style="cursor:pointer; font-weight:650;" onchange="updateSelectedCompanyPreview()">
+        <select id="regTMCompany" class="reg-input" required onchange="updateSelectedCompanyPreview()" aria-describedby="regTMCompanyErr">
           <option value="COMP-001">Nunno Official</option>
         </select>
+        <div class="reg-err" id="regTMCompanyErr" aria-live="polite" hidden></div>
         <div class="reg-company" id="companyBrandPreviewCard">
           <img id="previewCompLogo" src="assets/images/nunno-logo.png" alt="">
-          <div style="min-width:0; flex:1;">
-            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-              <strong id="previewCompName" style="color:var(--wa-text-primary); font-size:13.5px;">Nunno Official</strong>
-              <span id="previewCompBadge" style="font-size:10px; font-weight:750; padding:2px 7px; border-radius:999px; background:rgba(31,224,138,0.16); color:#4cecab;">Verified</span>
+          <div class="reg-company-main">
+            <div class="reg-company-row">
+              <strong id="previewCompName" class="reg-company-name">Nunno Official</strong>
+              <span id="previewCompBadge" class="reg-company-badge">Verified</span>
             </div>
-            <div id="previewCompTagline" style="font-size:11.5px; color:var(--wa-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+            <div id="previewCompTagline" class="reg-company-tag"></div>
           </div>
         </div>
       </div>
 
       <details class="reg-optional">
-        <summary>Optional: referral and profile photo</summary>
-        <div class="reg-section" id="groupTMReferredByTL" style="margin-top:4px;">
-          <label class="reg-label" for="regTMReferredByTL">Referred by a Team Leader? <span class="opt">(their username)</span></label>
-          <input type="text" id="regTMReferredByTL" class="reg-input" placeholder="e.g. ali" autocapitalize="off">
-          <div class="reg-hint">They get a bonus when you're approved.</div>
-        </div>
-        <div class="reg-section">
-          <label class="reg-label" for="regTMPfp">Profile photo link <span class="opt">(optional)</span></label>
-          <input type="text" id="regTMPfp" class="reg-input" placeholder="https://…">
+        <summary>Optional: referral &amp; profile photo</summary>
+        <div class="reg-optional-body">
+          <div class="reg-section" id="groupTMReferredByTL">
+            <label class="reg-label" for="regTMReferredByTL">Referred by a Team Leader? <span class="opt">(their username)</span></label>
+            <input type="text" id="regTMReferredByTL" class="reg-input" placeholder="e.g. ali" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <div class="reg-hint">They get a bonus when you're approved.</div>
+          </div>
+          <div class="reg-section">
+            <label class="reg-label" for="regTMPfp">Profile photo link <span class="opt">(optional)</span></label>
+            <input type="text" id="regTMPfp" class="reg-input" placeholder="https://…" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false">
+          </div>
         </div>
       </details>
 
-      <div class="error-box" id="tmRegModalError"></div>
-
-      <button type="submit" id="btnSubmitTMReg" class="reg-submit">Submit application</button>
+      <div class="reg-actions">
+        <div class="error-box" id="tmRegModalError" role="alert"></div>
+        <button type="submit" id="btnSubmitTMReg" class="reg-submit">Submit application</button>
+      </div>
       <div class="reg-foot" id="regFooterNotice">The company reviews your application. Once approved, sign in with your username and password.</div>
     </form>
   </div>
 </div>
+<script>
+// Signup form: presentation helpers only. Role cards behave like radio buttons, the password can
+// be shown / hidden, and the browser's own checks (required, 6+ characters) show as inline messages
+// under each field instead of popups. Submitting is still handled by handleTMRegisterSubmit().
+(function () {
+  var form = document.getElementById('formTMRegisterSubmit');
+  if (!form) return;
+
+  window.regTogglePass = function (btn) {
+    var inp = document.getElementById('regTMPassword');
+    if (!inp || !btn) return;
+    var show = inp.type === 'password';
+    inp.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    var t = btn.querySelector('.reg-eye-txt');
+    if (t) t.textContent = show ? 'Hide' : 'Show';
+  };
+
+  var cards = [document.getElementById('roleCardTM'), document.getElementById('roleCardTL')].filter(Boolean);
+  function syncRoleAria() {
+    cards.forEach(function (c) {
+      var on = c.classList.contains('is-active');
+      c.setAttribute('aria-checked', on ? 'true' : 'false');
+      c.tabIndex = on ? 0 : -1;
+    });
+  }
+  cards.forEach(function (c, i) {
+    c.addEventListener('keydown', function (e) {
+      var k = e.key;
+      if (k === 'Enter' || k === ' ' || k === 'Spacebar') {
+        e.preventDefault();
+        c.click();
+      } else if (k === 'ArrowDown' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowLeft') {
+        e.preventDefault();
+        var other = cards[(i + 1) % cards.length];
+        other.click();
+        other.focus();
+      }
+    });
+  });
+  if (window.MutationObserver) {
+    var roleObserver = new MutationObserver(syncRoleAria);
+    cards.forEach(function (c) { roleObserver.observe(c, { attributes: true, attributeFilter: ['class'] }); });
+  }
+  syncRoleAria();
+
+  var MESSAGES = {
+    regTMFullName: 'Please enter your full name.',
+    regTMCity: 'Please enter your city.',
+    regTMUsername: 'Please choose a username.',
+    regTMPassword: 'Please choose a password (at least 6 characters).',
+    regTMCompany: 'Please choose the company you are applying to.'
+  };
+  function messageFor(el) {
+    var v = el.validity;
+    if (v.valueMissing) return MESSAGES[el.id] || 'Please fill this in.';
+    if (v.tooShort) return 'Password must be at least 6 characters.';
+    return el.validationMessage || 'Please check this field.';
+  }
+  function showFieldError(el, text) {
+    var box = document.getElementById(el.id + 'Err');
+    if (!box) return;
+    el.setAttribute('aria-invalid', text ? 'true' : 'false');
+    box.textContent = text || '';
+    box.hidden = !text;
+  }
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var focusQueued = false;
+  // "invalid" does not bubble, so listen in the capture phase. preventDefault() only hides the
+  // browser's popup; the submit is still blocked exactly as before.
+  form.addEventListener('invalid', function (e) {
+    var el = e.target;
+    if (!el || !el.id || !document.getElementById(el.id + 'Err')) return;
+    e.preventDefault();
+    showFieldError(el, messageFor(el));
+    if (!focusQueued) {
+      focusQueued = true;
+      setTimeout(function () {
+        focusQueued = false;
+        try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
+        try { el.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); } catch (_) {}
+      }, 0);
+    }
+  }, true);
+  function recheck(e) {
+    var el = e.target;
+    if (!el || !el.id || el.getAttribute('aria-invalid') !== 'true') return;
+    showFieldError(el, el.validity.valid ? '' : messageFor(el));
+  }
+  form.addEventListener('input', recheck);
+  form.addEventListener('change', recheck);
+  form.addEventListener('focusout', function (e) {
+    var el = e.target;
+    if (!el || !el.id || !el.validity || !document.getElementById(el.id + 'Err')) return;
+    if (el.value && !el.validity.valid) showFieldError(el, messageFor(el));
+  });
+})();
+</script>
 
 <!-- MODAL: TM / TL Application Submitted Confirmation -->
 <div id="modalTMSuccess" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; backdrop-filter:blur(8px);">
@@ -2640,7 +2924,7 @@ async function handleTMRegisterSubmit(e) {
     if (data.success) {
       closeTMRegisterModal();
       const compSelect = document.getElementById('regTMCompany');
-      const compName = compSelect.options[compSelect.selectedIndex]?.text || 'Company';
+      const compName = String(compSelect.options[compSelect.selectedIndex]?.text || 'Company').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
       const successTitle = document.getElementById('successModalTitle');
       const successBody = document.getElementById('successModalBody');
       if (successTitle) {

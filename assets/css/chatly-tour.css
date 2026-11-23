@@ -1,0 +1,228 @@
+/* Chatly guided tour (assets/js/chatly-tour.js). Every class is prefixed ctour-. */
+
+.ctour-root {
+  --ctour-dim: rgba(5, 12, 9, 0.66);
+  --ctour-accent: #0fa968;
+  --ctour-accent-strong: #1fe08a;
+  --ctour-ring: rgba(31, 224, 138, 0.95);
+  --ctour-card: #ffffff;
+  --ctour-text: #0b1a14;
+  --ctour-muted: #4b6358;
+  --ctour-line: rgba(11, 26, 20, 0.12);
+  --ctour-ghost-hover: rgba(11, 26, 20, 0.06);
+  --ctour-dot: rgba(11, 26, 20, 0.18);
+  --ctour-shadow: 0 18px 50px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.12);
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  font-family: 'Segoe UI', Inter, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ctour-text);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+.ctour-root.ctour-dark {
+  --ctour-dim: rgba(0, 0, 0, 0.72);
+  --ctour-card: #13201b;
+  --ctour-text: #eefaf4;
+  --ctour-muted: #9db8ab;
+  --ctour-line: rgba(255, 255, 255, 0.12);
+  --ctour-ghost-hover: rgba(255, 255, 255, 0.07);
+  --ctour-dot: rgba(255, 255, 255, 0.22);
+  --ctour-shadow: 0 18px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(31, 224, 138, 0.18);
+}
+.ctour-root *,
+.ctour-root *::before,
+.ctour-root *::after { box-sizing: border-box; }
+.ctour-root [hidden] { display: none !important; }
+
+/* Click shield: the page underneath cannot be used while the tour is open. */
+.ctour-blocker {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+.ctour-root.ctour-no-target .ctour-blocker { background: var(--ctour-dim); }
+
+/* The cut-out: a transparent box whose huge shadow dims everything else. */
+.ctour-spot {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 3px var(--ctour-ring), 0 0 0 200vmax var(--ctour-dim);
+  transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease;
+}
+
+/* Tooltip card */
+.ctour-tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: min(360px, calc(100vw - 24px));
+  padding: 16px 16px 14px;
+  border-radius: 16px;
+  background: var(--ctour-card);
+  color: var(--ctour-text);
+  box-shadow: var(--ctour-shadow);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .2s ease, transform .2s ease;
+  outline: none;
+}
+.ctour-root.ctour-ready .ctour-tip { opacity: 1; transform: none; }
+
+.ctour-tip.ctour-center {
+  left: 50% !important;
+  top: 50% !important;
+  width: min(400px, calc(100vw - 32px));
+  transform: translate(-50%, -46%);
+  padding: 22px 20px 18px;
+}
+.ctour-root.ctour-ready .ctour-tip.ctour-center { transform: translate(-50%, -50%); }
+
+.ctour-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -4px -6px 6px 0;
+}
+.ctour-count {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ctour-muted);
+}
+.ctour-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: -.01em;
+  color: var(--ctour-text);
+}
+.ctour-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ctour-muted);
+}
+
+.ctour-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 14px 0 0;
+}
+.ctour-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ctour-dot);
+  transition: width .2s ease, background-color .2s ease;
+}
+.ctour-dot.is-done { background: var(--ctour-accent); opacity: .5; }
+.ctour-dot.is-on { width: 18px; background: var(--ctour-accent); }
+
+.ctour-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* Buttons: 44px minimum touch targets */
+.ctour-btn {
+  min-height: 44px;
+  min-width: 44px;
+  margin: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ctour-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color .15s ease, filter .15s ease, transform .1s ease;
+}
+.ctour-btn:focus-visible { outline: 3px solid var(--ctour-accent-strong); outline-offset: 2px; }
+.ctour-skip {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ctour-muted);
+}
+.ctour-skip:hover { background: var(--ctour-ghost-hover); color: var(--ctour-text); }
+.ctour-back {
+  border: 1.5px solid var(--ctour-line);
+}
+.ctour-back:hover { background: var(--ctour-ghost-hover); }
+.ctour-next {
+  margin-left: auto;
+  min-width: 108px;
+  background: linear-gradient(135deg, #2de89a, #0fa968);
+  color: #03130c;
+  box-shadow: 0 8px 20px rgba(15, 169, 104, 0.3);
+}
+.ctour-next:hover { filter: brightness(1.05); }
+.ctour-next:active { transform: scale(.98); }
+.ctour-tip.ctour-last .ctour-next { flex: 1; }
+
+/* Phones: the card becomes a sheet at the bottom (or top, if the target is down there). */
+.ctour-tip.ctour-sheet {
+  left: 0 !important;
+  right: 0;
+  width: auto;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 16px 16px 14px;
+  transform: translateY(12px);
+}
+.ctour-tip.ctour-sheet-bottom {
+  top: auto !important;
+  bottom: 0;
+  border-radius: 18px 18px 0 0;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+.ctour-tip.ctour-sheet-top {
+  top: 0 !important;
+  bottom: auto;
+  border-radius: 0 0 18px 18px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  transform: translateY(-12px);
+}
+.ctour-root.ctour-ready .ctour-tip.ctour-sheet { transform: none; }
+.ctour-tip.ctour-sheet .ctour-foot .ctour-btn { flex: 1; }
+.ctour-tip.ctour-sheet .ctour-next { min-width: 0; }
+
+@media (max-width: 599px) {
+  .ctour-title { font-size: 17px; }
+  .ctour-tip.ctour-center { padding: 20px 16px 16px; }
+  .ctour-tip.ctour-center .ctour-foot .ctour-btn { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctour-spot,
+  .ctour-tip,
+  .ctour-dot,
+  .ctour-btn { transition: none !important; }
+  .ctour-tip,
+  .ctour-tip.ctour-sheet,
+  .ctour-tip.ctour-sheet-top { transform: none; }
+  .ctour-tip.ctour-center,
+  .ctour-root.ctour-ready .ctour-tip.ctour-center { transform: translate(-50%, -50%); }
+}
+.ctour-root.ctour-reduced .ctour-spot,
+.ctour-root.ctour-reduced .ctour-tip,
+.ctour-root.ctour-reduced .ctour-dot,
+.ctour-root.ctour-reduced .ctour-btn { transition: none !important; }

@@ -689,7 +689,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   function rebalanceFrom(lane, why = "'s WhatsApp is offline") {
     const pending = state.audience.filter(c => c.laneId === lane.id && c.status === 'pending');
     const targets = state.lanes.filter(l => l.id !== lane.id && l.status !== 'offline' && l.status !== 'stopped'
-      && !(l.pausedUntil && l.pausedUntil > Date.now()) && !laneUser(l.id)?.campaign_paused && deviceOnline(l));
+      && !(l.pausedUntil && l.pausedUntil > Date.now()) && !laneHeldBack(l.id) && deviceOnline(l));
     if (!pending.length || !targets.length) return false;
     pending.forEach((c, i) => {
       const t = targets[i % targets.length];
@@ -736,6 +736,12 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       laneUsers = { at: Date.now(), byId };
     }
     return laneUsers.byId.get(String(id)) || null;
+  }
+  // Stopped by the admin, or a Nunno TM whose plan is not verified yet (Team Inbox locked):
+  // neither gets campaign numbers.
+  function laneHeldBack(id) {
+    const u = laneUser(id);
+    return !!(u && (u.campaign_paused || (u.plan_locked && !u.has_nunno_plan)));
   }
   function dailyLimitReached(laneId) {
     const u = laneUser(laneId);
@@ -816,7 +822,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     }
     // Stopped by the admin (admin portal → Stop): no more campaign messages for this closer.
     // Their unsent numbers move to the closers still sending; if there are none, they wait.
-    if (laneUser(lane.id)?.campaign_paused) {
+    if (laneHeldBack(lane.id)) {
       if (lane.status !== 'stopped') log(`⏹️ ${lane.name} was stopped by the admin and gets no more campaign messages.`, 'warn');
       lane.status = 'stopped';
       lane.nextAt = null;
@@ -970,8 +976,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     picked = picked.filter(s => (seenIds.has(s.id) ? false : (seenIds.add(s.id), true)));
     // closers the admin stopped get no campaign numbers until resumed
     laneUsers.at = 0;   // read users.json fresh for the start
-    const stoppedByAdmin = picked.filter(s => laneUser(s.id)?.campaign_paused);
-    picked = picked.filter(s => !laneUser(s.id)?.campaign_paused);
+    const stoppedByAdmin = picked.filter(s => laneHeldBack(s.id));
+    picked = picked.filter(s => !laneHeldBack(s.id));
     const hasDevice = s => typeof deviceReady === 'function' && deviceReady(s.id);
     const anyDeviceReady = picked.some(s => hasDevice(s));
     const mainReady = isMainOnline();
@@ -1079,7 +1085,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     log(`🚀 Campaign "${state.name}" launched for ${companyName}: ${state.audience.length} numbers split equally across ${n} Team Member${n > 1 ? 's' : ''}.`, 'info');
     log(`📱 ${state.lanes.map(l => `${l.name} (${l.display}) → ${l.assigned} numbers`).join(' | ')}`, 'info');
     if (skipped.length) log(`⚠️ Not included (WhatsApp not connected): ${skipped.map(s => s.name).join(', ')}`, 'warn');
-    if (stoppedByAdmin.length) log(`⏹️ Not included (stopped by the admin): ${stoppedByAdmin.map(s => s.name).join(', ')}`, 'warn');
+    if (stoppedByAdmin.length) log(`⏹️ Not included (stopped by the admin, or Nunno plan not verified yet): ${stoppedByAdmin.map(s => s.name).join(', ')}`, 'warn');
     log(`⏱️ Gap between messages: ${state.minDelay === state.maxDelay ? state.minDelay + ' s' : state.minDelay + '-' + state.maxDelay + ' s'} per WhatsApp.`, 'info');
     recount();
     writeStateNow();
