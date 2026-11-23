@@ -1991,6 +1991,13 @@ function renderEmployeeTable(employees) {
         planAction = `<button class="btn btn-emerald" style="padding:5px 8px; font-size:11px; font-weight:800;" onclick="toggleNunnoPlan('${emp.id}', true)" title="Unlock this TM without the plan purchase (for a talented TM who can't pay yet)">⚡ Force upgrade</button>`;
       }
     }
+    // Campaign sending status for this person (Nunno TMs without a verified plan never get campaign numbers).
+    const planBlocked = isNunno && emp.role === 'member' && !emp.has_nunno_plan;
+    planBadge += emp.campaign_paused
+      ? `<div style="margin-top:3px;"><span style="display:inline-flex; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);">⏸ Campaigns paused</span></div>`
+      : planBlocked
+        ? `<div style="margin-top:3px;"><span style="display:inline-flex; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(148,163,184,0.15); color:#94a3b8; border:1px solid rgba(148,163,184,0.3);" title="Nunno TMs send campaign messages only after their plan is activated">🚫 No campaigns until plan</span></div>`
+        : `<div style="margin-top:3px;"><span style="display:inline-flex; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">📣 Sends campaigns</span></div>`;
     // Basic / breakeven (Nunno TMs): they keep 100% of verified sales up to this amount, then the
     // normal plan commission (Rs. 700 on 1,700 and so on). Default Rs. 10,000.
     if (isNunno && (!isLead || isSuperLead)) {
@@ -2048,6 +2055,7 @@ function renderEmployeeTable(employees) {
               ⚡ Direct Login
             </button>
             ${planAction}
+            <button class="btn btn-secondary" style="padding:5px 9px; font-size:11px; font-weight:800; ${emp.campaign_paused ? 'color:#22c55e;' : 'color:#f59e0b;'}" onclick="toggleEmployeeCampaign('${emp.id}', ${emp.campaign_paused ? 'false' : 'true'})" title="${emp.campaign_paused ? 'Let this person send campaign messages again' : 'Stop campaign messages from this person (their numbers move to the others)'}">${emp.campaign_paused ? '▶ Resume campaigns' : '⏸ Pause campaigns'}</button>
             ${isNunno ? `<button class="btn btn-secondary" style="padding:5px 8px; font-size:11px; color:#fbbf24;" onclick="toggleSuperLead('${emp.id}', ${isSuperLead ? 'false' : 'true'})" title="${isSuperLead ? 'Back to a normal TM / TL' : 'Works as a TM and a TL: every Nunno plan + the Nunno x Chatly plan in Mark Paid. Team Inbox locked until their own plan is verified.'}">${isSuperLead ? '⭐ Remove Super Lead' : '⭐ Make Super Lead'}</button>` : ''}
             <button class="btn btn-secondary" style="padding:5px 10px; font-size:11.5px;" onclick="toggleEmployeeStatus('${emp.id}')">
               ${isSuspended ? 'Activate' : 'Suspend'}
@@ -2090,6 +2098,22 @@ async function toggleNunnoPlan(empId, activate) {
   }
 }
 window.toggleNunnoPlan = toggleNunnoPlan;
+
+// Pause / resume campaign sending for one person (same switch as the Stop / Resume in the status lights).
+async function toggleEmployeeCampaign(empId, pause) {
+  if (pause && !confirm('Pause campaign messages from this person?\n\nTheir unsent campaign numbers move to the others who are sending. They can still chat in the inbox.')) return;
+  try {
+    const res = await fetch('api/tenant_manager.php', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_campaign_paused', user_id: empId, paused: !!pause }) });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Could not save.');
+    loadEmployees();
+    if (typeof renderCloserLights === 'function') { try { const s = (window.campaignSendersCache || []).find(x => x.id === empId); if (s) s.campaign_paused = !!pause; renderCloserLights(); } catch (_) {} }
+  } catch (err) {
+    alert('⚠️ ' + err.message);
+  }
+}
+window.toggleEmployeeCampaign = toggleEmployeeCampaign;
 
 async function saveBasicLimit(empId) {
   const inp = document.getElementById('basic_' + empId);
