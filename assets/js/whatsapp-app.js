@@ -3547,22 +3547,29 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsText(file);
   }
 
-  // ── Gap between messages: one number, 1-60 s ──
-  // Colour runs from dark red (1-3 s, very likely to get numbers restricted) through orange
-  // (~10 s) to bright green (30 s and more, safe), with every shade in between.
+  // ── Gap between messages: one number, 30 s - 15 min (900 s), the same for every company ──
+  // Faster than 30 s is not offered any more: a 10 s gap got a closer's number restricted.
+  // Colour runs from orange (30 s, the fastest allowed) through yellow (~90 s) to bright green
+  // (5 min and more, safest), with every shade in between.
+  const DELAY_MIN = 30, DELAY_MAX = 900;
   function campaignDelayColor(d) {
-    d = Math.min(60, Math.max(1, d));
+    d = Math.min(DELAY_MAX, Math.max(DELAY_MIN, d));
     let h, l;
-    if (d <= 10) { const t = (d - 1) / 9; h = 2 + 26 * t; l = 30 + 18 * t; }          // dark red -> orange
-    else if (d <= 30) { const t = (d - 10) / 20; h = 28 + 104 * t; l = 48 - 8 * t; }  // orange -> green
-    else { const t = (d - 30) / 30; h = 132 + 8 * t; l = 40 + 8 * t; }                // green -> bright green
+    if (d <= 90) { const t = (d - 30) / 60; h = 24 + 26 * t; l = 47 - 2 * t; }          // orange -> amber
+    else if (d <= 300) { const t = (d - 90) / 210; h = 50 + 82 * t; l = 45 - 6 * t; }  // amber -> green
+    else { const t = (d - 300) / 600; h = 132 + 8 * t; l = 39 + 8 * t; }                // green -> bright green
     return `hsl(${Math.round(h)} 82% ${Math.round(l)}%)`;
   }
   function campaignDelayLabel(d) {
-    return d <= 3 ? 'Very risky' : d <= 6 ? 'Risky' : d <= 14 ? 'Moderate' : d <= 29 ? 'Fairly safe' : 'Safe';
+    return d < 45 ? 'Fastest' : d < 90 ? 'Moderate' : d < 180 ? 'Fairly safe' : d < 300 ? 'Safe' : 'Safest';
+  }
+  function campaignDelayText(d) {
+    if (d < 60) return `${d} seconds`;
+    const m = Math.floor(d / 60), s = d % 60;
+    return `${m} min${s ? ` ${s} s` : ''}`;
   }
   function setCampaignDelay(v) {
-    const d = Math.min(60, Math.max(1, Math.round(Number(v)) || 10));
+    const d = Math.min(DELAY_MAX, Math.max(DELAY_MIN, Math.round(Number(v)) || 60));
     const range = document.getElementById('campaignDelayRange');
     const input = document.getElementById('campaignDelayInput');
     if (range && Number(range.value) !== d) range.value = d;
@@ -3574,14 +3581,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const box = document.getElementById('campaignDelayBox');
     if (box) {
       box.style.setProperty('--delay-c', campaignDelayColor(d));
-      box.style.setProperty('--delay-p', `${((d - 1) / 59) * 100}%`);
+      box.style.setProperty('--delay-p', `${((d - DELAY_MIN) / (DELAY_MAX - DELAY_MIN)) * 100}%`);
     }
     const badge = document.getElementById('campaignDelayBadge');
     if (badge) badge.textContent = campaignDelayLabel(d);
     const hint = document.getElementById('campaignDelayHint');
     if (hint) {
-      hint.textContent = `Each WhatsApp sends one message every ${d} second${d === 1 ? '' : 's'}` +
-        (d <= 6 ? '. This fast, WhatsApp is likely to restrict the numbers.' : d < 15 ? '. Risky for new numbers.' : '.');
+      hint.textContent = `Each WhatsApp sends one message every ${campaignDelayText(d)}` +
+        (d < 60 ? '. Fastest allowed: fine for numbers that are a few weeks old, risky for brand-new ones.' : d >= 300 ? '. Safest for new numbers.' : '.');
     }
     try { updateCampaignLaunchSummary(); } catch (_) {}
   }
@@ -3593,24 +3600,13 @@ document.addEventListener('DOMContentLoaded', () => {
       input.addEventListener('input', () => { if (input.value !== '') setCampaignDelay(input.value); });
       input.addEventListener('change', () => { setCampaignDelay(input.value); input.value = campaignState.minDelay; });
     }
-    setCampaignDelay(els.campaignDelayMin ? els.campaignDelayMin.value : 10);
+    setCampaignDelay(els.campaignDelayMin ? els.campaignDelayMin.value : 60);
   })();
 
   function applyCampaignDelayPreset(val) {
     if (!els.campaignDelayMin || !els.campaignDelayMax) return;
-    // The server never sends faster than one message every 6 s per WhatsApp.
-    if (val === 'fast') {
-      els.campaignDelayMin.value = 6;
-      els.campaignDelayMax.value = 10;
-    } else if (val === 'recommended') {
-      els.campaignDelayMin.value = 8;
-      els.campaignDelayMax.value = 15;
-    } else if (val === 'human') {
-      els.campaignDelayMin.value = 15;
-      els.campaignDelayMax.value = 30;
-    }
-    campaignState.minDelay = Math.max(6, parseInt(els.campaignDelayMin.value, 10) || 8);
-    campaignState.maxDelay = Math.max(campaignState.minDelay + 3, parseInt(els.campaignDelayMax.value, 10) || 15);
+    // (old presets) mapped onto the 30 s - 15 min range
+    setCampaignDelay(val === 'fast' ? 30 : val === 'human' ? 180 : 60);
     loadCampaignSenders();
   }
 
@@ -4052,7 +4048,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'OmniDesk campaign';
 
     // One gap for every message (1-60 s), exactly as chosen on the page.
-    const gapSec = Math.min(60, Math.max(1, parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 10, 10) || 10));
+    const gapSec = Math.min(900, Math.max(30, parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 60, 10) || 60));
     const minD = gapSec, maxD = gapSec;
     campaignState.minDelay = minD;
     campaignState.maxDelay = maxD;
@@ -4959,22 +4955,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function isNunnoPlanLocked(user = state.currentUser || window.NUNNO_ACTIVE_USER) {
     if (!user) return false;
-    const uname = String(user.username || '').toLowerCase();
-    const name = String(user.name || '').toLowerCase();
-    const id = String(user.id || '').toUpperCase();
-
-    // Askari Raza / Admin / Nunno management is permanently exempt
-    if (uname.includes('askari') || name.includes('askari') || uname.includes('nunno') || id.includes('ASKARI') || id === 'EMP-TM-MWMK43N9' || id === 'EMP-TM-ASKARI') {
-      return false;
-    }
-    // admins and TLs are never locked; a Super Lead (TM + TL, e.g. Erij) is, until her plan is verified
-    if (user.role !== 'member' && !(user.super_lead && user.role === 'lead')) return false;
-    if ((user.company_id || 'COMP-001') !== 'COMP-001') return false; // Nunno only
-    if (user.has_nunno_plan) return false;                           // plan bought and verified
-    // New Nunno TMs (flagged at sign-up) must buy + verify the Rs. 1,000 Nunno x Chatly plan
-    // before the Team Inbox opens: to sell the product they first own it. TMs from before
-    // this rule (no flag) are not locked.
-    return Boolean(user.plan_locked);
+    // Nunno only: every Nunno Team Member (TM) must buy + verify the Rs. 1,000 Nunno x Chatly
+    // plan before the Team Inbox opens (to sell the product they first own it). Admins and TLs are
+    // never locked, and no other company has this rule.
+    if (String(user.role || '').toLowerCase() !== 'member') return false;
+    if ((user.company_id || 'COMP-001') !== 'COMP-001') return false;
+    return !user.has_nunno_plan;
   }
   window.isNunnoPlanLocked = isNunnoPlanLocked;
 
@@ -5179,18 +5165,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // Guided tour of the Sales Desk for new TLs and TMs (a TM only once their plan is verified).
   function maybeStartTour() {
     const u = state.currentUser;
-    if (!u || u.tour_done || !window.ChatlyTour || isNunnoPlanLocked(u)) return;
+    let seenHere = false;
+    try { seenHere = localStorage.getItem('chatly_tour_done_' + (u && u.id)) === '1'; } catch (_) {}
+    if (!u || u.tour_done || seenHere || !window.ChatlyTour || isNunnoPlanLocked(u)) return;
     const role = String(u.role || '').toLowerCase();
     if (role !== 'member' && role !== 'lead') return;
     // new accounts only (from the day the tour was added); existing closers already know the app
     const created = String(u.created_at || u.applied_at || '');
     if (!created || created < '2026-11-23') return;
     if (document.getElementById('nunnoPlanSuccess')) return;   // after the success screen
+    // Shown once: it is marked as seen the moment it starts (it used to be saved only when the
+    // last step was reached, so a refresh or closing it half-way showed it again).
     u.tour_done = true;
-    setTimeout(() => window.ChatlyTour.start({
-      role,
-      onDone: () => fetch('api/auth.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark_seen', flag: 'tour_done' }) }).catch(() => {})
-    }), 900);
+    try { localStorage.setItem('chatly_tour_done_' + u.id, '1'); } catch (_) {}
+    fetch('api/auth.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark_seen', flag: 'tour_done' }) }).catch(() => {});
+    setTimeout(() => window.ChatlyTour.start({ role, onDone: () => {} }), 900);
   }
   window.maybeStartTour = maybeStartTour;
 
@@ -5632,12 +5621,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Monthly Target Quota Progress (For TM/TL only)
     if (!isAdmin) {
-      const targetQuota = 10000;   // sales target shown on the workspace
+      const targetQuota = (() => { const v = parseInt(state.currentUser && state.currentUser.nunno_full_pay_limit, 10); return Number.isFinite(v) && v > 0 ? v : 10000; })();   // this TM's basic (admin can change it)
       const quotaPct = Math.min(Math.round((revenue / targetQuota) * 100), 100);
       const quotaFill = document.getElementById('revenueQuotaFill');
       if (quotaFill) quotaFill.style.width = `${quotaPct}%`;
       const quotaPctEl = document.getElementById('revenueQuotaPercent');
       if (quotaPctEl) quotaPctEl.textContent = `${quotaPct}%`;
+      const pillEl = document.getElementById('bentoTargetPill');
+      if (pillEl) pillEl.textContent = `Target: PKR ${targetQuota.toLocaleString()}`;
     }
 
     // SVG Circular Win Rate Ring
@@ -5885,8 +5876,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (wdCard1Footer) {
         if (earn && earn.scheme === 'nunno_first_10k') {
           const prog = Number(earn.full_pay_progress) || 0;
-          wdCard1Footer.textContent = prog < 10000
-            ? `Earned Rs. ${Number(earn.total_earned).toLocaleString()} · first Rs. 10,000 paid in full (${Math.round(prog / 100)}% done)`
+          const lim = Number(earn.full_pay_limit) || 10000;
+          wdCard1Footer.textContent = prog < lim
+            ? `Earned Rs. ${Number(earn.total_earned).toLocaleString()} · first Rs. ${lim.toLocaleString()} paid in full (${Math.round(prog / lim * 100)}% done)`
             : `Earned Rs. ${Number(earn.total_earned).toLocaleString()} · now on plan commission (700 / 2,000 / 10,000)`;
         } else {
           wdCard1Footer.textContent = earn ? `Earned Rs. ${Number(earn.total_earned).toLocaleString()} from verified sales` : 'Earned from verified closed deals';
@@ -6722,7 +6714,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // First sign-in after the admin verified a locked TM's plan: show "Plan verified" once.
     // Otherwise new TLs / unlocked TMs get the guided tour once.
     if (!isImpersonated) {
-      if (user.plan_locked && user.has_nunno_plan && user.nunno_plan_success_seen === false) showNunnoPlanSuccess();
+      if (user.has_nunno_plan && user.nunno_plan_success_seen === false) showNunnoPlanSuccess();
       else maybeStartTour();
     }
   }
@@ -8620,7 +8612,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Commission rules (must match api/earnings.php, which decides real payouts).
   // Nunno: the first Rs. 10,000 of verified sales is paid to the closer in full;
   // after that each plan pays 700 (Rs. 1,700), 2,000 (Rs. 5,000) or 10,000 (Rs. 15,000).
+  // Each Nunno TM's basic / breakeven can be set by the admin (default Rs. 10,000).
   const NUNNO_FULL_PAY_LIMIT = 10000;
+  function basicFor(closerId) {
+    const u = state.currentUser;
+    const v = u && (!closerId || u.id === closerId) ? parseInt(u.nunno_full_pay_limit, 10) : NaN;
+    return Number.isFinite(v) && v >= 0 ? v : NUNNO_FULL_PAY_LIMIT;
+  }
+  const rs = n => `Rs. ${Number(n).toLocaleString()}`;
   function getDealCommission(amt) {
     const num = Number(amt) || 0;
     const tiers = [[15000, 10000], [5000, 2000], [1700, 700]];
@@ -8642,8 +8641,9 @@ document.addEventListener('DOMContentLoaded', () => {
       .sort((a, b) => saleTime(a) - saleTime(b));
     const pendingLeads = state.leads.filter(l => (l.leadState === 'pending_verification' || l.status === 'pending_verification') && ownsDeal(l));
 
+    const BASIC = basicFor(closerId);
     let runningSales = 0;
-    let fullPayEarned = 0;       // the first Rs. 10,000, paid 100%
+    let fullPayEarned = 0;       // sales up to the basic (default Rs. 10,000), paid 100%
     let commissionsEarned = 0;   // plan commission after that
 
     const dealLedger = paidLeads.map(l => {
@@ -8654,14 +8654,14 @@ document.addEventListener('DOMContentLoaded', () => {
       let dealCommission = 0;
       let dealTag = '';
       if (isNunno) {
-        const fullPart = Math.max(0, Math.min(amt, NUNNO_FULL_PAY_LIMIT - before));
+        const fullPart = Math.max(0, Math.min(amt, BASIC - before));
         const rest = amt - fullPart;
         const restComm = rest > 0 ? Math.round(getDealCommission(amt) * (rest / amt)) : 0;
         fullPayEarned += fullPart;
         commissionsEarned += restComm;
         dealCommission = fullPart + restComm;
-        dealTag = rest <= 0 ? `🎯 Paid in full: +Rs. ${fullPart.toLocaleString()} (first Rs. 10,000)`
-          : fullPart > 0 ? `🎯 Crossed Rs. 10,000: +Rs. ${dealCommission.toLocaleString()}`
+        dealTag = rest <= 0 ? `🎯 Paid in full: +Rs. ${fullPart.toLocaleString()} (first ${rs(BASIC)})`
+          : fullPart > 0 ? `🎯 Crossed ${rs(BASIC)}: +Rs. ${dealCommission.toLocaleString()}`
           : `💰 Commission: +Rs. ${restComm.toLocaleString()}`;
       } else {
         dealCommission = Number(l.paidDetails?.commission) || 0;
@@ -8686,7 +8686,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const totalSales = runningSales;
-    const isTargetAchieved = totalSales >= NUNNO_FULL_PAY_LIMIT;
+    const isTargetAchieved = totalSales >= BASIC;
     // "baseSalary" keeps its old field name for the existing widgets: it is the first-10k part.
     const baseSalary = fullPayEarned;
     const totalPayout = baseSalary + commissionsEarned;
@@ -8744,25 +8744,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Visual Progress Taskbar
-    const pct = Math.min(100, Math.round((myRevenue / 10000) * 100));
+    const MYB = basicFor();
+    const pct = MYB > 0 ? Math.min(100, Math.round((myRevenue / MYB) * 100)) : 100;
     if (els.taskbarFill) {
       els.taskbarFill.style.width = `${pct}%`;
       els.taskbarFill.classList.toggle('target-met', myPerf.isTargetAchieved);
     }
     if (els.taskbarCurrent) els.taskbarCurrent.textContent = `Rs. ${myRevenue.toLocaleString()}`;
     if (els.taskbarPct) els.taskbarPct.textContent = `${pct}% Completed`;
-    if (els.taskbarGoal) els.taskbarGoal.textContent = `Target: Rs. 10,000`;
+    if (els.taskbarGoal) els.taskbarGoal.textContent = `Target: ${rs(MYB)}`;
 
     // Milestone Badge
     if (els.milestoneStatusBadge) {
       if (myPerf.isTargetAchieved) {
         els.milestoneStatusBadge.className = 'milestone-status-badge unlocked';
         if (els.targetBadgeIcon) els.targetBadgeIcon.textContent = '✅';
-        if (els.targetBadgeText) els.targetBadgeText.textContent = 'First Rs. 10,000 fully earned';
+        if (els.targetBadgeText) els.targetBadgeText.textContent = `First ${rs(MYB)} fully earned`;
       } else {
         els.milestoneStatusBadge.className = 'milestone-status-badge';
         if (els.targetBadgeIcon) els.targetBadgeIcon.textContent = '⏳';
-        if (els.targetBadgeText) els.targetBadgeText.textContent = `First Rs. 10,000: ${pct}% earned`;
+        if (els.targetBadgeText) els.targetBadgeText.textContent = `First ${rs(MYB)}: ${pct}% earned`;
       }
     }
 
@@ -8770,17 +8771,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (els.milestoneFeedback) {
       if (myPerf.isTargetAchieved) {
         els.milestoneFeedback.className = 'milestone-feedback unlocked';
-        els.milestoneFeedback.innerHTML = `🎉 <strong>First Rs. 10,000 fully earned!</strong> Every sale from now on pays plan commission: <strong>Rs. 700</strong> on Rs. 1,700 · <strong>Rs. 2,000</strong> on Rs. 5,000 · <strong>Rs. 10,000</strong> on Rs. 15,000.`;
+        els.milestoneFeedback.innerHTML = `🎉 <strong>First ${rs(MYB)} fully earned!</strong> Every sale from now on pays plan commission: <strong>Rs. 700</strong> on Rs. 1,700 · <strong>Rs. 2,000</strong> on Rs. 5,000 · <strong>Rs. 10,000</strong> on Rs. 15,000.`;
       } else {
         els.milestoneFeedback.className = 'milestone-feedback';
-        const remaining = 10000 - myRevenue;
-        els.milestoneFeedback.innerHTML = `Every rupee of your first Rs. 10,000 in sales is yours. <strong>Rs. ${remaining.toLocaleString()}</strong> to go, then plan commission on each sale.`;
+        const remaining = Math.max(0, MYB - myRevenue);
+        els.milestoneFeedback.innerHTML = `Every rupee of your first ${rs(MYB)} in sales is yours. <strong>Rs. ${remaining.toLocaleString()}</strong> to go, then plan commission on each sale.`;
       }
     }
 
     // Financial Breakdown Cards
     if (els.myBaseSalary) els.myBaseSalary.textContent = `Rs. ${myPerf.baseSalary.toLocaleString()}`;
-    if (els.myBaseSalarySub) els.myBaseSalarySub.textContent = myPerf.isTargetAchieved ? '✅ First Rs. 10,000 complete' : 'Paid 100% on your first Rs. 10,000';
+    if (els.myBaseSalarySub) els.myBaseSalarySub.textContent = myPerf.isTargetAchieved ? `✅ First ${rs(MYB)} complete` : `Paid 100% on your first ${rs(MYB)}`;
     if (els.myCommissionsEarned) els.myCommissionsEarned.textContent = `Rs. ${myPerf.commissionsEarned.toLocaleString()}`;
     if (els.myTotalPayout) els.myTotalPayout.textContent = `Rs. ${myPerf.totalPayout.toLocaleString()}`;
     if (els.myTotalRevenue) els.myTotalRevenue.textContent = `Rs. ${myRevenue.toLocaleString()}`;

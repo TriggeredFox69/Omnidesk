@@ -124,7 +124,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   };
   const snapshot = () => ({ success: true, mode: 'whatsapp_web', state: phase,
     is_connected: phase === 'ready', is_configured: phase === 'ready',
-    connected_number: number, qr, message: error, version: '18.9', engine: 'baileys' });
+    connected_number: number, qr, message: error, version: '19.1', engine: 'baileys' });
 
   async function disconnect(wipe = false) {
     phase = 'disconnected'; qr = null; number = ''; error = '';

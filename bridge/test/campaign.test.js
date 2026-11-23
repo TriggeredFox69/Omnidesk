@@ -4,7 +4,23 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { createCampaignManager, resolveSpintax, personalizeMessage } = require('../campaign');
+const { createCampaignManager: realCampaignManager, resolveSpintax, personalizeMessage } = require('../campaign');
+// Live campaigns never send faster than one message every 30 s; tests run with 1 s gaps.
+const createCampaignManager = opts => realCampaignManager({ minGapS: 1, ...opts });
+
+test('live campaigns never send faster than every 30 s, nor slower than every 15 min', () => {
+  const fs_ = require('node:fs'), os_ = require('node:os'), path_ = require('node:path');
+  const dir = fs_.mkdtempSync(path_.join(os_.tmpdir(), 'camp-gap-'));
+  const mgr = realCampaignManager({ send: async () => ({ success: true }), dataDir: dir, getLeadsPath: () => path_.join(dir, 'l.json'),
+    getUsersPath: () => path_.join(dir, 'u.json'), mainStatus: () => ({ ready: true }) });
+  const st = mgr.start({ message: 'Hi', delay: 10, audience: [{ phone: '923001112223' }], senders: [{ id: 'TM-1', name: 'A', roleType: 'member' }] });
+  assert.equal(st.minDelay, 30);
+  mgr.stop();
+  const st2 = mgr.start({ message: 'Hi', delay: 5000, audience: [{ phone: '923001112224' }], senders: [{ id: 'TM-1', name: 'A', roleType: 'member' }] });
+  assert.equal(st2.minDelay, 900);
+  mgr.stop();
+  fs_.rmSync(dir, { recursive: true, force: true });
+});
 
 test('resolveSpintax picks options and ignores variables', () => {
   const template = '{Salam|AoA|Hello} {name}!';
@@ -79,7 +95,7 @@ test('daily sent counts start again on a new Pakistan day; stop hands back unsen
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
   const usersFile = path.join(tmpDir, 'users.json');
   // yesterday's count must not carry over (and must not swallow today's sends)
-  fs.writeFileSync(usersFile, JSON.stringify([{ id: 'TM-1', name: 'TM One', company_id: 'COMP-001', role: 'member', status: 'active',
+  fs.writeFileSync(usersFile, JSON.stringify([{ id: 'TM-1', name: 'TM One', company_id: 'COMP-001', role: 'member', status: 'active', has_nunno_plan: true,
     messages_sent_today: 57, quota_reset_date: '2000-01-01' }]));
   const leadsFile = path.join(tmpDir, 'leads.json');
   fs.writeFileSync(leadsFile, '[]');
@@ -210,7 +226,8 @@ test('Ultimate campaign: closers from several companies, each chat lands in the 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
   const usersFile = path.join(tmpDir, 'users.json');
   fs.writeFileSync(usersFile, JSON.stringify([
-    { id: 'NU-1', name: 'Nunno TM', company_id: 'COMP-001', role: 'member', status: 'active' },
+    { id: 'NU-1', name: 'Nunno TM', company_id: 'COMP-001', role: 'member', status: 'active', has_nunno_plan: true },
+    { id: 'NU-2', name: 'Nunno TM without plan', company_id: 'COMP-001', role: 'member', status: 'active' },
     { id: 'ML-1', name: 'Metalink TM', company_id: 'COMP-004', role: 'member', status: 'active' },
     { id: 'ML-2', name: 'Busy Metalink TM', company_id: 'COMP-004', role: 'member', status: 'active' }
   ]));

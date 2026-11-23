@@ -95,7 +95,7 @@ function ucSenders(): array {
             'number' => preg_replace('/\D+/', '', (string) ($d['connected_number'] ?? '')),
             'state' => (string) ($d['state'] ?? 'not linked'),
             'stopped' => !empty($u['campaign_paused']),
-            'plan_locked' => !empty($u['plan_locked']) && empty($u['has_nunno_plan']),
+            'plan_locked' => $cid === 'COMP-001' && $role === 'member' && empty($u['has_nunno_plan']),   // Nunno TMs only
             'sent_today' => $q['sent'],
             'limit' => $q['limit'],
             'limit_reached' => $q['reached'],
@@ -184,7 +184,7 @@ switch ($action) {
             'name' => mb_substr(trim((string) ($in['name'] ?? '')) ?: 'Ultimate Campaign', 0, 120),
             'message' => mb_substr($message, 0, 4000),
             'variation' => $variation, 'media' => $media,
-            'delay' => max(1, min(60, (int) ($in['delay'] ?? 10))),
+            'delay' => max(30, min(900, (int) ($in['delay'] ?? 60))),   // 30 s - 15 min, like every campaign
             'senders' => $senders, 'closers' => $senders,
             'auto_data' => !empty($in['auto_data']),
         ];

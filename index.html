@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/whatsapp.css?v=16.1">
+  <link rel="stylesheet" href="assets/css/whatsapp.css?v=16.2">
   <link rel="stylesheet" href="assets/css/omnidesk.css?v=15.1">
   <script>
     (function() {
@@ -1492,24 +1492,24 @@ Live Demo: https://nunno.cloud
 _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
           </div>
 
-          <!-- One gap between messages, 1-60 s, coloured by risk (dark red = risky, green = safe) -->
+          <!-- One gap between messages, 30 s - 15 min (900 s), coloured by risk (orange = fastest allowed, green = safe) -->
           <div class="cs-pace cs-delay" id="campaignDelayBox">
             <div class="cs-label-row">
               <label class="form-label" for="campaignDelayInput">Gap between messages</label>
               <span class="cs-delay-badge" id="campaignDelayBadge">Moderate</span>
             </div>
             <div class="cs-delay-row">
-              <input type="range" id="campaignDelayRange" class="cs-delay-range" min="1" max="60" step="1" value="10" aria-label="Gap between messages in seconds">
+              <input type="range" id="campaignDelayRange" class="cs-delay-range" min="30" max="900" step="5" value="60" aria-label="Gap between messages in seconds">
               <div class="cs-delay-box">
-                <input type="number" id="campaignDelayInput" class="form-input" min="1" max="60" step="1" value="10" inputmode="numeric">
+                <input type="number" id="campaignDelayInput" class="form-input" min="30" max="900" step="1" value="60" inputmode="numeric">
                 <span>sec</span>
               </div>
             </div>
-            <div class="cs-delay-scale" aria-hidden="true"><span>1s risky</span><span>10s</span><span>30s+ safe</span><span>60s</span></div>
-            <p class="cs-hint cs-delay-hint" id="campaignDelayHint">Each WhatsApp sends one message every 10 seconds.</p>
+            <div class="cs-delay-scale" aria-hidden="true"><span>30s fastest</span><span>2 min</span><span>5 min+ safest</span><span>15 min</span></div>
+            <p class="cs-hint cs-delay-hint" id="campaignDelayHint">Each WhatsApp sends one message every 60 seconds.</p>
             <!-- older code reads these two: both always hold the gap above -->
-            <input type="hidden" id="campaignDelayMin" value="10">
-            <input type="hidden" id="campaignDelayMax" value="10">
+            <input type="hidden" id="campaignDelayMin" value="60">
+            <input type="hidden" id="campaignDelayMax" value="60">
           </div>
         </section>
 
@@ -2669,6 +2669,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
   <script src="assets/js/wa-widget.js?v=16.0"></script>
   <link rel="stylesheet" href="assets/css/chatly-tour.css?v=1">
   <script src="assets/js/chatly-tour.js?v=1"></script>
-  <script src="assets/js/whatsapp-app.js?v=16.3"></script>
+  <script src="assets/js/whatsapp-app.js?v=16.5"></script>
 </body>
 </html>

@@ -318,14 +318,17 @@ switch ($action) {
             ];
         }
         usort($closersSettlement, fn($a, $b) => $b['gross_revenue'] <=> $a['gross_revenue']);
+        $planSales = nunnoPlanSales();   // TMs' own Rs. 1,000 Nunno x Chatly plans (paid, verified)
         echo json_encode([
             'success' => true,
             'summary' => [
                 'total_tms'               => count($closersSettlement),
-                'total_plans_sold'        => $sumDeals,
-                'total_confirmed_revenue' => $sumRevenue,
+                'total_plans_sold'        => $sumDeals + $planSales['count'],
+                'total_confirmed_revenue' => $sumRevenue + $planSales['amount'],
+                'tm_plan_purchases'       => $planSales['count'],
+                'tm_plan_revenue'         => $planSales['amount'],
                 'total_payable_by_nunno'  => $sumOwed,
-                'total_nunno_profit'      => max(0, $sumRevenue - $sumOwed),
+                'total_nunno_profit'      => max(0, $sumRevenue + $planSales['amount'] - $sumOwed),
                 'total_paid_out'          => $sumPaidOut,
                 'total_pending_payouts'   => $sumPending,
                 'full_pay_limit'          => NUNNO_FULL_PAY_LIMIT,
@@ -356,6 +359,13 @@ switch ($action) {
                 'revenue' => (float) $r['total_sales'], 'payable' => $owed, 'paid_out' => (float) $r['paid_out']];
         }
         usort($lines, fn($a, $b) => $b['payable'] <=> $a['payable']);
+        // TMs' own Nunno x Chatly plan purchases (Rs. 1,000 each, paid and verified) are revenue Nunno collected.
+        $planSales = nunnoPlanSales();
+        if ($planSales['count']) {
+            $revenue += $planSales['amount'];
+            $lines[] = ['name' => 'Nunno x Chatly plan purchases (' . implode(', ', array_column($planSales['list'], 'name')) . ')',
+                'role' => 'Plan', 'deals' => $planSales['count'], 'revenue' => (float) $planSales['amount'], 'payable' => 0.0, 'paid_out' => 0.0];
+        }
         echo json_encode(['success' => true, 'generated_at' => date('c'), 'invoice' => [
             'total_revenue_collected' => $revenue,
             'total_payable_to_chatly' => $payable,

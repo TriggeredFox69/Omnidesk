@@ -1456,6 +1456,14 @@ body.theme-dark .lock-handler-status {
   font-size: 11px;
   color: var(--text-muted);
 }
+/* Inside a chat bubble the time follows the bubble's own text colour (white on the green sent
+   bubble, dark on the received one). The muted grey was nearly invisible on green. */
+.msg-bubble .msg-meta-row {
+  color: inherit;
+  opacity: 0.78;
+  font-weight: 600;
+  font-size: 11.5px;
+}
 
 /* ─── ADMIN CHAT SELECTION & DELETION UI ───────────────────── */
 .admin-batch-bar {

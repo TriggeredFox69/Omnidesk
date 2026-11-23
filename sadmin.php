@@ -959,11 +959,11 @@ async function handleSadminLogin(e) {
             <div class="uc-gap">
               <div class="uc-gap-top"><b>Gap between messages</b><span class="uc-gap-tag" id="ucGapTag">Moderate</span></div>
               <div class="uc-gap-row">
-                <input type="range" id="ucGapRange" min="1" max="60" step="1" value="10" aria-label="Gap between messages in seconds">
-                <input type="number" id="ucGap" class="fc" min="1" max="60" step="1" value="10" inputmode="numeric" aria-label="Gap in seconds"><span class="hint" style="margin:0">sec</span>
+                <input type="range" id="ucGapRange" min="30" max="900" step="5" value="60" aria-label="Gap between messages in seconds">
+                <input type="number" id="ucGap" class="fc" min="30" max="900" step="1" value="60" inputmode="numeric" aria-label="Gap in seconds"><span class="hint" style="margin:0">sec</span>
               </div>
-              <div class="uc-gap-scale"><span class="r">1s risky</span><span>10s</span><span class="g">30s+ safe</span><span>60s</span></div>
-              <div class="hint" id="ucGapText">Each WhatsApp sends one message every 10 seconds.</div>
+              <div class="uc-gap-scale"><span class="r">30s fastest</span><span>2 min</span><span class="g">5 min+ safest</span><span>15 min</span></div>
+              <div class="hint" id="ucGapText">Each WhatsApp sends one message every 60 seconds.</div>
             </div>
           </div>
 
@@ -3364,25 +3364,27 @@ function ucPhones(text) {
   });
   return [...out];
 }
+// 30 s - 15 min, the same range as the companies' campaign page (a 10 s gap got a number restricted)
 function ucGapColor(s) {
-  if (s <= 3) return ['#b91c1c', 'Very risky'];
-  if (s < 10) return ['#ef4444', 'Risky'];
-  if (s < 20) return ['#f97316', 'Moderate'];
-  if (s < 30) return ['#84cc16', 'Good'];
-  return ['#16a34a', 'Safe'];
+  if (s < 45) return ['#f97316', 'Fastest'];
+  if (s < 90) return ['#eab308', 'Moderate'];
+  if (s < 180) return ['#84cc16', 'Fairly safe'];
+  if (s < 300) return ['#22c55e', 'Safe'];
+  return ['#16a34a', 'Safest'];
 }
+function ucGapWords(s) { return s < 60 ? `${s} seconds` : `${Math.floor(s / 60)} min${s % 60 ? ' ' + (s % 60) + ' s' : ''}`; }
 function ucSetGap(v, from) {
-  const s = Math.min(60, Math.max(1, parseInt(v, 10) || 10));
+  const s = Math.min(900, Math.max(30, parseInt(v, 10) || 60));
   if (from !== 'range') $('#ucGapRange').value = s;
   if (from !== 'box') $('#ucGap').value = s;
   const [c, label] = ucGapColor(s);
   const box = $('#ucGap').closest('.uc-gap');
   box.style.setProperty('--gapc', c);
   $('#ucGapTag').textContent = label;
-  $('#ucGapText').textContent = `Each WhatsApp sends one message every ${s} second${s === 1 ? '' : 's'}.` + (s < 10 ? ' Risky: numbers get restricted much faster.' : s >= 30 ? ' Safest for the numbers.' : '');
+  $('#ucGapText').textContent = `Each WhatsApp sends one message every ${ucGapWords(s)}.` + (s < 60 ? ' Fastest allowed.' : s >= 300 ? ' Safest for the numbers.' : '');
   ucRenderChecks();
 }
-function ucGapValue() { return Math.min(60, Math.max(1, parseInt($('#ucGap').value, 10) || 10)); }
+function ucGapValue() { return Math.min(900, Math.max(30, parseInt($('#ucGap').value, 10) || 60)); }
 function ucSetAuto(on) {
   UC.auto = !!on;
   $('#ucAutoBtn').setAttribute('aria-pressed', UC.auto ? 'true' : 'false');
@@ -3580,7 +3582,7 @@ async function ucStart() {
   const n = ucCount();
   if (!sel.length || !n) { ucRenderChecks(); return; }
   const cos = new Set(sel.map(s => s.company_id)).size;
-  if (!confirm(`Start the Ultimate campaign?\n\n${fmt(n)} messages from ${fmt(sel.length)} closer WhatsApp${sel.length === 1 ? '' : 's'} in ${fmt(cos)} compan${cos === 1 ? 'y' : 'ies'}, one message every ${ucGapValue()} s per WhatsApp.\n\nReplies go to each closer's own company inbox.`)) return;
+  if (!confirm(`Start the Ultimate campaign?\n\n${fmt(n)} messages from ${fmt(sel.length)} closer WhatsApp${sel.length === 1 ? '' : 's'} in ${fmt(cos)} compan${cos === 1 ? 'y' : 'ies'}, one message every ${ucGapWords(ucGapValue())} per WhatsApp.\n\nReplies go to each closer's own company inbox.`)) return;
   UC.starting = true;
   ucRenderChecks();
   try {
@@ -3691,7 +3693,7 @@ $('#ucSendBody').addEventListener('change', e => {
 });
 $('#ucSearch').addEventListener('input', ucRenderSenders);
 $('#ucCoFilter').addEventListener('change', ucRenderSenders);
-ucSetGap(10);
+ucSetGap(60);
 
 /* =========================================================
    Boot + polling

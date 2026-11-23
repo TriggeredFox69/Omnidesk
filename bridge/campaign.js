@@ -56,7 +56,7 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption, store: storeOverride, isBusyElsewhere }) {
+function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption, store: storeOverride, isBusyElsewhere, minGapS }) {
   const digits = v => String(v || '').replace(/\D/g, '');
   const chatStoreRef = storeOverride || chatStore();   // chats in Supabase while its switch is on
   const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
@@ -605,8 +605,10 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   const OFFLINE_GRACE_MS = offlineGraceMs || 15000;
   // The company chooses the gap between messages (one number, 1-60 s). Below ~6 s numbers get
   // restricted much faster; the campaign page colours that red, and the choice is theirs.
-  const MIN_DELAY_S = 1;
-  const MAX_DELAY_S = 60;
+  // 30 s - 15 min for every company (a 10 s gap got a closer's number restricted for 5 hours).
+  // A campaign saved with a shorter gap is raised to 30 s when it runs.
+  const MIN_DELAY_S = Number.isFinite(minGapS) ? minGapS : 30;   // (tests pass a smaller minimum)
+  const MAX_DELAY_S = 900;
   const clampDelay = v => Math.min(MAX_DELAY_S, Math.max(MIN_DELAY_S, Math.round(Number(v) || 0) || MIN_DELAY_S));
   const laneTimers = new Map();
   const laneBusy = new Set();
@@ -744,7 +746,10 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   // neither gets campaign numbers.
   function laneHeldBack(id) {
     const u = laneUser(id);
-    return !!(u && (u.campaign_paused || (u.plan_locked && !u.has_nunno_plan)));
+    if (!u) return false;
+    // Nunno only: a Team Member works once their Nunno x Chatly plan is verified. No other company.
+    const nunnoTmWithoutPlan = (u.company_id || 'COMP-001') === 'COMP-001' && String(u.role || '').toLowerCase() === 'member' && !u.has_nunno_plan;
+    return !!(u.campaign_paused || nunnoTmWithoutPlan);
   }
   function dailyLimitReached(laneId) {
     const u = laneUser(laneId);
@@ -1083,7 +1088,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.totalSent = 0;
     state.totalFailed = 0;
     // One gap for every message (the campaign page sends minDelay = maxDelay = the chosen gap).
-    state.minDelay = clampDelay(parseInt(params.delay, 10) || parseInt(params.minDelay, 10) || 10);
+    state.minDelay = clampDelay(parseInt(params.delay, 10) || parseInt(params.minDelay, 10) || 60);
     state.maxDelay = Math.max(state.minDelay, clampDelay(parseInt(params.maxDelay, 10) || state.minDelay));
     state.remainingSeconds = 0;
     state.assignMode = 'equal_split';

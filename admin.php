@@ -1897,10 +1897,29 @@ async function loadEmployees() {
       currentEmployees = data.employees;
       renderEmployeeTable(data.employees);
       updateMetrics(data.employees);
+      loadCompanyEarnings();
     }
   } catch (err) {
     console.error('Error loading employees:', err);
   }
+}
+
+// Real earnings per person (api/earnings.php: verified sales only, the same numbers as wallets and
+// payouts). The TL commission card and the TL ledger use these, never the old test balances.
+window.companyEarningsById = null;
+async function loadCompanyEarnings() {
+  try {
+    const res = await fetch('api/earnings.php?action=company_earnings&company_id=<?php echo urlencode($activeCompany['id']); ?>');
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.closers)) return;
+    window.companyEarningsById = Object.fromEntries(data.closers.map(c => [c.user_id, c]));
+    updateMetrics(currentEmployees);
+    renderTLLedger(currentEmployees);
+  } catch (_) {}
+}
+function realEarned(emp) {
+  const e = window.companyEarningsById && window.companyEarningsById[emp.id];
+  return e ? Math.round(Number(e.total_earned) || 0) : 0;
 }
 
 // Daily limits start again at 12:00 AM Pakistan time. The server says how many seconds are
@@ -1930,7 +1949,7 @@ function updateMetrics(employees) {
   const tls = employees.filter(e => e.role === 'lead');
   const tms = employees.filter(e => e.role === 'member');
   const sentToday = employees.reduce((acc, e) => acc + (parseInt(e.messages_sent_today) || 0), 0);
-  const totalCommission = tls.reduce((acc, t) => acc + (parseInt(t.tl_commission_balance) || (tms.filter(m => m.joined_via_tl === t.id).length * 500)), 0);
+  const totalCommission = tls.reduce((acc, t) => acc + realEarned(t), 0);   // verified earnings only
 
   document.getElementById('metricTotalEmployees').textContent = employees.length;
   document.getElementById('metricTLCount').textContent = tls.length;
@@ -1971,6 +1990,16 @@ function renderEmployeeTable(employees) {
         planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">🔒 Nunno x Chatly plan: not activated</span></div>`;
         planAction = `<button class="btn btn-emerald" style="padding:5px 8px; font-size:11px; font-weight:800;" onclick="toggleNunnoPlan('${emp.id}', true)" title="Unlock this TM without the plan purchase (for a talented TM who can't pay yet)">⚡ Force upgrade</button>`;
       }
+    }
+    // Basic / breakeven (Nunno TMs): they keep 100% of verified sales up to this amount, then the
+    // normal plan commission (Rs. 700 on 1,700 and so on). Default Rs. 10,000.
+    if (isNunno && (!isLead || isSuperLead)) {
+      const basic = Number.isFinite(parseInt(emp.nunno_full_pay_limit, 10)) ? parseInt(emp.nunno_full_pay_limit, 10) : 10000;
+      planBadge += `<div style="margin-top:6px; display:flex; align-items:center; gap:4px; flex-wrap:wrap;" title="Basic / breakeven: this person keeps 100% of their verified sales up to this amount; after it, the normal plan commission applies.">
+        <span style="font-size:10px; font-weight:800; color:var(--text-muted);">BASIC Rs.</span>
+        <input type="number" id="basic_${emp.id}" class="limiter-input" style="width:84px; padding:3px 6px; font-size:11.5px;" min="0" step="1000" value="${basic}">
+        <button class="btn-quick-chip" style="padding:3px 7px; font-size:10.5px;" onclick="saveBasicLimit('${emp.id}')">Save</button>
+      </div>`;
     }
 
     return `
@@ -2061,6 +2090,24 @@ async function toggleNunnoPlan(empId, activate) {
   }
 }
 window.toggleNunnoPlan = toggleNunnoPlan;
+
+async function saveBasicLimit(empId) {
+  const inp = document.getElementById('basic_' + empId);
+  const limit = parseInt(inp && inp.value, 10);
+  if (!Number.isFinite(limit) || limit < 0) { alert('Enter an amount in rupees (0 or more).'); return; }
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_full_pay_limit', user_id: empId, limit })
+    });
+    const data = await res.json();
+    alert(data.success ? ('✅ ' + (data.message || 'Saved.')) : (data.error || 'Could not save.'));
+    if (data.success) loadEmployees();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+window.saveBasicLimit = saveBasicLimit;
 
 async function toggleSuperLead(empId, on) {
   if (!confirm(on
@@ -2219,8 +2266,7 @@ function renderTLLedger(employees) {
 
   tbody.innerHTML = tls.map(tl => {
     const recruited = employees.filter(m => m.joined_via_tl && (m.joined_via_tl === tl.id || m.joined_via_tl === tl.username || m.joined_via_tl === tl.phone)).length;
-    const balance = parseInt(tl.tl_commission_balance);
-    const commission = !isNaN(balance) ? balance : (recruited * rate);
+    const commission = realEarned(tl);   // verified earnings only (no more estimated / test balances)
     return `
       <tr>
         <td>
@@ -2367,7 +2413,11 @@ async function loadCompanyLeads() {
       currentCompanyLeads = data.leads;
       renderLeadsTable(data.leads);
       
-      const paid = data.leads.filter(l => ['paid', 'verified', 'approved'].includes((l.leadState || l.status || '').toLowerCase())).length;
+      // Paid = verified sales since the testing period ended (data/earnings_start.json), the same
+      // rule as earnings and the super admin's revenue. Test sales from before do not count.
+      const since = <?php echo (int) ((json_decode((string) @file_get_contents(__DIR__ . '/data/earnings_start.json'), true) ?: [])['from'] ?? 0); ?> * 1000;
+      const saleMs = l => { const v = (l.paidDetails && l.paidDetails.closedAt) || l.verifiedAt || 0; const n = typeof v === 'number' ? (v > 2e10 ? v : v * 1000) : Date.parse(v); return Number.isFinite(n) ? n : 0; };
+      const paid = data.leads.filter(l => ['paid', 'verified', 'approved'].includes((l.leadState || l.status || '').toLowerCase()) && saleMs(l) >= since).length;
       document.getElementById('metricPaidLeads').textContent = paid + ' Paid';
       const rate = data.leads.length ? Math.round((paid / data.leads.length) * 100) : 0;
       document.getElementById('metricConversionRate').textContent = rate + '%';

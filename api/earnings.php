@@ -145,6 +145,50 @@ function earningsCountFrom(): int {
     return $from;
 }
 
+/**
+ * Nunno x Chatly plan purchases (Rs. 1,000 each) that were really paid: the admin verified a TM's
+ * submitted payment (auth.php activate_tm_plan), or the owner confirmed it (Erij, below).
+ * "Force upgrade" unlocks a TM without payment and is not counted. Nunno revenue, not TM earnings.
+ */
+function nunnoPlanSales(): array {
+    $from = earningsCountFrom(); $list = [];
+    foreach (earningsUsers() as $u) {
+        if ((($u['company_id'] ?? NUNNO_COMPANY_ID) ?: NUNNO_COMPANY_ID) !== NUNNO_COMPANY_ID || empty($u['nunno_plan_paid'])) continue;
+        $t = strtotime((string) ($u['nunno_plan_paid_at'] ?? '')) ?: 0;
+        if ($t && $t < $from) continue;
+        $list[] = ['user_id' => $u['id'] ?? '', 'name' => $u['name'] ?? '', 'amount' => NUNNO_TL_PLAN_PRICE, 'paid_at' => $u['nunno_plan_paid_at'] ?? null];
+    }
+    return ['count' => count($list), 'amount' => count($list) * NUNNO_TL_PLAN_PRICE, 'list' => $list];
+}
+
+/**
+ * Owner, 2026-11-24: "Erij actually bought the Nunno x Chatly plan worth Rs. 1,000; don't lock her
+ * chats". Her account was deleted and re-created, so she is found by name, once: plan verified and
+ * paid (Rs. 1,000 of Nunno revenue), Super Lead as she asked. Returns true when it changed something.
+ */
+function nunnoApplyErijPlan(): bool {
+    $flag = __DIR__ . '/../data/erij_plan_applied.json';
+    if (is_file($flag)) return false;
+    require_once __DIR__ . '/quota.php';
+    $done = chatlyUsersUpdate(__DIR__ . '/../data/users.json', function (array &$all) {
+        foreach ($all as &$x) {
+            if ((($x['company_id'] ?? NUNNO_COMPANY_ID) ?: NUNNO_COMPANY_ID) !== NUNNO_COMPANY_ID) continue;
+            if (stripos((string) ($x['name'] ?? ''), 'erij') === false) continue;
+            if (!in_array(strtolower((string) ($x['role'] ?? '')), ['member', 'lead'], true)) continue;
+            $x['has_nunno_plan'] = true; $x['nunno_plan_status'] = 'active'; $x['plan_locked'] = false;
+            $x['nunno_plan_activated_at'] = $x['nunno_plan_activated_at'] ?? date('Y-m-d H:i:s');
+            $x['nunno_plan_success_seen'] = true;
+            $x['nunno_plan_paid'] = true; $x['nunno_plan_paid_at'] = $x['nunno_plan_paid_at'] ?? date('c');
+            $x['super_lead'] = true; $x['super_lead_seeded'] = true;
+            return (string) ($x['id'] ?? 'yes');
+        }
+        return false;   // she has not signed up again yet: try again later
+    });
+    if (!$done) return false;
+    @file_put_contents($flag, json_encode(['user_id' => $done, 'at' => date('c')]));
+    return true;
+}
+
 function earningsWithdrawals(): array {
     $from = earningsCountFrom();
     return array_values(array_filter(earningsReadJson(__DIR__ . '/../data/withdrawals.json'), function ($w) use ($from) {
@@ -181,8 +225,11 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
     $paid = array_values(array_filter($paid, fn($l) => earningsSaleTime($l) >= $countFrom));
     usort($paid, fn($a, $b) => earningsSaleTime($a) <=> earningsSaleTime($b));
 
-    $running = 0.0;      // Nunno: sales counted toward the first Rs. 10,000
+    $running = 0.0;      // Nunno: sales counted toward the TM's basic (breakeven)
     $totalSales = 0.0;
+    // A Nunno TM's basic / breakeven: 100% of sales up to it (default Rs. 10,000; the admin can set
+    // it per person, e.g. Rs. 100,000), then the plan commission on every sale after it.
+    $fullPayLimit = $isNunno ? max(0, (int) ($user['nunno_full_pay_limit'] ?? NUNNO_FULL_PAY_LIMIT)) : 0;
     $salesCommission = 0.0;
     $deals = [];
     $isNunnoTL = $isNunno && strtolower((string) ($user['role'] ?? '')) === 'lead';
@@ -203,10 +250,11 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
             // The first Rs. 10,000 of sales is the TM's in full. The plan that crosses the line
             // pays only up to 10,000 (6 x 1,700 = 10,200 -> 10,000; one 15,000 plan -> 10,000);
             // every plan after that pays its plan commission.
-            $fullPart = max(0, min($amount, NUNNO_FULL_PAY_LIMIT - $before));
-            $comm = $before >= NUNNO_FULL_PAY_LIMIT ? nunnoPlanCommission($amount) : $fullPart;
-            $rule = $before >= NUNNO_FULL_PAY_LIMIT ? 'Plan commission'
-                : ($fullPart < $amount ? 'Reached Rs. 10,000 (capped)' : 'First Rs. 10,000 (100%)');
+            $fullPart = max(0, min($amount, $fullPayLimit - $before));
+            $comm = $before >= $fullPayLimit ? nunnoPlanCommission($amount) : $fullPart;
+            $lim = 'Rs. ' . number_format($fullPayLimit);
+            $rule = $before >= $fullPayLimit ? 'Plan commission'
+                : ($fullPart < $amount ? "Reached {$lim} (capped)" : "First {$lim} (100%)");
         } else {
             $comm = earningsProductCommission($companyId, $l, $amount);
             $rule = 'Product commission';
@@ -220,7 +268,9 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
         ];
     }
 
-    $tlBounty = (float) ($user['tl_commission_balance'] ?? 0);
+    // Nunno TLs are paid per verified Nunno x Chatly plan (above). The old tl_commission_balance was
+    // credited automatically during testing and is not real money, so Nunno ignores it.
+    $tlBounty = $isNunno ? 0.0 : (float) ($user['tl_commission_balance'] ?? 0);
     $earned = $salesCommission + $tlBounty;
 
     $wds = array_values(array_filter($wdCache ?? earningsWithdrawals(), fn($w) => ($w['userId'] ?? '') === $userId));
@@ -239,8 +289,8 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
         'deals_count' => count($paid),
         'in_review_count' => count($inReview),
         'in_review_amount' => array_sum(array_map('earningsSaleAmount', $inReview)),
-        'full_pay_progress' => $isNunno ? min($running, NUNNO_FULL_PAY_LIMIT) : null,
-        'full_pay_limit' => $isNunno ? NUNNO_FULL_PAY_LIMIT : null,
+        'full_pay_progress' => $isNunno ? min($running, $fullPayLimit) : null,
+        'full_pay_limit' => $isNunno ? $fullPayLimit : null,
         'sales_commission' => $salesCommission,
         'tl_bounty' => $tlBounty,
         'total_earned' => $earned,
@@ -254,6 +304,7 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
 
 /** Earnings for every TM/TL of a company (admin ledgers). */
 function computeCompanyEarnings(string $companyId): array {
+    if ($companyId === NUNNO_COMPANY_ID) nunnoApplyErijPlan();
     $leads = earningsCompanyLeads($companyId);
     $wds = earningsWithdrawals();
     $rows = [];
