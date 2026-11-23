@@ -708,6 +708,15 @@ switch ($action) {
             'company' => $newCompany,
             'admin_username' => $adminUsername
         ]);
+        // Welcome email to the owner from the Chatly Gmail sender (login pointer only, never the
+        // password). Sent after the response; a failed email never affects the new company.
+        try {
+            require_once __DIR__ . '/mailer.php';
+            chatlyMailFinishResponse();
+            chatlyMailAutoCompanyWelcome($newCompany, $adminUsername, (string) ($currentUser['name'] ?? 'Chatly'));
+        } catch (Throwable $mailErr) {
+            // best effort only
+        }
         exit;
 
     // 4. Toggle Company Status (Active / Suspended)

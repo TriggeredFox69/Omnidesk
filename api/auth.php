@@ -585,6 +585,7 @@ switch ($action) {
                     echo json_encode(['success' => false, 'error' => 'This applicant belongs to another company.']);
                     exit;
                 }
+                $prevStatusBeforeApproval = strtolower((string) ($u['status'] ?? ''));
                 $u['status'] = 'active';
                 $isLead = (($u['role'] ?? '') === 'lead');
                 if ($isLead) {
@@ -641,6 +642,20 @@ switch ($action) {
             saveUsers($usersFile, $users);
             $roleLabel = ($approvedUser && $approvedUser['role'] === 'lead') ? 'Team Leader (TL)' : 'Sales Closer (TM)';
             echo json_encode(['success' => true, 'message' => "{$roleLabel} applicant approved and activated!"]);
+            // Nunno (COMP-001) only: "you're approved" email from the Nunno Gmail sender, sent after
+            // the response so a slow or failing email never holds up (or undoes) the approval.
+            $apCompany = strtolower((string) ($approvedUser['company_id'] ?? ''));
+            if ($approvedUser && ($prevStatusBeforeApproval ?? '') !== 'active'
+                && in_array($apCompany, ['', 'comp-001', 'nunno'], true)
+                && in_array(($approvedUser['role'] ?? ''), ['member', 'lead'], true)) {
+                try {
+                    require_once __DIR__ . '/mailer.php';
+                    chatlyMailFinishResponse();
+                    chatlyMailAutoApproval($approvedUser, (string) ($authAdmin['name'] ?? ($authAdmin['username'] ?? 'Admin')));
+                } catch (Throwable $mailErr) {
+                    // best effort only
+                }
+            }
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Applicant not found.']);

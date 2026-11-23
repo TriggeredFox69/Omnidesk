@@ -63,25 +63,37 @@ function wdExpectedBy(int $from): int {
     return $t->getTimestamp();
 }
 
-/** Email the person that their payout was sent (best effort; never blocks the payout). */
+/**
+ * Email the person that their payout was sent (best effort; never blocks the payout).
+ * Goes through Gmail SMTP (api/mailer.php): Nunno (COMP-001) people get it from the Nunno
+ * sender, everyone else from the Chatly sender.
+ */
 function wdNotifyPaid(array $w): void {
-    $email = '';
-    foreach (earningsUsers() as $u) if (($u['id'] ?? '') === ($w['userId'] ?? '')) { $email = (string) ($u['email'] ?? ''); break; }
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return;
-    $cfg = earningsReadJson(__DIR__ . '/../data/email_config.json');
-    $from = filter_var($cfg['sender_email'] ?? '', FILTER_VALIDATE_EMAIL) ? $cfg['sender_email'] : 'no-reply@chatly.pk';
-    $fromName = preg_replace('/[\r\n]+/', ' ', (string) ($cfg['sender_name'] ?? 'Chatly'));
-    $h = fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
-    $amount = number_format((float) ($w['amount'] ?? 0));
-    $body = '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:14px">'
-        . '<h2 style="color:#059669;margin:0 0 10px">Your payout has been sent ✅</h2>'
-        . '<p>Hello ' . $h($w['userName'] ?? '') . ',</p>'
-        . '<p><strong>PKR ' . $amount . '</strong> has been sent to your ' . $h($w['institution'] ?? $w['method'] ?? 'account')
-        . ' (' . $h($w['accountTitle'] ?? '') . ', ' . $h($w['accountNumber'] ?? '') . ').</p>'
-        . (!empty($w['txRef']) ? '<p>Payment reference: <strong>' . $h($w['txRef']) . '</strong></p>' : '')
-        . '<p style="color:#6b7280;font-size:13px">Request ' . $h($w['id'] ?? '') . ' · Chatly</p></div>';
-    $headers = ['MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', 'From: ' . $fromName . ' <' . $from . '>'];
-    @mail($email, 'Payout sent: PKR ' . $amount, $body, implode("\r\n", $headers));
+    try {
+        require_once __DIR__ . '/mailer.php';
+        chatlyMailAutoWithdrawalPaid($w);
+    } catch (Throwable $e) {
+        // best effort only
+    }
+}
+
+/** "Request received, arrives in 24-48 working hours, no payouts Sat/Sun" (best effort). */
+function wdNotifyRequested(array $w): void {
+    try {
+        require_once __DIR__ . '/mailer.php';
+        chatlyMailAutoWithdrawalRequested($w);
+    } catch (Throwable $e) {
+        // best effort only
+    }
+}
+
+/** Send the JSON reply now, then keep running for the email. */
+function wdFinishThenNotify(callable $notify): void {
+    try {
+        require_once __DIR__ . '/mailer.php';
+        chatlyMailFinishResponse();
+    } catch (Throwable $e) {}
+    $notify();
 }
 
 function wdFail(int $code, string $msg) {
@@ -173,6 +185,7 @@ if ($action === 'request_withdrawal') {
     unset($after['deals']);
     echo json_encode(['success' => true, 'withdrawal' => $new, 'earnings' => $after,
         'withdrawals' => array_values(array_filter($all, fn($w) => ($w['userId'] ?? '') === $me['id']))]);
+    wdFinishThenNotify(function () use ($new) { wdNotifyRequested($new); });
     exit;
 }
 
@@ -203,11 +216,13 @@ if ($action === 'update_status') {
     unset($w);
     if (!$found) { flock($h, LOCK_UN); fclose($h); wdFail(404, 'Withdrawal request not found.'); }
     writeWithdrawalsLocked($wdFile, $h, $all);
+    $paidRow = null;
     if ($status === 'approved') {
-        foreach ($all as $w) if (($w['id'] ?? '') === $id) { wdNotifyPaid($w); break; }
+        foreach ($all as $w) if (($w['id'] ?? '') === $id) { $paidRow = $w; break; }
     }
     $visible = $isSuper ? $all : array_values(array_filter($all, fn($w) => ($w['company_id'] ?? NUNNO_COMPANY_ID) === $myCompany));
     echo json_encode(['success' => true, 'withdrawals' => $visible]);
+    if ($paidRow) wdFinishThenNotify(function () use ($paidRow) { wdNotifyPaid($paidRow); });
     exit;
 }
 

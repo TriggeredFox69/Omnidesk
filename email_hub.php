@@ -341,6 +341,10 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
     <div id="tabSettings" class="hub-tab-content" style="display:none;">
       <div class="hub-card" style="max-width:680px;margin:0 auto;">
         <h2 style="font-size:16px;font-weight:800;margin:0 0 16px;">Mailer &amp; SMTP Configuration</h2>
+        <div style="font-size:12px;line-height:1.55;padding:10px 12px;border-radius:10px;border:1px solid var(--hub-border);margin-bottom:14px;color:var(--hub-muted);">
+          Emails from this hub are now delivered through Gmail SMTP: Nunno admins send as the <strong>nunno</strong> sender (numeniousnexus@gmail.com), the super admin as the <strong>chatly</strong> sender (chatly.pk@gmail.com).
+          Their Gmail App Passwords are set in the Nunno admin portal (Email TMs &amp; TLs tab &gt; Sender settings) and in the super admin console (Emails &gt; Sender settings). The fields below are the older single-account settings.
+        </div>
         <div class="auth-alert" id="hubSettingsAlert" style="display:none;margin-bottom:14px;"></div>
         <form id="hubSettingsForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:14px;">
           <div class="form-group" style="margin:0;">
@@ -748,13 +752,15 @@ if (!$currentUser && (in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127
         if (res && res.success && Array.isArray(res.logs) && res.logs.length) {
           tbody.innerHTML = res.logs.map(l => `
             <tr>
-              <td class="mono" style="font-size:11px;color:var(--hub-muted);">${l.id}</td>
+              <td class="mono" style="font-size:11px;color:var(--hub-muted);">${escapeHtml(l.id)}</td>
               <td><strong>${escapeHtml(l.recipient_name)}</strong><br><span style="font-size:11px;color:var(--hub-muted);">${escapeHtml(l.recipient_email)}</span></td>
               <td>${escapeHtml(l.subject)}</td>
-              <td><span style="font-size:10.5px;padding:2px 7px;border-radius:4px;background:rgba(31, 224, 138,0.1);color:#0fa968;font-weight:700;">${l.template_id}</span></td>
-              <td style="font-size:11px;color:var(--hub-muted);">${new Date(l.timestamp).toLocaleString()}</td>
+              <td><span style="font-size:10.5px;padding:2px 7px;border-radius:4px;background:rgba(31, 224, 138,0.1);color:#0fa968;font-weight:700;">${escapeHtml(l.template_id)}</span>${l.profile ? `<br><span style="font-size:10.5px;color:var(--hub-muted);">${escapeHtml(l.profile)} sender</span>` : ''}</td>
+              <td style="font-size:11px;color:var(--hub-muted);">${escapeHtml(new Date(l.timestamp).toLocaleString())}</td>
               <td style="font-size:11px;">${escapeHtml(l.sent_by || 'Admin')}</td>
-              <td><span style="padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;background:rgba(16,185,129,0.15);color:#059669;">✓ Sent</span></td>
+              <td>${l.status === 'failed'
+                ? `<span style="padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;background:rgba(244,63,94,0.15);color:#e11d48;">✕ Failed</span>${l.error ? `<br><span style="font-size:10.5px;color:var(--hub-muted);">${escapeHtml(l.error)}</span>` : ''}`
+                : `<span style="padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;background:rgba(16,185,129,0.15);color:#059669;">✓ Sent</span>`}</td>
             </tr>
           `).join('');
         } else {

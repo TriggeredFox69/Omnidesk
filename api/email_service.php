@@ -26,6 +26,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Real delivery goes through Gmail SMTP (api/mailer.php, sender profiles "nunno" / "chatly").
+require_once __DIR__ . '/mailer.php';
+
 $baseDir = dirname(__DIR__);
 $usersFile = $baseDir . '/data/users.json';
 $emailConfigFile = $baseDir . '/data/email_config.json';
@@ -76,7 +79,7 @@ function getEmailLogs($file) {
 // Save dispatch logs
 function saveEmailLogs($file, $logs) {
     $tempFile = $file . '.tmp.' . uniqid();
-    @file_put_contents($tempFile, json_encode(array_slice($logs, 0, 500), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    @file_put_contents($tempFile, json_encode(array_slice($logs, 0, CHATLY_MAIL_LOG_CAP), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     @rename($tempFile, $file);
 }
 
@@ -88,9 +91,15 @@ $action = $_GET['action'] ?? $body['action'] ?? 'get_templates';
 
 // Allow internal server script calls with valid bridge secret
 $secret = $body['secret'] ?? $_GET['secret'] ?? '';
-$isAuthorized = ($currentUser && $currentUser['role'] === 'admin') || ($secret === 'omnidesk_live_bridge_2026');
+$callerRole = strtolower((string) ($currentUser['role'] ?? ''));
+$isSecretCaller = ($secret === 'omnidesk_live_bridge_2026');
+$isSuperCaller = ($callerRole === 'superadmin');
+$isAuthorized = ($currentUser && in_array($callerRole, ['admin', 'superadmin'], true)) || $isSecretCaller;
+// Company of the calling admin (legacy accounts without one belong to Nunno, COMP-001).
+$callerCompany = (string) ($currentUser['company_id'] ?? '');
+if ($callerCompany === '' || strtolower($callerCompany) === 'nunno') $callerCompany = 'COMP-001';
 
-if (!$isAuthorized && in_array($action, ['send_email', 'save_settings', 'test_email', 'delete_log'])) {
+if (!$isAuthorized && in_array($action, ['send_email', 'save_settings', 'test_email', 'delete_log', 'get_logs'])) {
     http_response_code(403);
     echo json_encode(['success' => false, 'error' => 'Access Denied: Administrator authentication required.']);
     exit;
@@ -360,6 +369,14 @@ if ($action === 'get_templates') {
 // 2. Action: Get Dispatch Logs
 if ($action === 'get_logs') {
     $logs = getEmailLogs($emailLogsFile);
+    // A company admin only sees their own company's sends (older rows without a company
+    // belong to Nunno); the super admin and the bridge see everything.
+    if (!$isSuperCaller && !$isSecretCaller) {
+        $logs = array_values(array_filter($logs, function ($l) use ($callerCompany) {
+            $c = (string) ($l['company_id'] ?? '');
+            return $c === '' ? $callerCompany === 'COMP-001' : $c === $callerCompany;
+        }));
+    }
     echo json_encode(['success' => true, 'logs' => $logs]);
     exit;
 }
@@ -370,6 +387,7 @@ if ($action === 'get_settings') {
     // Don't expose password
     if (!empty($config['smtp_pass'])) $config['smtp_pass_masked'] = '••••••••';
     unset($config['smtp_pass']);
+    unset($config['profiles']);   // Gmail App Passwords of the sender profiles: never sent to a browser
     echo json_encode(['success' => true, 'settings' => $config]);
     exit;
 }
@@ -408,6 +426,22 @@ if ($action === 'send_email') {
     $bodyHtmlRaw = $body['message_html'] ?? '<p>No content specified.</p>';
     $templateId = $body['template_id'] ?? 'custom';
     $customVariables = is_array($body['variables'] ?? null) ? $body['variables'] : [];
+
+    // The Sales Desk follows "mark as paid" with its own payout email (template withdrawal_approved
+    // with variables.tx_ref). api/withdrawals.php now sends that payout email itself through Gmail,
+    // so this follow-up would be a duplicate: acknowledge it without sending.
+    if ($templateId === 'withdrawal_approved' && $targetType === 'custom' && isset($customVariables['tx_ref'])) {
+        echo json_encode([
+            'success'    => true,
+            'sent_count' => 0,
+            'total'      => 0,
+            'dispatched' => [],
+            'errors'     => [],
+            'skipped'    => true,
+            'message'    => 'The payout email is sent automatically when the payout is marked paid.'
+        ]);
+        exit;
+    }
 
     $allUsers = getEmailServiceUsers($usersFile);
     $config = getEmailConfig($emailConfigFile);
@@ -457,6 +491,16 @@ if ($action === 'send_email') {
         }
     }
 
+    // A company admin can only email their own company's people (the super admin and the
+    // bridge are not limited). Custom one-off addresses are left as they were.
+    if (!$isSuperCaller && !$isSecretCaller && $targetType !== 'custom') {
+        $recipients = array_values(array_filter($recipients, function ($u) use ($callerCompany) {
+            $c = (string) ($u['company_id'] ?? '');
+            if ($c === '' || strtolower($c) === 'nunno') $c = 'COMP-001';
+            return $c === $callerCompany;
+        }));
+    }
+
     if (empty($recipients)) {
         http_response_code(400);
         echo json_encode([
@@ -466,10 +510,28 @@ if ($action === 'send_email') {
         exit;
     }
 
-    $existingLogs = getEmailLogs($emailLogsFile);
+    if (count($recipients) > CHATLY_MAIL_MAX_PER_REQ) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Too many recipients in one dispatch (max ' . CHATLY_MAIL_MAX_PER_REQ . ').']);
+        exit;
+    }
+
+    // Which Gmail sender delivers it: the super admin sends as Chatly, signed-in Nunno (COMP-001)
+    // admins as Nunno. Other companies' admins, and callers with only the shared bridge secret
+    // (it is in the source code), keep the old PHP mail() path, so they can never send from
+    // Nunno's or Chatly's Gmail account.
+    $mailProfile = null;
+    if ($isSuperCaller) $mailProfile = 'chatly';
+    elseif ($currentUser && $callerRole === 'admin' && $callerCompany === 'COMP-001') $mailProfile = 'nunno';
+    if ($mailProfile !== null) {
+        $mp = chatlyMailProfile($mailProfile);
+        $senderEmail = (string) ($mp['sender_email'] ?? $senderEmail);
+    }
+
     $sentCount = 0;
     $errors = [];
     $dispatchedLogs = [];
+    $prepared = [];
 
     foreach ($recipients as $recipient) {
         $name = $recipient['name'] ?? 'Team Member';
@@ -507,6 +569,12 @@ if ($action === 'send_email') {
         }
 
         $fullHtml = wrapEmailInBrandedTemplate($interpolatedSubject, $badge, $interpolatedBody, $portalUrl);
+
+        if ($mailProfile !== null) {
+            // Gmail SMTP: collected here, sent below over one connection.
+            $prepared[] = ['to' => $email, 'name' => $name, 'subject' => $interpolatedSubject, 'html' => $fullHtml];
+            continue;
+        }
 
         // Headers
         $headers = [];
@@ -548,17 +616,44 @@ if ($action === 'send_email') {
             'template_id'     => $templateId,
             'status'          => $isSent ? 'delivered' : 'failed',
             'sent_by'         => $currentUser['name'] ?? 'System Administrator',
-            'sender_email'    => $senderEmail
+            'sender_email'    => $senderEmail,
+            'transport'       => 'mail',
+            'company_id'      => $callerCompany
         ];
 
-        array_unshift($existingLogs, $logEntry);
         $dispatchedLogs[] = $logEntry;
 
         if ($isSent) $sentCount++;
         else $errors[] = "Failed to dispatch to {$email}";
     }
 
-    saveEmailLogs($emailLogsFile, $existingLogs);
+    $note = null;
+    if ($mailProfile !== null && $prepared) {
+        $batch = chatlyMailBatch($mailProfile, $prepared, ['log' => false]);
+        $note = $batch['note'];
+        foreach ($prepared as $i => $m) {
+            $res = $batch['results'][$i] ?? ['ok' => false, 'error' => 'Not sent.'];
+            $dispatchedLogs[] = [
+                'id'              => 'ML-' . strtoupper(substr(uniqid(), -6)) . $i,
+                'timestamp'       => date('c'),
+                'profile'         => $mailProfile,
+                'recipient_email' => $m['to'],
+                'recipient_name'  => $m['name'],
+                'subject'         => $m['subject'],
+                'template_id'     => $templateId,
+                'status'          => $res['ok'] ? 'delivered' : 'failed',
+                'error'           => $res['ok'] ? null : $res['error'],
+                'sent_by'         => $currentUser['name'] ?? 'System Administrator',
+                'sender_email'    => $senderEmail,
+                'transport'       => $batch['transport'],
+                'company_id'      => $isSuperCaller ? '' : $callerCompany
+            ];
+            if ($res['ok']) $sentCount++;
+            else $errors[] = "Failed to dispatch to {$m['to']}: " . $res['error'];
+        }
+    }
+
+    chatlyMailLogMany($dispatchedLogs);   // locked append, newest first, capped
 
     echo json_encode([
         'success'    => true,
@@ -566,7 +661,8 @@ if ($action === 'send_email') {
         'total'      => count($recipients),
         'dispatched' => $dispatchedLogs,
         'errors'     => $errors,
-        'message'    => "Successfully dispatched {$sentCount} of " . count($recipients) . " email(s)."
+        'note'       => $note,
+        'message'    => "Successfully dispatched {$sentCount} of " . count($recipients) . " email(s)." . ($note ? ' ' . $note : '')
     ]);
     exit;
 }

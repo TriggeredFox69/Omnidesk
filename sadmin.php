@@ -439,6 +439,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     .explain { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 12px; line-height: 1.6; color: var(--text-2); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 14px; }
     .explain strong { color: var(--text); }
 
+    /* Emails */
+    .em-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; }
+    .em-grid > * { min-width: 0; }
+    textarea.fc { resize: vertical; line-height: 1.55; min-height: 120px; }
+    .em-list { max-height: 330px; overflow-y: auto; border: 1px solid var(--line-2); border-radius: 10px; background: var(--panel-2); margin-top: 8px; }
+    .em-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 12.5px; }
+    .em-row:last-child { border-bottom: 0; }
+    .em-row:hover { background: rgba(127, 127, 127, 0.05); }
+    .em-row input { width: 16px; height: 16px; accent-color: var(--green); flex: 0 0 auto; }
+    .em-row-main { flex: 1; min-width: 0; }
+    .em-row-main b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .em-row-main small { display: block; color: var(--text-3); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .em-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+    .em-result { margin-top: 16px; display: grid; gap: 12px; }
+    .em-result .banner { margin-bottom: 0; }
+    .em-check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+    .em-check input { width: 16px; height: 16px; accent-color: var(--green); }
+    .em-frame { width: 100%; height: 62vh; min-height: 380px; border: 1px solid var(--line-2); border-radius: 10px; background: #f1f5f4; display: block; }
+    @media (max-width: 1100px) { .em-grid { grid-template-columns: minmax(0, 1fr); } }
+
     /* Modals */
     .modal { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.7); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
     .modal.open { display: flex; }
@@ -645,6 +665,7 @@ async function handleSadminLogin(e) {
         <button class="nav-i" data-act="nav" data-sec="approvals"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M16 11l2 2 4-4"/></svg><span>Closer approvals</span><span class="nav-b" id="navPending" hidden>0</span></button>
         <button class="nav-i" data-act="nav" data-sec="settlement"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2M7 6V4h10v2"/></svg><span>Nunno settlement</span></button>
         <button class="nav-i" data-act="nav" data-sec="invoice"><svg class="ic" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg><span>Nunno invoice</span></button>
+        <button class="nav-i" data-act="nav" data-sec="emails"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>Emails</span></button>
         <div class="nav-g">Data</div>
         <button class="nav-i" data-act="nav" data-sec="numbers"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span>Number intelligence</span></button>
         <button class="nav-i" data-act="nav" data-sec="pool"><svg class="ic" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span>Fallback numbers</span></button>
@@ -885,6 +906,102 @@ async function handleSadminLogin(e) {
                 <thead><tr><th>Closer</th><th>Role</th><th>Verified sales</th><th>Revenue collected</th><th>Payable</th></tr></thead>
                 <tbody id="invLines"><tr><td class="empty" colspan="5">Loading invoice…</td></tr></tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ EMAILS ============ -->
+      <section class="sec" data-sec="emails" hidden>
+        <div class="panel">
+          <div class="panel-h">
+            <div><div class="panel-t">Email companies</div><div class="panel-d">Goes from the Chatly Gmail sender to each company's owner email and its admin accounts. Write plain text; links become clickable. Personalise with {first_name}, {name} and {company}.</div></div>
+            <div class="tools">
+              <select id="emPreset" class="fc fc-sm" aria-label="Template">
+                <option value="custom">Template: blank</option>
+                <option value="welcome">Welcome to Chatly</option>
+                <option value="billing">Plan / billing reminder</option>
+                <option value="feature">New feature announcement</option>
+                <option value="maintenance">Maintenance notice</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-b">
+            <div class="em-grid">
+              <div>
+                <div class="fg"><label class="fl" for="emSubject">Subject</label><input id="emSubject" class="fc" maxlength="200" placeholder="e.g. New on Chatly: faster campaigns"></div>
+                <div class="fg"><label class="fl" for="emMessage">Message</label><textarea id="emMessage" class="fc" rows="13" maxlength="20000" placeholder="Hello {first_name},&#10;&#10;Write your message here. Lines starting with - become a list."></textarea><div class="hint">Plain text only (no HTML). A blank line starts a new paragraph. The email gets the Chatly header, an "Open your admin portal" button and a footer.</div></div>
+                <div class="em-actions">
+                  <button class="btn btn-sm" data-act="em-preview">Preview</button>
+                  <button class="btn btn-gold btn-sm" id="emSendBtn" data-act="em-send">Send email</button>
+                  <span class="hint" id="emSendHint"></span>
+                </div>
+              </div>
+              <div>
+                <label class="fl">Recipients</label>
+                <div class="seg" role="tablist">
+                  <button class="on" data-act="em-aud" data-aud="all" role="tab">All companies</button>
+                  <button data-act="em-aud" data-aud="pick" role="tab">Selected companies</button>
+                </div>
+                <div id="emPickTools" hidden>
+                  <div class="em-actions" style="margin-top:10px;">
+                    <input type="search" id="emCoSearch" class="fc fc-sm search" placeholder="Search name, owner, email…">
+                    <button class="btn btn-ghost btn-xs" data-act="em-all">Select shown</button>
+                    <button class="btn btn-ghost btn-xs" data-act="em-none">Clear</button>
+                  </div>
+                  <div class="em-list" id="emCoList"></div>
+                </div>
+                <div class="hint" id="emCoCount" style="margin-top:8px;"></div>
+              </div>
+            </div>
+            <div class="em-result" id="emResult" hidden></div>
+          </div>
+        </div>
+        <div class="grid g-2">
+          <div class="panel">
+            <div class="panel-h">
+              <div><div class="panel-t">Send log</div><div class="panel-d">Everything sent from the Chatly sender: composer emails, test emails and automatic emails.</div></div>
+              <button class="btn btn-sm" data-act="em-logs">Refresh</button>
+            </div>
+            <div class="panel-b flush">
+              <div class="tbl-wrap">
+                <table class="rt">
+                  <thead><tr><th>Time</th><th>To</th><th>Subject</th><th>Type</th><th>Status</th></tr></thead>
+                  <tbody id="emLogBody"><tr><td class="empty" colspan="5">Open this section to load the log…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h"><div><div class="panel-t">Sender settings</div><div class="panel-d">Gmail account that sends Chatly emails.</div></div></div>
+            <div class="panel-b">
+              <div class="mini-kpis" style="grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 14px;">
+                <div><span>Sender</span><b id="emSetSender" style="font-size:13px;">—</b><small id="emSetTransport">loading…</small></div>
+                <div><span>Sent in 24 h</span><b id="emSetUsage">—</b><small>of the daily limit</small></div>
+              </div>
+              <div class="fg"><label class="fl" for="emSetName">Sender name</label><input id="emSetName" class="fc" maxlength="60" placeholder="Chatly"></div>
+              <div class="fg">
+                <label class="fl" for="emSetPass">Gmail App Password</label>
+                <input id="emSetPass" class="fc" type="password" autocomplete="new-password" spellcheck="false" placeholder="xxxx xxxx xxxx xxxx">
+                <div class="hint" id="emSetPassState">—</div>
+                <div class="hint">Sign in to Google as the sender account &gt; Google Account &gt; Security &gt; 2-Step Verification (turn on) &gt; App passwords &gt; create one named "Chatly" and paste the 16 letters here. It is stored on the server only and never shown again.</div>
+              </div>
+              <div class="frow">
+                <div class="fg"><label class="fl" for="emSetCap">Daily limit</label><input id="emSetCap" class="fc" type="number" min="1" max="2000" step="10"><div class="hint">Gmail allows about 500 a day.</div></div>
+                <div class="fg"><label class="fl">&nbsp;</label><label class="em-check"><input type="checkbox" id="emSetEnabled"> Sending on</label></div>
+              </div>
+              <div class="em-actions">
+                <button class="btn btn-green btn-sm" data-act="em-save">Save settings</button>
+                <button class="btn btn-danger btn-xs" data-act="em-clear-pass">Remove password</button>
+              </div>
+              <div class="fg" style="margin-top:14px;">
+                <label class="fl" for="emTestTo">Send a test email</label>
+                <div class="em-actions" style="margin-top:0;">
+                  <input id="emTestTo" class="fc fc-sm" type="email" placeholder="your email" style="flex:1 1 180px;">
+                  <button class="btn btn-sm" id="emTestBtn" data-act="em-test">Send test email to me</button>
+                </div>
+                <div class="hint">Leave empty to use the email on your super admin account.</div>
+              </div>
             </div>
           </div>
         </div>
@@ -1196,6 +1313,15 @@ async function handleSadminLogin(e) {
     </div>
   </div>
 
+  <!-- EMAIL PREVIEW MODAL -->
+  <div class="modal" id="emPreviewModal" role="dialog" aria-modal="true" aria-labelledby="emPreviewTitle">
+    <div class="modal-card wide">
+      <div class="modal-h"><div><h3 id="emPreviewTitle">Email preview</h3><p id="emPreviewSubject">Subject</p></div><button class="modal-x" data-act="close-modal" aria-label="Close">&times;</button></div>
+      <div class="modal-b"><iframe id="emPreviewFrame" class="em-frame" sandbox="" title="Email preview" referrerpolicy="no-referrer"></iframe><div class="hint" style="margin-top:8px;">Sample recipient shown; {first_name}, {name} and {company} are filled in for each company.</div></div>
+      <div class="modal-f"><button class="btn" data-act="close-modal">Close</button></div>
+    </div>
+  </div>
+
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
@@ -1376,6 +1502,7 @@ const SECTIONS = {
   approvals:  ['Closer approvals', 'Closer applicants waiting for approval on any company'],
   settlement: ['Nunno settlement', 'Verified sales, what closers earned and what Nunno keeps'],
   invoice:    ['Nunno invoice', 'Revenue Nunno collected through Chatly, and what Nunno owes Chatly'],
+  emails:     ['Emails', 'Email company owners from the Chatly Gmail sender, see every send, manage the sender'],
   numbers:    ['Number intelligence', 'Every number in every company, sliced and exported'],
   pool:       ['Fallback numbers', 'Company numbers lent to closers until their own phone is ready'],
   brand:      ['Brand leads', 'Brands that asked to promote their product on Chatly'],
@@ -1404,6 +1531,7 @@ function onShow(name) {
   if (name === 'approvals') loadMasterPendingTMs();
   if (name === 'settlement') loadNunnoSettlement();
   if (name === 'invoice') loadNunnoInvoice();
+  if (name === 'emails') emOpen();
   if (name === 'numbers') nxLoad(false);
   if (name === 'pool') loadNumberPool();
   if (name === 'brand') loadBrandInquiries();
@@ -1435,6 +1563,7 @@ const refreshCore = guarded(async function () {
     renderOverview();
     renderCompanies();
     renderAutoData();
+    if (S.section === 'emails') emCompaniesChanged();
   } catch (err) {
     setLive(false);
   }
@@ -2626,6 +2755,267 @@ function triggerNewInquiryNotification(newestInq) {
 }
 
 /* =========================================================
+   Emails (Chatly Gmail sender -> company owners / admins)
+   ========================================================= */
+const EM = { aud: 'all', picked: new Set(), preset: 'custom', settings: null, myEmail: '', loaded: false, coSig: '' };
+const EM_PRESETS = {
+  welcome: ['Welcome to Chatly, {company}',
+    'Hello {first_name},\n\nWelcome to Chatly! Your company workspace for {company} is ready.\n\n- Sign in to your admin portal: https://chatly.pk/cc\n- Add your products and prices\n- Approve or invite your sales closers (TMs) and team leaders (TLs)\n- Each closer links their own WhatsApp and starts replying to leads\n\nIf you need anything, just reply to this email.\n\nTeam Chatly'],
+  billing: ['Your Chatly plan: renewal reminder for {company}',
+    'Hello {first_name},\n\nThis is a friendly reminder that the Chatly plan for {company} is due for renewal.\n\nTo keep your closers sending and your Auto Data running without a break, please complete the payment before the due date. Reply to this email if you need the invoice or the payment details.\n\nThank you for growing with Chatly.\n\nTeam Chatly'],
+  feature: ['New on Chatly: (feature name)',
+    'Hello {first_name},\n\nWe just released something new for {company}:\n\n- What is new: (describe the feature in one line)\n- Why it helps: (the benefit for your sales team)\n- Where to find it: https://chatly.pk/cc\n\nAs always, reply to this email with feedback or questions.\n\nTeam Chatly'],
+  maintenance: ['Scheduled maintenance: Chatly',
+    'Hello {first_name},\n\nChatly will have a short maintenance window:\n\n- When: (day, date, time PKT)\n- Expected duration: about 15 minutes\n- Impact: WhatsApp sending may pause briefly. Chats, leads and balances are safe.\n\nNo action is needed from you. Thank you for your patience.\n\nTeam Chatly']
+};
+const EM_KINDS = {
+  test: 'test', auto_company_welcome: 'welcome (auto)', auto_withdrawal_paid: 'payout sent (auto)',
+  auto_withdrawal_requested: 'payout request (auto)', auto_approval_tm: 'TM approved (auto)', auto_approval_tl: 'TL approved (auto)'
+};
+function emKindLabel(k) {
+  k = String(k || '');
+  if (EM_KINDS[k]) return EM_KINDS[k];
+  if (k.indexOf('composer_') === 0) return (k.slice(9).replace(/_/g, ' ') || 'custom');
+  return k || 'email';
+}
+function emKindTone(k) {
+  k = String(k || '');
+  if (k.indexOf('auto_') === 0) return 'cyan';
+  return k === 'test' ? 'gray' : 'violet';
+}
+function emWhen(t) {
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? String(t || '') : d.toLocaleString();
+}
+function emOpen() {
+  emRenderCompanies();
+  if (!EM.loaded) { EM.loaded = true; loadEmailSettings(); }
+  loadEmailLogs();
+}
+function emApplyPreset(key) {
+  const subj = $('#emSubject'), msg = $('#emMessage');
+  if (key === 'custom' || !EM_PRESETS[key]) { EM.preset = 'custom'; return; }
+  if ((subj.value.trim() || msg.value.trim()) && !confirm('Replace the current subject and message with this template?')) {
+    $('#emPreset').value = EM.preset;
+    return;
+  }
+  EM.preset = key;
+  subj.value = EM_PRESETS[key][0];
+  msg.value = EM_PRESETS[key][1];
+}
+function emSetAud(aud) {
+  EM.aud = aud === 'pick' ? 'pick' : 'all';
+  $$('[data-act="em-aud"]').forEach(b => b.classList.toggle('on', b.dataset.aud === EM.aud));
+  emRenderCompanies();
+}
+function emTargets() {
+  const all = S.companies || [];
+  return EM.aud === 'all' ? all : all.filter(c => EM.picked.has(c.id));
+}
+function emVisibleCompanies() {
+  const q = ($('#emCoSearch').value || '').trim().toLowerCase();
+  return (S.companies || []).filter(c => !q || [c.name, c.slug, c.owner_name, c.owner_email, c.id].some(v => String(v || '').toLowerCase().includes(q)));
+}
+function emRenderCount() {
+  const all = S.companies || [];
+  const n = emTargets().length;
+  $('#emCoCount').textContent = EM.aud === 'pick'
+    ? fmt(n) + ' of ' + fmt(all.length) + ' companies selected. Each gets one copy per owner / admin email.'
+    : 'All ' + fmt(all.length) + ' companies: every owner email and company admin account gets one copy.';
+  $('#emSendHint').textContent = n ? 'to ' + fmt(n) + (n === 1 ? ' company' : ' companies') : '';
+}
+function emRenderCompanies() {
+  const list = $('#emCoList');
+  if (!list) return;
+  const pick = EM.aud === 'pick';
+  $('#emPickTools').hidden = !pick;
+  EM.coSig = (S.companies || []).map(c => c.id + ':' + (c.owner_email || '') + ':' + (c.status || '')).join('|');
+  if (pick) {
+    const rows = emVisibleCompanies();
+    list.innerHTML = rows.length ? rows.map(c => {
+      const sus = (c.status || 'active') !== 'active';
+      return `<label class="em-row"><input type="checkbox" data-em-co="${esc(c.id)}"${EM.picked.has(c.id) ? ' checked' : ''}>` +
+        `<span class="em-row-main"><b>${esc(c.name || c.id)}</b><small>${esc(c.owner_email || 'no owner email')}${c.owner_name ? ' · ' + esc(c.owner_name) : ''}</small></span>` +
+        (sus ? '<span class="tag red">suspended</span>' : '') + '</label>';
+    }).join('') : `<div class="empty-note">${(S.companies || []).length ? 'No companies match.' : 'Loading companies…'}</div>`;
+  }
+  emRenderCount();
+}
+function emCompaniesChanged() {
+  const sig = (S.companies || []).map(c => c.id + ':' + (c.owner_email || '') + ':' + (c.status || '')).join('|');
+  if (sig !== EM.coSig) emRenderCompanies();
+}
+function emPickShown(on) {
+  emVisibleCompanies().forEach(c => { if (on) EM.picked.add(c.id); else EM.picked.delete(c.id); });
+  if (!on) EM.picked.clear();
+  emRenderCompanies();
+}
+const emPreview = guarded(async function () {
+  const subject = $('#emSubject').value.trim(), message = $('#emMessage').value.trim();
+  if (!subject && !message) { toast('Write a subject and a message first.', { kind: 'err' }); return; }
+  try {
+    const d = await postJSON('api/email_center.php', { action: 'preview', profile: 'chatly', subject: subject, message: message });
+    if (!d.success) { toast(d.error || 'Preview failed.', { kind: 'err' }); return; }
+    $('#emPreviewSubject').textContent = 'Subject: ' + (d.subject || '');
+    $('#emPreviewFrame').srcdoc = d.html || '';
+    openModal('emPreviewModal');
+  } catch (err) {
+    toast(err.message, { kind: 'err' });
+  }
+});
+function emShowResult(r, total) {
+  const box = $('#emResult');
+  const failed = r.results.filter(x => !x.ok);
+  box.hidden = false;
+  box.innerHTML =
+    (r.error ? `<div class="banner">${esc(r.error)}</div>` : '') +
+    (r.note ? `<div class="banner warn">${esc(r.note)}</div>` : '') +
+    `<div class="mini-kpis">
+      <div class="hl"><span>Sent</span><b class="c-green">${fmt(r.sent)}</b><small>${r.transport === 'mail' ? 'via PHP mail() fallback' : 'via Gmail SMTP'}</small></div>
+      <div><span>Failed</span><b class="${r.failed ? 'c-red' : ''}">${fmt(r.failed)}</b><small>${r.failed ? 'reasons below' : 'none'}</small></div>
+      <div><span>Companies</span><b>${fmt(r.done)} / ${fmt(total)}</b><small>${r.done < total ? 'stopped early' : 'all processed'}</small></div>
+      <div><span>Sender</span><b style="font-size:13px;">${esc(EM.settings ? EM.settings.sender_email : 'Chatly')}</b><small>profile chatly</small></div>
+    </div>` +
+    (failed.length ? `<ul class="feed">${failed.map(x => `<li><span class="when"><span class="tag red">failed</span></span><span class="what">${esc(x.name || x.to)}<small>${esc(x.to)} · ${esc(x.error || 'not sent')}</small></span></li>`).join('')}</ul>` : '');
+}
+const emSend = guarded(async function () {
+  const subject = $('#emSubject').value.trim(), message = $('#emMessage').value.trim();
+  if (!subject || !message) { toast('Write a subject and a message.', { kind: 'err' }); return; }
+  const targets = emTargets();
+  if (!targets.length) { toast('Choose at least one company.', { kind: 'err' }); return; }
+  const from = EM.settings ? EM.settings.sender_email : 'the Chatly sender';
+  if (!confirm('Send "' + subject + '" to ' + targets.length + (targets.length === 1 ? ' company' : ' companies') + ' from ' + from + '?')) return;
+  const ids = targets.map(c => c.id);
+  const agg = { sent: 0, failed: 0, results: [], note: null, transport: null, error: null, done: 0 };
+  const btn = $('#emSendBtn');
+  const box = $('#emResult');
+  btn.disabled = true;
+  box.hidden = false;
+  try {
+    for (let i = 0; i < ids.length; i += 10) {
+      const chunk = ids.slice(i, i + 10);
+      box.innerHTML = `<div class="empty-note">Sending… ${fmt(i)} of ${fmt(ids.length)} companies done</div>`;
+      let d;
+      try {
+        d = await postJSON('api/email_center.php', { action: 'send_chatly', audience: 'pick', company_ids: chunk, subject: subject, message: message, preset: $('#emPreset').value });
+      } catch (err) {
+        agg.error = err.message;
+        break;
+      }
+      if (!d.success) { agg.error = d.error || 'Sending failed.'; break; }
+      agg.sent += n0(d.sent);
+      agg.failed += n0(d.failed);
+      (d.results || []).forEach(x => agg.results.push(x));
+      if (d.note) agg.note = d.note;
+      if (d.transport) agg.transport = d.transport;
+      agg.done += chunk.length;
+    }
+  } finally {
+    btn.disabled = false;
+  }
+  emShowResult(agg, ids.length);
+  toast(fmt(agg.sent) + ' sent, ' + fmt(agg.failed) + ' failed.', { title: 'Emails', kind: agg.error || agg.failed ? 'err' : 'ok' });
+  loadEmailLogs();
+  loadEmailSettings();
+});
+async function loadEmailLogs() {
+  const tb = $('#emLogBody');
+  if (!tb) return;
+  try {
+    const d = await api('api/email_center.php?action=logs&profile=chatly&limit=100');
+    if (!d.success) { tb.innerHTML = emptyRow(5, d.error || 'Could not load the send log.', 'var(--red)'); return; }
+    const logs = Array.isArray(d.logs) ? d.logs : [];
+    tb.innerHTML = logs.length ? logs.map(l => `<tr>
+      ${td('Time', `<span class="mono">${esc(emWhen(l.time))}</span>`)}
+      ${td('To', `<b>${esc(l.name || l.to)}</b><small>${esc(l.to)}</small>`)}
+      ${td('Subject', `<span class="clamp">${esc(l.subject)}</span>`)}
+      ${td('Type', `<span class="tag ${emKindTone(l.kind)}">${esc(emKindLabel(l.kind))}</span>`)}
+      ${td('Status', l.ok
+        ? `<span class="tag green">sent</span><small>${l.transport === 'mail' ? 'PHP mail()' : 'Gmail'}</small>`
+        : `<span class="tag red">failed</span><small>${esc(l.error || '')}</small>`)}
+    </tr>`).join('') : emptyRow(5, 'Nothing sent from the Chatly sender yet.');
+  } catch (err) {
+    tb.innerHTML = emptyRow(5, err.message, 'var(--red)');
+  }
+}
+function renderEmailSettings() {
+  const s = EM.settings;
+  if (!s) return;
+  $('#emSetSender').textContent = s.sender_email || '—';
+  const tr = $('#emSetTransport');
+  tr.textContent = s.app_password_set ? (s.enabled ? 'Gmail SMTP · on' : 'Gmail SMTP · turned off') : 'No App Password: mail() fallback';
+  tr.className = s.app_password_set && s.enabled ? 'c-green' : 'c-amber';
+  $('#emSetUsage').textContent = fmt(s.sent_last_24h) + ' / ' + fmt(s.daily_cap);
+  $('#emSetName').value = s.sender_name || '';
+  $('#emSetCap').value = s.daily_cap || 450;
+  $('#emSetEnabled').checked = !!s.enabled;
+  const pw = $('#emSetPass');
+  pw.value = '';
+  pw.placeholder = s.app_password_set ? s.app_password_mask + '  (saved; type a new one to replace)' : 'xxxx xxxx xxxx xxxx';
+  $('#emSetPassState').textContent = s.app_password_set
+    ? 'An App Password is saved' + (s.updated_at ? ' (last change ' + emWhen(s.updated_at) + ')' : '') + '.'
+    : 'No App Password saved yet: emails fall back to PHP mail() and will likely land in spam.';
+  $('#emTestTo').placeholder = EM.myEmail || 'your email';
+}
+async function loadEmailSettings() {
+  try {
+    const d = await api('api/email_center.php?action=settings&profile=chatly');
+    if (!d.success) { $('#emSetTransport').textContent = d.error || 'Could not load sender settings.'; return; }
+    EM.settings = d.settings;
+    EM.myEmail = d.my_email || '';
+    renderEmailSettings();
+  } catch (err) {
+    $('#emSetTransport').textContent = err.message;
+  }
+}
+const emSaveSettings = guarded(async function () {
+  const body = {
+    action: 'save_settings', profile: 'chatly',
+    sender_name: $('#emSetName').value.trim(),
+    daily_cap: n0($('#emSetCap').value) || 450,
+    enabled: $('#emSetEnabled').checked
+  };
+  const pw = $('#emSetPass').value.trim();
+  if (pw) body.app_password = pw;
+  try {
+    const d = await postJSON('api/email_center.php', body);
+    if (!d.success) { toast(d.error || 'Could not save sender settings.', { kind: 'err' }); return; }
+    EM.settings = d.settings;
+    renderEmailSettings();
+    toast(d.message || 'Saved.', { title: 'Sender settings' });
+  } catch (err) {
+    toast(err.message, { kind: 'err' });
+  }
+});
+const emClearPass = guarded(async function () {
+  if (!confirm('Remove the saved Gmail App Password? Emails will fall back to PHP mail() until a new one is saved.')) return;
+  try {
+    const d = await postJSON('api/email_center.php', { action: 'save_settings', profile: 'chatly', clear_password: true });
+    if (!d.success) { toast(d.error || 'Could not remove the password.', { kind: 'err' }); return; }
+    EM.settings = d.settings;
+    renderEmailSettings();
+    toast('App Password removed.', { title: 'Sender settings' });
+  } catch (err) {
+    toast(err.message, { kind: 'err' });
+  }
+});
+const emTest = guarded(async function () {
+  const btn = $('#emTestBtn');
+  btn.disabled = true;
+  try {
+    const d = await postJSON('api/email_center.php', { action: 'test', profile: 'chatly', to: $('#emTestTo').value.trim() });
+    if (d.success) toast((d.message || 'Test email sent.') + (d.note ? ' ' + d.note : ''), { title: 'Test email', ms: 8000, kind: d.note ? 'info' : 'ok' });
+    else toast(d.error || 'Test email failed.', { title: 'Test email failed', kind: 'err', ms: 10000 });
+  } catch (err) {
+    toast(err.message, { kind: 'err' });
+  } finally {
+    btn.disabled = false;
+    loadEmailLogs();
+    loadEmailSettings();
+  }
+});
+
+/* =========================================================
    Modals
    ========================================================= */
 function openModal(id) { const m = document.getElementById(id); if (m) m.classList.add('open'); }
@@ -2693,6 +3083,15 @@ document.addEventListener('click', e => {
     case 't-pause': toggleTermPause(); break;
     case 't-clear': T.lines = []; $('#termOut').innerHTML = ''; T.unseen = 0; sysLine('screen cleared'); break;
     case 't-jump': T.stick = true; T.unseen = 0; scrollTermBottom(); updateJump(); break;
+    case 'em-aud': emSetAud(el.dataset.aud); break;
+    case 'em-all': emPickShown(true); break;
+    case 'em-none': emPickShown(false); break;
+    case 'em-preview': emPreview(); break;
+    case 'em-send': emSend(); break;
+    case 'em-logs': loadEmailLogs(); break;
+    case 'em-save': emSaveSettings(); break;
+    case 'em-clear-pass': emClearPass(); break;
+    case 'em-test': emTest(); break;
   }
 });
 document.addEventListener('change', e => {
@@ -2715,6 +3114,14 @@ $('#secSearch').addEventListener('input', () => { renderLogins(); renderAudit();
 $('#termScreen').addEventListener('scroll', onTermScroll, { passive: true });
 $('#termCo').addEventListener('change', e => { T.co = e.target.value; T.unseen = 0; T.stick = true; renderTerm(); updateJump(); });
 $('#termGrep').addEventListener('input', e => { T.grep = e.target.value.trim().toLowerCase(); T.stick = true; renderTerm(); updateJump(); });
+$('#emPreset').addEventListener('change', e => emApplyPreset(e.target.value));
+$('#emCoSearch').addEventListener('input', emRenderCompanies);
+$('#emCoList').addEventListener('change', e => {
+  const cb = e.target.closest('input[data-em-co]');
+  if (!cb) return;
+  if (cb.checked) EM.picked.add(cb.dataset.emCo); else EM.picked.delete(cb.dataset.emCo);
+  emRenderCount();
+});
 $('#adList').addEventListener('input', e => { if (e.target.matches('input[data-f]')) e.target.classList.add('dirty'); });
 $('#adList').addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !e.target.matches('input[data-f]')) return;

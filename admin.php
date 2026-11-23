@@ -86,6 +86,13 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
         'logo'                  => 'assets/images/chatly-icon.png'
     ];
 }
+
+// "Email" tab: Nunno (COMP-001) only, for the Nunno company admin or the super admin.
+// The server (api/email_center.php) enforces the same rule.
+$cuRoleForEmail = strtolower((string) ($currentUser['role'] ?? ''));
+$cuCompanyForEmail = (string) ($currentUser['company_id'] ?? '');
+$showNunnoEmail = $isAdmin && (($activeCompany['id'] ?? '') === 'COMP-001')
+    && ($cuRoleForEmail === 'superadmin' || $cuCompanyForEmail === '' || $cuCompanyForEmail === 'COMP-001');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -486,6 +493,48 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     .closer-light-btn.is-resume:hover { background: rgba(16,185,129,0.12); }
     .closer-light-btn:disabled { opacity: 0.5; cursor: wait; }
     @media (prefers-reduced-motion: reduce) { .closer-light-card.light-orange .closer-light { animation: none; } }
+
+    /* Email tab (Nunno) */
+    .nem-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+    .nem-grid > * { min-width: 0; }
+    .nem-grid-2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0 20px; }
+    .nem-grid-2 > * { min-width: 0; }
+    textarea.form-control { resize: vertical; line-height: 1.55; }
+    .nem-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .nem-chip { padding: 7px 12px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); color: var(--text-secondary); font-family: inherit; }
+    .nem-chip:hover { color: var(--text-main); border-color: var(--border-accent); }
+    .nem-chip.active { background: var(--accent-emerald-dark); border-color: var(--accent-emerald-dark); color: #fff; }
+    .nem-list { max-height: 340px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 12px; margin-top: 10px; background: rgba(255,255,255,0.015); }
+    .nem-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; font-size: 12.5px; }
+    .nem-row:last-child { border-bottom: 0; }
+    .nem-row:hover { background: rgba(255,255,255,0.04); }
+    .nem-row.no-email { opacity: 0.55; cursor: not-allowed; }
+    .nem-row input { width: 16px; height: 16px; accent-color: #10b981; flex-shrink: 0; }
+    .nem-row-main { flex: 1; min-width: 0; }
+    .nem-row-main b { display: block; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nem-row-main small { display: block; color: var(--text-muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nem-tag { display: inline-flex; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; white-space: nowrap; border: 1px solid; }
+    .nem-tag.tm { color: #34d399; border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.1); }
+    .nem-tag.tl { color: #c084fc; border-color: rgba(147,51,234,0.35); background: rgba(147,51,234,0.1); }
+    .nem-tag.ok { color: #34d399; border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.1); }
+    .nem-tag.bad { color: #fb7185; border-color: rgba(244,63,94,0.35); background: rgba(244,63,94,0.1); }
+    .nem-tag.auto { color: #60a5fa; border-color: rgba(59,130,246,0.35); background: rgba(59,130,246,0.1); }
+    .nem-tag.muted { color: var(--text-secondary); border-color: var(--border-subtle); background: transparent; }
+    .nem-hint { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+    .nem-banner { padding: 11px 14px; border-radius: 10px; font-size: 12.5px; margin-bottom: 12px; border: 1px solid rgba(244,63,94,0.3); background: rgba(244,63,94,0.1); color: #fb7185; }
+    .nem-banner.warn { border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.1); color: #fbbf24; }
+    .nem-banner.ok { border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.1); color: #34d399; }
+    .nem-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .nem-stat { border: 1px solid var(--border-subtle); border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,0.02); min-width: 0; }
+    .nem-stat span { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .nem-stat b { display: block; font-size: 18px; font-weight: 800; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nem-stat small { display: block; font-size: 11px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nem-fails { list-style: none; display: grid; gap: 6px; }
+    .nem-fails li { font-size: 12.5px; padding: 8px 10px; border-radius: 9px; border: 1px solid rgba(244,63,94,0.25); background: rgba(244,63,94,0.06); overflow-wrap: anywhere; }
+    .nem-fails li small { display: block; color: var(--text-muted); }
+    .nem-log td small { display: block; color: var(--text-muted); font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
+    .nem-frame { width: 100%; height: 62vh; min-height: 360px; border: 1px solid var(--border-subtle); border-radius: 12px; background: #f1f5f4; display: block; }
+    @media (max-width: 1000px) { .nem-grid, .nem-grid-2 { grid-template-columns: minmax(0, 1fr); } }
   </style>
 </head>
 <body>
@@ -649,6 +698,11 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     <button class="dash-tab-btn" id="tabBtnWithdrawals" onclick="switchDashboardTab('withdrawals')">
       <span>💸</span> Closer Withdrawals &amp; Payouts <span id="badgePendingWdCount" style="display:none; background:#f59e0b; color:#000; font-size:10px; padding:2px 7px; border-radius:10px; font-weight:800; margin-left:6px;">0</span>
     </button>
+    <?php if ($showNunnoEmail): ?>
+    <button class="dash-tab-btn" id="tabBtnEmail" onclick="switchDashboardTab('email')">
+      <span>✉️</span> Email TMs &amp; TLs
+    </button>
+    <?php endif; ?>
   </div>
 
   <!-- TAB 0: PENDING CLOSER APPLICATIONS -->
@@ -1266,6 +1320,133 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     </div>
   </div>
 
+  <?php if ($showNunnoEmail): ?>
+  <!-- TAB: EMAIL TMs & TLs (Nunno, COMP-001 only) -->
+  <div class="dash-pane" id="paneEmail">
+    <div class="content-box">
+      <div class="box-header">
+        <div>
+          <div class="box-title"><span>✉️</span> Email your Team Members &amp; Team Leaders</div>
+          <div class="box-desc">
+            Sent from the Nunno Gmail sender (<strong id="nemSenderLabel">numeniousnexus@gmail.com</strong>) to Nunno TMs and TLs only.
+            Write plain text; links become clickable. Personalise with <strong>{first_name}</strong>, <strong>{name}</strong> or <strong>{username}</strong>.
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="nemPreset" class="form-control" style="width:auto; padding:9px 12px;" onchange="nemApplyPreset(this.value)" aria-label="Template">
+            <option value="custom">Template: blank</option>
+            <option value="approval">Approval congratulations</option>
+            <option value="payout">Payout sent</option>
+            <option value="plan">Plan reminder (Nunno x Chatly)</option>
+            <option value="announcement">Announcement</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="nem-grid">
+        <div>
+          <div class="form-group">
+            <label class="form-label" for="nemSubject">Subject</label>
+            <input type="text" id="nemSubject" class="form-control" maxlength="200" placeholder="e.g. Your payout has been sent">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="nemMessage">Message</label>
+            <textarea id="nemMessage" class="form-control" rows="13" maxlength="20000" placeholder="Hello {first_name},&#10;&#10;Write your message here. Lines starting with - become a list."></textarea>
+            <div class="nem-hint">Plain text only (no HTML). A blank line starts a new paragraph. The email gets the Nunno header, an "Open Chatly" button and a footer.</div>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <button type="button" class="btn btn-secondary" onclick="nemPreview()">👁 Preview</button>
+            <button type="button" class="btn btn-emerald" id="nemSendBtn" onclick="nemSend()">Send email</button>
+            <span class="nem-hint" id="nemSendHint" style="margin-top:0;"></span>
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Recipients</label>
+          <div class="nem-chips" role="tablist">
+            <button type="button" class="nem-chip active" data-nem-aud="tm" onclick="nemSetAud('tm')">All TMs</button>
+            <button type="button" class="nem-chip" data-nem-aud="tl" onclick="nemSetAud('tl')">All TLs</button>
+            <button type="button" class="nem-chip" data-nem-aud="all" onclick="nemSetAud('all')">All TMs + TLs</button>
+            <button type="button" class="nem-chip" data-nem-aud="pick" onclick="nemSetAud('pick')">Pick people</button>
+          </div>
+          <div id="nemPickTools" style="display:none; margin-top:10px;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <input type="search" id="nemSearch" class="form-control" style="flex:1 1 180px; width:auto; padding:8px 12px;" placeholder="Search name, username, email…" oninput="nemRenderPeople()">
+              <button type="button" class="btn-quick-chip" onclick="nemPickShown(true)">Select shown</button>
+              <button type="button" class="btn-quick-chip" onclick="nemPickShown(false)">Clear</button>
+            </div>
+          </div>
+          <div class="nem-list" id="nemList"><div class="nem-hint" style="padding:14px;">Loading TMs and TLs…</div></div>
+          <div class="nem-hint" id="nemAudCount"></div>
+        </div>
+      </div>
+      <div id="nemResult" style="display:none; margin-top:18px;"></div>
+    </div>
+
+    <div class="nem-grid-2">
+      <div class="content-box">
+        <div class="box-header" style="margin-bottom:10px;">
+          <div>
+            <div class="box-title"><span>📜</span> Recent sends</div>
+            <div class="box-desc">Composer emails, test emails and automatic emails (approvals, payouts) from the Nunno sender.</div>
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="nemLoadLogs()">🔄 Refresh</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="nem-log">
+            <thead><tr><th>Time</th><th>To</th><th>Subject</th><th>Type</th><th>Status</th></tr></thead>
+            <tbody id="nemLogBody"><tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">Open this tab to load the log…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="content-box">
+        <div class="box-header" style="margin-bottom:12px;">
+          <div>
+            <div class="box-title"><span>⚙️</span> Sender settings</div>
+            <div class="box-desc">Gmail account that sends Nunno emails.</div>
+          </div>
+        </div>
+        <div class="nem-stats">
+          <div class="nem-stat"><span>Sender</span><b id="nemSetSender" style="font-size:13px;">—</b><small id="nemSetTransport">loading…</small></div>
+          <div class="nem-stat"><span>Sent in 24 h</span><b id="nemSetUsage">—</b><small>of the daily limit</small></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="nemSetName">Sender name</label>
+          <input type="text" id="nemSetName" class="form-control" maxlength="60" placeholder="Nunno">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="nemSetPass">Gmail App Password</label>
+          <input type="password" id="nemSetPass" class="form-control" autocomplete="new-password" spellcheck="false" placeholder="xxxx xxxx xxxx xxxx">
+          <div class="nem-hint" id="nemSetPassState">—</div>
+          <div class="nem-hint">Sign in to Google as numeniousnexus@gmail.com &gt; Google Account &gt; Security &gt; 2-Step Verification (turn on) &gt; App passwords &gt; create one named "Chatly" and paste the 16 letters here. It is stored on the server only and never shown again.</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="nemSetCap">Daily limit</label>
+            <input type="number" id="nemSetCap" class="form-control" min="1" max="2000" step="10">
+            <div class="nem-hint">Gmail allows about 500 a day.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">&nbsp;</label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-secondary); cursor:pointer; padding-top:10px;"><input type="checkbox" id="nemSetEnabled" style="width:16px; height:16px; accent-color:#10b981;"> Sending on</label>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-emerald" onclick="nemSaveSettings()">Save settings</button>
+          <button type="button" class="btn btn-danger" onclick="nemClearPass()">Remove password</button>
+        </div>
+        <div class="form-group" style="margin-top:16px;">
+          <label class="form-label" for="nemTestTo">Send a test email</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input type="email" id="nemTestTo" class="form-control" style="flex:1 1 180px; width:auto;" placeholder="your email">
+            <button type="button" class="btn btn-secondary" id="nemTestBtn" onclick="nemTest()">Send test email to me</button>
+          </div>
+          <div class="nem-hint" id="nemTestMsg">Leave empty to use the email on your admin account.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
 <?php endif; ?>
 
 </div>
@@ -1474,7 +1655,7 @@ async function saveTLCommissionRate() {
 }
 
 function switchDashboardTab(tabName) {
-  const tabs = ['closers', 'pending', 'verifyDeals', 'leads', 'campaigns', 'commissions', 'products', 'withdrawals'];
+  const tabs = ['closers', 'pending', 'verifyDeals', 'leads', 'campaigns', 'commissions', 'products', 'withdrawals', 'email'];
   tabs.forEach((t) => {
     const pane = document.getElementById('pane' + t.charAt(0).toUpperCase() + t.slice(1));
     const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1488,6 +1669,7 @@ function switchDashboardTab(tabName) {
   if (tabName === 'products') loadCompanyConfig();
   if (tabName === 'commissions') loadEmployees();
   if (tabName === 'withdrawals') loadCompanyWithdrawals();
+  if (tabName === 'email' && typeof window.nemOnShow === 'function') window.nemOnShow();
 }
 
 function adjustApproveLimit(delta) {
@@ -3282,5 +3464,357 @@ function toggleTheme() {
   try { localStorage.setItem('nunno_theme', isLight ? 'light' : 'dark'); } catch(_) {}
 }
 </script>
+<?php if ($showNunnoEmail): ?>
+<!-- MODAL: Email preview (Nunno) -->
+<div class="modal-overlay" id="nemPreviewModal" onclick="if (event.target === this) nemClosePreview()">
+  <div class="modal-card" style="max-width: 760px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px;">
+      <div style="min-width:0;">
+        <h3 class="modal-title" style="margin:0;">Email preview</h3>
+        <div id="nemPreviewSubject" style="font-size:12.5px; color:var(--text-secondary); overflow-wrap:anywhere;"></div>
+      </div>
+      <button type="button" onclick="nemClosePreview()" aria-label="Close" style="background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer;">&times;</button>
+    </div>
+    <iframe id="nemPreviewFrame" class="nem-frame" sandbox="" title="Email preview" referrerpolicy="no-referrer"></iframe>
+    <div class="nem-hint">Sample recipient shown; {first_name}, {name} and {username} are filled in for each person.</div>
+  </div>
+</div>
+<script>
+/* Email tab (Nunno, COMP-001): composer, recipients, send log and sender settings.
+   Server side: api/email_center.php (profile "nunno"). */
+const NEM = { aud: 'tm', people: [], picked: new Set(), preset: 'custom', settings: null, myEmail: '', loaded: false, peopleLoaded: false, busy: false };
+const NEM_PRESETS = {
+  approval: ["Congratulations {first_name}, you're approved!",
+    "Hello {first_name},\n\nCongratulations! Your Nunno x Chatly account has been approved.\n\n- Sign in at https://chatly.pk with your username: {username}\n- TMs: buy the Nunno x Chatly plan to unlock your workspace: https://nunno.cloud/partner/chatly-c7x4k2\n- Link your WhatsApp in the Sales Desk and start replying to leads\n\nWelcome to the team!\n\nNunno"],
+  payout: ["Your payout has been sent",
+    "Hello {first_name},\n\nGood news: your latest payout has been sent to your account.\n\nDepending on your bank or wallet it can take a little while to show. If it has not arrived within a few hours, reply to this email with your payment reference.\n\nPayouts arrive within 24-48 hours of a request on working days (no payouts on Saturday and Sunday).\n\nThank you for your hard work. Keep closing!\n\nNunno"],
+  plan: ["Unlock Chatly: buy the Nunno x Chatly plan",
+    "Hello {first_name},\n\nTo work on Chatly and start earning, you first need the Nunno x Chatly plan. In order to sell the product, first you should own the product.\n\nBuy the Nunno x Chatly plan to unlock: https://nunno.cloud/partner/chatly-c7x4k2\n\nAs soon as your plan is verified, your workspace unlocks and you can start closing sales.\n\nNunno"],
+  announcement: ["Announcement from Nunno",
+    "Hello {first_name},\n\n(Write your announcement here.)\n\n- Key point one\n- Key point two\n\nQuestions? Just reply to this email.\n\nNunno"]
+};
+const NEM_KINDS = {
+  test: 'test', auto_approval_tm: 'TM approved (auto)', auto_approval_tl: 'TL approved (auto)',
+  auto_withdrawal_paid: 'payout sent (auto)', auto_withdrawal_requested: 'payout request (auto)', auto_company_welcome: 'welcome (auto)'
+};
+function nemEl(id) { return document.getElementById(id); }
+function nemEsc(v) { return escapeHtml(v); }
+function nemFmt(n) { const x = Number(n); return (Number.isFinite(x) ? x : 0).toLocaleString(); }
+function nemValidEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim()); }
+function nemWhen(t) { const d = new Date(t); return isNaN(d.getTime()) ? String(t || '') : d.toLocaleString(); }
+function nemKindLabel(k) {
+  k = String(k || '');
+  if (NEM_KINDS[k]) return NEM_KINDS[k];
+  if (k.indexOf('composer_') === 0) return (k.slice(9).replace(/_/g, ' ') || 'custom');
+  return k || 'email';
+}
+async function nemApi(url, body) {
+  const opts = { credentials: 'same-origin' };
+  if (body) {
+    opts.method = 'POST';
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
+  let data = null;
+  try { data = await res.json(); } catch (_) { throw new Error('Unreadable server reply (HTTP ' + res.status + ')'); }
+  return data || {};
+}
+
+window.nemOnShow = function () {
+  if (!NEM.loaded) { NEM.loaded = true; nemLoadSettings(); }
+  nemLoadPeople();
+  nemLoadLogs();
+};
+
+function nemApplyPreset(key) {
+  const subj = nemEl('nemSubject'), msg = nemEl('nemMessage');
+  if (key === 'custom' || !NEM_PRESETS[key]) { NEM.preset = 'custom'; return; }
+  if ((subj.value.trim() || msg.value.trim()) && !confirm('Replace the current subject and message with this template?')) {
+    nemEl('nemPreset').value = NEM.preset;
+    return;
+  }
+  NEM.preset = key;
+  subj.value = NEM_PRESETS[key][0];
+  msg.value = NEM_PRESETS[key][1];
+}
+
+async function nemLoadPeople() {
+  const list = nemEl('nemList');
+  try {
+    const d = await nemApi('api/tenant_manager.php?action=list_company_employees&company_id=COMP-001');
+    if (d && d.success && Array.isArray(d.employees)) {
+      NEM.people = d.employees
+        .filter(u => u && (u.role === 'member' || u.role === 'lead'))
+        .map(u => ({
+          id: String(u.id || ''), name: String(u.name || u.username || ''), username: String(u.username || ''),
+          email: String(u.email || '').trim(), role: u.role, status: String(u.status || 'active').toLowerCase()
+        }))
+        .filter(u => u.id)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      NEM.peopleLoaded = true;
+    } else if (!NEM.peopleLoaded) {
+      list.innerHTML = '<div class="nem-hint" style="padding:14px; color:#fb7185;">' + nemEsc((d && d.error) || 'Could not load TMs and TLs.') + '</div>';
+      return;
+    }
+  } catch (err) {
+    if (!NEM.peopleLoaded) list.innerHTML = '<div class="nem-hint" style="padding:14px; color:#fb7185;">' + nemEsc(err.message) + '</div>';
+    return;
+  }
+  nemRenderPeople();
+}
+
+function nemAudPeople() {
+  if (NEM.aud === 'pick') return NEM.people.filter(u => NEM.picked.has(u.id));
+  return NEM.people.filter(u => u.status !== 'suspended'
+    && (NEM.aud === 'all' || (NEM.aud === 'tm' ? u.role === 'member' : u.role === 'lead')));
+}
+
+function nemSetAud(aud) {
+  NEM.aud = ['tm', 'tl', 'all', 'pick'].includes(aud) ? aud : 'tm';
+  document.querySelectorAll('[data-nem-aud]').forEach(b => b.classList.toggle('active', b.dataset.nemAud === NEM.aud));
+  nemEl('nemPickTools').style.display = NEM.aud === 'pick' ? 'block' : 'none';
+  nemRenderPeople();
+}
+
+function nemVisible() {
+  if (NEM.aud !== 'pick') return nemAudPeople();
+  const q = (nemEl('nemSearch').value || '').trim().toLowerCase();
+  if (!q) return NEM.people;
+  return NEM.people.filter(u => [u.name, u.username, u.email].some(v => String(v || '').toLowerCase().includes(q)));
+}
+
+function nemRenderPeople() {
+  const list = nemEl('nemList');
+  if (!list || !NEM.peopleLoaded) return;
+  const pick = NEM.aud === 'pick';
+  const rows = nemVisible();
+  list.innerHTML = rows.length ? rows.map(u => {
+    const has = nemValidEmail(u.email);
+    const roleTag = u.role === 'lead' ? '<span class="nem-tag tl">TL</span>' : '<span class="nem-tag tm">TM</span>';
+    const st = u.status !== 'active' ? ' <span class="nem-tag muted">' + nemEsc(u.status) + '</span>' : '';
+    const box = pick ? '<input type="checkbox" data-nem-id="' + nemEsc(u.id) + '"' + (NEM.picked.has(u.id) ? ' checked' : '') + (has ? '' : ' disabled') + '>' : '';
+    return '<label class="nem-row' + (has ? '' : ' no-email') + '">' + box
+      + '<span class="nem-row-main"><b>' + nemEsc(u.name) + '</b><small>@' + nemEsc(u.username) + ' · ' + (has ? nemEsc(u.email) : 'no email on file') + '</small></span>'
+      + roleTag + st + '</label>';
+  }).join('') : '<div class="nem-hint" style="padding:14px;">' + (pick ? 'Nobody matches.' : 'Nobody in this group yet.') + '</div>';
+  nemRenderCount();
+}
+
+function nemRenderCount() {
+  const people = nemAudPeople();
+  const withEmail = people.filter(u => nemValidEmail(u.email)).length;
+  const noEmail = people.length - withEmail;
+  const label = { tm: 'All Team Members', tl: 'All Team Leaders', all: 'All TMs and TLs', pick: 'Picked' }[NEM.aud];
+  nemEl('nemAudCount').textContent = label + ': ' + nemFmt(withEmail) + ' will get the email'
+    + (noEmail ? ', ' + nemFmt(noEmail) + ' skipped (no email on file)' : '')
+    + (NEM.aud !== 'pick' ? '. Suspended accounts are left out.' : '.');
+  nemEl('nemSendHint').textContent = withEmail ? 'to ' + nemFmt(withEmail) + (withEmail === 1 ? ' person' : ' people') : '';
+}
+
+function nemPickShown(on) {
+  if (on) nemVisible().forEach(u => { if (nemValidEmail(u.email)) NEM.picked.add(u.id); });
+  else NEM.picked.clear();
+  nemRenderPeople();
+}
+
+nemEl('nemList').addEventListener('change', function (e) {
+  const cb = e.target.closest('input[data-nem-id]');
+  if (!cb) return;
+  if (cb.checked) NEM.picked.add(cb.dataset.nemId); else NEM.picked.delete(cb.dataset.nemId);
+  nemRenderCount();
+});
+
+function nemClosePreview() { nemEl('nemPreviewModal').style.display = 'none'; }
+
+async function nemPreview() {
+  const subject = nemEl('nemSubject').value.trim(), message = nemEl('nemMessage').value.trim();
+  if (!subject && !message) { alert('Write a subject and a message first.'); return; }
+  try {
+    const d = await nemApi('api/email_center.php', { action: 'preview', profile: 'nunno', subject: subject, message: message });
+    if (!d.success) { alert(d.error || 'Preview failed.'); return; }
+    nemEl('nemPreviewSubject').textContent = 'Subject: ' + (d.subject || '');
+    nemEl('nemPreviewFrame').srcdoc = d.html || '';
+    nemEl('nemPreviewModal').style.display = 'flex';
+  } catch (err) {
+    alert('Preview failed: ' + err.message);
+  }
+}
+
+function nemShowResult(r, total) {
+  const box = nemEl('nemResult');
+  const failed = r.results.filter(x => !x.ok);
+  box.style.display = 'block';
+  box.innerHTML =
+    (r.error ? '<div class="nem-banner">' + nemEsc(r.error) + '</div>' : '')
+    + (r.note ? '<div class="nem-banner warn">' + nemEsc(r.note) + '</div>' : '')
+    + '<div class="nem-stats">'
+    + '<div class="nem-stat"><span>Sent</span><b style="color:#34d399;">' + nemFmt(r.sent) + '</b><small>' + (r.transport === 'mail' ? 'via PHP mail() fallback' : 'via Gmail SMTP') + '</small></div>'
+    + '<div class="nem-stat"><span>Failed</span><b style="color:' + (r.failed ? '#fb7185' : 'inherit') + ';">' + nemFmt(r.failed) + '</b><small>' + (r.failed ? 'reasons below' : 'none') + '</small></div>'
+    + '<div class="nem-stat"><span>Processed</span><b>' + nemFmt(r.done) + ' / ' + nemFmt(total) + '</b><small>' + (r.done < total ? 'stopped early' : 'all recipients') + '</small></div>'
+    + '</div>'
+    + (failed.length ? '<ul class="nem-fails">' + failed.map(x => '<li><b>' + nemEsc(x.name || x.to) + '</b><small>' + nemEsc(x.to) + ' · ' + nemEsc(x.error || 'not sent') + '</small></li>').join('') + '</ul>' : '');
+}
+
+async function nemSend() {
+  if (NEM.busy) return;
+  const subject = nemEl('nemSubject').value.trim(), message = nemEl('nemMessage').value.trim();
+  if (!subject || !message) { alert('Write a subject and a message.'); return; }
+  const targets = nemAudPeople().filter(u => nemValidEmail(u.email));
+  if (!targets.length) { alert('Nobody with an email address is selected.'); return; }
+  const from = NEM.settings ? NEM.settings.sender_email : 'the Nunno sender';
+  if (!confirm('Send "' + subject + '" to ' + targets.length + (targets.length === 1 ? ' person' : ' people') + ' from ' + from + '?')) return;
+  NEM.busy = true;
+  const btn = nemEl('nemSendBtn');
+  const box = nemEl('nemResult');
+  btn.disabled = true;
+  box.style.display = 'block';
+  const ids = targets.map(u => u.id);
+  const agg = { sent: 0, failed: 0, results: [], note: null, transport: null, error: null, done: 0 };
+  try {
+    for (let i = 0; i < ids.length; i += 20) {
+      const chunk = ids.slice(i, i + 20);
+      box.innerHTML = '<div class="nem-banner ok">Sending… ' + nemFmt(i) + ' of ' + nemFmt(ids.length) + ' done</div>';
+      let d;
+      try {
+        d = await nemApi('api/email_center.php', { action: 'send_nunno', audience: 'pick', user_ids: chunk, subject: subject, message: message, preset: nemEl('nemPreset').value });
+      } catch (err) {
+        agg.error = err.message;
+        break;
+      }
+      if (!d.success) { agg.error = d.error || 'Sending failed.'; break; }
+      agg.sent += Number(d.sent) || 0;
+      agg.failed += Number(d.failed) || 0;
+      (d.results || []).forEach(x => agg.results.push(x));
+      if (d.note) agg.note = d.note;
+      if (d.transport) agg.transport = d.transport;
+      agg.done += chunk.length;
+    }
+  } finally {
+    NEM.busy = false;
+    btn.disabled = false;
+  }
+  nemShowResult(agg, ids.length);
+  nemLoadLogs();
+  nemLoadSettings();
+}
+
+async function nemLoadLogs() {
+  const tb = nemEl('nemLogBody');
+  const empty = (text, color) => '<tr><td colspan="5" style="text-align:center; padding:20px; color:' + (color || 'var(--text-muted)') + ';">' + nemEsc(text) + '</td></tr>';
+  try {
+    const d = await nemApi('api/email_center.php?action=logs&profile=nunno&limit=100');
+    if (!d.success) { tb.innerHTML = empty(d.error || 'Could not load the send log.', '#fb7185'); return; }
+    const logs = Array.isArray(d.logs) ? d.logs : [];
+    tb.innerHTML = logs.length ? logs.map(l => {
+      const kind = String(l.kind || '');
+      const tone = kind.indexOf('auto_') === 0 ? 'auto' : 'muted';
+      const status = l.ok
+        ? '<span class="nem-tag ok">sent</span><small>' + (l.transport === 'mail' ? 'PHP mail()' : 'Gmail') + '</small>'
+        : '<span class="nem-tag bad">failed</span><small>' + nemEsc(l.error || '') + '</small>';
+      return '<tr>'
+        + '<td style="white-space:nowrap; font-size:12px;">' + nemEsc(nemWhen(l.time)) + '</td>'
+        + '<td><b>' + nemEsc(l.name || l.to) + '</b><small>' + nemEsc(l.to) + '</small></td>'
+        + '<td style="max-width:260px; overflow-wrap:anywhere;">' + nemEsc(l.subject) + '</td>'
+        + '<td><span class="nem-tag ' + tone + '">' + nemEsc(nemKindLabel(kind)) + '</span></td>'
+        + '<td>' + status + '</td>'
+        + '</tr>';
+    }).join('') : empty('Nothing sent from the Nunno sender yet.');
+  } catch (err) {
+    tb.innerHTML = empty(err.message, '#fb7185');
+  }
+}
+
+function nemRenderSettings() {
+  const s = NEM.settings;
+  if (!s) return;
+  nemEl('nemSenderLabel').textContent = s.sender_email || 'numeniousnexus@gmail.com';
+  nemEl('nemSetSender').textContent = s.sender_email || '—';
+  const tr = nemEl('nemSetTransport');
+  tr.textContent = s.app_password_set ? (s.enabled ? 'Gmail SMTP · on' : 'Gmail SMTP · turned off') : 'No App Password: mail() fallback';
+  tr.style.color = s.app_password_set && s.enabled ? '#34d399' : '#fbbf24';
+  nemEl('nemSetUsage').textContent = nemFmt(s.sent_last_24h) + ' / ' + nemFmt(s.daily_cap);
+  nemEl('nemSetName').value = s.sender_name || '';
+  nemEl('nemSetCap').value = s.daily_cap || 450;
+  nemEl('nemSetEnabled').checked = !!s.enabled;
+  const pw = nemEl('nemSetPass');
+  pw.value = '';
+  pw.placeholder = s.app_password_set ? s.app_password_mask + '  (saved; type a new one to replace)' : 'xxxx xxxx xxxx xxxx';
+  nemEl('nemSetPassState').textContent = s.app_password_set
+    ? 'An App Password is saved' + (s.updated_at ? ' (last change ' + nemWhen(s.updated_at) + ')' : '') + '.'
+    : 'No App Password saved yet: emails fall back to PHP mail() and will likely land in spam.';
+  nemEl('nemTestTo').placeholder = NEM.myEmail || 'your email';
+}
+
+async function nemLoadSettings() {
+  try {
+    const d = await nemApi('api/email_center.php?action=settings&profile=nunno');
+    if (!d.success) { nemEl('nemSetTransport').textContent = d.error || 'Could not load sender settings.'; return; }
+    NEM.settings = d.settings;
+    NEM.myEmail = d.my_email || '';
+    nemRenderSettings();
+  } catch (err) {
+    nemEl('nemSetTransport').textContent = err.message;
+  }
+}
+
+async function nemSaveSettings() {
+  const body = {
+    action: 'save_settings', profile: 'nunno',
+    sender_name: nemEl('nemSetName').value.trim(),
+    daily_cap: Number(nemEl('nemSetCap').value) || 450,
+    enabled: nemEl('nemSetEnabled').checked
+  };
+  const pw = nemEl('nemSetPass').value.trim();
+  if (pw) body.app_password = pw;
+  try {
+    const d = await nemApi('api/email_center.php', body);
+    if (!d.success) { alert(d.error || 'Could not save sender settings.'); return; }
+    NEM.settings = d.settings;
+    nemRenderSettings();
+    alert(d.message || 'Sender settings saved.');
+  } catch (err) {
+    alert('Could not save: ' + err.message);
+  }
+}
+
+async function nemClearPass() {
+  if (!confirm('Remove the saved Gmail App Password? Emails will fall back to PHP mail() until a new one is saved.')) return;
+  try {
+    const d = await nemApi('api/email_center.php', { action: 'save_settings', profile: 'nunno', clear_password: true });
+    if (!d.success) { alert(d.error || 'Could not remove the password.'); return; }
+    NEM.settings = d.settings;
+    nemRenderSettings();
+  } catch (err) {
+    alert('Could not remove the password: ' + err.message);
+  }
+}
+
+async function nemTest() {
+  const btn = nemEl('nemTestBtn');
+  const msg = nemEl('nemTestMsg');
+  btn.disabled = true;
+  msg.style.color = '';
+  msg.textContent = 'Sending test email…';
+  try {
+    const d = await nemApi('api/email_center.php', { action: 'test', profile: 'nunno', to: nemEl('nemTestTo').value.trim() });
+    if (d.success) {
+      msg.style.color = d.note ? '#fbbf24' : '#34d399';
+      msg.textContent = (d.message || 'Test email sent.') + (d.note ? ' ' + d.note : ' Check the inbox (and spam folder).');
+    } else {
+      msg.style.color = '#fb7185';
+      msg.textContent = d.error || 'Test email failed.';
+    }
+  } catch (err) {
+    msg.style.color = '#fb7185';
+    msg.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    nemLoadLogs();
+    nemLoadSettings();
+  }
+}
+</script>
+<?php endif; ?>
 </body>
 </html>
