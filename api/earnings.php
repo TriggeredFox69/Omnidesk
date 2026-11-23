@@ -127,8 +127,30 @@ function earningsProductCommission(string $companyId, array $l, float $amount): 
     return 0.0;
 }
 
+/**
+ * Revenue and earnings count from this moment: sales and withdrawals before it were the
+ * testing period (owner: "no revenue is done, make it 0"). Saved in data/earnings_start.json
+ * the first time this code runs (so: the moment it was deployed). To start counting again from
+ * a new moment, delete that file.
+ */
+function earningsCountFrom(): int {
+    static $from = null;
+    if ($from !== null) return $from;
+    $file = __DIR__ . '/../data/earnings_start.json';
+    $d = earningsReadJson($file);
+    if (!empty($d['from']) && is_numeric($d['from'])) return $from = (int) $d['from'];
+    $from = time();
+    @file_put_contents($file, json_encode(['from' => $from, 'from_text' => date('c', $from),
+        'note' => 'Sales and withdrawals before this moment (testing period) are not counted.'], JSON_PRETTY_PRINT));
+    return $from;
+}
+
 function earningsWithdrawals(): array {
-    return earningsReadJson(__DIR__ . '/../data/withdrawals.json');
+    $from = earningsCountFrom();
+    return array_values(array_filter(earningsReadJson(__DIR__ . '/../data/withdrawals.json'), function ($w) use ($from) {
+        $t = is_array($w) ? strtotime((string) ($w['created_at'] ?? '')) : false;
+        return $t === false || $t >= $from;   // no date: keep (cannot tell)
+    }));
 }
 
 /** Full earnings statement for one user. */
@@ -154,21 +176,30 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
         }
     }
     $inReview = array_values(array_filter($mine, fn($l) => earningsLeadState($l) === 'pending_verification'));
+    // the testing period's sales do not count (see earningsCountFrom)
+    $countFrom = earningsCountFrom();
+    $paid = array_values(array_filter($paid, fn($l) => earningsSaleTime($l) >= $countFrom));
     usort($paid, fn($a, $b) => earningsSaleTime($a) <=> earningsSaleTime($b));
 
-    $running = 0.0;
+    $running = 0.0;      // Nunno: sales counted toward the first Rs. 10,000
+    $totalSales = 0.0;
     $salesCommission = 0.0;
     $deals = [];
     $isNunnoTL = $isNunno && strtolower((string) ($user['role'] ?? '')) === 'lead';
     foreach ($paid as $l) {
-        $amount = $isNunnoTL ? NUNNO_TL_PLAN_PRICE : earningsSaleAmount($l);
+        // The Rs. 1,000 Nunno x Chatly plan always pays Rs. 500, whoever sold it (a TL's recruit,
+        // a Super Lead, or an unofficial lead). A TL's deals are that plan, except a regular
+        // Nunno plan they claimed as an unofficial lead, which pays like a TM's sale.
+        $planName = (string) ($l['paidDetails']['plan'] ?? '');
+        $isActivation = $isNunno && (strcasecmp($planName, NUNNO_TL_PLAN_NAME) === 0 || ($isNunnoTL && empty($l['unofficial'])));
+        $amount = $isActivation ? NUNNO_TL_PLAN_PRICE : earningsSaleAmount($l);
+        $totalSales += $amount;
         $before = $running;
-        $running += $amount;
-        if ($isNunnoTL) {
-            // A Nunno TL's "sale" is a TM they recruited who bought the Nunno x Chatly plan.
+        if ($isActivation) {
             $comm = NUNNO_TL_COMMISSION;
-            $rule = 'TM activated (Nunno x Chatly plan): Rs. ' . number_format(NUNNO_TL_COMMISSION);
+            $rule = 'Nunno x Chatly plan activated: Rs. ' . number_format(NUNNO_TL_COMMISSION);
         } elseif ($isNunno) {
+            $running += $amount;
             // The first Rs. 10,000 of sales is the TM's in full. The plan that crosses the line
             // pays only up to 10,000 (6 x 1,700 = 10,200 -> 10,000; one 15,000 plan -> 10,000);
             // every plan after that pays its plan commission.
@@ -184,7 +215,8 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
         $deals[] = [
             'lead_id' => $l['id'] ?? '', 'name' => $l['name'] ?? '', 'phone' => $l['display'] ?? ($l['phone'] ?? ''),
             'plan' => $l['paidDetails']['plan'] ?? ($l['interest'] ?? ''), 'amount' => $amount,
-            'commission' => $comm, 'rule' => $rule, 'closed_at' => earningsSaleTime($l) ?: null,
+            'commission' => $comm, 'rule' => $rule . (!empty($l['unofficial']) ? ' · unofficial lead' : ''),
+            'unofficial' => !empty($l['unofficial']), 'closed_at' => earningsSaleTime($l) ?: null,
         ];
     }
 
@@ -203,7 +235,7 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
         'role' => $user['role'] ?? 'member',
         'company_id' => $companyId,
         'scheme' => $isNunno ? 'nunno_first_10k' : 'product_commission',
-        'total_sales' => $running,
+        'total_sales' => $totalSales,
         'deals_count' => count($paid),
         'in_review_count' => count($inReview),
         'in_review_amount' => array_sum(array_map('earningsSaleAmount', $inReview)),

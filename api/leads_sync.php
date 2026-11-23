@@ -1051,6 +1051,8 @@ if ($action === 'reject_deal') {
             $l['rejectedBy'] = $sessionUser['name'] ?? 'System Administrator';
             $l['rejectedAt'] = date('Y-m-d H:i:s');
             $l['paidDetails'] = null;
+            // an unofficial lead has no chat to go back to: a rejected claim is closed (Won't pay)
+            if (!empty($l['unofficial'])) { $l['leadState'] = 'useless'; $l['status'] = 'useless'; }
 
             if (!isset($l['messages']) || !is_array($l['messages'])) $l['messages'] = [];
             $l['messages'][] = [

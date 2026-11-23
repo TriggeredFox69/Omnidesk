@@ -2248,6 +2248,8 @@ async function loadPendingDeals() {
         const method = d.paidDetails?.method || 'EasyPaisa / Bank';
         const trx = d.paidDetails?.trxId || d.paidDetails?.refId || 'Slip attached in chat';
         const time = d.paidDetails?.closedAt || d.lastActive || 'Recently';
+        const unofficial = !!(d.unofficial || d.paidDetails?.unofficial);
+        const subEmail = d.paidDetails?.email || d.email || '';
 
         return `
           <tr>
@@ -2256,8 +2258,10 @@ async function loadPendingDeals() {
               <div style="font-size:10.5px; color:var(--text-muted);">${escapeHtml(closerId)}</div>
             </td>
             <td>
+              ${unofficial ? '<span title="Closed outside Chatly and claimed by the closer. Check the TRX ID and subscriber email before verifying." style="display:inline-block; margin-bottom:4px; padding:2px 8px; border-radius:99px; font-size:10.5px; font-weight:800; color:#fbbf24; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4);">📝 Unofficial lead</span>' : ''}
               <div style="font-weight:700; color:#38bdf8;">+${escapeHtml(d.phone || '')}</div>
               <div style="font-size:11px; color:var(--text-secondary);">${escapeHtml(d.name || '')}</div>
+              ${unofficial && subEmail ? `<div style="font-size:11px; color:var(--text-muted);">✉️ ${escapeHtml(subEmail)}</div>` : ''}
             </td>
             <td><span class="badge-pkg">${escapeHtml(plan)}</span></td>
             <td><strong style="color:#fbbf24;">Rs. ${amt.toLocaleString()}</strong></td>

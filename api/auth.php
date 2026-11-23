@@ -800,6 +800,49 @@ switch ($action) {
         exit;
 
     // 0e-2. Activate or Deactivate TM Nunno Plan (Company Admin or Superadmin)
+    // Super Lead (Nunno): works as a TM and a TL. Mark Paid offers every Nunno plan plus the
+    // Rs. 1,000 Nunno x Chatly plan, chats they start from their phone become their leads, and
+    // their Team Inbox stays locked until their own Nunno x Chatly plan is verified.
+    case 'set_super_lead':
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw, true) ?: $_POST;
+        $authAdmin = $_SESSION['omnidesk_user'] ?? null;
+        $adminRole = strtolower((string) ($authAdmin['role'] ?? ''));
+        if (!$authAdmin || !in_array($adminRole, ['admin', 'superadmin'], true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access Denied: Administrator privileges required.']);
+            exit;
+        }
+        $targetId = trim((string) ($data['user_id'] ?? ''));
+        $on = !empty($data['on']);
+        require_once __DIR__ . '/quota.php';
+        $result = chatlyUsersUpdate($usersFile, function (array &$all) use ($targetId, $on, $authAdmin, $adminRole) {
+            foreach ($all as &$x) {
+                if (($x['id'] ?? '') !== $targetId) continue;
+                $company = ($x['company_id'] ?? 'COMP-001') ?: 'COMP-001';
+                if ($company !== 'COMP-001') return 'Super Lead is only for Nunno.';
+                if ($adminRole !== 'superadmin' && (($authAdmin['company_id'] ?? 'COMP-001') ?: 'COMP-001') !== $company) return 'That person belongs to another company.';
+                if (!in_array($x['role'] ?? '', ['member', 'lead'], true)) return 'Only TMs and TLs can be Super Leads.';
+                $x['super_lead'] = $on;
+                $x['super_lead_seeded'] = true;
+                if ($on && empty($x['has_nunno_plan'])) {
+                    $x['plan_locked'] = true;
+                    if (($x['nunno_plan_status'] ?? '') !== 'pending_verification') $x['nunno_plan_status'] = 'unpaid';
+                }
+                return ['ok' => true, 'name' => $x['name'] ?? $targetId];
+            }
+            return false;
+        });
+        if (is_array($result) && !empty($result['ok'])) {
+            echo json_encode(['success' => true, 'message' => $on
+                ? "{$result['name']} is now a Super Lead. Their Team Inbox stays locked until their Nunno x Chatly plan is verified."
+                : "{$result['name']} is no longer a Super Lead."]);
+        } else {
+            http_response_code(is_string($result) ? 400 : 404);
+            echo json_encode(['success' => false, 'error' => is_string($result) ? $result : 'Account not found.']);
+        }
+        exit;
+
     case 'activate_tm_plan':
         $raw = file_get_contents('php://input');
         $data = json_decode($raw, true) ?: $_POST;
@@ -829,6 +872,8 @@ switch ($action) {
                 if ($activate) {
                     $u['nunno_plan_activated_at'] = date('Y-m-d H:i:s');
                     $u['nunno_plan_success_seen'] = false;   // the TM sees a "verified" screen once
+                } else {
+                    $u['plan_locked'] = true;   // Revoke really locks the Team Inbox (also for TMs from before the lock rule)
                 }
                 $found = true;
                 $updatedUser = sanitizeUser($u);
@@ -1081,8 +1126,27 @@ switch ($action) {
                 $checkUser['quota_metrics'] = chatlyQuotaMetrics($su);
                 // Plan lock / tour state changes on the server (admin verifies the plan), so the
                 // page always gets the current values, not the copy from sign-in.
+                // Syeda Erij Fatima asked to be a Super Lead (works as TM and TL, Team Inbox locked
+                // until her Nunno x Chatly plan is verified). Applied once; the admin portal's
+                // Super Lead button changes it later.
+                if (($su['id'] ?? '') === 'EMP-TM-1795190775' && !isset($su['super_lead_seeded'])) {
+                    chatlyUsersUpdate($usersFile, function (array &$all) use (&$su) {
+                        foreach ($all as &$x) {
+                            if (($x['id'] ?? '') !== 'EMP-TM-1795190775') continue;
+                            $x['super_lead'] = true;
+                            $x['super_lead_seeded'] = true;
+                            if (empty($x['has_nunno_plan'])) {
+                                $x['plan_locked'] = true;
+                                if (($x['nunno_plan_status'] ?? '') !== 'pending_verification') $x['nunno_plan_status'] = 'unpaid';
+                            }
+                            $su = $x;
+                            return true;
+                        }
+                        return false;
+                    });
+                }
                 foreach (['has_nunno_plan', 'nunno_plan_status', 'plan_locked', 'nunno_plan_email', 'nunno_plan_submitted_at',
-                          'nunno_plan_activated_at', 'nunno_plan_success_seen', 'tour_done', 'status', 'campaign_paused'] as $f) {
+                          'nunno_plan_activated_at', 'nunno_plan_success_seen', 'tour_done', 'status', 'campaign_paused', 'super_lead'] as $f) {
                     if (array_key_exists($f, $su)) $checkUser[$f] = $su[$f]; else unset($checkUser[$f]);
                 }
                 break;

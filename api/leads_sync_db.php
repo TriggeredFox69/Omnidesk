@@ -237,6 +237,8 @@ try {
             $hasOwner = !empty($l['ownerId']);
             $patch = ['leadState' => $hasOwner ? 'ongoing' : 'fresh', 'status' => $hasOwner ? 'replied' : 'unread', 'verificationStatus' => 'rejected',
                 'rejectionReason' => $reason, 'rejectedBy' => $by, 'rejectedAt' => date('Y-m-d H:i:s'), 'paidDetails' => null];
+            // an unofficial lead has no chat to go back to: a rejected claim is closed (Won't pay)
+            if (!empty($l['unofficial'])) { $patch['leadState'] = 'useless'; $patch['status'] = 'useless'; }
             $msg = ['id' => 'rej_' . time(), 'sender' => 'agent', 'agentName' => 'Security Audit', 'time' => date('H:i'), 'timestamp' => time(),
                 'text' => "🔴 TRANSACTION REJECTED (AUDIT NOTICE)\n• Reason: {$reason}\n• Audited by: {$by}\n• Status reverted to Ongoing."];
             $okText = 'Transaction rejected and lead reverted to ongoing.';
