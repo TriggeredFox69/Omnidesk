@@ -53,38 +53,6 @@ function getCompanies($file) {
                 'created_at'            => date('Y-m-d H:i:s')
             ],
             [
-                'id'                    => 'COMP-002',
-                'name'                  => 'Apex Crypto Signals',
-                'short_name'            => 'Apex Signals',
-                'slug'                  => 'apex',
-                'owner_name'            => 'Daniyal Sheikh',
-                'owner_email'           => 'admin@apexsignals.pk',
-                'plan'                  => 'Growth Tier',
-                'badge'                 => 'Institutional Signals & VIP Alpha',
-                'logo'                  => 'assets/images/apex-logo.svg',
-                'brand_color'           => '#3b82f6',
-                'max_employees'         => 45,
-                'default_message_limit' => 200,
-                'status'                => 'active',
-                'created_at'            => date('Y-m-d H:i:s')
-            ],
-            [
-                'id'                    => 'COMP-003',
-                'name'                  => 'Pak Trade Academy',
-                'short_name'            => 'Pak Trade',
-                'slug'                  => 'paktrade',
-                'owner_name'            => 'Bilal Tariq',
-                'owner_email'           => 'bilal@paktrade.edu.pk',
-                'plan'                  => 'Starter Tier',
-                'badge'                 => 'Mentorship & Trade Bootcamp',
-                'logo'                  => 'assets/images/paktrade-logo.svg',
-                'brand_color'           => '#10b981',
-                'max_employees'         => 25,
-                'default_message_limit' => 150,
-                'status'                => 'active',
-                'created_at'            => date('Y-m-d H:i:s')
-            ],
-            [
                 'id'                    => 'COMP-004',
                 'name'                  => 'Metalink',
                 'short_name'            => 'Metalink',
@@ -103,6 +71,20 @@ function getCompanies($file) {
         ];
         saveCompanies($file, $comps);
         return $comps;
+    }
+
+    // The two demo companies from the early build (Apex Crypto Signals, Pak Trade Academy) are
+    // removed for good, with their admin logins. Only the untouched demo entries match.
+    $demo = ['COMP-002' => 'admin@apexsignals.pk', 'COMP-003' => 'bilal@paktrade.edu.pk'];
+    $demoGone = [];
+    $comps = array_values(array_filter($comps, function ($c) use ($demo, &$demoGone) {
+        $id = $c['id'] ?? '';
+        if (isset($demo[$id]) && strtolower($c['owner_email'] ?? '') === $demo[$id]) { $demoGone[] = $id; return false; }
+        return true;
+    }));
+    if ($demoGone) {
+        saveCompanies($file, $comps);
+        chatlyRemoveCompanyUsers($demoGone);
     }
 
     $hasMetalink = false;
@@ -132,6 +114,20 @@ function getCompanies($file) {
         saveCompanies($file, $comps);
     }
     return $comps;
+}
+
+/** Deletes every account (admin, TL, TM) that belongs to these companies. Never the super admin. */
+function chatlyRemoveCompanyUsers(array $companyIds): int {
+    $removed = 0;
+    chatlyUsersUpdate(__DIR__ . '/../data/users.json', function (array &$users) use ($companyIds, &$removed) {
+        $before = count($users);
+        $users = array_values(array_filter($users, function ($u) use ($companyIds) {
+            return ($u['role'] ?? '') === 'superadmin' || !in_array($u['company_id'] ?? '', $companyIds, true);
+        }));
+        $removed = $before - count($users);
+        return $removed > 0 ? null : false;
+    });
+    return $removed;
 }
 
 function saveCompanies($file, $data) {
@@ -629,7 +625,13 @@ switch ($action) {
             }
         }
 
-        $companyId = 'COMP-' . str_pad(count($companies) + 1, 3, '0', STR_PAD_LEFT);
+        // Next number after the highest ever used (never count + 1: after a delete that would hand
+        // out an existing company's id, or a deleted company's old chats and Auto Data usage).
+        $maxNum = 4; // COMP-002 / COMP-003 were the removed demo companies
+        foreach ($companies as $c) {
+            if (preg_match('/^COMP-(\d+)$/', $c['id'] ?? '', $m)) $maxNum = max($maxNum, (int) $m[1]);
+        }
+        $companyId = 'COMP-' . str_pad($maxNum + 1, 3, '0', STR_PAD_LEFT);
         $newCompany = [
             'id'                    => $companyId,
             'name'                  => $name,
@@ -1024,6 +1026,7 @@ switch ($action) {
         }
 
         saveCompanies($companiesFile, $newCompanies);
+        chatlyRemoveCompanyUsers([$companyId]); // no orphan admin / closer logins left behind
         logAudit($auditFile, $companyId, $currentUser['id'], $currentUser['name'], 'company_deleted', "Deleted company $deletedName ($companyId)");
         echo json_encode(['success' => true, 'message' => "Company '$deletedName' has been purged successfully."]);
         exit;

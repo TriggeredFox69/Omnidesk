@@ -1103,9 +1103,6 @@ switch ($action) {
         } elseif (in_array($cleanUsername, ['metalink_admin', 'admin_metalink', 'comp-004'], true)) {
             $username = 'metalink';
             $cleanUsername = 'metalink';
-        } elseif (in_array($cleanUsername, ['apex', 'admin_apex', 'comp-002'], true)) {
-            $username = 'apex_admin';
-            $cleanUsername = 'apex_admin';
         }
 
         foreach ($users as $idx => $u) {
@@ -1134,8 +1131,6 @@ switch ($action) {
             } elseif (in_array($uName, ['metalink', 'zeeshan'], true) && (strcasecmp($password, 'Zeeshan123') === 0 || strcasecmp($password, 'metalink123') === 0 || strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'password123') === 0)) {
                 $isValidPassword = true;
             } elseif (in_array($uName, ['admin', 'nunno'], true) && (strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'password123') === 0 || strcasecmp($password, 'nunno123') === 0 || strcasecmp($password, 'admin') === 0 || strcasecmp($password, 'nunno') === 0)) {
-                $isValidPassword = true;
-            } elseif (in_array($uName, ['apex_admin', 'apex'], true) && (strcasecmp($password, 'admin123') === 0 || strcasecmp($password, 'password123') === 0 || strcasecmp($password, 'apex123') === 0 || strcasecmp($password, 'admin') === 0)) {
                 $isValidPassword = true;
             } elseif (($password === 'sadmin123' || $password === 'sadmin' || $password === 'SuperAdmin@2026!' || $password === 'admin123' || $password === 'password123') && ($uName === 'sadmin' || $userRole === 'superadmin')) {
                 $isValidPassword = true;

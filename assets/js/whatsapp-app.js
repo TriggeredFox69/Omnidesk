@@ -665,20 +665,6 @@ document.addEventListener('DOMContentLoaded', () => {
       badge: 'Scalper Alpha & SaaS',
       brand_color: '#14c27a'
     },
-    'COMP-002': {
-      name: 'Apex Crypto Signals',
-      short_name: 'Apex Signals',
-      logo: 'assets/images/apex-logo.svg',
-      badge: 'Institutional Signals & VIP Alpha',
-      brand_color: '#3b82f6'
-    },
-    'COMP-003': {
-      name: 'Pak Trade Academy',
-      short_name: 'Pak Trade',
-      logo: 'assets/images/paktrade-logo.svg',
-      badge: 'Mentorship & Trade Bootcamp',
-      brand_color: '#10b981'
-    },
     'COMP-004': {
       name: 'Metalink',
       short_name: 'Metalink',

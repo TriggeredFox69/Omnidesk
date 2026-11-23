@@ -406,6 +406,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     .ad-row { display: grid; grid-template-columns: minmax(170px, 1.05fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(270px, 1.25fr); gap: 14px 18px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
     .ad-row:last-child { border-bottom: 0; }
     .ad-row.suspended { opacity: .7; }
+    .ad-row { transition: background-color .4s; }
+    .ad-row.ad-flash { background: rgba(234, 179, 8, .14); }
     .ad-meter-top { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-2); margin-bottom: 6px; }
     .ad-meter-top > span:first-child { text-transform: uppercase; letter-spacing: .07em; font-size: 10.5px; font-weight: 700; color: var(--text-3); }
     .ad-num { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
@@ -1566,7 +1568,8 @@ function renderCompanies() {
       ${td('Plan', `<span class="tag gold">${esc(c.plan || 'Growth')}</span>`)}
       ${td('Workforce', `<b>${fmt(c.employee_count)}</b><small>${fmt(c.tl_count)} TLs · ${fmt(c.tm_count)} closers</small>`)}
       ${td('Msgs today', `<b class="c-green mono">${fmt(c.messages_today)}</b>`)}
-      ${td('Auto Data', S.usage ? `<span class="mono">${fmt(u.today)}${u.daily_limit ? ' / ' + fmt(u.daily_limit) : ''}</span><small>${fmt(u.total)} total${u.total_limit ? ' of ' + fmt(u.total_limit) : ''}</small>` : '<small>—</small>')}
+      ${td('Auto Data', (S.usage ? `<span class="mono">${fmt(u.today)}${u.daily_limit ? ' / ' + fmt(u.daily_limit) : ''}</span><small>${fmt(u.total)} total${u.total_limit ? ' of ' + fmt(u.total_limit) : ''}</small>` : '<small>—</small>')
+        + `<button class="btn btn-ghost btn-xs" style="margin-top:4px" data-act="ad-limits" data-id="${id}" title="Set this company's daily and total Auto Data limits">${u.daily_limit || u.total_limit ? 'Edit limits' : 'Set limits'}</button>`)}
       ${td('Fallback phone', `<span class="mono">${esc(c.fallback_phone || '—')}</span>`)}
       ${td('Status', `<span class="tag ${sus ? 'red' : 'green'}">${sus ? 'Suspended' : 'Active'}</span>`)}
       ${td('Actions', `<button class="btn btn-gold btn-xs" data-act="impersonate" data-id="${id}" title="Log in as this company's admin">Open admin</button>
@@ -2647,6 +2650,19 @@ document.addEventListener('click', e => {
     case 'toggle': toggleCompanyStatus(id, name, el.dataset.sus === '1'); break;
     case 'delete-company': deleteCompany(id, name); break;
     case 'ad-save': saveAutoDataLimits(id, el); break;
+    case 'ad-limits': {
+      // Jump to this company's row in Auto Data limits and put the cursor in "Daily limit".
+      showSection('autodata');
+      const row = adRow(id);
+      if (row) {
+        row.scrollIntoView({ block: 'center' });
+        row.classList.add('ad-flash');
+        setTimeout(() => row.classList.remove('ad-flash'), 1600);
+        const inp = row.querySelector('[data-f="daily"]');
+        if (inp) inp.focus({ preventScroll: true });
+      }
+      break;
+    }
     case 'ad-refresh': loadUsage(); break;
     case 'approve': masterApproveTM(id, name); break;
     case 'reject': masterRejectTM(id, name); break;
