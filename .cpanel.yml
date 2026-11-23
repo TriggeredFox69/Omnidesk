@@ -12,7 +12,7 @@ deployment:
     - /bin/cp -rf assets/* /home/dailygol/chatly.pk/assets/ 2>/dev/null || true
     - /bin/cp -rf cc/* /home/dailygol/chatly.pk/cc/ 2>/dev/null || true
     - /bin/cp -rf ss/* /home/dailygol/chatly.pk/ss/ 2>/dev/null || true
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md /home/dailygol/chatly.pk/ 2>/dev/null || true
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php terms.php robots.txt sitemap.xml open-omnidesk.html README.md LOCAL-TEST.md /home/dailygol/chatly.pk/ 2>/dev/null || true
     - /bin/cp -R bridge/dist /home/dailygol/chatly.pk/bridge/ 2>/dev/null || true
     - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json /home/dailygol/chatly.pk/bridge/ 2>/dev/null || true
     - /bin/chmod +x /home/dailygol/chatly.pk/bridge/*.sh 2>/dev/null || true
@@ -28,7 +28,7 @@ deployment:
     - /bin/cp -rf assets/* /home/dailygol/public_html/chatly.pk/assets/ 2>/dev/null || true
     - /bin/cp -rf cc/* /home/dailygol/public_html/chatly.pk/cc/ 2>/dev/null || true
     - /bin/cp -rf ss/* /home/dailygol/public_html/chatly.pk/ss/ 2>/dev/null || true
-    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md /home/dailygol/public_html/chatly.pk/ 2>/dev/null || true
+    - /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php terms.php robots.txt sitemap.xml open-omnidesk.html README.md LOCAL-TEST.md /home/dailygol/public_html/chatly.pk/ 2>/dev/null || true
     - /bin/cp -R bridge/dist /home/dailygol/public_html/chatly.pk/bridge/ 2>/dev/null || true
     - /bin/cp -f bridge/*.js bridge/*.sh bridge/package.json /home/dailygol/public_html/chatly.pk/bridge/ 2>/dev/null || true
     - /bin/chmod +x /home/dailygol/public_html/chatly.pk/bridge/*.sh 2>/dev/null || true

@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+Allow: /terms
+Allow: /assets/
+Disallow: /api/
+Disallow: /data/
+Disallow: /bridge/
+Disallow: /cc
+Disallow: /ss
+Disallow: /admin
+Disallow: /sadmin
+Disallow: /desk
+Disallow: /app
+Disallow: /index.php
+Disallow: /index.html
+Disallow: /admin.php
+Disallow: /sadmin.php
+Disallow: /cc.php
+Disallow: /ss.php
+Disallow: /email_hub.php
+Disallow: /*?action=
+Disallow: /*?logout
+Disallow: /*?switch
+
+Sitemap: https://chatly.pk/sitemap.xml

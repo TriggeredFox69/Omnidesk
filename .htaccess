@@ -16,6 +16,15 @@ Options -Indexes +FollowSymLinks
     RewriteEngine On
     RewriteBase /
 
+    # SEO: one address only. www.chatly.pk and http:// go to https://chatly.pk (301), so Google does
+    # not split the ranking between four copies of the site. (Only for the live domain.)
+    RewriteCond %{HTTP_HOST} ^www\.chatly\.pk$ [NC]
+    RewriteRule ^ https://chatly.pk%{REQUEST_URI} [L,R=301]
+    RewriteCond %{HTTP_HOST} ^chatly\.pk$ [NC]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^ https://chatly.pk%{REQUEST_URI} [L,R=301]
+
     RewriteRule ^data/.*$ - [F,L]
     RewriteRule ^bridge/.*$ - [F,L]
 
@@ -53,6 +62,14 @@ Options -Indexes +FollowSymLinks
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
+    # SEO: private pages (the app, admin portals, email hub) stay out of Google
+    <FilesMatch "^(index\.php|index\.html|admin\.php|sadmin\.php|cc\.php|ss\.php|email_hub\.php|open-omnidesk\.html)$">
+        Header set X-Robots-Tag "noindex, nofollow"
+    </FilesMatch>
+</IfModule>
+<IfModule mod_expires.c>
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
 </IfModule>
 
 # 7. Default Index: Always serve the marketing landing page on root domain

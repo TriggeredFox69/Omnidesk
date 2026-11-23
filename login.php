@@ -53,9 +53,58 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Chatly — WhatsApp Closing Platform &amp; Multi-Role Gateway</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<?php
+// ---- SEO: the public home page of chatly.pk ----
+$seoUrl   = 'https://chatly.pk/';
+$seoTitle = 'Chatly.pk – WhatsApp Sales Team & Closers Platform in Pakistan';
+$seoDesc  = 'Chatly turns WhatsApp chats into paying customers. Brands get a closer team, campaigns and a shared WhatsApp inbox. Closers earn commission on every sale, across Pakistan.';
+$seoImage = 'https://chatly.pk/assets/images/og-chatly.jpg';
+// One list for the visible FAQ section AND the FAQ structured data (Google requires them to match).
+$chatlyFaq = [
+    ['What is Chatly?', 'Chatly (chatly.pk) is a WhatsApp sales platform from Pakistan. Brands list their products, and a team of closers chats with buyers on WhatsApp and closes the sales, all in one shared team inbox.'],
+    ['How do closers earn money on Chatly?', 'Closers link their own WhatsApp, chat with buyers who are interested in a brand\'s product and earn commission on every verified sale. Earnings show up in the closer\'s portal and are paid to a bank account or a mobile wallet such as EasyPaisa or JazzCash.'],
+    ['How much can a closer earn?', 'It depends on the brand and on how many sales you close. Each brand sets its own products and commissions, and team leaders also earn for every closer they bring in.'],
+    ['How do brands use Chatly?', 'Each brand gets its own company workspace and admin portal. It can run WhatsApp campaigns, approve closers and follow every lead from the first message to the paid order. Brands pay for promotion and keep the customers.'],
+    ['Do I need to install an app?', 'No. Chatly works in the browser on your phone or computer. Closers link WhatsApp by scanning a QR code or with a pairing code.'],
+    ['Is Chatly available all over Pakistan?', 'Yes. Chatly is built for brands and closers across Pakistan, from Karachi and Lahore to Islamabad and beyond, with earnings in Pakistani rupees.'],
+];
+$seoLd = [
+    '@context' => 'https://schema.org',
+    '@graph' => [
+        ['@type' => 'Organization', '@id' => $seoUrl . '#org', 'name' => 'Chatly', 'alternateName' => 'Chatly.pk', 'url' => $seoUrl,
+         'logo' => 'https://chatly.pk/assets/images/chatly-icon.png', 'email' => 'chatly.pk@gmail.com', 'areaServed' => 'PK'],
+        ['@type' => 'WebSite', '@id' => $seoUrl . '#site', 'name' => 'Chatly', 'alternateName' => ['Chatly.pk', 'Chatly Pakistan'], 'url' => $seoUrl,
+         'inLanguage' => 'en-PK', 'publisher' => ['@id' => $seoUrl . '#org']],
+        ['@type' => 'WebApplication', 'name' => 'Chatly', 'url' => $seoUrl, 'applicationCategory' => 'BusinessApplication', 'operatingSystem' => 'Web browser',
+         'description' => $seoDesc, 'publisher' => ['@id' => $seoUrl . '#org']],
+        ['@type' => 'FAQPage', 'mainEntity' => array_map(fn($q) => ['@type' => 'Question', 'name' => $q[0],
+         'acceptedAnswer' => ['@type' => 'Answer', 'text' => $q[1]]], $chatlyFaq)],
+    ],
+];
+?>
+  <title><?= htmlspecialchars($seoTitle) ?></title>
+  <meta name="description" content="<?= htmlspecialchars($seoDesc) ?>">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="<?= $seoUrl ?>">
+  <meta name="theme-color" content="#12C77A">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Chatly">
+  <meta property="og:locale" content="en_PK">
+  <meta property="og:url" content="<?= $seoUrl ?>">
+  <meta property="og:title" content="<?= htmlspecialchars($seoTitle) ?>">
+  <meta property="og:description" content="<?= htmlspecialchars($seoDesc) ?>">
+  <meta property="og:image" content="<?= $seoImage ?>">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Chatly: turn WhatsApp chats into paying customers">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<?= htmlspecialchars($seoTitle) ?>">
+  <meta name="twitter:description" content="<?= htmlspecialchars($seoDesc) ?>">
+  <meta name="twitter:image" content="<?= $seoImage ?>">
+  <script type="application/ld+json"><?= json_encode($seoLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
   <link rel="icon" type="image/png" href="assets/images/chatly-icon.png">
+  <link rel="apple-touch-icon" href="assets/images/chatly-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -1463,6 +1512,30 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
 
 </section>
 
+<!-- ═══════════ LANDING: FAQ (same text as the FAQ structured data in <head>) ═══════════ -->
+<section class="lp-section lp-block lp-center" id="faq">
+  <span class="lp-eyebrow">FAQ</span>
+  <h2 class="lp-h2">Questions about <span class="lp-grad">Chatly</span></h2>
+  <p class="lp-lead">Chatly.pk is Pakistan's WhatsApp sales platform for brands and closers.</p>
+  <div class="lp-faq">
+<?php foreach ($chatlyFaq as $i => [$q, $a]): ?>
+    <details<?= $i === 0 ? ' open' : '' ?>><summary><h3><?= htmlspecialchars($q) ?></h3></summary><p><?= htmlspecialchars($a) ?></p></details>
+<?php endforeach; ?>
+  </div>
+</section>
+<style>
+  .lp-faq { max-width: 820px; margin: 22px auto 0; text-align: left; display: grid; gap: 10px; }
+  .lp-faq details { border: 1px solid rgba(127,127,127,0.22); border-radius: 14px; padding: 4px 18px; background: rgba(127,127,127,0.05); }
+  .lp-faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; }
+  .lp-faq summary::-webkit-details-marker { display: none; }
+  .lp-faq summary::after { content: '+'; font-size: 22px; font-weight: 700; color: #12C77A; flex-shrink: 0; }
+  .lp-faq details[open] summary::after { content: '–'; }
+  .lp-faq summary h3 { margin: 0; font-size: 16px; font-weight: 750; }
+  .lp-faq p { margin: 0 0 14px; font-size: 14.5px; line-height: 1.6; opacity: 0.85; }
+  .lp-foot-links { margin-top: 8px; font-size: 13px; }
+  .lp-foot-links a { color: inherit; opacity: 0.8; text-decoration: underline; text-underline-offset: 2px; margin: 0 6px; }
+</style>
+
 <!-- ═══════════ LANDING: FINAL CTA + FOOTER ═══════════ -->
 <section class="lp-section">
   <div class="lp-final">
@@ -1475,7 +1548,8 @@ if ((isset($_GET['action']) && $_GET['action'] === 'logout') || isset($_GET['log
   </div>
   <div class="lp-foot">
     <img src="assets/images/chatly-logo.png" alt="Chatly" class="dark-logo">
-    &copy; Chatly &middot; WhatsApp sales closing platform
+    &copy; <?= date('Y') ?> Chatly.pk &middot; WhatsApp sales closing platform for Pakistan
+    <div class="lp-foot-links"><a href="/terms">Terms of Service</a> &middot; <a href="mailto:chatly.pk@gmail.com">Contact</a> &middot; <a href="#faq">FAQ</a></div>
   </div>
 </section>
 

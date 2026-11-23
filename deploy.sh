@@ -37,7 +37,7 @@ for TARGET in "${TARGETS[@]}"; do
     /bin/cp -rf ss/* "$TARGET/ss/" 2>/dev/null || true
 
     # Core Root Files
-    /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php open-omnidesk.html README.md LOCAL-TEST.md "$TARGET/" 2>/dev/null || true
+    /bin/cp -f index.php index.html login.php admin.php sadmin.php cc.php ss.php email_hub.php terms.php robots.txt sitemap.xml open-omnidesk.html README.md LOCAL-TEST.md "$TARGET/" 2>/dev/null || true
     /bin/cp -f .htaccess "$TARGET/" 2>/dev/null || true
 
     # Bridge Files

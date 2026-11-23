@@ -10,7 +10,9 @@ header('Cache-Control: public, max-age=600');
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chatly Terms of Service</title>
-  <meta name="description" content="The terms that apply when you use Chatly (chatly.pk).">
+  <meta name="description" content="The terms that apply when you use Chatly (chatly.pk), Pakistan's WhatsApp sales platform for brands and closers.">
+  <link rel="canonical" href="https://chatly.pk/terms">
+  <meta name="robots" content="index, follow">
   <link rel="icon" type="image/png" href="/assets/images/chatly-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
