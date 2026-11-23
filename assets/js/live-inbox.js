@@ -102,6 +102,7 @@
     }
     async function poll() {
       if (busy || !state.currentUser || window.NUNNO_OFFLINE_PREVIEW) return;
+      if (window.chatlyBackingOff && window.chatlyBackingOff()) return;   // host asked us to slow down
       busy = true;
       try {
         const result = await api('get_events', { after: cursor });
@@ -203,12 +204,14 @@
         message.deliveryError = error.message; toast(error.message);
       } finally { sendingMedia = false; renderList(); if (state.activeLeadId === lead.id) renderChat(); }
     }
-    // Poll every 2 seconds for instant real-time live WhatsApp sync
-    // Slow down when the tab is hidden to save CPU + network
-    let _pollInterval = setInterval(poll, 2000);
+    // Live WhatsApp sync: every 3 s while the tab is open, every 30 s in the background (instant
+    // catch-up when it comes back). 2 s polling from every tab made the host's bot protection show
+    // captchas to people sharing one internet address (offices, mobile networks).
+    let _pollInterval = setInterval(poll, 3000);
     document.addEventListener('visibilitychange', () => {
       clearInterval(_pollInterval);
-      _pollInterval = setInterval(poll, document.hidden ? 10000 : 2000);
+      if (!document.hidden) poll();
+      _pollInterval = setInterval(poll, document.hidden ? 30000 : 3000);
     });
     return { poll, loadMedia, sendMedia };
   };

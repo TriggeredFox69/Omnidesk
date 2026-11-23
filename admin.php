@@ -1227,6 +1227,12 @@ $showNunnoEmail = $isAdmin && (($activeCompany['id'] ?? '') === 'COMP-001')
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Supports Spintax syntax and <code>{name}</code> personalizer tag.</div>
       </div>
 
+      <div class="form-group" style="max-width: 850px; margin-bottom: 24px;">
+        <label class="form-label" style="font-weight:700;" for="cfgCampaignLink">Campaign link <span style="font-weight:500; color:var(--text-muted);">(what <code>{link}</code> becomes in campaign messages)</span></label>
+        <input type="text" id="cfgCampaignLink" class="form-control" maxlength="300" placeholder="e.g. https://yourwebsite.com or https://wa.me/923001234567">
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Your own website, page or WhatsApp link. Leave empty and <code>{link}</code> is simply left out of the message.</div>
+      </div>
+
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; max-width: 850px;">
         <h4 style="font-size: 14px; font-weight: 800; margin: 0; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
           <span>📦</span> Active Products &amp; Pricing Tiers
@@ -3042,6 +3048,8 @@ async function loadCompanyConfig() {
     const data = await res.json();
     if (data.success && data.config) {
       if (data.config.default_pitch) document.getElementById('cfgDefaultPitch').value = data.config.default_pitch;
+      const linkInp = document.getElementById('cfgCampaignLink');
+      if (linkInp) linkInp.value = data.config.campaign_link || '';
       if (data.config.tl_commission_per_tm !== undefined) {
         window.currentCompanyTLCommissionRate = parseInt(data.config.tl_commission_per_tm) || 500;
         const rateInp = document.getElementById('inputTLCommissionRate');
@@ -3168,6 +3176,7 @@ async function saveProductConfig() {
         action: 'update_company_config',
         company_id: '<?php echo $activeCompany['id']; ?>',
         default_pitch: defaultPitch,
+        campaign_link: (document.getElementById('cfgCampaignLink')?.value || '').trim(),
         products: updatedProducts
       })
     });

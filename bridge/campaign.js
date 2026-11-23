@@ -27,7 +27,7 @@ function resolveSpintax(text) {
   });
 }
 
-function personalizeMessage(template, contact, companyName = 'Chatly') {
+function personalizeMessage(template, contact, companyName = 'Chatly', link = '') {
   if (!template) return '';
   let msg = resolveSpintax(template);
   const cName = contact?.name || contact?.display || contact?.phone || 'Valued Client';
@@ -50,8 +50,13 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
     .replace(/\{company\}/gi, companyName)
     .replace(/\{plan\}/gi, 'Exclusive Business Plan')
     .replace(/\{price\}/gi, 'Rs. 5,000')
-    .replace(/\{coupon\}/gi, 'CHATLY30')
-    .replace(/\{link\}/gi, 'https://chatly.pk');
+    .replace(/\{coupon\}/gi, 'CHATLY30');
+  // {link} = the company's own link (admin portal setting). Never chatly.pk: cold campaign messages
+  // carrying Chatly's domain got it listed as "Spam URLs" by web filters (FortiGuard). No link set:
+  // the tag is left out and the spacing tidied.
+  const lk = String(link || '').trim();
+  if (lk) msg = msg.replace(/\{link\}/gi, lk);
+  else msg = msg.replace(/[ \t]*\{link\}[ \t]*/gi, ' ').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').trim();
 
   return msg;
 }
@@ -355,7 +360,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
         const ownerId = contact.assignedOwnerId || null;
         const ownerName = contact.assignedOwnerName || '';
         const ownerUsername = contact.assignedOwnerUsername || '';
-        const personalizedMsg = personalizeMessage(messageTemplate, contact, state.companyName);
+        const personalizedMsg = personalizeMessage(messageTemplate, contact, state.companyName, state.campaignLink);
 
         if (existing) {
           existing.ownerId = ownerId;
@@ -860,7 +865,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     contact.senderName = lane.name;
     contact.senderRole = lane.role;
     contact.senderPhone = lane.phone;
-    const personalizedMsg = personalizeMessage(state.messageTemplate, contact, state.companyName);   // not stored per contact (keeps the state file small)
+    const personalizedMsg = personalizeMessage(state.messageTemplate, contact, state.companyName, state.campaignLink);   // not stored per contact (keeps the state file small)
     state.activeLaneId = lane.id;
     saveState();
     const attemptStart = Date.now();
@@ -1040,6 +1045,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.messageTemplate = params.message || '';
     state.variation = params.variation || 'text';
     state.autoData = Boolean(params.auto_data);   // numbers came from the Auto Data pool
+    state.campaignLink = String(params.campaign_link || '').slice(0, 300);   // the company's own link for {link}
     state.media = storeCampaignMedia(companyId, state.id, params.media || null);
     if (params.image_url && !state.media) state.media = { mimetype: 'image/jpeg', filename: 'flyer.jpg', url: params.image_url };
     if (params.audio_url && !state.media) state.media = { mimetype: 'audio/ogg', filename: 'voice_pitch.ogg', url: params.audio_url };

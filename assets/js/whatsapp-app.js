@@ -3824,10 +3824,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function startCampaignStatusPolling() {
     if (campaignPollTimer) clearInterval(campaignPollTimer);
     campaignPollTimer = setInterval(() => {
+      if (document.hidden || (window.chatlyBackingOff && window.chatlyBackingOff())) return;
       if (campaignState.isRunning || (els.viewCampaign && els.viewCampaign.style.display !== 'none')) {
         syncServerCampaignStatus();
       }
-    }, 4000);
+    }, 5000);
   }
 
   function applyServerCampaignState(data) {
@@ -9947,20 +9948,23 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAgentProfile();
   renderConnectedNumber();
   // (WhatsApp status is refreshed from applyUserSession and the 10s poll below; no extra startup call.)
+  // (Gentle polling: the host's bot protection challenges an address that sends too many requests.)
+  const backingOff = () => !!(window.chatlyBackingOff && window.chatlyBackingOff());
   setInterval(() => {
-    if (state.currentUser && !document.hidden && !els.connectWaModal?.classList.contains('open')) {
+    if (state.currentUser && !document.hidden && !backingOff() && !els.connectWaModal?.classList.contains('open')) {
       refreshSenderConnection().catch(() => {
         renderSenderConnection({ is_configured: false, message: 'Cannot reach the WhatsApp service.' });
       });
     }
-  }, 10000);
+  }, 30000);
 
-  // 24/7 Real-Time Lead Sync across team devices
+  // Lead sync across team devices (new messages already arrive through the live feed)
   setInterval(() => {
-    if (state.currentUser && !document.hidden) {
+    if (state.currentUser && !document.hidden && !backingOff()) {
       fetchServerLeads(true);
     }
-  }, 5000);
+  }, 8000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && state.currentUser) fetchServerLeads(true); });
 
   renderConversationsList();
   renderActiveChat();

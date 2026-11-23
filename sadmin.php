@@ -3416,7 +3416,7 @@ function ucRenderPreview() {
       if (head === 'name') return inner.includes('|') ? inner.split('|')[1].trim() : 'Ali';
       if (head === 'phone') return '+92 300 1234567';
       if (head === 'city') return 'Lahore';
-      if (head === 'link') return 'https://chatly.pk';
+      if (head === 'link') return '';   // no {link} for Chatly's own campaigns (keeps chatly.pk off spam lists)
       if (head === 'company') return 'Chatly';
       return inner.includes('|') ? inner.split('|')[0].trim() : inner;
     });
