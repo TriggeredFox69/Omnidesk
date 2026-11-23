@@ -628,12 +628,14 @@ function handleWhatsAppBridge(string $action, array $input): void {
             }
             $input['audience'] = $built['audience'];
             $autoClaim = $built['claim'];
+            $autoNote = (string) ($built['note'] ?? '');
         }
 
         $result = whatsappBridgeRequest('/campaign/start', $input);
         if (empty($result['success']) && $autoClaim) {
             chatlyAutoDataRelease($campaignCompany, $autoClaim['from'], $autoClaim['to']);   // nothing was sent: give the numbers back
         }
+        if (!empty($result['success']) && !empty($autoNote)) $result['auto_data_note'] = $autoNote;
         if (!empty($result['success'])) {
             // The audience is NOT copied into the CRM here any more. That created a
             // "Queued for outreach" lead for every number of every campaign (14,000+ leads that

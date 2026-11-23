@@ -157,3 +157,51 @@ test('a closer at their daily limit is paused until 12 AM instead of sending', a
   mgr.stop();
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
+
+test('the chosen gap is exact and counts from the start of each send (a slow send does not add to it)', async t => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
+  fs.writeFileSync(path.join(tmpDir, 'leads.json'), '[]');
+  fs.writeFileSync(path.join(tmpDir, 'users.json'), '[]');
+  const at = [];
+  const mgr = createCampaignManager({
+    send: async () => { at.push(Date.now()); await new Promise(r => setTimeout(r, 700)); return { success: true, message_id: 'G' + at.length }; },
+    dataDir: tmpDir, getLeadsPath: () => path.join(tmpDir, 'leads.json'), getUsersPath: () => path.join(tmpDir, 'users.json'),
+    mainStatus: () => ({ ready: true })
+  });
+  t.after(() => { mgr.stop(); fs.rmSync(tmpDir, { recursive: true, force: true }); });
+  mgr.start({ message: 'Hi', audience: [{ phone: '923004444441' }, { phone: '923004444442' }, { phone: '923004444443' }], minDelay: 2, maxDelay: 2,
+    senders: [{ id: 'TM-1', name: 'One', phone: '923000000001', roleType: 'member' }] });
+  assert.equal(mgr.getStatus().minDelay, 2, 'no 6 s floor any more');
+  await new Promise(r => setTimeout(r, 4800));
+  assert.equal(at.length, 3);
+  const gaps = [at[1] - at[0], at[2] - at[1]].map(g => Math.round(g / 100) / 10);
+  for (const g of gaps) assert.ok(g >= 1.9 && g <= 2.4, `gap ${g}s should be 2s`);
+});
+
+test('a closer stopped by the admin gets no campaign numbers; stopping mid-campaign moves theirs to the others', async t => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
+  fs.writeFileSync(path.join(tmpDir, 'leads.json'), '[]');
+  const usersFile = path.join(tmpDir, 'users.json');
+  const users = [{ id: 'TM-1', name: 'One' }, { id: 'TM-2', name: 'Two' }, { id: 'TM-3', name: 'Three', campaign_paused: true }];
+  fs.writeFileSync(usersFile, JSON.stringify(users));
+  const sentBy = [];
+  const mgr = createCampaignManager({
+    send: async p => { sentBy.push(p.phone); return { success: true, message_id: 'S' + sentBy.length }; },
+    dataDir: tmpDir, getLeadsPath: () => path.join(tmpDir, 'leads.json'), getUsersPath: () => usersFile,
+    mainStatus: () => ({ ready: true }), offlineGraceMs: 0
+  });
+  t.after(() => { mgr.stop(); fs.rmSync(tmpDir, { recursive: true, force: true }); });
+  // 60 numbers, 30 each, one per second: still running when the admin stops TM-2
+  const st = mgr.start({ message: 'Hi', audience: Array.from({ length: 60 }, (_, i) => ({ phone: '9230055555' + String(i).padStart(2, '0') })), minDelay: 1, maxDelay: 1,
+    senders: users.map(u => ({ id: u.id, name: u.name, phone: '92300000000' + u.id.slice(-1), roleType: 'member' })) });
+  assert.deepEqual(st.lanes.map(l => l.id), ['TM-1', 'TM-2'], 'TM-3 (stopped) is left out');
+  users[1].campaign_paused = true;
+  fs.writeFileSync(usersFile, JSON.stringify(users));
+  await new Promise(r => setTimeout(r, 11500));   // users.json is re-read every 10 s
+  const lanes = mgr.getStatus().lanes;
+  const tm1 = lanes.find(l => l.id === 'TM-1'), tm2 = lanes.find(l => l.id === 'TM-2');
+  assert.equal(tm2.status, 'done', "TM-2's lane ended");
+  assert.equal(tm2.remaining, 0, 'nothing left waiting for TM-2');
+  assert.equal(tm1.assigned + tm2.assigned, 60);
+  assert.ok(tm1.assigned > 30, "TM-2's unsent numbers moved to TM-1");
+});

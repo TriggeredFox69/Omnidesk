@@ -35,6 +35,19 @@ alter table public.chatly_pool_meta    enable row level security;
 alter table public.chatly_pool_cursors enable row level security;
 revoke all on public.chatly_numbers, public.chatly_pool_meta, public.chatly_pool_cursors from anon, authenticated;
 
+-- Numbers each company took per Pakistan day (for the super admin's daily Auto Data limits).
+create table if not exists public.chatly_pool_daily (
+  company_id text    not null,
+  day        date    not null,
+  claimed    integer not null default 0,
+  primary key (company_id, day)
+);
+alter table public.chatly_pool_daily enable row level security;
+revoke all on public.chatly_pool_daily from anon, authenticated;
+
+create or replace function public.chatly_pk_today() returns date
+language sql stable as $$ select (now() at time zone 'Asia/Karachi')::date $$;
+
 -- Hands the next p_count numbers to a company and moves its cursor past them.
 -- Returns {"from": .., "to": .., "total": .., "phones": [923…, …]}.
 create or replace function public.chatly_claim_numbers(p_company text, p_count integer)
@@ -68,6 +81,9 @@ begin
    where company_id = p_company;
 
   if v_to > v_from then
+    insert into chatly_pool_daily (company_id, day, claimed) values (p_company, chatly_pk_today(), v_to - v_from)
+    on conflict (company_id, day) do update set claimed = chatly_pool_daily.claimed + excluded.claimed;
+
     select coalesce(array_agg(923000000000::bigint + n.v order by n.pos), '{}')
       into v_phones
       from chatly_numbers c
@@ -85,18 +101,24 @@ end;
 $$;
 
 -- Gives a claim back (only when nothing was claimed after it), e.g. a campaign that did not start.
+drop function if exists public.chatly_release_numbers(text, bigint, bigint);
 create or replace function public.chatly_release_numbers(p_company text, p_from bigint, p_to bigint)
 returns boolean
-language sql
+language plpgsql
 set search_path = public
 as $$
+begin
   update chatly_pool_cursors
      set next_pos = p_from, claimed_total = greatest(0, claimed_total - (p_to - p_from)), updated_at = now()
-   where company_id = p_company and next_pos = p_to and p_to > p_from and p_from >= 0
-  returning true;
+   where company_id = p_company and next_pos = p_to and p_to > p_from and p_from >= 0;
+  if not found then return false; end if;
+  update chatly_pool_daily set claimed = greatest(0, claimed - (p_to - p_from)::int)
+   where company_id = p_company and day = chatly_pk_today();
+  return true;
+end;
 $$;
 
--- total / used / remaining for one company.
+-- total / used / remaining for one company, plus what it took today and in total.
 create or replace function public.chatly_pool_status(p_company text)
 returns jsonb
 language sql
@@ -107,17 +129,38 @@ as $$
            'total', m.total,
            'used', coalesce(c.next_pos, 0),
            'remaining', greatest(0, m.total - coalesce(c.next_pos, 0)),
+           'today', coalesce((select claimed from chatly_pool_daily d where d.company_id = p_company and d.day = chatly_pk_today()), 0),
+           'claimed_total', coalesce(c.claimed_total, 0),
            'imported_at', m.imported_at)
     from chatly_pool_meta m
     left join chatly_pool_cursors c on c.company_id = p_company
    where m.id = 1;
 $$;
 
+-- Every company's Auto Data use: {"COMP-004": {"today": n, "total": n}, ...} and the pool size.
+create or replace function public.chatly_pool_usage_all()
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'pool_total', (select total from chatly_pool_meta where id = 1),
+    'usage', coalesce((select jsonb_object_agg(c.company_id, jsonb_build_object(
+                 'today', coalesce((select claimed from chatly_pool_daily d where d.company_id = c.company_id and d.day = chatly_pk_today()), 0),
+                 'total', c.claimed_total))
+               from chatly_pool_cursors c), '{}'::jsonb));
+$$;
+
 -- Functions are executable by everyone by default: only the server's key may call these.
 revoke all on function public.chatly_claim_numbers(text, integer)          from public, anon, authenticated;
 revoke all on function public.chatly_release_numbers(text, bigint, bigint) from public, anon, authenticated;
 revoke all on function public.chatly_pool_status(text)                     from public, anon, authenticated;
+revoke all on function public.chatly_pool_usage_all()                      from public, anon, authenticated;
+revoke all on function public.chatly_pk_today()                            from public, anon, authenticated;
 grant execute on function public.chatly_claim_numbers(text, integer)          to service_role;
 grant execute on function public.chatly_release_numbers(text, bigint, bigint) to service_role;
 grant execute on function public.chatly_pool_status(text)                     to service_role;
-grant select, insert, update, delete on public.chatly_numbers, public.chatly_pool_meta, public.chatly_pool_cursors to service_role;
+grant execute on function public.chatly_pool_usage_all()                      to service_role;
+grant execute on function public.chatly_pk_today()                            to service_role;
+grant select, insert, update, delete on public.chatly_numbers, public.chatly_pool_meta, public.chatly_pool_cursors, public.chatly_pool_daily to service_role;

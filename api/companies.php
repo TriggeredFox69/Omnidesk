@@ -188,6 +188,53 @@ if (in_array($action, ['list', 'public_list', 'get_company_config'], true) && se
 
 switch ($action) {
 
+    // Auto Data limits (Super Admin): how many pool numbers each company may take per day and
+    // in total, set according to what the company pays. 0 = unlimited.
+    case 'auto_data_usage':
+        requireSuperAdmin($currentUser);
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+        require_once __DIR__ . '/auto_data.php';
+        $limits = [];
+        foreach (getCompanies($companiesFile) as $c) if (!empty($c['id'])) $limits[$c['id']] = chatlyAutoDataLimits($c);
+        $r = chatlySupabaseRpc('chatly_pool_usage_all', [], 15);
+        $poolUsage = ($r['ok'] && is_array($r['data'])) ? (array) ($r['data']['usage'] ?? []) : [];
+        $usage = [];
+        foreach ($limits as $cid => $lim) {
+            $u = (array) ($poolUsage[$cid] ?? []);
+            $usage[$cid] = ['today' => (int) ($u['today'] ?? 0), 'total' => (int) ($u['total'] ?? 0),
+                'daily_limit' => $lim['daily'], 'total_limit' => $lim['total']];
+        }
+        echo json_encode($r['ok']
+            ? ['success' => true, 'usage' => $usage, 'pool_total' => (int) ($r['data']['pool_total'] ?? 0)]
+            : ['success' => false, 'message' => 'Usage is unavailable: ' . ($r['error'] ?? 'Supabase error'), 'usage' => $usage]);
+        exit;
+
+    case 'set_auto_data_limits':
+        requireSuperAdmin($currentUser);
+        $cid = trim((string) ($jsonInput['company_id'] ?? ''));
+        $daily = max(0, (int) ($jsonInput['daily_limit'] ?? 0));
+        $total = max(0, (int) ($jsonInput['total_limit'] ?? 0));
+        $companies = getCompanies($companiesFile);
+        $found = false;
+        foreach ($companies as &$c) {
+            if (($c['id'] ?? '') !== $cid) continue;
+            $c['auto_data_daily_limit'] = $daily;
+            $c['auto_data_total_limit'] = $total;
+            $found = $c['name'] ?? $cid;
+            break;
+        }
+        unset($c);
+        if ($found === false) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Company not found.']);
+            exit;
+        }
+        saveCompanies($companiesFile, $companies);
+        logAudit($auditFile, $cid, $currentUser['id'] ?? '', $currentUser['name'] ?? 'Super Admin', 'auto_data_limits',
+            "Auto Data limits for {$found}: " . ($daily ?: 'unlimited') . ' per day, ' . ($total ?: 'unlimited') . ' in total.');
+        echo json_encode(['success' => true]);
+        exit;
+
     // 1. Get Platform-wide Telemetry (Super Admin)
     case 'get_telemetry':
         requireSuperAdmin($currentUser);

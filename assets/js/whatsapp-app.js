@@ -3296,8 +3296,7 @@ document.addEventListener('DOMContentLoaded', () => {
             els.campaignCustomMsg.value = data.draft.message;
             updateCampaignPreview();
           }
-          if (data.draft.minDelay && els.campaignDelayMin) els.campaignDelayMin.value = data.draft.minDelay;
-          if (data.draft.maxDelay && els.campaignDelayMax) els.campaignDelayMax.value = data.draft.maxDelay;
+          if (data.draft.minDelay) setCampaignDelay(data.draft.minDelay);
           renderCampaignAudienceUI();
           logCampaignTerminal(`☁️ Loaded ${data.draft.audience.length} saved campaign contacts from company cloud storage. Ready to launch.`, 'info');
         }
@@ -3398,10 +3397,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!p) { el.textContent = 'Checking your number pool…'; return; }
     if (!p.success) { el.classList.add('warn'); el.textContent = p.message || 'The number pool is not available right now.'; return; }
     const left = Number(p.remaining) || 0;
-    if (ad.count > left) el.classList.add('warn');
-    el.innerHTML = left > 0
-      ? `<strong>${left.toLocaleString()}</strong> fresh numbers left for your company${ad.count > left ? ` · only ${left.toLocaleString()} will be sent` : ''}`
-      : 'Your company has used every number in the pool.';
+    const allowed = typeof p.allowed_now === 'number' ? p.allowed_now : left;
+    const limits = [];
+    if (p.daily_limit > 0) limits.push(`today ${Number(p.today || 0).toLocaleString()} / ${Number(p.daily_limit).toLocaleString()}`);
+    if (p.total_limit > 0) limits.push(`total ${Number(p.claimed_total || 0).toLocaleString()} / ${Number(p.total_limit).toLocaleString()}`);
+    if (ad.count > allowed) el.classList.add('warn');
+    if (left <= 0) { el.textContent = 'Your company has used every number in the pool.'; return; }
+    if (allowed <= 0) {
+      el.textContent = `Your Auto Data limit is used up (${limits.join(' · ')}). ${p.daily_limit > 0 && p.today >= p.daily_limit ? 'It resets at 12:00 AM.' : 'Contact Chatly to raise it.'}`;
+      return;
+    }
+    el.innerHTML = limits.length
+      ? `You can use <strong>${allowed.toLocaleString()}</strong> numbers now <span class="cs-ad-lim">(${escapeHtml(limits.join(' · '))})</span>${ad.count > allowed ? ` · only ${allowed.toLocaleString()} will be sent` : ''}`
+      : `<strong>${left.toLocaleString()}</strong> fresh numbers left for your company${ad.count > left ? ` · only ${left.toLocaleString()} will be sent` : ''}`;
   }
   function renderAutoData() {
     const ad = autoDataState();
@@ -3552,6 +3560,55 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     reader.readAsText(file);
   }
+
+  // ── Gap between messages: one number, 1-60 s ──
+  // Colour runs from dark red (1-3 s, very likely to get numbers restricted) through orange
+  // (~10 s) to bright green (30 s and more, safe), with every shade in between.
+  function campaignDelayColor(d) {
+    d = Math.min(60, Math.max(1, d));
+    let h, l;
+    if (d <= 10) { const t = (d - 1) / 9; h = 2 + 26 * t; l = 30 + 18 * t; }          // dark red -> orange
+    else if (d <= 30) { const t = (d - 10) / 20; h = 28 + 104 * t; l = 48 - 8 * t; }  // orange -> green
+    else { const t = (d - 30) / 30; h = 132 + 8 * t; l = 40 + 8 * t; }                // green -> bright green
+    return `hsl(${Math.round(h)} 82% ${Math.round(l)}%)`;
+  }
+  function campaignDelayLabel(d) {
+    return d <= 3 ? 'Very risky' : d <= 6 ? 'Risky' : d <= 14 ? 'Moderate' : d <= 29 ? 'Fairly safe' : 'Safe';
+  }
+  function setCampaignDelay(v) {
+    const d = Math.min(60, Math.max(1, Math.round(Number(v)) || 10));
+    const range = document.getElementById('campaignDelayRange');
+    const input = document.getElementById('campaignDelayInput');
+    if (range && Number(range.value) !== d) range.value = d;
+    if (input && document.activeElement !== input) input.value = d;
+    if (els.campaignDelayMin) els.campaignDelayMin.value = d;
+    if (els.campaignDelayMax) els.campaignDelayMax.value = d;
+    campaignState.minDelay = d;
+    campaignState.maxDelay = d;
+    const box = document.getElementById('campaignDelayBox');
+    if (box) {
+      box.style.setProperty('--delay-c', campaignDelayColor(d));
+      box.style.setProperty('--delay-p', `${((d - 1) / 59) * 100}%`);
+    }
+    const badge = document.getElementById('campaignDelayBadge');
+    if (badge) badge.textContent = campaignDelayLabel(d);
+    const hint = document.getElementById('campaignDelayHint');
+    if (hint) {
+      hint.textContent = `Each WhatsApp sends one message every ${d} second${d === 1 ? '' : 's'}` +
+        (d <= 6 ? '. This fast, WhatsApp is likely to restrict the numbers.' : d < 15 ? '. Risky for new numbers.' : '.');
+    }
+    try { updateCampaignLaunchSummary(); } catch (_) {}
+  }
+  (function wireCampaignDelay() {
+    const range = document.getElementById('campaignDelayRange');
+    const input = document.getElementById('campaignDelayInput');
+    if (range) range.addEventListener('input', () => setCampaignDelay(range.value));
+    if (input) {
+      input.addEventListener('input', () => { if (input.value !== '') setCampaignDelay(input.value); });
+      input.addEventListener('change', () => { setCampaignDelay(input.value); input.value = campaignState.minDelay; });
+    }
+    setCampaignDelay(els.campaignDelayMin ? els.campaignDelayMin.value : 10);
+  })();
 
   function applyCampaignDelayPreset(val) {
     if (!els.campaignDelayMin || !els.campaignDelayMax) return;
@@ -3958,6 +4015,10 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('⚠️ Your company has used every number in the Auto Data pool.');
       return;
     }
+    if (autoData.on && autoData.pool && autoData.pool.success && typeof autoData.pool.allowed_now === 'number' && autoData.pool.allowed_now <= 0) {
+      showToast('⚠️ Your Auto Data limit is used up for now. Daily limits reset at 12:00 AM.');
+      return;
+    }
 
     const isAudioVar = campaignState.variation === 'audio';
     const msg = els.campaignCustomMsg ? els.campaignCustomMsg.value.trim() : '';
@@ -4004,10 +4065,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const campaignName = (els.campaignNameInput && els.campaignNameInput.value.trim()) || 'OmniDesk campaign';
 
-    let minD = parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 8, 10) || 8;
-    let maxD = parseInt(els.campaignDelayMax ? els.campaignDelayMax.value : 15, 10) || 15;
-    if (minD < 6) minD = 6;                    // same floor as the server
-    if (maxD < minD + 3) maxD = minD + 3;
+    // One gap for every message (1-60 s), exactly as chosen on the page.
+    const gapSec = Math.min(60, Math.max(1, parseInt(els.campaignDelayMin ? els.campaignDelayMin.value : 10, 10) || 10));
+    const minD = gapSec, maxD = gapSec;
     campaignState.minDelay = minD;
     campaignState.maxDelay = maxD;
 
@@ -4083,7 +4143,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await response.json();
       if (data && data.success) {
         const started = Number(data.totalContacts) || launchCount;
-        showToast(`🚀 Campaign started: ${started.toLocaleString()} numbers shared between ${deviceCount} WhatsApp${deviceCount === 1 ? '' : 's'}.`);
+        showToast(data.auto_data_note
+          ? `🚀 Campaign started. ${data.auto_data_note}`
+          : `🚀 Campaign started: ${started.toLocaleString()} numbers shared between ${deviceCount} WhatsApp${deviceCount === 1 ? '' : 's'}.`);
         applyServerCampaignState(data);
         startCampaignStatusPolling();
         fetchServerLeads(true);

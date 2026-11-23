@@ -19,14 +19,35 @@ const CHATLY_AUTO_DATA_MAX = 50000;
 
 require_once __DIR__ . '/supabase.php';
 
-/** total / used / remaining for a company. */
+/** A company's record from data/companies.json, or null. */
+function chatlyAutoDataCompany(string $companyId): ?array {
+    $list = json_decode((string) @file_get_contents(__DIR__ . '/../data/companies.json'), true);
+    foreach ((is_array($list) ? $list : []) as $c) if (($c['id'] ?? '') === $companyId) return $c;
+    return null;
+}
+
+/** The super admin's Auto Data limits for a company: ['daily' => n, 'total' => n], 0 = unlimited. */
+function chatlyAutoDataLimits(?array $company): array {
+    return ['daily' => max(0, (int) ($company['auto_data_daily_limit'] ?? 0)), 'total' => max(0, (int) ($company['auto_data_total_limit'] ?? 0))];
+}
+
+/** total / used / remaining for a company, its limits, and how many it may take right now. */
 function chatlyAutoDataStatus(string $companyId): array {
     $r = chatlySupabaseRpc('chatly_pool_status', ['p_company' => $companyId], 10);
     if (!$r['ok']) return ['success' => false, 'setup' => $r['setup'] ?? true,
         'message' => ($r['setup'] ?? true) ? $r['error'] : 'Auto Data is not set up on the server yet (Supabase is not connected).'];
     $d = is_array($r['data']) ? $r['data'] : [];
     if (empty($d['total'])) return ['success' => false, 'message' => 'The number pool is empty. The numbers have not been uploaded yet.'];
-    return ['success' => true, 'total' => (int) $d['total'], 'used' => (int) ($d['used'] ?? 0), 'remaining' => (int) ($d['remaining'] ?? 0)];
+    $lim = chatlyAutoDataLimits(chatlyAutoDataCompany($companyId));
+    $today = (int) ($d['today'] ?? 0);
+    $claimed = (int) ($d['claimed_total'] ?? 0);
+    $remaining = (int) ($d['remaining'] ?? 0);
+    $allowed = $remaining;
+    if ($lim['daily'] > 0) $allowed = min($allowed, max(0, $lim['daily'] - $today));
+    if ($lim['total'] > 0) $allowed = min($allowed, max(0, $lim['total'] - $claimed));
+    return ['success' => true, 'total' => (int) $d['total'], 'used' => (int) ($d['used'] ?? 0), 'remaining' => $remaining,
+        'today' => $today, 'claimed_total' => $claimed, 'daily_limit' => $lim['daily'], 'total_limit' => $lim['total'],
+        'allowed_now' => $allowed];
 }
 
 /** Takes the next $count numbers for a company. ['ok', 'phones' => [...], 'from', 'to'] */
@@ -83,26 +104,45 @@ function chatlyAutoDataAudience(string $companyId, int $count, array $leftover =
             $picked[] = $p;
         }
     };
-    $add($leftover);
+    $add($leftover);   // already given to this company earlier: does not count against its limits again
+
+    // The super admin's daily / total limits for this company (0 = unlimited).
+    $st = chatlyAutoDataStatus($companyId);
+    $allowance = !empty($st['success']) ? (int) $st['allowed_now'] : PHP_INT_MAX;
+    $taken = 0;
+    $limitHit = false;
 
     $claim = null;
     for ($round = 0; $round < 3 && count($picked) < $count; $round++) {
-        $c = chatlyAutoDataClaim($companyId, $count - count($picked));
+        $want = min($count - count($picked), $allowance - $taken);
+        if ($want <= 0) { $limitHit = true; break; }
+        $c = chatlyAutoDataClaim($companyId, $want);
         if (!$c['ok']) {
             if ($claim) chatlyAutoDataRelease($companyId, $claim['from'], $claim['to']);
             return ['ok' => false, 'error' => $c['error']];
         }
         if (!$c['phones']) break;                     // the company has used the whole pool
+        $taken += $c['to'] - $c['from'];
         $claim = $claim ? ['from' => $claim['from'], 'to' => $c['to']] : ['from' => $c['from'], 'to' => $c['to']];
         $add($c['phones']);
     }
+    $limitText = '';
+    if ($limitHit && !empty($st['success'])) {
+        $dailyLeft = $st['daily_limit'] > 0 ? max(0, $st['daily_limit'] - $st['today']) : PHP_INT_MAX;
+        $totalLeft = $st['total_limit'] > 0 ? max(0, $st['total_limit'] - $st['claimed_total']) : PHP_INT_MAX;
+        $limitText = $dailyLeft <= $totalLeft
+            ? "your daily Auto Data limit is {$st['daily_limit']} numbers (it resets at 12:00 AM)"
+            : "your total Auto Data limit is {$st['total_limit']} numbers";
+    }
     if (!$picked) {
         if ($claim) chatlyAutoDataRelease($companyId, $claim['from'], $claim['to']);
-        return ['ok' => false, 'error' => 'No fresh numbers are left in the pool for your company.'];
+        return ['ok' => false, 'error' => $limitText !== '' ? "No more Auto Data numbers right now: {$limitText}. Contact Chatly to raise it."
+            : 'No fresh numbers are left in the pool for your company.'];
     }
     shuffle($picked);
     $audience = array_map(fn($p) => ['phone' => $p, 'display' => '+' . $p, 'name' => '', 'city' => 'Pakistan', 'network' => 'Auto Data'], $picked);
-    return ['ok' => true, 'audience' => $audience, 'claim' => $claim];
+    $note = ($limitText !== '' && count($picked) < $count) ? 'Only ' . count($picked) . " numbers: {$limitText}." : '';
+    return ['ok' => true, 'audience' => $audience, 'claim' => $claim, 'note' => $note];
 }
 
 // ---- HTTP: status for the Campaign page ----

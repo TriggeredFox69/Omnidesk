@@ -457,7 +457,7 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
 
     // Daily-limit controls on the company admin panel (admin.php): set a closer's limit,
     // reset today's count, suspend / activate. Company admins only, own company only.
-    if (in_array($action, ['update_message_limit', 'reset_employee_quota', 'toggle_employee_status'], true)) {
+    if (in_array($action, ['update_message_limit', 'reset_employee_quota', 'toggle_employee_status', 'set_campaign_paused'], true)) {
         $me = chatlySessionUser();
         if (!chatlyIsCompanyAdmin($me) && !chatlyIsSuperAdmin($me)) {
             http_response_code(403);
@@ -477,6 +477,10 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
                 } elseif ($action === 'reset_employee_quota') {
                     $u['messages_sent_today'] = 0;
                     $u['quota_reset_date'] = chatlyQuotaToday();
+                } elseif ($action === 'set_campaign_paused') {
+                    // Stop = this closer gets no more campaign messages (the bridge moves their
+                    // unsent numbers to the others); Resume = back in campaigns.
+                    $u['campaign_paused'] = !empty($input['paused']);
                 } else {
                     $u['status'] = (strtolower((string) ($u['status'] ?? 'active')) === 'suspended') ? 'active' : 'suspended';
                 }
@@ -553,7 +557,8 @@ if (php_sapi_name() !== 'cli' && basename($_SERVER['SCRIPT_FILENAME'] ?? '') ===
                 'display'       => str_starts_with($u['phone'] ?? '', '+') ? $u['phone'] : ('+' . $cleanPhone),
                 'messages_sent' => chatlyQuotaSentToday($u),
                 'device_number' => $devNum,
-                'connected'     => true,
+                'connected'     => isset($connectedDevices[$u['id']]),
+                'campaign_paused' => !empty($u['campaign_paused']),
                 'status'        => 'ready'
             ];
         }

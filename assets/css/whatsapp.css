@@ -5379,6 +5379,7 @@ body:not(.theme-dark) #viewCampaign .cs-status { filter: brightness(0.8) saturat
 #viewCampaign .cs-ad-chips button.active { background: var(--accent-wa); border-color: var(--accent-wa); color: var(--on-accent); }
 #viewCampaign .cs-ad-pool { padding: 9px 12px; border-radius: 10px; font-size: 12.5px; color: var(--text-secondary); background: var(--cs-surface); border: 1px solid var(--cs-line); }
 #viewCampaign .cs-ad-pool strong { color: var(--accent-wa); font-weight: 800; }
+#viewCampaign .cs-ad-pool .cs-ad-lim { color: var(--text-muted); font-size: 11.5px; }
 #viewCampaign .cs-ad-pool.warn { color: var(--status-ongoing-text); background: var(--status-ongoing-glass); border-color: var(--status-ongoing-border); }
 #viewCampaign .cs-ad-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
 #viewCampaign .cs-step-head .cs-pill.cs-pill-auto { background: var(--accent-wa); color: var(--on-accent); border-color: var(--accent-wa); }
@@ -5424,6 +5425,25 @@ body:not(.theme-dark) #viewCampaign .cs-status { filter: brightness(0.8) saturat
 #viewCampaign .tag-chip { padding: 4px 10px; font-size: 11.5px; background: var(--cs-soft); border-color: var(--cs-line-strong); color: var(--accent-wa); }
 #viewCampaign .cs-pace { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--cs-line); }
 #viewCampaign .cs-pace-select { width: auto; max-width: 62%; padding: 6px 10px; font-size: 12px; }
+/* Gap between messages: --delay-c is set by the script (dark red 1 s → orange 10 s → green 30 s+) */
+#viewCampaign .cs-delay { --delay-c: hsl(28 82% 48%); --delay-p: 15%; }
+#viewCampaign .cs-delay-badge { font-size: 11.5px; font-weight: 800; padding: 3px 10px; border-radius: 999px; color: #fff;
+  background: var(--delay-c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--delay-c) 18%, transparent); transition: background 0.2s ease; }
+#viewCampaign .cs-delay-row { display: flex; align-items: center; gap: 12px; }
+#viewCampaign .cs-delay-range { flex: 1; min-width: 0; height: 8px; border-radius: 999px; appearance: none; -webkit-appearance: none; cursor: pointer;
+  background: linear-gradient(90deg, var(--delay-c) var(--delay-p), var(--cs-line-strong) var(--delay-p)); outline: none; }
+#viewCampaign .cs-delay-range::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  border: 4px solid var(--delay-c); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+#viewCampaign .cs-delay-range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 4px solid var(--delay-c); }
+#viewCampaign .cs-delay-range:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--delay-c) 35%, transparent); }
+#viewCampaign .cs-delay-box { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+#viewCampaign .cs-delay-box .form-input { width: 72px; text-align: center; font-size: 18px; font-weight: 800; padding: 7px 6px;
+  color: var(--delay-c); border: 2px solid var(--delay-c); }
+#viewCampaign .cs-delay-box span { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+#viewCampaign .cs-delay-scale { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); margin-top: -2px; }
+#viewCampaign .cs-delay-scale span:first-child { color: hsl(2 70% 45%); font-weight: 700; }
+#viewCampaign .cs-delay-scale span:nth-child(3) { color: hsl(132 60% 38%); font-weight: 700; }
+#viewCampaign .cs-delay-hint { margin: 0; color: var(--text-secondary); }
 #viewCampaign .cs-pace-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 #viewCampaign .cs-pace-fields label { display: block; margin-bottom: 4px; }
 

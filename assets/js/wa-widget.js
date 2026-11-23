@@ -107,6 +107,11 @@
     const isStopped = campaignStatus === 'stopped';
     const isPaused = campaignStatus === 'paused';
 
+    // stopped in the admin portal: gets no campaign messages until resumed
+    if (sender.campaign_paused) {
+      return { cls: 'cw-red', label: 'Stopped by admin', sent: Number(lane?.sent || 0), total: Number(lane?.assigned || 0) };
+    }
+
     if (!lane) {
       const todaySent = Number(sender.messages_sent || 0);
       if (todaySent > 0) return { cls: 'cw-green', label: `${todaySent} sent today`, sent: todaySent, total: 0 };

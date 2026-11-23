@@ -466,6 +466,26 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
     html.theme-light .form-control { background: #fff; color: #0f172a; border-color: #cbd5e1; }
     .form-control:focus { outline: none; border-color: var(--accent-emerald); }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    /* Closer status lights: green ready · orange sending / limited · red offline / stopped */
+    .closer-light-card { --lc: #10b981; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+      background: color-mix(in srgb, var(--lc) 7%, rgba(255,255,255,0.02)); border: 1px solid color-mix(in srgb, var(--lc) 35%, transparent); }
+    .closer-light-card.light-orange { --lc: #f59e0b; }
+    .closer-light-card.light-red { --lc: #ef4444; }
+    .closer-light { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; background: var(--lc);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--lc) 25%, transparent), 0 0 10px var(--lc); }
+    .closer-light-card.light-orange .closer-light { animation: closerPulse 1.2s ease-in-out infinite; }
+    @keyframes closerPulse { 50% { opacity: 0.45; } }
+    .closer-light-name { font-weight: 700; font-size: 12.5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .closer-light-meta { font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .closer-light-meta .mono { font-family: 'JetBrains Mono', monospace; }
+    .closer-light-label { font-size: 11px; font-weight: 750; color: var(--lc); margin-top: 2px; }
+    .closer-light-btn { flex-shrink: 0; padding: 5px 9px; border-radius: 7px; font-size: 11px; font-weight: 800; cursor: pointer; border: 1px solid; background: transparent; }
+    .closer-light-btn.is-stop { color: #f87171; border-color: rgba(239,68,68,0.45); }
+    .closer-light-btn.is-stop:hover { background: rgba(239,68,68,0.12); }
+    .closer-light-btn.is-resume { color: #34d399; border-color: rgba(16,185,129,0.5); }
+    .closer-light-btn.is-resume:hover { background: rgba(16,185,129,0.12); }
+    .closer-light-btn:disabled { opacity: 0.5; cursor: wait; }
+    @media (prefers-reduced-motion: reduce) { .closer-light-card.light-orange .closer-light { animation: none; } }
   </style>
 </head>
 <body>
@@ -1404,7 +1424,7 @@ if (!$activeCompany && ($companyId === 'COMP-004' || $companyId === 'metalink'))
   </div>
 </div>
 
-<script src="assets/js/wa-widget.js?v=15.7"></script>
+<script src="assets/js/wa-widget.js?v=16.0"></script>
 <script>
 function escapeHtml(text) {
   if (text === null || text === undefined) return '';
@@ -2332,6 +2352,85 @@ function clearDropNumbers() {
 }
 
 // ═══ Connected WhatsApps Loader ═══
+// ── Closer status lights (Closers tab) ──
+//  green  = WhatsApp connected and ready
+//  orange = sending campaign messages right now, or paused by a limit (daily / WhatsApp)
+//  red    = WhatsApp offline, or stopped by the admin
+// Stop = this closer gets no more campaign messages (their unsent numbers move to the others);
+// Resume puts them back. Saved on the server, so it holds for every campaign until resumed.
+function closerLight(s) {
+  const st = window.lastCampaignStatus;
+  const lane = st && Array.isArray(st.lanes) ? st.lanes.find(l => l.id === s.id) : null;
+  if (s.campaign_paused) return ['red', 'Stopped by you'];
+  if (s.connected === false) return ['red', 'WhatsApp offline'];
+  if (lane && lane.pausedUntil && Number(lane.pausedUntil) > Date.now()) {
+    return ['orange', lane.pauseReason === 'daily_limit' ? 'Daily limit reached' : 'Limited by WhatsApp'];
+  }
+  if (st && st.status === 'running' && lane && Number(lane.remaining) > 0 && lane.status !== 'offline' && lane.status !== 'stopped') {
+    return ['orange', `Sending · ${Number(lane.sent || 0)}/${Number(lane.assigned || 0)}`];
+  }
+  return ['green', Number(s.messages_sent || 0) > 0 ? `Ready · ${Number(s.messages_sent)} sent today` : 'Ready'];
+}
+
+function renderCloserLights() {
+  const box = document.getElementById('closerTabSendersContainer');
+  if (!box) return;
+  const senders = window.currentCampaignSenders || [];
+  if (!senders.length) {
+    box.innerHTML = `<div style="color:var(--text-muted); padding:10px;">No registered TM/TL WhatsApp numbers found.</div>`;
+    return;
+  }
+  box.innerHTML = senders.map((s) => {
+    const isTL = (s.roleType === 'lead');
+    const [color, label] = closerLight(s);
+    const paused = !!s.campaign_paused;
+    return `
+      <div class="closer-light-card light-${color}">
+        <span class="closer-light" title="${escapeHtml(label)}"></span>
+        <div style="min-width:0; flex:1;">
+          <div class="closer-light-name">${escapeHtml(s.name)}</div>
+          <div class="closer-light-meta">${isTL ? 'Team Leader' : 'TM Closer'} · <span class="mono">${escapeHtml(s.display || s.phone)}</span></div>
+          <div class="closer-light-label">${escapeHtml(label)}</div>
+        </div>
+        <button type="button" class="closer-light-btn ${paused ? 'is-resume' : 'is-stop'}" data-closer-toggle="${escapeHtml(s.id)}" data-paused="${paused ? '1' : '0'}"
+          title="${paused ? 'Put this closer back into campaigns' : 'Stop sending campaign messages to this closer (their unsent numbers go to the others)'}">
+          ${paused ? '▶ Resume' : '⏹ Stop'}
+        </button>
+      </div>`;
+  }).join('');
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-closer-toggle]');
+  if (!btn) return;
+  const id = btn.getAttribute('data-closer-toggle');
+  const pause = btn.getAttribute('data-paused') !== '1';
+  const s = (window.currentCampaignSenders || []).find(x => x.id === id);
+  if (pause && !confirm(`Stop ${s ? s.name : 'this closer'}? They get no more campaign messages until you resume them. Numbers already waiting for them move to the other closers.`)) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('api/tenant_manager.php', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_campaign_paused', user_id: id, paused: pause }) });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Could not save.');
+    if (s) s.campaign_paused = pause;
+    renderCloserLights();
+  } catch (err) {
+    alert('⚠️ ' + err.message);
+    btn.disabled = false;
+  }
+});
+
+// Keep the lights live: campaign progress every 10 s, connections every 30 s.
+setInterval(async () => {
+  try {
+    const res = await fetch('api/direct_sender.php?action=get_campaign_status');
+    const data = await res.json();
+    if (data && data.success) { window.lastCampaignStatus = data; renderCloserLights(); }
+  } catch (_) {}
+}, 10000);
+setInterval(() => { loadCampaignSenders(); }, 30000);
+
 async function loadCampaignSenders() {
   const container = document.getElementById('campaignSendersPoolContainer');
   const badge = document.getElementById('campaignPoolCountBadge');
@@ -2362,47 +2461,21 @@ async function loadCampaignSenders() {
           : '';
       })(Array.isArray(data.not_connected) ? data.not_connected : []);
 
+      const connectedCount = senders.filter(s => s.connected !== false).length;
       if (badge) {
-        badge.textContent = `${senders.length} WhatsApp${senders.length !== 1 ? 's' : ''} Connected`;
-        badge.style.background = senders.length > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
-        badge.style.color = senders.length > 0 ? '#10b981' : '#ef4444';
+        badge.textContent = `${connectedCount} WhatsApp${connectedCount !== 1 ? 's' : ''} Connected`;
+        badge.style.background = connectedCount > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+        badge.style.color = connectedCount > 0 ? '#10b981' : '#ef4444';
       }
 
       const closerBadge = document.getElementById('closerTabPoolBadge');
       if (closerBadge) {
-        closerBadge.textContent = `${senders.length} Active`;
-        closerBadge.style.background = senders.length > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
-        closerBadge.style.color = senders.length > 0 ? '#10b981' : '#ef4444';
+        closerBadge.textContent = `${connectedCount} of ${senders.length} connected`;
+        closerBadge.style.background = connectedCount > 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+        closerBadge.style.color = connectedCount > 0 ? '#10b981' : '#ef4444';
       }
 
-      const closerContainer = document.getElementById('closerTabSendersContainer');
-      if (closerContainer) {
-        if (!senders.length) {
-          closerContainer.innerHTML = `<div style="color:var(--text-muted); padding:10px;">No registered TM/TL WhatsApp numbers found.</div>`;
-        } else {
-          closerContainer.innerHTML = senders.map((s) => {
-            const isTL = (s.roleType === 'lead');
-            const badgeBg = isTL ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #38bdf8, #0284c7)';
-            const roleTag = isTL ? 'Team Leader (TL)' : 'TM Closer';
-            const roleColor = isTL ? '#34d399' : '#38bdf8';
-            return `
-              <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 12px; display:flex; align-items:center; gap:10px;">
-                <div style="width:32px; height:32px; border-radius:50%; background:${badgeBg}; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:12px; flex-shrink:0;">
-                  ${(s.name || 'W').charAt(0).toUpperCase()}
-                </div>
-                <div style="min-width:0; flex:1;">
-                  <div style="font-weight:700; font-size:12px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.name)}</div>
-                  <div style="font-size:10.5px; color:${roleColor}; font-weight:600;">${roleTag}</div>
-                  <div style="font-family:monospace; color:#38bdf8; font-size:11px; font-weight:700; margin-top:1px;">${escapeHtml(s.display || s.phone)}</div>
-                </div>
-                <span style="font-size:9.5px; font-weight:700; color:#10b981; background:rgba(16,185,129,0.12); padding:2px 6px; border-radius:4px; flex-shrink:0;">
-                  ● Ready
-                </span>
-              </div>
-            `;
-          }).join('');
-        }
-      }
+      renderCloserLights();
 
       if (container && window.ChatlyWaWidget) {
         window.ChatlyWaWidget.render(container, senders, window.lastCampaignStatus || null);
@@ -2637,6 +2710,7 @@ async function pollCampaignStatus() {
 
 function updateCampaignMonitorUI(data) {
   window.lastCampaignStatus = data;
+  renderCloserLights();
   const waBox = document.getElementById('campaignSendersPoolContainer');
   if (waBox && window.ChatlyWaWidget && (window.currentCampaignSenders || []).length) {
     window.ChatlyWaWidget.render(waBox, window.currentCampaignSenders, data);

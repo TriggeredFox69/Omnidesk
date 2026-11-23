@@ -602,7 +602,11 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   // than OFFLINE_GRACE_MS, their unsent numbers move to the TMs still connected,
   // so the campaign always runs until every number has been messaged.
   const OFFLINE_GRACE_MS = offlineGraceMs || 15000;
-  const MIN_DELAY_S = 6;
+  // The company chooses the gap between messages (one number, 1-60 s). Below ~6 s numbers get
+  // restricted much faster; the campaign page colours that red, and the choice is theirs.
+  const MIN_DELAY_S = 1;
+  const MAX_DELAY_S = 60;
+  const clampDelay = v => Math.min(MAX_DELAY_S, Math.max(MIN_DELAY_S, Math.round(Number(v) || 0) || MIN_DELAY_S));
   const laneTimers = new Map();
   const laneBusy = new Set();
 
@@ -682,9 +686,10 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     }, ms));
   }
 
-  function rebalanceFrom(lane) {
+  function rebalanceFrom(lane, why = "'s WhatsApp is offline") {
     const pending = state.audience.filter(c => c.laneId === lane.id && c.status === 'pending');
-    const targets = state.lanes.filter(l => l.id !== lane.id && l.status !== 'offline' && deviceOnline(l));
+    const targets = state.lanes.filter(l => l.id !== lane.id && l.status !== 'offline' && l.status !== 'stopped'
+      && !(l.pausedUntil && l.pausedUntil > Date.now()) && !laneUser(l.id)?.campaign_paused && deviceOnline(l));
     if (!pending.length || !targets.length) return false;
     pending.forEach((c, i) => {
       const t = targets[i % targets.length];
@@ -697,7 +702,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     });
     lane.assigned -= pending.length;
     laneCursor.clear();
-    log(`🔁 ${lane.name}'s WhatsApp is offline. Moved their ${pending.length} unsent numbers to ${targets.map(t => t.name).join(', ')}.`, 'warn');
+    const whyText = why.startsWith("'") ? `${lane.name}${why}` : `${lane.name} ${why}`;
+    log(`🔁 ${whyText}. Moved their ${pending.length} unsent numbers to ${targets.length > 5 ? targets.length + ' other closers' : targets.map(t => t.name).join(', ')}.`, 'warn');
     targets.forEach(t => {
       if (t.status === 'done') t.status = 'ready';
       if (!laneTimers.has(t.id) && !laneBusy.has(t.id)) scheduleLane(t, 500);
@@ -808,6 +814,18 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       scheduleLane(lane, Math.min(lane.pausedUntil - nowMs, 10 * 60 * 1000));
       return;
     }
+    // Stopped by the admin (admin portal → Stop): no more campaign messages for this closer.
+    // Their unsent numbers move to the closers still sending; if there are none, they wait.
+    if (laneUser(lane.id)?.campaign_paused) {
+      if (lane.status !== 'stopped') log(`⏹️ ${lane.name} was stopped by the admin and gets no more campaign messages.`, 'warn');
+      lane.status = 'stopped';
+      lane.nextAt = null;
+      if (rebalanceFrom(lane, 'was stopped by the admin')) { lane.status = 'done'; saveState(); return; }
+      saveState();
+      scheduleLane(lane, 30000);
+      return;
+    }
+    if (lane.status === 'stopped') log(`▶️ ${lane.name} was resumed by the admin.`, 'info');
 
     if (!deviceOnline(lane)) {
       if (lane.status !== 'offline') {
@@ -836,6 +854,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     const personalizedMsg = personalizeMessage(state.messageTemplate, contact, state.companyName);   // not stored per contact (keeps the state file small)
     state.activeLaneId = lane.id;
     saveState();
+    const attemptStart = Date.now();
+    const sinceLast = lane.lastAttemptAt ? Math.round((attemptStart - lane.lastAttemptAt) / 1000) : null;
+    lane.lastAttemptAt = attemptStart;
 
     try {
       const payload = { phone: contact.phone, message: personalizedMsg, request_id: contact.requestId, simulate: false, allow_simulation: false };
@@ -867,7 +888,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
           ack: 0
         }, cleanPhone, { phone: cleanPhone, agentName: lane.name, viaUserId: lane.id, viaNumber: lane.phone, fromChatly: true }).catch(() => {});
       }
-      log(`✅ ${lane.name} (${lane.display}) ➔ ${contact.display || contact.phone}  [${lane.sent + lane.failed}/${lane.assigned}]`, 'success');
+      // the real timing, so the log shows what actually happened (send time and gap since the last one)
+      const took = ((Date.now() - attemptStart) / 1000).toFixed(1);
+      log(`✅ ${lane.name} (${lane.display}) ➔ ${contact.display || contact.phone}  [${lane.sent + lane.failed}/${lane.assigned}] · sent in ${took}s${sinceLast !== null ? ` · ${sinceLast}s after the previous` : ''}`, 'success');
     } catch (err) {
       // A send that died because the TM's WhatsApp dropped ("Connection Closed", or a
       // submission that never confirmed while the device went offline) is retried after the
@@ -906,16 +929,17 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     if (state.status !== 'running') return;
     if (lane.status === 'offline') { scheduleLane(lane, 5000); return; }
     if (lane.pausedUntil && Date.now() < lane.pausedUntil) return;   // recordRefusal already scheduled the re-check
-    // also applies to campaigns saved before the 6 s floor existed (e.g. resumed after a restart)
-    const minSec = Math.max(MIN_DELAY_S, state.minDelay || 8);
-    const maxSec = Math.max(minSec, state.maxDelay || 15);
-    // The full gap applies after every attempt, including numbers that turned out not to be on
-    // WhatsApp: rapid-fire number lookups look like scraping and get numbers restricted.
-    const jitter = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
-    lane.nextAt = Date.now() + jitter * 1000;
+    const minSec = clampDelay(state.minDelay || 10);
+    const maxSec = Math.max(minSec, clampDelay(state.maxDelay || minSec));
+    const gapSec = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;   // one fixed gap when min = max
+    // The gap counts from the START of this attempt, so "every 10 s" really is every 10 s even
+    // when a send takes a few seconds. Applies to numbers not on WhatsApp too (rapid-fire
+    // lookups look like scraping).
+    const waitMs = Math.max(250, gapSec * 1000 - (Date.now() - attemptStart));
+    lane.nextAt = Date.now() + waitMs;
     lane.status = 'waiting';
     saveState();
-    scheduleLane(lane, jitter * 1000);
+    scheduleLane(lane, waitMs);
   }
 
   function kickAllLanes() {
@@ -944,12 +968,18 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     picked = picked.filter(s => s && s.id && s.roleType !== 'admin' && s.roleType !== 'superadmin' && s.role !== 'Admin');
     const seenIds = new Set();
     picked = picked.filter(s => (seenIds.has(s.id) ? false : (seenIds.add(s.id), true)));
+    // closers the admin stopped get no campaign numbers until resumed
+    laneUsers.at = 0;   // read users.json fresh for the start
+    const stoppedByAdmin = picked.filter(s => laneUser(s.id)?.campaign_paused);
+    picked = picked.filter(s => !laneUser(s.id)?.campaign_paused);
     const hasDevice = s => typeof deviceReady === 'function' && deviceReady(s.id);
     const anyDeviceReady = picked.some(s => hasDevice(s));
     const mainReady = isMainOnline();
 
     if (!picked.length) {
-      return { success: false, status: state.status, message: 'No closers or team members found for this company to send campaign outreach.' };
+      return { success: false, status: state.status, message: stoppedByAdmin.length
+        ? 'Every closer in this campaign is stopped in the admin portal. Resume at least one to send.'
+        : 'No closers or team members found for this company to send campaign outreach.' };
     }
 
     if (!anyDeviceReady && !mainReady) {
@@ -1035,11 +1065,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.currentIndex = 0;
     state.totalSent = 0;
     state.totalFailed = 0;
-    const requestedDelay = parseInt(params.minDelay, 10) || parseInt(params.delay, 10) || 5;
-    // Faster than one message every ~6 s from one number gets WhatsApp numbers throttled
-    // (sends hang, then "unconfirmed") or banned, so 6 s is the floor per WhatsApp.
-    state.minDelay = Math.max(MIN_DELAY_S, requestedDelay);
-    state.maxDelay = Math.max(state.minDelay + 3, parseInt(params.maxDelay, 10) || (state.minDelay + 4));
+    // One gap for every message (the campaign page sends minDelay = maxDelay = the chosen gap).
+    state.minDelay = clampDelay(parseInt(params.delay, 10) || parseInt(params.minDelay, 10) || 10);
+    state.maxDelay = Math.max(state.minDelay, clampDelay(parseInt(params.maxDelay, 10) || state.minDelay));
     state.remainingSeconds = 0;
     state.assignMode = 'equal_split';
     state.status = 'running';
@@ -1051,6 +1079,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     log(`🚀 Campaign "${state.name}" launched for ${companyName}: ${state.audience.length} numbers split equally across ${n} Team Member${n > 1 ? 's' : ''}.`, 'info');
     log(`📱 ${state.lanes.map(l => `${l.name} (${l.display}) → ${l.assigned} numbers`).join(' | ')}`, 'info');
     if (skipped.length) log(`⚠️ Not included (WhatsApp not connected): ${skipped.map(s => s.name).join(', ')}`, 'warn');
+    if (stoppedByAdmin.length) log(`⏹️ Not included (stopped by the admin): ${stoppedByAdmin.map(s => s.name).join(', ')}`, 'warn');
+    log(`⏱️ Gap between messages: ${state.minDelay === state.maxDelay ? state.minDelay + ' s' : state.minDelay + '-' + state.maxDelay + ' s'} per WhatsApp.`, 'info');
     recount();
     writeStateNow();
     kickAllLanes();
