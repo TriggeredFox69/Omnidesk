@@ -2328,6 +2328,10 @@ async function handleSadminLogin(e) {
   }
   @keyframes regSpin { to { transform:rotate(360deg); } }
   .reg-foot { padding:12px 0 24px; text-align:center; font-size:13px; line-height:1.5; color:var(--wa-text-muted); }
+  .reg-terms { display:flex; align-items:flex-start; gap:10px; margin:0 0 12px; font-size:13px; line-height:1.45; color:var(--wa-text-secondary); cursor:pointer; }
+  .reg-terms input { width:18px; height:18px; margin:1px 0 0; flex-shrink:0; accent-color:#1fe08a; cursor:pointer; }
+  .reg-terms a { color:#1fe08a; font-weight:700; text-decoration:underline; text-underline-offset:2px; white-space:nowrap; }
+  .reg-terms.need { color:var(--reg-err); }
 
   /* Tablet / desktop: centred card */
   @media (min-width: 600px) {
@@ -2469,6 +2473,10 @@ async function handleSadminLogin(e) {
       </details>
 
       <div class="reg-actions">
+        <label class="reg-terms" for="regTerms">
+          <input type="checkbox" id="regTerms" checked onchange="if(this.checked){this.closest('.reg-terms').classList.remove('need');var b=document.getElementById('tmRegModalError');if(b)b.style.display='none';}">
+          <span>By signing up you agree to Chatly's Terms of Service. <a href="/terms" target="_blank" rel="noopener">Learn more</a></span>
+        </label>
         <div class="error-box" id="tmRegModalError" role="alert"></div>
         <button type="submit" id="btnSubmitTMReg" class="reg-submit">Submit application</button>
       </div>
@@ -2886,6 +2894,14 @@ async function handleTMRegisterSubmit(e) {
   e.preventDefault();
   const btn = document.getElementById('btnSubmitTMReg');
   const errBox = document.getElementById('tmRegModalError');
+  const terms = document.getElementById('regTerms');
+  if (terms && !terms.checked) {
+    terms.closest('.reg-terms')?.classList.add('need');
+    errBox.textContent = "Please tick the box to accept Chatly's Terms of Service before signing up.";
+    errBox.style.display = 'block';
+    terms.focus();
+    return;
+  }
   btn.disabled = true;
   btn.textContent = 'Submitting…';
   errBox.style.display = 'none';
@@ -2917,7 +2933,8 @@ async function handleTMRegisterSubmit(e) {
         gender,
         pfp,
         role,
-        referred_by_tl
+        referred_by_tl,
+        accepted_terms: !!document.getElementById('regTerms')?.checked
       })
     });
     const data = await res.json();

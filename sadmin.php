@@ -417,6 +417,92 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     .ad-form label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); font-weight: 700; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .ad-form input { width: 100%; min-width: 0; padding: 7px 9px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--text); font: 600 13px 'JetBrains Mono', monospace; }
     .ad-form input:focus { outline: none; border-color: var(--green); }
+
+    /* Ultimate campaign (red) */
+    .nav-uc .ic { color: var(--red); }
+    .nav-uc.active { background: linear-gradient(90deg, rgba(255, 70, 90, 0.18), rgba(255, 70, 90, 0.02)); border-color: rgba(255, 70, 90, 0.35); }
+    .nav-uc.active::before { background: var(--red); box-shadow: 0 0 10px var(--red); }
+    .nav-uc.active .ic { color: var(--red); }
+    .nav-live.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+    .uc { --uc: #ff3b55; --uc-2: #c8102e; --uc-soft: rgba(255, 59, 85, 0.1); --uc-line: rgba(255, 59, 85, 0.3); }
+    .uc .fc:focus { border-color: var(--uc); box-shadow: 0 0 0 3px rgba(255, 59, 85, 0.16); }
+    .uc-hero { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; padding: 18px 20px; border-radius: var(--r); margin-bottom: 14px;
+      border: 1px solid var(--uc-line); background: radial-gradient(circle at 0% 0%, rgba(255, 59, 85, 0.22), transparent 55%), linear-gradient(135deg, rgba(200, 16, 46, 0.16), rgba(255, 59, 85, 0.03)); }
+    .uc-kicker { font: 700 10.5px 'JetBrains Mono', monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--uc); }
+    .uc-hero h2 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin-top: 4px; }
+    .uc-hero p { font-size: 12.5px; color: var(--text-2); margin-top: 6px; max-width: 720px; line-height: 1.5; }
+    .uc-state { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 99px; border: 1px solid var(--line-2); background: var(--panel-2); font: 700 12px 'JetBrains Mono', monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); white-space: nowrap; }
+    .uc-state i { width: 9px; height: 9px; border-radius: 50%; background: var(--text-3); }
+    .uc-state.running { color: var(--uc); border-color: var(--uc-line); background: var(--uc-soft); }
+    .uc-state.running i { background: var(--uc); box-shadow: 0 0 0 0 rgba(255, 59, 85, .6); animation: ucRing 1.6s infinite; }
+    .uc-state.paused { color: var(--amber); border-color: rgba(255, 181, 71, .35); } .uc-state.paused i { background: var(--amber); }
+    .uc-state.completed { color: var(--green); } .uc-state.completed i { background: var(--green); }
+    @keyframes ucRing { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 85, .6); } 70% { box-shadow: 0 0 0 9px rgba(255, 59, 85, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 85, 0); } }
+    .uc-kpis { margin-bottom: 14px; }
+    .uc-kpis .hl { border-color: var(--uc-line); background: linear-gradient(180deg, rgba(255, 59, 85, 0.14), rgba(255, 59, 85, 0.02)); }
+    .uc-kpis .hl b { color: var(--uc); }
+    .uc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+    .uc-card { background: var(--panel); border: 1px solid var(--line-2); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+    .uc-card-h { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+    .uc-card-h b { font-size: 15px; font-weight: 800; }
+    .uc-step { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font: 800 13px 'Inter', sans-serif; color: #fff; background: linear-gradient(135deg, var(--uc), var(--uc-2)); box-shadow: 0 4px 14px rgba(255, 59, 85, 0.35); flex: 0 0 auto; }
+    .uc-chip { margin-left: auto; padding: 4px 10px; border-radius: 99px; font-size: 11.5px; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--uc), var(--uc-2)); white-space: nowrap; }
+    .uc-chip.ghost { color: var(--uc); background: var(--uc-soft); border: 1px solid var(--uc-line); font-weight: 700; }
+    .uc-auto { display: flex; align-items: center; gap: 12px; width: 100%; margin: 14px 0 12px; padding: 12px 14px; border-radius: 13px; cursor: pointer; text-align: left; color: var(--text);
+      border: 1.5px solid var(--line-2); background: var(--panel-2); transition: border-color .2s, background .2s; }
+    .uc-auto-ic { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--track); color: var(--text-2); flex: 0 0 auto; }
+    .uc-auto-t { flex: 1; min-width: 0; } .uc-auto-t b { display: block; font-size: 14px; } .uc-auto-t small { display: block; font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+    .uc-switch { width: 44px; height: 24px; border-radius: 99px; background: var(--track); position: relative; flex: 0 0 auto; transition: background .2s; }
+    .uc-switch i { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
+    .uc-auto[aria-pressed="true"] { border-color: var(--uc); background: var(--uc-soft); }
+    .uc-auto[aria-pressed="true"] .uc-auto-ic { background: linear-gradient(135deg, var(--uc), var(--uc-2)); color: #fff; }
+    .uc-auto[aria-pressed="true"] .uc-auto-t small { color: var(--uc); font-weight: 600; }
+    .uc-auto[aria-pressed="true"] .uc-switch { background: var(--uc); } .uc-auto[aria-pressed="true"] .uc-switch i { left: 23px; }
+    .uc-box { border: 1px solid var(--line); background: var(--panel-2); border-radius: 13px; padding: 14px; }
+    .uc-count { display: flex; align-items: center; gap: 10px; } .uc-count .fc { font: 700 20px 'JetBrains Mono', monospace; padding: 10px 12px; } .uc-count span { color: var(--text-3); font-size: 12.5px; }
+    .uc-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+    .uc-quick button, .uc-tags button { border: 1px solid var(--line-2); background: var(--panel); color: var(--text); font: 700 12px 'Inter', sans-serif; padding: 6px 12px; border-radius: 99px; cursor: pointer; }
+    .uc-quick button:hover, .uc-tags button:hover { border-color: var(--uc); color: var(--uc); }
+    .uc-left { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); font-size: 12.5px; color: var(--text-2); }
+    .uc-left b { color: var(--uc); font-family: 'JetBrains Mono', monospace; }
+    .uc-file-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .uc-types { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .uc-types button { padding: 10px 6px; border-radius: 11px; border: 1.5px solid var(--line-2); background: var(--panel-2); color: var(--text); font: 700 12.5px 'Inter', sans-serif; cursor: pointer; }
+    .uc-types button.on { border-color: var(--uc); background: var(--uc-soft); color: var(--uc); }
+    .uc-media { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .uc-msg-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .uc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .uc-tags button { font-family: 'JetBrains Mono', monospace; color: var(--uc); background: var(--uc-soft); border-color: var(--uc-line); }
+    #ucMsg { resize: vertical; line-height: 1.55; min-height: 150px; }
+    .uc-gap { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .uc-gap-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+    .uc-gap-tag { padding: 4px 11px; border-radius: 99px; font-size: 11.5px; font-weight: 800; color: #fff; background: var(--gapc, #f97316); white-space: nowrap; }
+    .uc-gap-row { display: flex; align-items: center; gap: 12px; margin: 12px 0 6px; }
+    .uc-gap-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--gapc, #f97316); }
+    .uc-gap-row .fc { width: 72px; text-align: center; font: 700 18px 'JetBrains Mono', monospace; padding: 7px; border: 2px solid var(--gapc, #f97316); color: var(--gapc, #f97316); }
+    .uc-gap-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); margin-bottom: 6px; }
+    .uc-gap-scale .r { color: #e11d48; font-weight: 700; } .uc-gap-scale .g { color: var(--green); font-weight: 700; }
+    .uc-preview { min-height: 150px; border-radius: 13px; padding: 14px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255, 59, 85, 0.06), transparent), var(--panel-2); }
+    .uc-bubble { margin-left: auto; max-width: 92%; width: fit-content; padding: 10px 12px; border-radius: 12px 12px 3px 12px; background: #fde2e6; color: #2a0a10; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+    .uc-checks { list-style: none; margin: 12px 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2); display: grid; gap: 7px; font-size: 12.5px; }
+    .uc-checks li { display: flex; gap: 8px; align-items: flex-start; } .uc-checks li::before { content: '•'; font-weight: 800; color: var(--amber); } .uc-checks li.ok::before { content: '✓'; color: var(--green); }
+    .uc-checks li.bad { color: var(--amber); }
+    .uc-start { width: 100%; padding: 14px; border: 0; border-radius: 13px; font: 800 15px 'Inter', sans-serif; color: #fff; cursor: pointer; background: linear-gradient(135deg, var(--uc), var(--uc-2)); box-shadow: 0 8px 24px rgba(255, 59, 85, 0.35); transition: transform .15s, opacity .15s; }
+    .uc-start:hover { transform: translateY(-1px); } .uc-start:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+    .uc-run { margin-top: 12px; }
+    .uc-prog-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-2); margin-bottom: 6px; } .uc-prog-top b { font: 700 13px 'JetBrains Mono', monospace; color: var(--text); }
+    .uc-bar i { background: linear-gradient(90deg, var(--uc-2), var(--uc)); }
+    .uc-run-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; } .uc-run-btns .btn { flex: 1; }
+    .uc-log-h { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 6px; font-size: 13px; }
+    .uc-log { height: 230px; overflow-y: auto; border-radius: 12px; padding: 10px 12px; background: #0b0204; border: 1px solid rgba(255, 59, 85, .25); font: 11.5px/1.6 'JetBrains Mono', monospace; color: #ffd6dc; }
+    .uc-log-l { white-space: pre-wrap; overflow-wrap: anywhere; } .uc-log-l .t { color: #a06a73; } .uc-log-l.success { color: #8ff0b6; } .uc-log-l.warn { color: #ffcf7a; } .uc-log-l.error { color: #ff7d8f; } .uc-log-l.dim { color: #a06a73; }
+    .uc-panel::before { border-color: var(--uc); }
+    .uc-panel .panel-t::before { background: var(--uc); box-shadow: 0 0 8px var(--uc); }
+    .uc-panel input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--uc); cursor: pointer; }
+    .uc-panel tr.off td { opacity: .55; }
+    .uc-lane { font: 600 12px 'JetBrains Mono', monospace; white-space: nowrap; }
+    @media (max-width: 1250px) { .uc-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .uc-grid > .uc-card:last-child { grid-column: 1 / -1; } }
+    @media (max-width: 760px) { .uc-grid { grid-template-columns: minmax(0, 1fr); } .uc-hero h2 { font-size: 20px; } .uc-types { grid-template-columns: 1fr; } }
     .ad-form input.dirty { border-color: var(--amber); }
     .ad-msg { grid-column: 1 / -1; font-size: 11.5px; }
     .ad-msg:empty { display: none; }
@@ -660,6 +746,7 @@ async function handleSadminLogin(e) {
         <button class="nav-i" data-act="nav" data-sec="overview"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Overview</span></button>
         <button class="nav-i" data-act="nav" data-sec="chats"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg><span>Live chats</span><span class="nav-live" id="navChatsLive"></span></button>
         <div class="nav-g">Manage</div>
+        <button class="nav-i nav-uc" data-act="nav" data-sec="ultimate"><svg class="ic" viewBox="0 0 24 24"><path d="M3 11l15-6v14L3 13z"/><path d="M7 13.5V18a2 2 0 0 0 4 0v-3"/><path d="M21 9v4"/></svg><span>Ultimate campaign</span><span class="nav-live red" id="navUcLive" hidden></span></button>
         <button class="nav-i" data-act="nav" data-sec="companies"><svg class="ic" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3"/></svg><span>Companies</span></button>
         <button class="nav-i" data-act="nav" data-sec="autodata"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg><span>Auto Data limits</span></button>
         <button class="nav-i" data-act="nav" data-sec="approvals"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M16 11l2 2 4-4"/></svg><span>Closer approvals</span><span class="nav-b" id="navPending" hidden>0</span></button>
@@ -798,6 +885,123 @@ async function handleSadminLogin(e) {
               <table class="rt">
                 <thead><tr><th>Company</th><th>Plan</th><th>Workforce</th><th>Msgs today</th><th>Auto Data</th><th>Fallback phone</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody id="companyTableBody"><tr><td class="empty" colspan="8">Loading companies…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ULTIMATE CAMPAIGN ============ -->
+      <section class="sec uc" data-sec="ultimate" hidden>
+        <div class="uc-hero">
+          <div>
+            <div class="uc-kicker">Super admin · every WhatsApp on Chatly</div>
+            <h2>Ultimate campaign</h2>
+            <p>One campaign sent from every connected closer WhatsApp in every company. Replies land in the sending closer's own inbox. WhatsApps already sending their company's campaign are skipped.</p>
+          </div>
+          <div class="uc-state" id="ucState"><i></i><span>Idle</span></div>
+        </div>
+        <div class="mini-kpis uc-kpis">
+          <div class="hl"><span>Connected WhatsApps</span><b id="ucKConn">—</b><small id="ucKConnSub">across all companies</small></div>
+          <div><span>Selected to send</span><b id="ucKSel">—</b><small>ticked below</small></div>
+          <div><span>Companies</span><b id="ucKCo">—</b><small>with a connected WhatsApp</small></div>
+          <div><span>Auto Data left</span><b id="ucKPool">—</b><small>fresh numbers for Ultimate</small></div>
+        </div>
+
+        <div class="uc-grid">
+          <!-- 1. Numbers -->
+          <div class="uc-card">
+            <div class="uc-card-h"><span class="uc-step">1</span><b>Numbers</b><span class="uc-chip" id="ucNumChip">0</span></div>
+            <label class="fl" for="ucName">Campaign name</label>
+            <input type="text" id="ucName" class="fc" maxlength="120" placeholder="Ultimate campaign">
+            <button type="button" class="uc-auto" id="ucAutoBtn" aria-pressed="true">
+              <span class="uc-auto-ic"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
+              <span class="uc-auto-t"><b>Auto Data</b><small id="ucAutoSub">On: numbers come from the Chatly number pool</small></span>
+              <span class="uc-switch"><i></i></span>
+            </button>
+            <div id="ucAutoBox" class="uc-box">
+              <label class="fl" for="ucCount">How many messages to send?</label>
+              <div class="uc-count"><input type="number" id="ucCount" class="fc" min="1" max="50000" step="1" value="100" inputmode="numeric"><span>messages</span></div>
+              <div class="uc-quick">
+                <button type="button" data-uc-count="100">100</button><button type="button" data-uc-count="500">500</button><button type="button" data-uc-count="1000">1,000</button><button type="button" data-uc-count="5000">5,000</button><button type="button" data-uc-count="10000">10,000</button>
+              </div>
+              <div class="uc-left" id="ucPoolLeft">Loading the pool…</div>
+              <p class="hint">Fresh numbers no company has a chat with yet, split equally between the ticked WhatsApps. Numbers not on WhatsApp are skipped.</p>
+            </div>
+            <div id="ucManualBox" class="uc-box" hidden>
+              <label class="fl" for="ucNumbers">Paste numbers (one per line, or separated by commas)</label>
+              <textarea id="ucNumbers" class="fc" rows="7" placeholder="03001234567&#10;923211234567"></textarea>
+              <div class="uc-file-row">
+                <label class="btn btn-sm" for="ucNumFile">Upload .txt / .csv</label>
+                <input type="file" id="ucNumFile" accept=".txt,.csv,text/plain,text/csv" hidden>
+                <span class="hint" id="ucNumCount" style="margin:0">0 valid numbers</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Message -->
+          <div class="uc-card">
+            <div class="uc-card-h"><span class="uc-step">2</span><b>Message</b><span class="uc-chip ghost">Personalized per contact</span></div>
+            <label class="fl">Message type</label>
+            <div class="uc-types" id="ucTypes">
+              <button type="button" class="on" data-uc-type="text">Text only</button>
+              <button type="button" data-uc-type="text_image">Text + image</button>
+              <button type="button" data-uc-type="audio">Voice note</button>
+            </div>
+            <div class="uc-media" id="ucMediaBox" hidden>
+              <label class="btn btn-sm" for="ucMediaFile" id="ucMediaLbl">Choose image</label>
+              <input type="file" id="ucMediaFile" hidden>
+              <span class="hint" id="ucMediaName" style="margin:0">No file chosen</span>
+            </div>
+            <div class="uc-msg-top"><label class="fl" for="ucMsg" style="margin:0">Your message</label><span class="hint" style="margin:0">Click a tag to insert it</span></div>
+            <div class="uc-tags"><button type="button" data-uc-tag="{name}">{name}</button><button type="button" data-uc-tag="{phone}">{phone}</button><button type="button" data-uc-tag="{city}">{city}</button><button type="button" data-uc-tag="{link}">{link}</button></div>
+            <textarea id="ucMsg" class="fc" rows="8" maxlength="4000" placeholder="Write your message...&#10;&#10;Tip: {name} becomes each person's name, and {Salam|AoA|Hello} picks one greeting at random so every message is a little different."></textarea>
+            <div class="uc-gap">
+              <div class="uc-gap-top"><b>Gap between messages</b><span class="uc-gap-tag" id="ucGapTag">Moderate</span></div>
+              <div class="uc-gap-row">
+                <input type="range" id="ucGapRange" min="1" max="60" step="1" value="10" aria-label="Gap between messages in seconds">
+                <input type="number" id="ucGap" class="fc" min="1" max="60" step="1" value="10" inputmode="numeric" aria-label="Gap in seconds"><span class="hint" style="margin:0">sec</span>
+              </div>
+              <div class="uc-gap-scale"><span class="r">1s risky</span><span>10s</span><span class="g">30s+ safe</span><span>60s</span></div>
+              <div class="hint" id="ucGapText">Each WhatsApp sends one message every 10 seconds.</div>
+            </div>
+          </div>
+
+          <!-- 3. Check & start -->
+          <div class="uc-card">
+            <div class="uc-card-h"><span class="uc-step">3</span><b>Check &amp; start</b><span class="uc-chip ghost">Preview</span></div>
+            <div class="uc-preview"><div class="uc-bubble" id="ucPreview">Type a message to preview it here.</div></div>
+            <ul class="uc-checks" id="ucChecks"></ul>
+            <button type="button" class="uc-start" id="ucStartBtn" data-act="uc-start">▶ Start ultimate campaign</button>
+            <div class="uc-run" id="ucRunBox" hidden>
+              <div class="uc-prog"><div class="uc-prog-top"><b id="ucProgText">0 / 0</b><span id="ucProgSub">sent · failed</span></div><div class="bar uc-bar"><i id="ucProgBar"></i></div></div>
+              <div class="uc-run-btns">
+                <button type="button" class="btn btn-sm" id="ucPauseBtn" data-act="uc-pause">Pause</button>
+                <button type="button" class="btn btn-danger btn-sm" id="ucStopBtn" data-act="uc-stop">■ Stop now</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="ucClearBtn" data-act="uc-clear" hidden>Clear</button>
+              </div>
+            </div>
+            <div class="uc-log-h"><b>Activity log</b><span class="hint" style="margin:0" id="ucLogCount">0 events</span></div>
+            <div class="uc-log" id="ucLog"><div class="uc-log-l dim">Ready. Pick the WhatsApps below, write the message and press Start.</div></div>
+          </div>
+        </div>
+
+        <div class="panel uc-panel">
+          <div class="panel-h">
+            <div><div class="panel-t">Every WhatsApp on Chatly</div><div class="panel-d" id="ucSendCount">Loading…</div></div>
+            <div class="tools">
+              <input type="search" id="ucSearch" class="fc fc-sm search" placeholder="Search closer, company, number…">
+              <select id="ucCoFilter" class="fc fc-sm"><option value="">All companies</option></select>
+              <button class="btn btn-sm" data-act="uc-all">Tick all ready</button>
+              <button class="btn btn-sm" data-act="uc-none">Untick all</button>
+              <button class="btn btn-sm" data-act="uc-reload">Refresh</button>
+            </div>
+          </div>
+          <div class="panel-b flush">
+            <div class="tbl-wrap">
+              <table class="rt">
+                <thead><tr><th style="width:40px"></th><th>Closer</th><th>Company</th><th>WhatsApp</th><th>Status</th><th>Today</th><th>In this campaign</th></tr></thead>
+                <tbody id="ucSendBody"><tr><td class="empty" colspan="7">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -1497,6 +1701,7 @@ const coName = id => { const c = S.companies.find(x => x.id === id); return c ? 
 const SECTIONS = {
   overview:   ['Overview', 'Live platform pulse across every company'],
   chats:      ['Live chats', 'Every WhatsApp message across all companies, as it happens'],
+  ultimate:   ['Ultimate campaign', 'One campaign from every connected WhatsApp on Chatly'],
   companies:  ['Companies', 'Open any company admin, check stats, suspend or delete'],
   autodata:   ['Auto Data limits', 'How many pool numbers each company may use, per day and in total'],
   approvals:  ['Closer approvals', 'Closer applicants waiting for approval on any company'],
@@ -1527,6 +1732,7 @@ function onShow(name) {
   if (name === 'chats') { renderTerm(); T.stick = true; T.unseen = 0; updateJump(); scrollTermBottom(); pollChat(); }
   if (name === 'overview') { renderOverview(); pollChat(); }
   if (name === 'companies') renderCompanies();
+  if (name === 'ultimate') ucOpen();
   if (name === 'autodata') { renderAutoData(); loadUsage(); }
   if (name === 'approvals') loadMasterPendingTMs();
   if (name === 'settlement') loadNunnoSettlement();
@@ -3092,6 +3298,13 @@ document.addEventListener('click', e => {
     case 'em-save': emSaveSettings(); break;
     case 'em-clear-pass': emClearPass(); break;
     case 'em-test': emTest(); break;
+    case 'uc-start': ucStart(); break;
+    case 'uc-pause': ucControl(UC.status === 'paused' ? 'resume' : 'pause'); break;
+    case 'uc-stop': ucStop(); break;
+    case 'uc-clear': ucControl('clear'); break;
+    case 'uc-all': ucPickAll(true); break;
+    case 'uc-none': ucPickAll(false); break;
+    case 'uc-reload': ucLoadSenders(); ucLoadPool(); break;
   }
 });
 document.addEventListener('change', e => {
@@ -3131,6 +3344,356 @@ $('#adList').addEventListener('keydown', e => {
 });
 
 /* =========================================================
+   Ultimate campaign (every connected WhatsApp on Chatly)
+   ========================================================= */
+const UC_API = 'api/ultimate_campaign.php';
+const UC = {
+  senders: [], picked: new Set(), edited: false, loaded: false,
+  auto: true, type: 'text', media: null, pool: null,
+  status: 'idle', last: null, starting: false
+};
+const ucReady = s => s.connected && !s.stopped && !s.plan_locked && !s.limit_reached && !s.busy_in;
+function ucPhones(text) {
+  const out = new Set();
+  String(text || '').split(/[\s,;|]+/).forEach(t => {
+    let d = t.replace(/\D/g, '');
+    if (d.startsWith('0092')) d = d.slice(2);
+    else if (d.startsWith('03') && d.length === 11) d = '92' + d.slice(1);
+    else if (d.startsWith('3') && d.length === 10) d = '92' + d;
+    if (d.length >= 10 && d.length <= 15) out.add(d);
+  });
+  return [...out];
+}
+function ucGapColor(s) {
+  if (s <= 3) return ['#b91c1c', 'Very risky'];
+  if (s < 10) return ['#ef4444', 'Risky'];
+  if (s < 20) return ['#f97316', 'Moderate'];
+  if (s < 30) return ['#84cc16', 'Good'];
+  return ['#16a34a', 'Safe'];
+}
+function ucSetGap(v, from) {
+  const s = Math.min(60, Math.max(1, parseInt(v, 10) || 10));
+  if (from !== 'range') $('#ucGapRange').value = s;
+  if (from !== 'box') $('#ucGap').value = s;
+  const [c, label] = ucGapColor(s);
+  const box = $('#ucGap').closest('.uc-gap');
+  box.style.setProperty('--gapc', c);
+  $('#ucGapTag').textContent = label;
+  $('#ucGapText').textContent = `Each WhatsApp sends one message every ${s} second${s === 1 ? '' : 's'}.` + (s < 10 ? ' Risky: numbers get restricted much faster.' : s >= 30 ? ' Safest for the numbers.' : '');
+  ucRenderChecks();
+}
+function ucGapValue() { return Math.min(60, Math.max(1, parseInt($('#ucGap').value, 10) || 10)); }
+function ucSetAuto(on) {
+  UC.auto = !!on;
+  $('#ucAutoBtn').setAttribute('aria-pressed', UC.auto ? 'true' : 'false');
+  $('#ucAutoSub').textContent = UC.auto ? 'On: numbers come from the Chatly number pool' : 'Off: paste or upload your own numbers';
+  $('#ucAutoBox').hidden = !UC.auto;
+  $('#ucManualBox').hidden = UC.auto;
+  ucRenderChecks();
+}
+function ucSetType(t) {
+  UC.type = t;
+  UC.media = null;
+  $$('#ucTypes [data-uc-type]').forEach(b => b.classList.toggle('on', b.dataset.ucType === t));
+  $('#ucMediaBox').hidden = t === 'text';
+  const f = $('#ucMediaFile');
+  f.value = '';
+  f.accept = t === 'audio' ? 'audio/*,.ogg,.opus,.mp3,.m4a' : 'image/*';
+  $('#ucMediaLbl').textContent = t === 'audio' ? 'Choose voice note' : 'Choose image';
+  $('#ucMediaName').textContent = 'No file chosen';
+  ucRenderChecks();
+}
+function ucCount() {
+  return UC.auto ? Math.max(0, parseInt($('#ucCount').value, 10) || 0) : ucPhones($('#ucNumbers').value).length;
+}
+function ucRenderPreview() {
+  const msg = $('#ucMsg').value.trim();
+  const p = $('#ucPreview');
+  if (!msg) { p.textContent = UC.type === 'audio' ? '🎙️ Voice note' + (UC.media ? ': ' + UC.media.filename : '') : 'Type a message to preview it here.'; return; }
+  const filled = msg
+    .replace(/\{([^{}]+)\}/g, (m, inner) => {
+      const head = inner.split('|')[0].trim().toLowerCase();
+      if (head === 'name') return inner.includes('|') ? inner.split('|')[1].trim() : 'Ali';
+      if (head === 'phone') return '+92 300 1234567';
+      if (head === 'city') return 'Lahore';
+      if (head === 'link') return 'https://chatly.pk';
+      if (head === 'company') return 'Chatly';
+      return inner.includes('|') ? inner.split('|')[0].trim() : inner;
+    });
+  p.textContent = (UC.type === 'text_image' ? '🖼️ ' + (UC.media ? UC.media.filename : 'image') + '\n' : UC.type === 'audio' ? '🎙️ voice note\n' : '') + filled;
+}
+function ucRenderChecks() {
+  const sel = UC.senders.filter(s => UC.picked.has(s.id) && s.connected);
+  const n = ucCount();
+  const items = [];
+  items.push(n > 0 ? ['ok', UC.auto ? `Auto Data: ${fmt(n)} numbers from the pool` : `${fmt(n)} numbers added`] : ['bad', UC.auto ? 'Enter how many messages to send' : 'Add the numbers (step 1)']);
+  const msg = $('#ucMsg').value.trim();
+  if (UC.type === 'audio') items.push(UC.media ? ['ok', 'Voice note ready'] : ['bad', 'Upload the voice note (step 2)']);
+  else {
+    items.push(msg ? ['ok', 'Message written'] : ['bad', 'Write the message (step 2)']);
+    if (UC.type === 'text_image') items.push(UC.media ? ['ok', 'Image ready'] : ['bad', 'Upload the image (step 2)']);
+  }
+  const cos = new Set(sel.map(s => s.company_id));
+  items.push(sel.length ? ['ok', `${fmt(sel.length)} WhatsApp${sel.length === 1 ? '' : 's'} from ${fmt(cos.size)} compan${cos.size === 1 ? 'y' : 'ies'}`] : ['bad', 'Tick at least one connected WhatsApp below']);
+  if (sel.length && n) items.push(['ok', `About ${fmt(Math.ceil(n / sel.length))} messages each, one every ${ucGapValue()} s`]);
+  $('#ucChecks').innerHTML = items.map(([k, t]) => `<li class="${k}">${esc(t)}</li>`).join('');
+  $('#ucNumChip').textContent = UC.auto ? `${fmt(n)} Auto` : fmt(n);
+  $('#ucKSel').textContent = fmt(sel.length);
+  const running = UC.status === 'running' || UC.status === 'paused';
+  const ready = items.every(i => i[0] === 'ok');
+  const btn = $('#ucStartBtn');
+  btn.hidden = running;
+  btn.disabled = !ready || UC.starting;
+  btn.textContent = UC.starting ? 'Starting…' : '▶ Start ultimate campaign';
+  ucRenderPreview();
+}
+function ucStatusTag(s) {
+  if (s.busy_in === 'ultimate') return '<span class="tag red">In this campaign</span>';
+  if (!s.connected) return `<span class="tag gray">${esc(s.state === 'not linked' ? 'Not linked' : 'Offline')}</span>`;
+  if (s.stopped) return '<span class="tag amber">Stopped by admin</span>';
+  if (s.plan_locked) return '<span class="tag amber">Plan not verified</span>';
+  if (s.busy_in) return `<span class="tag cyan" title="Already sending this company's campaign">Busy: ${esc(s.busy_in)}</span>`;
+  if (s.limit_reached) return '<span class="tag amber">Daily limit reached</span>';
+  return '<span class="tag green">Ready</span>';
+}
+function ucRenderSenders() {
+  const body = $('#ucSendBody');
+  const q = ($('#ucSearch').value || '').trim().toLowerCase();
+  const co = $('#ucCoFilter').value;
+  const lanes = new Map(((UC.last && UC.last.lanes) || []).map(l => [String(l.id), l]));
+  const list = UC.senders.filter(s => (!co || s.company_id === co) &&
+    (!q || [s.name, s.username, s.company_name, s.number].join(' ').toLowerCase().includes(q)));
+  const conn = UC.senders.filter(s => s.connected);
+  $('#ucKConn').textContent = fmt(conn.length);
+  $('#ucKConnSub').textContent = `of ${fmt(UC.senders.length)} closers`;
+  $('#ucKCo').textContent = fmt(new Set(conn.map(s => s.company_id)).size);
+  $('#ucSendCount').textContent = `${fmt(conn.length)} connected of ${fmt(UC.senders.length)} active closers. Ready ones are ticked; untick any number you want to protect.`;
+  if (!UC.senders.length) { body.innerHTML = emptyRow(7, UC.loaded ? 'No active closers on Chatly yet.' : 'Loading…'); return; }
+  if (!list.length) { body.innerHTML = emptyRow(7, 'No WhatsApp matches this search.'); return; }
+  body.innerHTML = list.map(s => {
+    const can = s.connected && !s.busy_in;
+    const lane = lanes.get(s.id);
+    const laneTxt = lane ? `<span class="uc-lane">${fmt(lane.sent)} / ${fmt(lane.assigned)}</span><small>${esc(lane.status || '')}${lane.failed ? ' · ' + fmt(lane.failed) + ' failed' : ''}</small>` : '<small>—</small>';
+    const lim = s.limit > 0 ? ` / ${fmt(s.limit)}` : '';
+    return `<tr class="${can ? '' : 'off'}">
+      ${td('', `<input type="checkbox" data-uc-pick="${esc(s.id)}" ${UC.picked.has(s.id) ? 'checked' : ''} ${can ? '' : 'disabled'} aria-label="Send from ${esc(s.name)}">`)}
+      ${td('Closer', `<b>${esc(s.name)}</b><small>@${esc(s.username)} · ${esc(s.role)}</small>`)}
+      ${td('Company', esc(s.company_name))}
+      ${td('WhatsApp', `<span class="mono">${s.number ? '+' + esc(s.number) : '—'}</span>`)}
+      ${td('Status', ucStatusTag(s))}
+      ${td('Today', `<span class="mono">${fmt(s.sent_today)}${lim}</span>`)}
+      ${td('In this campaign', laneTxt)}
+    </tr>`;
+  }).join('');
+}
+function ucFillCompanies() {
+  const sel = $('#ucCoFilter'), cur = sel.value;
+  const cos = new Map();
+  UC.senders.forEach(s => cos.set(s.company_id, s.company_name));
+  sel.innerHTML = '<option value="">All companies</option>' + [...cos].sort((a, b) => a[1].localeCompare(b[1]))
+    .map(([id, nm]) => `<option value="${esc(id)}">${esc(nm)}</option>`).join('');
+  if (cos.has(cur)) sel.value = cur;
+}
+const ucLoadSenders = guarded(async function () {
+  try {
+    const d = await api(UC_API + '?action=senders');
+    if (!d.success) { $('#ucSendCount').textContent = d.message || 'Could not load the WhatsApps.'; return; }
+    UC.senders = Array.isArray(d.senders) ? d.senders : [];
+    UC.loaded = true;
+    const byId = new Map(UC.senders.map(s => [s.id, s]));
+    if (!UC.edited) UC.picked = new Set(UC.senders.filter(ucReady).map(s => s.id));
+    else UC.picked.forEach(id => { const s = byId.get(id); if (!s || !s.connected) UC.picked.delete(id); });
+    ucFillCompanies();
+    ucRenderSenders();
+    ucRenderChecks();
+  } catch (err) {
+    $('#ucSendCount').textContent = 'Could not load the WhatsApps: ' + err.message;
+  }
+});
+const ucLoadPool = guarded(async function () {
+  try {
+    const d = await api(UC_API + '?action=auto_status');
+    UC.pool = d;
+    const el = $('#ucPoolLeft');
+    if (d.success) {
+      el.innerHTML = `<b>${fmt(d.allowed_now != null ? d.allowed_now : d.remaining)}</b> fresh numbers left for the Ultimate campaign`;
+      $('#ucKPool').textContent = fmt(d.remaining);
+    } else {
+      el.textContent = d.message || 'Auto Data is not available right now.';
+      $('#ucKPool').textContent = '—';
+    }
+  } catch (err) { $('#ucPoolLeft').textContent = 'Could not load the pool: ' + err.message; }
+});
+function ucApplyStatus(d) {
+  if (!d || !d.success) return;
+  UC.last = d;
+  const st = d.status || 'idle';
+  const was = UC.status;
+  UC.status = (d.companyId && d.companyId !== 'CHATLY-HQ') ? 'idle' : st;
+  const running = UC.status === 'running' || UC.status === 'paused';
+  const pill = $('#ucState');
+  pill.className = 'uc-state ' + UC.status;
+  pill.querySelector('span').textContent = { running: 'Sending', paused: 'Paused', stopped: 'Stopped', completed: 'Completed', idle: 'Idle' }[UC.status] || UC.status;
+  $('#navUcLive').hidden = UC.status !== 'running';
+  const total = n0(d.totalContacts), sent = n0(d.totalSent), failed = n0(d.totalFailed), done = n0(d.currentIndex);
+  const hasRun = total > 0 && UC.status !== 'idle';
+  $('#ucRunBox').hidden = !hasRun;
+  if (hasRun) {
+    $('#ucProgText').textContent = `${fmt(done)} / ${fmt(total)}`;
+    $('#ucProgSub').textContent = `${fmt(sent)} sent · ${fmt(failed)} failed · ${fmt((d.lanes || []).length)} WhatsApps`;
+    $('#ucProgBar').style.width = (total ? Math.min(100, done / total * 100) : 0).toFixed(1) + '%';
+    $('#ucPauseBtn').hidden = !running;
+    $('#ucPauseBtn').textContent = UC.status === 'paused' ? '▶ Resume' : 'Pause';
+    $('#ucStopBtn').hidden = !running;
+    $('#ucClearBtn').hidden = running;
+  }
+  const logs = Array.isArray(d.logs) ? d.logs : [];
+  const box = $('#ucLog');
+  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  if (logs.length) {
+    box.innerHTML = logs.map(l => `<div class="uc-log-l ${esc(l.type || '')}"><span class="t">${esc(l.time || '')}</span> ${esc(l.message || '')}</div>`).join('');
+    if (stick || was !== UC.status) box.scrollTop = box.scrollHeight;
+  }
+  $('#ucLogCount').textContent = `${fmt(logs.length)} events`;
+  if (was !== UC.status && (was === 'running') !== (UC.status === 'running')) ucLoadSenders();
+  if (S.section === 'ultimate') ucRenderSenders();
+  ucRenderChecks();
+}
+const ucPoll = guarded(async function () {
+  try { ucApplyStatus(await api(UC_API + '?action=status')); } catch (_) {}
+});
+function ucOpen() {
+  ucPoll();
+  ucLoadSenders();
+  ucLoadPool();
+  ucRenderChecks();
+}
+function ucPickAll(on) {
+  UC.edited = true;
+  if (on) UC.senders.filter(ucReady).forEach(s => UC.picked.add(s.id));
+  else UC.picked.clear();
+  ucRenderSenders();
+  ucRenderChecks();
+}
+async function ucStart() {
+  const sel = UC.senders.filter(s => UC.picked.has(s.id) && s.connected);
+  const n = ucCount();
+  if (!sel.length || !n) { ucRenderChecks(); return; }
+  const cos = new Set(sel.map(s => s.company_id)).size;
+  if (!confirm(`Start the Ultimate campaign?\n\n${fmt(n)} messages from ${fmt(sel.length)} closer WhatsApp${sel.length === 1 ? '' : 's'} in ${fmt(cos)} compan${cos === 1 ? 'y' : 'ies'}, one message every ${ucGapValue()} s per WhatsApp.\n\nReplies go to each closer's own company inbox.`)) return;
+  UC.starting = true;
+  ucRenderChecks();
+  try {
+    const body = {
+      action: 'start', name: $('#ucName').value.trim() || 'Ultimate campaign',
+      message: $('#ucMsg').value, variation: UC.type, media: UC.media,
+      delay: ucGapValue(), auto_data: UC.auto, auto_count: UC.auto ? n : 0,
+      audience: UC.auto ? [] : ucPhones($('#ucNumbers').value).map(p => ({ phone: p })),
+      sender_ids: sel.map(s => s.id)
+    };
+    const d = await postJSON(UC_API + '?action=start', body);
+    if (d.success) {
+      toast(d.auto_data_note ? 'Started. ' + d.auto_data_note : `Started: ${fmt(d.totalContacts || n)} numbers across ${fmt((d.lanes || []).length)} WhatsApps.`, { title: 'Ultimate campaign' });
+      ucApplyStatus(d);
+      ucLoadPool();
+      ucLoadSenders();
+    } else {
+      toast(d.message || 'Could not start the campaign.', { kind: 'err', ms: 7000 });
+    }
+  } catch (err) {
+    toast('Could not start: ' + err.message, { kind: 'err' });
+  } finally {
+    UC.starting = false;
+    ucRenderChecks();
+  }
+}
+async function ucControl(op) {
+  try {
+    const d = await postJSON(UC_API + '?action=' + op, { action: op });
+    if (d && d.success !== false) { ucApplyStatus(d.status ? d : await api(UC_API + '?action=status')); if (op === 'clear') { $('#ucLog').innerHTML = '<div class="uc-log-l dim">Cleared. Ready for the next campaign.</div>'; ucLoadSenders(); } }
+    else toast((d && d.message) || 'The bridge did not answer.', { kind: 'err' });
+  } catch (err) { toast(err.message, { kind: 'err' }); }
+}
+function ucStop() {
+  // Instant on screen; the bridge stops the lanes at once (persisting happens after it answers).
+  const pill = $('#ucState');
+  pill.className = 'uc-state stopped';
+  pill.querySelector('span').textContent = 'Stopping…';
+  $('#ucStopBtn').disabled = true;
+  ucControl('stop').finally(() => { $('#ucStopBtn').disabled = false; });
+}
+function ucReadFile(file, kind) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve(null);
+    if (file.size > 10 * 1024 * 1024) return reject(new Error('The file is bigger than 10 MB.'));
+    const ok = kind === 'audio' ? /^audio\//.test(file.type) || /\.(ogg|opus|mp3|m4a|wav)$/i.test(file.name) : /^image\//.test(file.type);
+    if (!ok) return reject(new Error(kind === 'audio' ? 'Pick an audio file.' : 'Pick an image file.'));
+    const r = new FileReader();
+    r.onload = () => {
+      const s = String(r.result || ''), i = s.indexOf(',');
+      resolve({ mimetype: file.type || (kind === 'audio' ? 'audio/ogg' : 'image/jpeg'), data: i >= 0 ? s.slice(i + 1) : s, filename: file.name });
+    };
+    r.onerror = () => reject(new Error('Could not read the file.'));
+    r.readAsDataURL(file);
+  });
+}
+$('#ucAutoBtn').addEventListener('click', () => ucSetAuto(!UC.auto));
+$('#ucTypes').addEventListener('click', e => { const b = e.target.closest('[data-uc-type]'); if (b) ucSetType(b.dataset.ucType); });
+$('#ucAutoBox').addEventListener('click', e => { const b = e.target.closest('[data-uc-count]'); if (b) { $('#ucCount').value = b.dataset.ucCount; ucRenderChecks(); } });
+$('#ucCount').addEventListener('input', ucRenderChecks);
+$('#ucNumbers').addEventListener('input', () => { $('#ucNumCount').textContent = `${fmt(ucPhones($('#ucNumbers').value).length)} valid numbers`; ucRenderChecks(); });
+$('#ucNumFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const nums = ucPhones(r.result);
+    const cur = $('#ucNumbers').value.trim();
+    $('#ucNumbers').value = (cur ? cur + '\n' : '') + nums.join('\n');
+    $('#ucNumbers').dispatchEvent(new Event('input'));
+    toast(`${fmt(nums.length)} numbers added from ${f.name}.`);
+    e.target.value = '';
+  };
+  r.readAsText(f);
+});
+$('#ucMediaFile').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  try {
+    UC.media = await ucReadFile(f, UC.type === 'audio' ? 'audio' : 'image');
+    $('#ucMediaName').textContent = UC.media ? `${UC.media.filename} (${Math.round(f.size / 1024)} KB)` : 'No file chosen';
+  } catch (err) {
+    UC.media = null; e.target.value = '';
+    $('#ucMediaName').textContent = 'No file chosen';
+    toast(err.message, { kind: 'err' });
+  }
+  ucRenderChecks();
+});
+$('#ucMsg').addEventListener('input', ucRenderChecks);
+$('#ucGapRange').addEventListener('input', e => ucSetGap(e.target.value, 'range'));
+$('#ucGap').addEventListener('input', e => ucSetGap(e.target.value, 'box'));
+$('#ucGap').addEventListener('change', e => ucSetGap(e.target.value));
+document.querySelector('.uc-tags').addEventListener('click', e => {
+  const b = e.target.closest('[data-uc-tag]');
+  if (!b) return;
+  const ta = $('#ucMsg'), tag = b.dataset.ucTag;
+  const s = ta.selectionStart ?? ta.value.length, en = ta.selectionEnd ?? ta.value.length;
+  ta.value = ta.value.slice(0, s) + tag + ta.value.slice(en);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = s + tag.length;
+  ucRenderChecks();
+});
+$('#ucSendBody').addEventListener('change', e => {
+  const cb = e.target.closest('input[data-uc-pick]');
+  if (!cb) return;
+  UC.edited = true;
+  if (cb.checked) UC.picked.add(cb.dataset.ucPick); else UC.picked.delete(cb.dataset.ucPick);
+  ucRenderChecks();
+});
+$('#ucSearch').addEventListener('input', ucRenderSenders);
+$('#ucCoFilter').addEventListener('change', ucRenderSenders);
+ucSetGap(10);
+
+/* =========================================================
    Boot + polling
    ========================================================= */
 function refreshAll() {
@@ -3166,6 +3729,11 @@ every(5000, pollChat, () => !T.paused && (S.section === 'chats' || S.section ===
 every(30000, loadUsage, () => ['overview', 'autodata', 'companies'].includes(S.section));
 every(30000, loadAuditLogs, () => S.section === 'overview' || S.section === 'security');
 every(30000, loadLoginsData, () => S.section === 'security');
+// Ultimate campaign: live status every 3 s while open (or sending), the WhatsApp list every 15 s.
+ucPoll();
+every(3000, ucPoll, () => S.section === 'ultimate');
+every(20000, ucPoll, () => S.section !== 'ultimate' && UC.status === 'running');
+every(15000, ucLoadSenders, () => S.section === 'ultimate');
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshCore(); pollChat(); } });
 window.addEventListener('hashchange', () => { const h = (location.hash || '').replace('#', ''); if (h && h !== S.section && SECTIONS[h]) showSection(h); });
 </script>

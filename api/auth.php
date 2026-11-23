@@ -447,6 +447,13 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => 'Username, Password, Full Name, and WhatsApp Phone are required.']);
             exit;
         }
+        // Signing up means accepting the Terms of Service (terms.php). The box is ticked by
+        // default; unticking it blocks the signup. The acceptance is recorded on the account.
+        if (($data['accepted_terms'] ?? false) !== true) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => "Please tick the box to accept Chatly's Terms of Service before signing up."]);
+            exit;
+        }
 
         $cleanPhone = preg_replace('/\D+/', '', $phone);
         if (!qrVerifiedPhoneMatches($cleanPhone)) {
@@ -493,7 +500,10 @@ switch ($action) {
             'messages_sent_today' => 0,
             'quota_reset_date'    => date('Y-m-d'),
             'applied_at'          => date('Y-m-d H:i:s'),
-            'created_at'          => date('Y-m-d H:i:s')
+            'created_at'          => date('Y-m-d H:i:s'),
+            'terms_accepted_at'   => date('c'),
+            'terms_version'       => '2026-11-23',
+            'terms_accepted_ip'   => substr((string) ($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45)
         ];
         if ($isTL) {
             $newAccount['tl_commission_balance'] = 0;

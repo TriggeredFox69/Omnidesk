@@ -56,7 +56,7 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption, store: storeOverride }) {
+function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption, store: storeOverride, isBusyElsewhere }) {
   const digits = v => String(v || '').replace(/\D/g, '');
   const chatStoreRef = storeOverride || chatStore();   // chats in Supabase while its switch is on
   const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
@@ -434,7 +434,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   }
   function updateCrmLead(contact, crmMessage, assignMode, activeSender) {
     crmQueue.push({
-      companyId: state.companyId || 'COMP-001', campaignName: state.name, closersPool: state.closersPool || [],
+      companyId: (activeSender && activeSender.companyId) || state.companyId || 'COMP-001', campaignName: state.name,
+      closersPool: (activeSender && activeSender.companyId) ? [] : (state.closersPool || []),
       contact: { phone: contact.phone, name: contact.name, display: contact.display, city: contact.city, network: contact.network,
         assignedOwnerId: contact.assignedOwnerId, assignedOwnerName: contact.assignedOwnerName,
         assignedOwnerUsername: contact.assignedOwnerUsername, assignedOwnerRole: contact.assignedOwnerRole },
@@ -671,7 +672,9 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   }
   const laneOf = id => (state.lanes || []).find(l => l.id === id);
   const deviceOnline = lane => lane.mode === 'main' ? isMainOnline() : (typeof deviceReady === 'function' && deviceReady(lane.id));
-  const laneSender = lane => ({ id: lane.id, name: lane.name, username: lane.username, role: lane.role, roleType: lane.roleType, phone: lane.phone });
+  // companyId: the closer's own company. In the super admin's Ultimate Campaign the lanes come
+  // from every company, and each chat goes to the sending closer's own company inbox.
+  const laneSender = lane => ({ id: lane.id, name: lane.name, username: lane.username, role: lane.role, roleType: lane.roleType, phone: lane.phone, companyId: lane.companyId || null });
 
   function clearLaneTimers() {
     for (const t of laneTimers.values()) clearTimeout(t);
@@ -978,6 +981,13 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     laneUsers.at = 0;   // read users.json fresh for the start
     const stoppedByAdmin = picked.filter(s => laneHeldBack(s.id));
     picked = picked.filter(s => !laneHeldBack(s.id));
+    // A WhatsApp already sending another campaign (its company's, or the super admin's Ultimate
+    // Campaign) is left out: two campaigns at once would double its sending speed.
+    const busyElsewhere = picked.filter(s => typeof isBusyElsewhere === 'function' && isBusyElsewhere(s.id));
+    picked = picked.filter(s => !busyElsewhere.includes(s));
+    if (!picked.length && busyElsewhere.length) {
+      return { success: false, status: state.status, message: 'Every WhatsApp picked for this campaign is already sending another campaign. Wait for it to finish, or stop it first.' };
+    }
     const hasDevice = s => typeof deviceReady === 'function' && deviceReady(s.id);
     const anyDeviceReady = picked.some(s => hasDevice(s));
     const mainReady = isMainOnline();
@@ -1040,6 +1050,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
       return {
         index: idx + 1, id: s.id, name: s.name || `TM ${idx + 1}`, username: s.username || '',
         role: s.role || (s.roleType === 'lead' ? 'Team Leader (TL)' : 'TM Closer'), roleType: s.roleType || 'member',
+        companyId: s.company_id ? String(s.company_id).replace(/[^a-zA-Z0-9_-]/g, '') : null, companyName: s.company_name || '',
         phone, display: s.device_number ? ('+' + s.device_number) : (s.display || (phone ? '+' + phone : '')),
         mode: userHasDevice ? 'device' : 'main',
         assigned: 0, sent: 0, failed: 0, status: 'ready', offlineSince: null, nextAt: null, lastSentAt: null
@@ -1086,6 +1097,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     log(`📱 ${state.lanes.map(l => `${l.name} (${l.display}) → ${l.assigned} numbers`).join(' | ')}`, 'info');
     if (skipped.length) log(`⚠️ Not included (WhatsApp not connected): ${skipped.map(s => s.name).join(', ')}`, 'warn');
     if (stoppedByAdmin.length) log(`⏹️ Not included (stopped by the admin, or Nunno plan not verified yet): ${stoppedByAdmin.map(s => s.name).join(', ')}`, 'warn');
+    if (busyElsewhere.length) log(`⏭️ Not included (already sending another campaign): ${busyElsewhere.map(s => s.name).join(', ')}`, 'warn');
     log(`⏱️ Gap between messages: ${state.minDelay === state.maxDelay ? state.minDelay + ' s' : state.minDelay + '-' + state.maxDelay + ' s'} per WhatsApp.`, 'info');
     recount();
     writeStateNow();
@@ -1236,6 +1248,14 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     if (autoResume.unref) autoResume.unref();
   }
 
+  // Is this closer's WhatsApp still sending for this campaign? (running, or coming back by
+  // itself after a restart, with numbers left for them)
+  function isLaneActive(userId) {
+    if (!(state.status === 'running' || (state.status === 'paused' && state.resumeAfterRestart))) return false;
+    const lane = laneOf(String(userId));
+    return !!lane && lane.status !== 'done';
+  }
+
   return {
     start,
     pause,
@@ -1244,6 +1264,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     clear,
     leftover,
     noteAck,
+    isLaneActive,
     getStatus
   };
 }

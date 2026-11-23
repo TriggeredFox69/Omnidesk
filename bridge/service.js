@@ -87,11 +87,19 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   // Nunno (COMP-001) keeps the original campaign_state.json.
   const campaignManagers = new Map();
   const cleanCompany = id => String(id || '').replace(/[^a-zA-Z0-9_-]/g, '') || 'COMP-001';
+  // The campaign (other than campaign `selfId`) a closer's WhatsApp is sending for, or null.
+  // CHATLY-HQ is the super admin's Ultimate Campaign, which sends from every company's closers.
+  function busyCampaignOf(userId, selfId) {
+    for (const [id, mgr] of campaignManagers) {
+      if (id !== selfId && mgr.isLaneActive && mgr.isLaneActive(userId)) return id;
+    }
+    return null;
+  }
   function campaignFor(companyId) {
     const id = cleanCompany(companyId);
     if (!campaignManagers.has(id)) {
       const stateFile = require('node:path').join(bridgeDataDir, id === 'COMP-001' ? 'campaign_state.json' : `campaign_state_${id}.json`);
-      campaignManagers.set(id, createCampaignManager({ ...campaignOptions, stateFile }));
+      campaignManagers.set(id, createCampaignManager({ ...campaignOptions, stateFile, isBusyElsewhere: userId => !!busyCampaignOf(userId, id) }));
     }
     return campaignManagers.get(id);
   }
@@ -116,7 +124,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   };
   const snapshot = () => ({ success: true, mode: 'whatsapp_web', state: phase,
     is_connected: phase === 'ready', is_configured: phase === 'ready',
-    connected_number: number, qr, message: error, version: '18.7', engine: 'baileys' });
+    connected_number: number, qr, message: error, version: '18.8', engine: 'baileys' });
 
   async function disconnect(wipe = false) {
     phase = 'disconnected'; qr = null; number = ''; error = '';
@@ -325,6 +333,15 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       if (req.method === 'GET' && url.pathname === '/device/status') { reply(200, devicePool.get(url.searchParams.get('id') || '')); return; }
       if (url.pathname === '/campaign/status') {
         reply(200, campaignFor(url.searchParams.get('company_id')).getStatus());
+        return;
+      }
+      if (url.pathname === '/campaign/busy') {
+        // closer id -> the campaign (company id, or CHATLY-HQ) their WhatsApp is sending for
+        const busy = {};
+        for (const [id, mgr] of campaignManagers) {
+          for (const l of (mgr.getStatus().lanes || [])) if (mgr.isLaneActive(l.id)) busy[l.id] = id;
+        }
+        reply(200, { success: true, busy });
         return;
       }
       if (url.pathname === '/campaign/leftover') {

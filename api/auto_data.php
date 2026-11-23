@@ -16,6 +16,8 @@
  */
 
 const CHATLY_AUTO_DATA_MAX = 50000;
+// The super admin's Ultimate Campaign: its own position in the pool, no company limits.
+if (!defined('CHATLY_ULTIMATE_ID')) define('CHATLY_ULTIMATE_ID', 'CHATLY-HQ');
 
 require_once __DIR__ . '/supabase.php';
 
@@ -67,6 +69,17 @@ function chatlyAutoDataRelease(string $companyId, int $from, int $to): void {
 
 /** Last-9-digit keys of a company's existing leads (to skip numbers that already have a chat). */
 function chatlyAutoDataLeadKeys(string $companyId): array {
+    // The super admin's Ultimate Campaign sends from every company's closers, and each chat
+    // lands in the sender's own company, so it skips numbers that have a chat in ANY company.
+    if ($companyId === CHATLY_ULTIMATE_ID) {
+        $all = [];
+        $list = json_decode((string) @file_get_contents(__DIR__ . '/../data/companies.json'), true);
+        foreach ((is_array($list) ? $list : []) as $c) {
+            $id = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($c['id'] ?? ''));
+            if ($id !== '' && $id !== CHATLY_ULTIMATE_ID) $all += chatlyAutoDataLeadKeys($id);
+        }
+        return $all;
+    }
     if (chatlyLeadStoreOn()) {
         require_once __DIR__ . '/lead_store.php';
         return array_fill_keys(array_keys(chatlyLeadKeyIndex($companyId)), true);

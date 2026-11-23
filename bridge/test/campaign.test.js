@@ -205,3 +205,46 @@ test('a closer stopped by the admin gets no campaign numbers; stopping mid-campa
   assert.equal(tm1.assigned + tm2.assigned, 60);
   assert.ok(tm1.assigned > 30, "TM-2's unsent numbers moved to TM-1");
 });
+
+test('Ultimate campaign: closers from several companies, each chat lands in the sender\'s own company; busy WhatsApps are skipped', async t => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-test-'));
+  const usersFile = path.join(tmpDir, 'users.json');
+  fs.writeFileSync(usersFile, JSON.stringify([
+    { id: 'NU-1', name: 'Nunno TM', company_id: 'COMP-001', role: 'member', status: 'active' },
+    { id: 'ML-1', name: 'Metalink TM', company_id: 'COMP-004', role: 'member', status: 'active' },
+    { id: 'ML-2', name: 'Busy Metalink TM', company_id: 'COMP-004', role: 'member', status: 'active' }
+  ]));
+  const leadsOf = id => path.join(tmpDir, 'tenants', id, 'leads.json');
+  const sentFrom = [];
+  const mgr = createCampaignManager({
+    send: async () => { throw new Error('the main number must not be used'); },
+    deviceSend: async (id, p) => { sentFrom.push([id, p.phone]); return { success: true, message_id: 'wa_' + sentFrom.length }; },
+    deviceReady: () => true,
+    dataDir: tmpDir, getLeadsPath: id => leadsOf(id), getUsersPath: () => usersFile, mainStatus: () => ({ ready: false }),
+    stateFile: path.join(tmpDir, 'campaign_state_CHATLY-HQ.json'),
+    isBusyElsewhere: id => id === 'ML-2'   // already sending Metalink's own campaign
+  });
+  t.after(() => { mgr.stop(); fs.rmSync(tmpDir, { recursive: true, force: true }); });
+  const st = mgr.start({
+    company_id: 'CHATLY-HQ', company_name: 'Chatly', message: 'Hi', minDelay: 1, maxDelay: 1,
+    audience: ['923001110001', '923001110002', '923001110003', '923001110004'].map(phone => ({ phone })),
+    senders: [
+      { id: 'NU-1', name: 'Nunno TM', roleType: 'member', company_id: 'COMP-001', phone: '923000000001' },
+      { id: 'ML-1', name: 'Metalink TM', roleType: 'member', company_id: 'COMP-004', phone: '923000000002' },
+      { id: 'ML-2', name: 'Busy Metalink TM', roleType: 'member', company_id: 'COMP-004', phone: '923000000003' }
+    ]
+  });
+  assert.equal(st.success, true);
+  assert.deepEqual(st.lanes.map(l => l.id), ['NU-1', 'ML-1'], 'the busy WhatsApp is left out');
+  assert.equal(mgr.isLaneActive('ML-1'), true);
+  assert.equal(mgr.isLaneActive('ML-2'), false);
+  await new Promise(r => setTimeout(r, 1800));   // 2 numbers per lane, 1 s apart
+  mgr.stop();
+  await new Promise(r => setImmediate(r));
+  const nunno = JSON.parse(fs.readFileSync(leadsOf('COMP-001'), 'utf8'));
+  const metalink = JSON.parse(fs.readFileSync(leadsOf('COMP-004'), 'utf8'));
+  assert.ok(nunno.length >= 1 && nunno.every(l => l.ownerId === 'NU-1' && l.company_id === 'COMP-001'), 'Nunno TM\'s chats are in Nunno');
+  assert.ok(metalink.length >= 1 && metalink.every(l => l.ownerId === 'ML-1' && l.company_id === 'COMP-004'), 'Metalink TM\'s chats are in Metalink');
+  assert.equal(fs.existsSync(leadsOf('CHATLY-HQ')), false, 'nothing is stored under CHATLY-HQ');
+  assert.ok(sentFrom.every(([id]) => id !== 'ML-2'));
+});
