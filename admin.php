@@ -1958,7 +1958,8 @@ function renderEmployeeTable(employees) {
     const isNunno = '<?php echo $activeCompany['id']; ?>' === 'COMP-001';
     let planBadge = '';
     let planAction = '';
-    if (isNunno && !isLead) {
+    const isSuperLead = isNunno && !!emp.super_lead;
+    if (isNunno && (!isLead || isSuperLead)) {
       if (emp.has_nunno_plan) {
         planBadge = `<div style="margin-top:3px;"><span style="display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:800; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">🟢 Nunno x Chatly plan: activated</span></div>`;
         planAction = `<button class="btn btn-secondary" style="padding:5px 8px; font-size:11px; color:#ef4444;" onclick="toggleNunnoPlan('${emp.id}', false)" title="Revoke Nunno Collab Plan">🔒 Revoke</button>`;
@@ -1986,8 +1987,8 @@ function renderEmployeeTable(employees) {
           </div>
         </td>
         <td>
-          <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; ${isLead ? 'background:rgba(31, 224, 138,0.15); color:#8ff5c8; border:1px solid rgba(31, 224, 138,0.3);' : 'background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3);'}">
-            ${isLead ? '👑 Team Lead' : '📱 Closer TM'}
+          <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; ${isSuperLead ? 'background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.35);' : isLead ? 'background:rgba(31, 224, 138,0.15); color:#8ff5c8; border:1px solid rgba(31, 224, 138,0.3);' : 'background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3);'}" ${isSuperLead ? 'title="Works as a TM and a TL: sells every Nunno plan and the Nunno x Chatly plan"' : ''}>
+            ${isSuperLead ? '⭐ Super Lead' : isLead ? '👑 Team Lead' : '📱 Closer TM'}
           </span>
           ${planBadge}
         </td>
@@ -2018,6 +2019,7 @@ function renderEmployeeTable(employees) {
               ⚡ Direct Login
             </button>
             ${planAction}
+            ${isNunno ? `<button class="btn btn-secondary" style="padding:5px 8px; font-size:11px; color:#fbbf24;" onclick="toggleSuperLead('${emp.id}', ${isSuperLead ? 'false' : 'true'})" title="${isSuperLead ? 'Back to a normal TM / TL' : 'Works as a TM and a TL: every Nunno plan + the Nunno x Chatly plan in Mark Paid. Team Inbox locked until their own plan is verified.'}">${isSuperLead ? '⭐ Remove Super Lead' : '⭐ Make Super Lead'}</button>` : ''}
             <button class="btn btn-secondary" style="padding:5px 10px; font-size:11.5px;" onclick="toggleEmployeeStatus('${emp.id}')">
               ${isSuspended ? 'Activate' : 'Suspend'}
             </button>
@@ -2059,6 +2061,24 @@ async function toggleNunnoPlan(empId, activate) {
   }
 }
 window.toggleNunnoPlan = toggleNunnoPlan;
+
+async function toggleSuperLead(empId, on) {
+  if (!confirm(on
+    ? 'Make this person a Super Lead?\n\nThey work as a TM and a TL: Mark Paid offers every Nunno plan plus the Rs. 1,000 Nunno x Chatly plan. Their Team Inbox stays locked until their own Nunno x Chatly plan is verified.'
+    : 'Remove Super Lead from this person?')) return;
+  try {
+    const res = await fetch('api/auth.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set_super_lead', user_id: empId, on: !!on })
+    });
+    const data = await res.json();
+    alert(data.success ? (data.message || 'Saved.') : (data.error || 'Could not change Super Lead.'));
+    if (data.success) loadEmployees();
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+window.toggleSuperLead = toggleSuperLead;
 
 async function directLoginAsEmployee(username) {
   if (!username) return;

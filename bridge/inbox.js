@@ -98,7 +98,8 @@ function createInbox({ getClient, storageFile, getMediaClients, store: storeOver
 
   function isNunnoTL(userId) {
     const u = tenants.usersById().get(String(userId));
-    return !!u && String(u.role || '').toLowerCase() === 'lead' && (tenants.companyOfUser(userId) === 'COMP-001');
+    // a Super Lead (works as a TM and a TL) gets this too
+    return !!u && (String(u.role || '').toLowerCase() === 'lead' || !!u.super_lead) && (tenants.companyOfUser(userId) === 'COMP-001');
   }
   // A lead for a chat a Nunno TL started from their phone, owned by that TL. One per number
   // (fixed id), so two quick messages never create two leads.

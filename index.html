@@ -751,6 +751,75 @@
 
     </section>
 
+    <!-- Claim an unofficial lead (Nunno TMs / TLs): a sale closed outside Chatly -->
+    <section class="ucl-strip" id="unofficialLeadStrip" hidden>
+      <div class="ucl-strip-ic">📝</div>
+      <div class="ucl-strip-t">
+        <b>Closed a sale outside Chatly?</b>
+        <span>Claim it as an unofficial lead. Once the admin verifies the payment, the commission is added to your earnings.</span>
+      </div>
+      <button type="button" class="ucl-btn" id="openUnofficialLeadBtn">Claim unofficial lead</button>
+    </section>
+    <div class="ucl-modal" id="unofficialLeadModal" hidden role="dialog" aria-modal="true" aria-labelledby="uclTitle">
+      <form class="ucl-card" id="unofficialLeadForm" novalidate>
+        <div class="ucl-head">
+          <div><h3 id="uclTitle">Claim an unofficial lead</h3><p>For a Nunno sale you closed outside Chatly. The admin checks the payment before any commission is paid.</p></div>
+          <button type="button" class="ucl-x" id="closeUnofficialLeadBtn" aria-label="Close">✕</button>
+        </div>
+        <div class="ucl-body">
+          <label class="ucl-l">Plan the customer bought</label>
+          <div class="ucl-plans" id="uclPlans"><div class="ucl-hint">Loading plans…</div></div>
+          <div class="ucl-row">
+            <div><label class="ucl-l" for="uclName">Customer name</label><input class="ucl-in" id="uclName" maxlength="80" autocomplete="off" placeholder="e.g. Ahmed Raza"></div>
+            <div><label class="ucl-l" for="uclPhone">Customer WhatsApp number</label><input class="ucl-in" id="uclPhone" inputmode="tel" maxlength="20" autocomplete="off" placeholder="03001234567"></div>
+          </div>
+          <label class="ucl-l" for="uclEmail">Email of the paid subscriber</label>
+          <input class="ucl-in" id="uclEmail" type="email" maxlength="120" autocomplete="off" placeholder="the email they subscribed with on nunno.cloud">
+          <div class="ucl-row">
+            <div><label class="ucl-l" for="uclMethod">Payment method</label>
+              <select class="ucl-in" id="uclMethod"><option>EasyPaisa</option><option>JazzCash</option><option>Bank transfer</option><option>Card</option><option>Crypto (USDT)</option><option>Other</option></select></div>
+            <div><label class="ucl-l" for="uclTrx">Transaction ID (TRX ID)</label><input class="ucl-in" id="uclTrx" maxlength="64" autocomplete="off" placeholder="from the payment receipt"></div>
+          </div>
+          <label class="ucl-l" for="uclNote">Note for the admin <span>(optional)</span></label>
+          <textarea class="ucl-in" id="uclNote" rows="2" maxlength="500" placeholder="Anything that helps verify it"></textarea>
+          <div class="ucl-err" id="uclErr" hidden></div>
+        </div>
+        <div class="ucl-foot">
+          <span class="ucl-hint" id="uclSummary"></span>
+          <button type="submit" class="ucl-btn" id="uclSubmit">Submit for verification</button>
+        </div>
+      </form>
+    </div>
+    <style>
+      .ucl-strip { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:14px 0 4px; padding:14px 16px; border-radius:18px;
+        background:var(--glass-surface, #fff); border:1px dashed rgba(245,158,11,.55); box-shadow:0 8px 24px -10px rgba(0,0,0,.08); }
+      .ucl-strip-ic { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; background:rgba(245,158,11,.14); flex:0 0 auto; }
+      .ucl-strip-t { flex:1 1 260px; min-width:0; } .ucl-strip-t b { display:block; font-size:14.5px; } .ucl-strip-t span { display:block; font-size:12.5px; opacity:.72; margin-top:2px; line-height:1.45; }
+      .ucl-btn { border:0; border-radius:12px; padding:11px 18px; font:800 13.5px inherit; font-family:inherit; color:#fff; cursor:pointer; background:linear-gradient(135deg,#f59e0b,#d97706); box-shadow:0 6px 18px rgba(245,158,11,.35); white-space:nowrap; }
+      .ucl-btn:disabled { opacity:.6; cursor:progress; }
+      .ucl-modal { position:fixed; inset:0; z-index:9000; display:flex; align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; background:rgba(2,8,6,.55); backdrop-filter:blur(4px); }
+      .ucl-modal[hidden] { display:none; }
+      .ucl-card { width:100%; max-width:560px; background:#fff; color:#0f1f18; border-radius:20px; box-shadow:0 30px 80px rgba(0,0,0,.35); overflow:hidden; }
+      body.theme-dark .ucl-card { background:#0d1715; color:#e3f1ea; }
+      .ucl-head { display:flex; justify-content:space-between; gap:12px; padding:18px 20px 12px; border-bottom:1px solid rgba(127,127,127,.18); }
+      .ucl-head h3 { margin:0; font-size:18px; } .ucl-head p { margin:4px 0 0; font-size:12.5px; opacity:.72; line-height:1.45; }
+      .ucl-x { border:0; background:rgba(127,127,127,.12); color:inherit; width:34px; height:34px; border-radius:10px; cursor:pointer; flex:0 0 auto; }
+      .ucl-body { padding:14px 20px 4px; }
+      .ucl-l { display:block; font-size:12px; font-weight:700; margin:12px 0 5px; opacity:.85; } .ucl-l span { font-weight:500; opacity:.7; }
+      .ucl-in { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:11px; border:1px solid rgba(127,127,127,.3); background:rgba(127,127,127,.06); color:inherit; font:14px inherit; font-family:inherit; }
+      .ucl-in:focus { outline:none; border-color:#f59e0b; box-shadow:0 0 0 3px rgba(245,158,11,.18); }
+      .ucl-row { display:grid; grid-template-columns:1fr 1fr; gap:0 12px; }
+      .ucl-plans { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
+      .ucl-plan { text-align:left; padding:10px 12px; border-radius:12px; border:1.5px solid rgba(127,127,127,.28); background:rgba(127,127,127,.04); color:inherit; cursor:pointer; font-family:inherit; }
+      .ucl-plan b { display:block; font-size:13px; } .ucl-plan span { display:block; font-size:12px; opacity:.75; margin-top:2px; } .ucl-plan em { display:block; font-style:normal; font-size:11.5px; font-weight:700; color:#16a34a; margin-top:3px; }
+      .ucl-plan.on { border-color:#f59e0b; background:rgba(245,158,11,.1); }
+      .ucl-hint { font-size:12px; opacity:.72; }
+      .ucl-err { margin-top:12px; padding:10px 12px; border-radius:10px; font-size:13px; color:#b91c1c; background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); }
+      body.theme-dark .ucl-err { color:#fca5a5; }
+      .ucl-foot { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 20px 18px; }
+      @media (max-width:560px) { .ucl-row { grid-template-columns:1fr; } .ucl-btn { width:100%; } }
+    </style>
+
     <!-- 3. Pipeline Health & Segmented Visual Gauge -->
     <section class="profile-pipeline-progress">
       <div class="pipeline-progress-header">
@@ -2600,6 +2669,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
   <script src="assets/js/wa-widget.js?v=16.0"></script>
   <link rel="stylesheet" href="assets/css/chatly-tour.css?v=1">
   <script src="assets/js/chatly-tour.js?v=1"></script>
-  <script src="assets/js/whatsapp-app.js?v=16.2"></script>
+  <script src="assets/js/whatsapp-app.js?v=16.3"></script>
 </body>
 </html>

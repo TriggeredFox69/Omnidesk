@@ -4967,7 +4967,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (uname.includes('askari') || name.includes('askari') || uname.includes('nunno') || id.includes('ASKARI') || id === 'EMP-TM-MWMK43N9' || id === 'EMP-TM-ASKARI') {
       return false;
     }
-    if (user.role !== 'member') return false;                      // admins and TLs are never locked
+    // admins and TLs are never locked; a Super Lead (TM + TL, e.g. Erij) is, until her plan is verified
+    if (user.role !== 'member' && !(user.super_lead && user.role === 'lead')) return false;
     if ((user.company_id || 'COMP-001') !== 'COMP-001') return false; // Nunno only
     if (user.has_nunno_plan) return false;                           // plan bought and verified
     // New Nunno TMs (flagged at sign-up) must buy + verify the Rs. 1,000 Nunno x Chatly plan
@@ -5348,9 +5349,100 @@ document.addEventListener('DOMContentLoaded', () => {
     requestAnimationFrame(step);
   }
 
+  // ---- Claim an unofficial lead (Nunno TMs / TLs): a sale closed outside Chatly ----
+  // The claim becomes an "In review" sale tagged unofficial (api/unofficial_leads.php); the admin
+  // verifies it like any other sale and the commission of its plan lands in the earnings.
+  const ucl = { plans: [], plan: '', loaded: false, busy: false };
+  function syncUnofficialLeadStrip(user) {
+    const strip = document.getElementById('unofficialLeadStrip');
+    if (!strip) return;
+    const role = String((user && user.role) || '').toLowerCase();
+    strip.hidden = !(user && ['member', 'lead'].includes(role) && (user.company_id || 'COMP-001') === 'COMP-001');
+  }
+  function uclSummary() {
+    const p = ucl.plans.find(x => x.name === ucl.plan);
+    const el = document.getElementById('uclSummary');
+    if (el) el.textContent = p ? `${p.name} · Rs. ${Number(p.amount).toLocaleString()}` : 'Pick the plan first';
+  }
+  function uclRenderPlans() {
+    const host = document.getElementById('uclPlans');
+    if (!host) return;
+    if (!ucl.plans.length) { host.innerHTML = '<div class="ucl-hint">Could not load the plans. Close and try again.</div>'; return; }
+    host.innerHTML = ucl.plans.map(p => `<button type="button" class="ucl-plan${p.name === ucl.plan ? ' on' : ''}" data-plan="${escapeHtml(p.name)}">
+      <b>${escapeHtml(p.badge || '📦')} ${escapeHtml(p.name)}</b><span>Rs. ${Number(p.amount).toLocaleString()}</span></button>`).join('');
+    uclSummary();
+  }
+  async function openUnofficialLeadModal() {
+    const modal = document.getElementById('unofficialLeadModal');
+    if (!modal) return;
+    modal.hidden = false;
+    document.getElementById('uclErr').hidden = true;
+    if (!ucl.loaded) {
+      try {
+        const r = await fetch('api/unofficial_leads.php?action=plans', { credentials: 'same-origin' });
+        const d = await r.json();
+        if (d.success && Array.isArray(d.plans)) { ucl.plans = d.plans; ucl.loaded = true; }
+      } catch (_) {}
+    }
+    uclRenderPlans();
+    setTimeout(() => document.getElementById('uclName')?.focus(), 50);
+  }
+  function closeUnofficialLeadModal() {
+    const modal = document.getElementById('unofficialLeadModal');
+    if (modal) modal.hidden = true;
+  }
+  async function submitUnofficialLead(e) {
+    e.preventDefault();
+    if (ucl.busy) return;
+    const err = document.getElementById('uclErr');
+    const fail = msg => { err.textContent = msg; err.hidden = false; };
+    const val = id => (document.getElementById(id)?.value || '').trim();
+    if (!ucl.plan) return fail('Pick the plan the customer bought.');
+    if (!val('uclName')) return fail("Enter the customer's name.");
+    if (val('uclPhone').replace(/\D/g, '').length < 10) return fail("Enter the customer's WhatsApp number, e.g. 03001234567.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val('uclEmail'))) return fail('Enter the email the customer subscribed with.');
+    if (val('uclTrx').length < 4) return fail('Enter the transaction ID (TRX ID) from the payment.');
+    err.hidden = true;
+    ucl.busy = true;
+    const btn = document.getElementById('uclSubmit');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    try {
+      const r = await fetch('api/unofficial_leads.php?action=claim', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'claim', plan: ucl.plan, customer_name: val('uclName'), phone: val('uclPhone'),
+          email: val('uclEmail'), method: val('uclMethod'), trx_id: val('uclTrx'), note: val('uclNote') })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!d.success) { fail(d.error || 'Could not submit the claim. Try again.'); return; }
+      document.getElementById('unofficialLeadForm').reset();
+      ucl.plan = '';
+      closeUnofficialLeadModal();
+      showToast('📝 ' + (d.message || 'Unofficial lead submitted for verification.'));
+      if (typeof fetchServerLeads === 'function') fetchServerLeads(true);
+    } catch (ex) {
+      fail('Could not submit the claim: ' + ex.message);
+    } finally {
+      ucl.busy = false;
+      btn.disabled = false;
+      btn.textContent = 'Submit for verification';
+    }
+  }
+  document.getElementById('openUnofficialLeadBtn')?.addEventListener('click', openUnofficialLeadModal);
+  document.getElementById('closeUnofficialLeadBtn')?.addEventListener('click', closeUnofficialLeadModal);
+  document.getElementById('unofficialLeadModal')?.addEventListener('click', e => { if (e.target.id === 'unofficialLeadModal') closeUnofficialLeadModal(); });
+  document.getElementById('unofficialLeadForm')?.addEventListener('submit', submitUnofficialLead);
+  document.getElementById('uclPlans')?.addEventListener('click', e => {
+    const b = e.target.closest('[data-plan]');
+    if (!b) return;
+    ucl.plan = b.dataset.plan;
+    uclRenderPlans();
+  });
+
   function renderEmployeeWorkspace() {
     const user = state.currentUser || state.currentAgent;
     if (!user) return;
+    syncUnofficialLeadStrip(state.currentUser);
     const isAdmin = user.role === 'admin';
     const employeeName = user.name || 'there';
 
@@ -5359,9 +5451,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (nameTarget) nameTarget.textContent = employeeName;
     const roleTarget = document.getElementById('profileCloserRole');
     if (roleTarget) {
-      roleTarget.textContent = isAdmin 
-        ? '👑 System Administrator' 
-        : (user.gender === 'female' ? '👩 Sales Team Lead' : (user.role === 'lead' ? '👨 Sales Team Lead' : '👨 Closer Specialist'));
+      // (every female closer used to show "Sales Team Lead" whatever her role)
+      const fem = user.gender === 'female';
+      roleTarget.textContent = isAdmin
+        ? '👑 System Administrator'
+        : user.super_lead ? '⭐ Super Lead'
+        : user.role === 'lead' ? (fem ? '👩 Sales Team Lead' : '👨 Sales Team Lead')
+        : (fem ? '👩 Closer Specialist' : '👨 Closer Specialist');
     }
     const idTarget = document.getElementById('profileCloserId');
     if (idTarget) idTarget.textContent = user.id || 'EMP-TL-01';
@@ -8189,7 +8285,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // A Nunno Team Leader's "sale" is a recruit who bought the Nunno x Chatly plan: one locked
     // option at Rs. 1,000 (the TL earns Rs. 500 once the admin verifies it).
     const me = state.currentUser || {};
-    const nunnoTL = String(me.role || '').toLowerCase() === 'lead' && (me.company_id || state.currentCompanyId || 'COMP-001') === 'COMP-001';
+    const meNunno = (me.company_id || state.currentCompanyId || 'COMP-001') === 'COMP-001';
+    // A Super Lead works as a TM and a TL: every Nunno plan AND the Nunno x Chatly plan.
+    const superLead = meNunno && !!me.super_lead;
+    const nunnoTL = !superLead && meNunno && String(me.role || '').toLowerCase() === 'lead';
+    if (els.paidPlanSelect && superLead && !Array.from(els.paidPlanSelect.options).some(o => o.value === 'Nunno x Chatly Special Plan')) {
+      els.paidPlanSelect.insertAdjacentHTML('afterbegin', '<option value="Nunno x Chatly Special Plan" data-amount="1000" data-commission="500">🤝 Nunno x Chatly Special Plan (Rs. 1,000)</option>');
+    }
     if (els.paidPlanSelect) {
       if (nunnoTL) {
         els.paidPlanSelect.innerHTML = '<option value="Nunno x Chatly Special Plan" data-amount="1000" data-commission="500" selected>🔒 Nunno x Chatly Special Plan (Rs. 1,000)</option>';
@@ -9268,13 +9370,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      // High-Fidelity Audio Constraints: Mono, 48kHz (native WhatsApp Opus standard), full dynamic range
+      // Mono, 48 kHz, with the browser's full voice processing (what WhatsApp's own recorder
+      // does). Noise suppression must stay ON: with auto gain on and suppression off, the
+      // gain control raised fans / traffic / room hiss along with the voice, so every voice
+      // note sounded noisy (measured: ~17 dB worse noise floor, more clipping).
       const audioConstraints = {
         channelCount: { ideal: 1 },
         sampleRate: { ideal: 48000 },
         sampleSize: { ideal: 16 },
         echoCancellation: { ideal: true },
-        noiseSuppression: { ideal: false }, // Avoid aggressive clipping/muffling so voice stays natural, warm, and crisp
+        noiseSuppression: { ideal: true },
         autoGainControl: { ideal: true }
       };
 
@@ -9297,9 +9402,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // Studio-grade 128 kbps Opus bitrate (eliminates robotic / muffled 16-32 kbps default)
+      // 64 kbps mono Opus is transparent for speech (WhatsApp itself uses ~16-24 kbps); the
+      // bridge remuxes it to Ogg without re-encoding, so this is what the recipient hears.
       const recorderOptions = {
-        audioBitsPerSecond: 128000
+        audioBitsPerSecond: 64000
       };
       if (selectedMime) recorderOptions.mimeType = selectedMime;
 
@@ -9308,7 +9414,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (err) {
         try {
           mediaRecorder = selectedMime
-            ? new MediaRecorder(mediaStream, { mimeType: selectedMime, audioBitsPerSecond: 64000 })
+            ? new MediaRecorder(mediaStream, { mimeType: selectedMime, audioBitsPerSecond: 32000 })
             : new MediaRecorder(mediaStream);
         } catch (_) {
           mediaRecorder = new MediaRecorder(mediaStream);
