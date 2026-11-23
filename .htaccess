@@ -66,6 +66,11 @@ Options -Indexes +FollowSymLinks
     <FilesMatch "^(index\.php|index\.html|admin\.php|sadmin\.php|cc\.php|ss\.php|email_hub\.php|open-omnidesk\.html)$">
         Header set X-Robots-Tag "noindex, nofollow"
     </FilesMatch>
+    # The app pages must never come from the browser's cache: an old copy kept showing an old
+    # campaign page (e.g. the 1-60 s gap) to some companies after an update.
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
 </IfModule>
 <IfModule mod_expires.c>
     ExpiresByType image/webp "access plus 1 month"
