@@ -752,6 +752,7 @@ async function handleSadminLogin(e) {
         <button class="nav-i" data-act="nav" data-sec="approvals"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M16 11l2 2 4-4"/></svg><span>Closer approvals</span><span class="nav-b" id="navPending" hidden>0</span></button>
         <button class="nav-i" data-act="nav" data-sec="settlement"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2M7 6V4h10v2"/></svg><span>Nunno settlement</span></button>
         <button class="nav-i" data-act="nav" data-sec="invoice"><svg class="ic" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg><span>Nunno invoice</span></button>
+        <button class="nav-i" data-act="nav" data-sec="voice"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>Voice changer</span></button>
         <button class="nav-i" data-act="nav" data-sec="emails"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>Emails</span></button>
         <div class="nav-g">Data</div>
         <button class="nav-i" data-act="nav" data-sec="numbers"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg><span>Number intelligence</span></button>
@@ -1004,6 +1005,39 @@ async function handleSadminLogin(e) {
                 <tbody id="ucSendBody"><tr><td class="empty" colspan="7">Loading…</td></tr></tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VOICE CHANGER ============ -->
+      <section class="sec" data-sec="voice" hidden>
+        <div class="panel">
+          <div class="panel-h"><div><div class="panel-t">ElevenLabs account</div><div class="panel-d">Voice notes recorded in a company's Team Inbox are converted to a persona voice before they are sent (same words, timing and emotion). The API key stays on the server.</div></div></div>
+          <div class="panel-b">
+            <div class="frow">
+              <div class="fg"><label class="fl" for="vcKey">ElevenLabs API key</label><input type="password" id="vcKey" class="fc" autocomplete="off" placeholder="paste to set or replace"><div class="hint" id="vcKeyHint">Not saved yet. ElevenLabs → Profile → API keys.</div></div>
+              <div class="fg" style="display:flex; align-items:flex-end; gap:8px;"><button class="btn btn-gold btn-sm" data-act="vc-save-key">Save key</button><button class="btn btn-sm" data-act="vc-clear-key">Remove key</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><div><div class="panel-t">Persona voice per company</div><div class="panel-d">Pick a voice in ElevenLabs → Voice Library (e.g. a young Urdu / Hindi female voice), add it to My Voices and copy its Voice ID. If a conversion fails, the voice note is not sent.</div></div></div>
+          <div class="panel-b">
+            <div class="frow">
+              <div class="fg"><label class="fl" for="vcCompany">Company</label><select id="vcCompany" class="fc"></select></div>
+              <div class="fg"><label class="fl" for="vcPersona">Persona name</label><input type="text" id="vcPersona" class="fc" maxlength="40" placeholder="Alishba"></div>
+            </div>
+            <div class="frow">
+              <div class="fg"><label class="fl" for="vcVoice">ElevenLabs Voice ID</label><input type="text" id="vcVoice" class="fc mono" maxlength="40" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM"><div class="hint" id="vcVoiceHint"></div></div>
+              <div class="fg" style="display:flex; align-items:flex-end; gap:8px;"><button class="btn btn-sm" data-act="vc-check">Check voice</button>
+                <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:13px; margin-left:8px;"><input type="checkbox" id="vcEnabled" style="width:18px; height:18px;"> Switched on</label></div>
+            </div>
+            <div class="frow">
+              <div class="fg"><label class="fl" for="vcStab">Stability <span id="vcStabV">0.45</span> <small>(lower = more lively)</small></label><input type="range" id="vcStab" min="0" max="1" step="0.05" value="0.45" style="width:100%"></div>
+              <div class="fg"><label class="fl" for="vcStyle">Style <span id="vcStyleV">0.35</span> <small>(higher = more energetic)</small></label><input type="range" id="vcStyle" min="0" max="1" step="0.05" value="0.35" style="width:100%"></div>
+            </div>
+            <button class="btn btn-gold btn-sm" data-act="vc-save">Save company voice</button>
+            <span class="hint" id="vcMsg" style="margin-left:10px;"></span>
           </div>
         </div>
       </section>
@@ -1707,6 +1741,7 @@ const SECTIONS = {
   approvals:  ['Closer approvals', 'Closer applicants waiting for approval on any company'],
   settlement: ['Nunno settlement', 'Verified sales, what closers earned and what Nunno keeps'],
   invoice:    ['Nunno invoice', 'Revenue Nunno collected through Chatly, and what Nunno owes Chatly'],
+  voice:      ['Voice changer', 'Team Inbox voice notes sent in a persona voice (ElevenLabs), per company'],
   emails:     ['Emails', 'Email company owners from the Chatly Gmail sender, see every send, manage the sender'],
   numbers:    ['Number intelligence', 'Every number in every company, sliced and exported'],
   pool:       ['Fallback numbers', 'Company numbers lent to closers until their own phone is ready'],
@@ -1738,6 +1773,7 @@ function onShow(name) {
   if (name === 'settlement') loadNunnoSettlement();
   if (name === 'invoice') loadNunnoInvoice();
   if (name === 'emails') emOpen();
+  if (name === 'voice') vcLoad();
   if (name === 'numbers') nxLoad(false);
   if (name === 'pool') loadNumberPool();
   if (name === 'brand') loadBrandInquiries();
@@ -3298,6 +3334,10 @@ document.addEventListener('click', e => {
     case 'em-save': emSaveSettings(); break;
     case 'em-clear-pass': emClearPass(); break;
     case 'em-test': emTest(); break;
+    case 'vc-save-key': vcSaveKey(false); break;
+    case 'vc-clear-key': if (confirm('Remove the ElevenLabs API key? Voice notes in persona companies will stop sending until a key is saved again.')) vcSaveKey(true); break;
+    case 'vc-check': vcCheck(); break;
+    case 'vc-save': vcSave(); break;
     case 'uc-start': ucStart(); break;
     case 'uc-pause': ucControl(UC.status === 'paused' ? 'resume' : 'pause'); break;
     case 'uc-stop': ucStop(); break;
@@ -3342,6 +3382,58 @@ $('#adList').addEventListener('keydown', e => {
   const btn = row && row.querySelector('[data-act="ad-save"]');
   if (btn) btn.click();
 });
+
+/* =========================================================
+   Voice changer (ElevenLabs persona voice per company)
+   ========================================================= */
+const VC_API = 'api/voice_changer.php';
+const VC = { settings: {}, companies: [] };
+function vcFill() {
+  const c = VC.settings[$('#vcCompany').value] || {};
+  $('#vcPersona').value = c.persona || '';
+  $('#vcVoice').value = c.voice_id || '';
+  $('#vcEnabled').checked = !!c.enabled;
+  $('#vcStab').value = c.stability != null ? c.stability : 0.45; $('#vcStabV').textContent = $('#vcStab').value;
+  $('#vcStyle').value = c.style != null ? c.style : 0.35; $('#vcStyleV').textContent = $('#vcStyle').value;
+  $('#vcVoiceHint').textContent = '';
+}
+async function vcLoad() {
+  try {
+    const d = await api(VC_API + '?action=settings');
+    if (!d.success) { $('#vcMsg').textContent = d.error || 'Could not load.'; return; }
+    VC.settings = d.settings || {}; VC.companies = d.companies || [];
+    $('#vcKeyHint').textContent = d.has_key ? `Saved (${d.key_hint}). Paste a new one to replace it.` : 'Not saved yet. ElevenLabs → Profile → API keys.';
+    const sel = $('#vcCompany'), cur = sel.value;
+    sel.innerHTML = VC.companies.map(c => `<option value="${esc(c.id)}">${esc(c.name)}${VC.settings[c.id] && VC.settings[c.id].enabled ? '  (voice on)' : ''}</option>`).join('');
+    const chatlyCo = VC.companies.find(c => /chatly/i.test(c.name));
+    sel.value = cur && VC.companies.some(c => c.id === cur) ? cur : (chatlyCo ? chatlyCo.id : (VC.companies[0] || {}).id || '');
+    vcFill();
+  } catch (err) { $('#vcMsg').textContent = 'Could not load: ' + err.message; }
+}
+async function vcSaveKey(clear) {
+  const key = $('#vcKey').value.trim();
+  if (!clear && !key) { toast('Paste the API key first.', { kind: 'err' }); return; }
+  const d = await postJSON(VC_API + '?action=save_settings', clear ? { clear_key: true } : { api_key: key });
+  toast(d.success ? (clear ? 'API key removed.' : 'API key saved.') : (d.error || 'Could not save.'), { kind: d.success ? 'ok' : 'err' });
+  $('#vcKey').value = ''; vcLoad();
+}
+async function vcCheck() {
+  const voice = $('#vcVoice').value.trim();
+  $('#vcVoiceHint').textContent = 'Checking…';
+  const d = await postJSON(VC_API + '?action=check_voice', { voice_id: voice });
+  $('#vcVoiceHint').textContent = d.success ? `✓ ${d.name}${d.labels ? ' · ' + d.labels : ''}` : (d.error || 'Not found.');
+}
+async function vcSave() {
+  const body = { company_id: $('#vcCompany').value, persona: $('#vcPersona').value.trim(), voice_id: $('#vcVoice').value.trim(),
+    enabled: $('#vcEnabled').checked, stability: parseFloat($('#vcStab').value), style: parseFloat($('#vcStyle').value), similarity_boost: 0.8 };
+  if (body.enabled && !body.voice_id) { toast('Enter the Voice ID before switching it on.', { kind: 'err' }); return; }
+  const d = await postJSON(VC_API + '?action=save_settings', body);
+  $('#vcMsg').textContent = d.success ? '✓ Saved. Closers in this company now send voice notes in this voice.' : (d.error || 'Could not save.');
+  if (d.success) vcLoad();
+}
+$('#vcCompany').addEventListener('change', vcFill);
+$('#vcStab').addEventListener('input', e => { $('#vcStabV').textContent = e.target.value; });
+$('#vcStyle').addEventListener('input', e => { $('#vcStyleV').textContent = e.target.value; });
 
 /* =========================================================
    Ultimate campaign (every connected WhatsApp on Chatly)

@@ -9499,8 +9499,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const audioDataUrl = reader.result;
+        // Companies with a voice persona (super admin -> Voice changer): the note is converted to
+        // the persona's voice first. If that fails it is NOT sent (never the real voice by accident).
+        const vc = await voiceChangerStatus();
+        if (vc.enabled && !window.NUNNO_OFFLINE_PREVIEW) {
+          try {
+            showToast(`🎙️ Converting to ${vc.persona || 'the persona'}'s voice…`);
+            const conv = await convertVoiceNote(audioDataUrl);
+            dispatchOutgoingAudioMessage(conv.dataUrl, durationStr, durationSec, targetLeadId, conv.filename);
+          } catch (err) {
+            showToast(`⚠️ Voice note NOT sent: ${err.message}`);
+          }
+          return;
+        }
         dispatchOutgoingAudioMessage(audioDataUrl, durationStr, durationSec, targetLeadId);
       };
       reader.readAsDataURL(audioBlob);
@@ -9514,9 +9527,53 @@ document.addEventListener('DOMContentLoaded', () => {
     mediaRecorder.stop();
   }
 
-  function dispatchOutgoingAudioMessage(audioUrl, durationStr, durationSeconds, leadId) {
+  // ---- Voice changer (ElevenLabs, set up by the super admin per company) ----
+  let _vcStatus = null;
+  function voiceChangerStatus() {
+    if (!_vcStatus) {
+      _vcStatus = fetch('api/voice_changer.php?action=status', { credentials: 'same-origin' })
+        .then(r => r.json()).then(d => ({ enabled: !!(d && d.success && d.enabled), persona: (d && d.persona) || '' }))
+        .catch(() => ({ enabled: false, persona: '' }));
+      _vcStatus.then(s => {
+        const btn = els.voiceRecordBtn;
+        if (btn && s.enabled) { btn.title = `Record a voice note (sent in ${s.persona || 'the persona'}'s voice)`; btn.classList.add('vc-on'); }
+      });
+    }
+    return _vcStatus;
+  }
+  setTimeout(() => { if (state.currentUser) voiceChangerStatus(); }, 1500);
+  async function convertVoiceNote(dataUrl) {
+    const res = await fetch('api/voice_changer.php?action=convert', {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: dataUrl })
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!d.success || !d.audio) throw new Error(d.error || 'the voice changer did not answer');
+    if (!d.needs_reencode) return { dataUrl: d.audio, filename: 'voice-note.ogg' };
+    return { dataUrl: await reencodeToWebmOpus(d.audio), filename: 'voice-note.webm' };
+  }
+  // MP3 from the voice changer -> WebM/Opus (what the bridge turns into a WhatsApp voice note).
+  // Plays the audio silently into a recorder, so it takes as long as the note itself.
+  async function reencodeToWebmOpus(dataUrl) {
+    const buf = await (await fetch(dataUrl)).arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    const audio = await ctx.decodeAudioData(buf);
+    const dest = ctx.createMediaStreamDestination();
+    const src = ctx.createBufferSource(); src.buffer = audio; src.connect(dest);
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+    const rec = new MediaRecorder(dest.stream, { mimeType: mime, audioBitsPerSecond: 64000 });
+    const chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    const done = new Promise(r => { rec.onstop = r; });
+    rec.start(); src.start();
+    await new Promise(r => { src.onended = r; });
+    rec.stop(); await done; ctx.close().catch(() => {});
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    return await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onloadend = () => resolve(fr.result); fr.onerror = reject; fr.readAsDataURL(blob); });
+  }
+
+  function dispatchOutgoingAudioMessage(audioUrl, durationStr, durationSeconds, leadId, filename) {
     if (!window.NUNNO_OFFLINE_PREVIEW) {
-      return liveInbox.sendMedia(audioUrl, { voice: true, duration: durationSeconds, filename: 'voice-note.webm', leadId });
+      return liveInbox.sendMedia(audioUrl, { voice: true, duration: durationSeconds, filename: filename || 'voice-note.webm', leadId });
     }
     const lead = getLead(state.activeLeadId);
     if (!lead) return;
