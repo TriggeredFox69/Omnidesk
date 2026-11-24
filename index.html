@@ -58,8 +58,8 @@
 </head>
 <body>
   <script>
-    /* Chatly is dark-first: apply the saved theme before first paint to avoid a light flash */
-    try { if (localStorage.getItem('nunno_theme') !== 'light') document.body.classList.add('theme-dark'); } catch (_) { document.body.classList.add('theme-dark'); }
+    /* White by default; dark only when the user picked dark. Applied before first paint (no flash). */
+    try { if (localStorage.getItem('nunno_theme') === 'dark') document.body.classList.add('theme-dark'); } catch (_) {}
   </script>
 
   <!-- CHATLY LAUNCH LOADER OVERLAY -->
@@ -86,8 +86,8 @@
     (function () {
       var o = document.getElementById('loginAnimOverlay');
       if (!o) return;
-      var dark = true;
-      try { dark = localStorage.getItem('nunno_theme') !== 'light'; } catch (_) {}
+      var dark = false;
+      try { dark = localStorage.getItem('nunno_theme') === 'dark'; } catch (_) {}
       o.classList.add(dark ? 'theme-dark' : 'theme-light');
       var hide = function () {
         o.classList.remove('active');
@@ -2669,6 +2669,6 @@ _Reply STOP agar aap mazeed updates nahi chahte._</textarea>
   <script src="assets/js/wa-widget.js?v=16.0"></script>
   <link rel="stylesheet" href="assets/css/chatly-tour.css?v=1">
   <script src="assets/js/chatly-tour.js?v=1"></script>
-  <script src="assets/js/whatsapp-app.js?v=16.6"></script>
+  <script src="assets/js/whatsapp-app.js?v=16.7"></script>
 </body>
 </html>

@@ -120,10 +120,11 @@ $showNunnoEmail = $isAdmin && (($activeCompany['id'] ?? '') === 'COMP-001')
   <script>
     (function(){
       try {
-        if (localStorage.getItem('nunno_theme') === 'light') {
+        // White by default; dark only when the user picked dark themselves.
+        if (localStorage.getItem('nunno_theme') !== 'dark') {
           document.documentElement.classList.add('theme-light');
         }
-      } catch(_) {}
+      } catch(_) { document.documentElement.classList.add('theme-light'); }
     })();
   </script>
   <style>

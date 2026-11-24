@@ -127,10 +127,11 @@ $seoLd = [
             window.history.replaceState({}, document.title, '/');
           }
         }
-        if (localStorage.getItem('nunno_theme') === 'light') {
+        // White by default for new visitors; dark only when they picked dark themselves.
+        if (localStorage.getItem('nunno_theme') !== 'dark') {
           document.documentElement.classList.add('theme-light');
         }
-      } catch(_) {}
+      } catch(_) { document.documentElement.classList.add('theme-light'); }
     })();
 
     function handleGeneralLogout(e) {

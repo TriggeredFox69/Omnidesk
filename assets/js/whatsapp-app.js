@@ -493,7 +493,9 @@ document.addEventListener('DOMContentLoaded', () => {
     els.themeToggleBtn.innerHTML = `<svg class="theme-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${icon}</svg><span>${label}</span>`;
   }
 
-  setTheme(localStorage.getItem('nunno_theme') === 'light' ? 'light' : 'dark');
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem('nunno_theme'); } catch (_) {}
+  setTheme(savedTheme === 'dark' ? 'dark' : 'light');   // white by default for new users
   els.themeToggleBtn?.addEventListener('click', () => {
     setTheme(document.body.classList.contains('theme-dark') ? 'light' : 'dark');
   });
