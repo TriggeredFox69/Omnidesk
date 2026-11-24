@@ -173,6 +173,7 @@ if ($action === 'save_settings') {
     $newKey = trim((string) ($in['api_key'] ?? ''));
     if ($newKey !== '') {
         if (!preg_match('/^[A-Za-z0-9_\-]{20,200}$/', $newKey)) vcOut(['success' => false, 'error' => 'That does not look like an ElevenLabs API key.'], 400);
+        if (strpos($newKey, 'sk_') !== 0) vcOut(['success' => false, 'error' => 'That is the key ID, not the API key. The API key starts with sk_ (ElevenLabs shows it once, when the key is created).'], 400);
         $cfg['api_key'] = $newKey; unset($cfg['opus_ok']);
     }
     $cid = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($in['company_id'] ?? ''));
