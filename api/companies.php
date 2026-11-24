@@ -113,7 +113,55 @@ function getCompanies($file) {
         ];
         saveCompanies($file, $comps);
     }
+    if (chatlyRecoverLostCompanies($comps)) saveCompanies($file, $comps);
     return $comps;
+}
+
+/**
+ * Brings back companies that were wiped from companies.json while their admin login and
+ * tenant data still exist. Older deploy scripts copied the repo's companies.json over the
+ * live one on every deploy, erasing every company made on the server since. A real delete
+ * (delete_company) also removes the company's users, so a company admin with no company
+ * can only mean a wiped company. Rebuilt from the tenant config (name, slug) and the admin.
+ */
+function chatlyRecoverLostCompanies(array &$comps): bool {
+    $users = @json_decode((string) @file_get_contents(__DIR__ . '/../data/users.json'), true);
+    if (!is_array($users)) return false;
+    $known = [];
+    foreach ($comps as $c) $known[$c['id'] ?? ''] = true;
+    $slugs = [];
+    foreach ($comps as $c) $slugs[strtolower($c['slug'] ?? '')] = true;
+    $added = false;
+    foreach ($users as $u) {
+        $cid = (string) ($u['company_id'] ?? '');
+        if (($u['role'] ?? '') !== 'admin' || !preg_match('/^COMP-\d+$/', $cid) || isset($known[$cid])) continue;
+        if (in_array($cid, ['COMP-002', 'COMP-003'], true)) continue; // the removed demo companies
+        $cfg = @json_decode((string) @file_get_contents(__DIR__ . '/../data/tenants/' . $cid . '/config.json'), true);
+        $slug = is_array($cfg) ? strtolower(preg_replace('/[^a-z0-9_-]/i', '', (string) ($cfg['company_slug'] ?? ''))) : '';
+        $name = is_array($cfg) ? trim((string) ($cfg['company_name'] ?? '')) : '';
+        if ($slug === '' || $name === '' || isset($slugs[$slug])) continue;
+        $comps[] = [
+            'id'                    => $cid,
+            'name'                  => $name,
+            'short_name'            => $name,
+            'slug'                  => $slug,
+            'owner_name'            => (string) ($u['name'] ?? ($name . ' Admin')),
+            'owner_email'           => (string) ($u['email'] ?? ''),
+            'plan'                  => 'Enterprise Growth',
+            'logo'                  => 'assets/images/chatly-icon.png',
+            'brand_color'           => '#10b981',
+            'fallback_phone'        => '+923318036576',
+            'max_employees'         => 50,
+            'default_message_limit' => 200,
+            'status'                => 'active',
+            'created_at'            => (string) ($cfg['created_at'] ?? ($u['created_at'] ?? date('Y-m-d H:i:s'))),
+            'recovered_at'          => date('Y-m-d H:i:s')
+        ];
+        $known[$cid] = true;
+        $slugs[$slug] = true;
+        $added = true;
+    }
+    return $added;
 }
 
 /** Deletes every account (admin, TL, TM) that belongs to these companies. Never the super admin. */

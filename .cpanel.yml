@@ -18,7 +18,6 @@ deployment:
     - /bin/chmod +x /home/dailygol/chatly.pk/bridge/*.sh 2>/dev/null || true
     - /bin/cp -f .htaccess /home/dailygol/chatly.pk/ 2>/dev/null || true
     - /bin/cp -f data/.htaccess /home/dailygol/chatly.pk/data/ 2>/dev/null || true
-    - /bin/cp -f data/companies.json data/email_config.json /home/dailygol/chatly.pk/data/ 2>/dev/null || true
     - /bin/chmod 755 /home/dailygol/chatly.pk /home/dailygol/chatly.pk/cc /home/dailygol/chatly.pk/ss 2>/dev/null || true
     - /bin/chmod 775 /home/dailygol/chatly.pk/data 2>/dev/null || true
 
@@ -34,6 +33,5 @@ deployment:
     - /bin/chmod +x /home/dailygol/public_html/chatly.pk/bridge/*.sh 2>/dev/null || true
     - /bin/cp -f .htaccess /home/dailygol/public_html/chatly.pk/ 2>/dev/null || true
     - /bin/cp -f data/.htaccess /home/dailygol/public_html/chatly.pk/data/ 2>/dev/null || true
-    - /bin/cp -f data/companies.json data/email_config.json /home/dailygol/public_html/chatly.pk/data/ 2>/dev/null || true
     - /bin/chmod 755 /home/dailygol/public_html/chatly.pk /home/dailygol/public_html/chatly.pk/cc /home/dailygol/public_html/chatly.pk/ss 2>/dev/null || true
     - /bin/chmod 775 /home/dailygol/public_html/chatly.pk/data 2>/dev/null || true

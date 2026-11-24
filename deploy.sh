@@ -47,7 +47,9 @@ for TARGET in "${TARGETS[@]}"; do
 
     # Data files (preserve existing runtime json if present)
     /bin/cp -f data/.htaccess "$TARGET/data/" 2>/dev/null || true
-    /bin/cp -n data/companies.json data/email_config.json "$TARGET/data/" 2>/dev/null || /bin/cp -f data/companies.json data/email_config.json "$TARGET/data/" 2>/dev/null || true
+    # companies.json is live data (companies made in super admin). Only a brand-new site gets
+    # the starter copy; an existing one is NEVER overwritten (that used to erase new companies).
+    [ -f "$TARGET/data/companies.json" ] || /bin/cp data/companies.json "$TARGET/data/" 2>/dev/null || true
 
     # Permissions
     /bin/chmod 755 "$TARGET" "$TARGET/cc" "$TARGET/ss" 2>/dev/null || true
