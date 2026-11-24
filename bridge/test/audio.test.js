@@ -8,8 +8,29 @@ const {
   getOpusSamplesPerFrame,
   getOpusPacketSamples,
   createOggPage,
-  oggCrc
+  oggCrc,
+  oggOpusVoiceInfo
 } = require('../audio');
+
+test('oggOpusVoiceInfo gives WhatsApp wave bars and length from Opus packet sizes', () => {
+  const head = Buffer.alloc(19); head.write('OpusHead', 0, 'ascii'); head[8] = 1; head[9] = 1; head.writeUInt16LE(312, 10);
+  const tags = Buffer.from('OpusTags\0\0\0\0\0\0\0\0');
+  // 3 seconds of 20 ms packets: loud first second, silence, loud last second.
+  const audio = [];
+  for (let i = 0; i < 150; i++) audio.push(Buffer.alloc(i >= 50 && i < 100 ? 3 : 80, 0xf8));
+  const ogg = Buffer.concat([
+    createOggPage(0x02, 0, 7, 0, [head]),
+    createOggPage(0x00, 0, 7, 1, [tags]),
+    createOggPage(0x04, 312 + 150 * 960, 7, 2, audio)
+  ]);
+  const info = oggOpusVoiceInfo(ogg);
+  assert.equal(info.seconds, 3);
+  assert.equal(info.waveform.length, 64);
+  assert.ok(info.waveform[5] > 80, 'loud start has tall bars');
+  assert.ok(info.waveform[32] < 10, 'silence has short bars');
+  assert.ok(info.waveform[60] > 80, 'loud end has tall bars');
+  assert.equal(oggOpusVoiceInfo(Buffer.from('ID3 not ogg')), null);
+});
 
 test('getOpusSamplesPerFrame returns correct frame size for all configurations', () => {
   // CELT 20ms

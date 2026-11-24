@@ -358,7 +358,68 @@ async function ensureOggOpus(buffer) {
   return buffer;
 }
 
+/**
+ * Voice-note waveform and length for WhatsApp, read straight from an Ogg Opus file.
+ * WhatsApp draws a voice note's wave bars from a 64-value waveform (0-100) sent with
+ * the message. Baileys can only make one with the optional audio-decode package, which
+ * the server does not have, so every voice note arrived as a flat line. Opus is
+ * variable bitrate: loud speech uses big packets and silence tiny ones, so packet size
+ * per millisecond follows the voice's loudness. Decoding is not needed.
+ * Returns { waveform: Uint8Array(64), seconds } or null when the buffer is not Ogg Opus.
+ */
+function oggOpusVoiceInfo(buffer, bars = 64) {
+  if (!isOgg(buffer)) return null;
+  const packets = [];
+  let pending = [];
+  let lastGranule = 0;
+  let off = 0;
+  while (off + 27 <= buffer.length && buffer.toString('ascii', off, off + 4) === 'OggS') {
+    const segCount = buffer[off + 26];
+    const lacingStart = off + 27;
+    if (lacingStart + segCount > buffer.length) break;
+    let bodyLen = 0;
+    for (let i = 0; i < segCount; i++) bodyLen += buffer[lacingStart + i];
+    const granule = Number(buffer.readBigInt64LE(off + 6));
+    if (granule > 0) lastGranule = granule;
+    let p = lacingStart + segCount;
+    for (let i = 0; i < segCount; i++) {
+      const len = buffer[lacingStart + i];
+      pending.push(buffer.subarray(p, Math.min(p + len, buffer.length)));
+      p += len;
+      if (len < 255) { packets.push(Buffer.concat(pending)); pending = []; }
+    }
+    off = lacingStart + segCount + bodyLen;
+  }
+  if (packets.length < 3 || packets[0].toString('ascii', 0, 8) !== 'OpusHead') return null;
+  const preSkip = packets[0].length >= 12 ? packets[0].readUInt16LE(10) : 0;
+  const audio = packets.slice(2);
+
+  // Loudness of each packet = bytes per 20 ms of sound.
+  const level = audio.map(pk => pk.length / Math.max(1, getOpusPacketSamples(pk) / 960));
+  const sorted = [...level].sort((a, b) => a - b);
+  const floor = sorted[Math.floor(sorted.length * 0.05)] || 0;
+  const raw = [];
+  for (let b = 0; b < bars; b++) {
+    const from = Math.floor((b * level.length) / bars);
+    const to = Math.max(from + 1, Math.floor(((b + 1) * level.length) / bars));
+    let sum = 0; let n = 0;
+    for (let i = from; i < to && i < level.length; i++) { sum += Math.max(0, level[i] - floor); n++; }
+    raw.push(n ? sum / n : 0);
+  }
+  const max = Math.max(...raw);
+  const waveform = new Uint8Array(bars);
+  for (let b = 0; b < bars; b++) {
+    // Constant-bitrate audio has no size changes; give it a gentle natural-looking wave.
+    const v = max > 0.5 ? (raw[b] / max) : (0.45 + 0.35 * Math.abs(Math.sin(b * 0.9) * Math.cos(b * 0.37)));
+    // Packet size squeezes loud vs quiet together; the power curve opens it back up.
+    waveform[b] = Math.max(0, Math.min(100, Math.round(Math.pow(v, 1.6) * 100)));
+  }
+  const seconds = Math.max(1, Math.round(Math.max(0, lastGranule - preSkip) / 48000));
+  return { waveform, seconds };
+}
+
 module.exports = {
+  oggOpusVoiceInfo,
   ensureOggOpus,
   isOgg,
   isWebm,

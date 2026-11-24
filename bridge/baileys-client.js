@@ -56,7 +56,7 @@ try {
     NodeCache = class { constructor() { this.m = new Map(); } get(k) { return this.m.get(k); } set(k, v) { this.m.set(k, v); } del(k) { this.m.delete(k); } has(k) { return this.m.has(k); } flushAll() { this.m.clear(); } };
   }
 }
-const { ensureOggOpus, isOgg } = require('./audio');
+const { ensureOggOpus, isOgg, oggOpusVoiceInfo } = require('./audio');
 
 class BaileysClient extends EventEmitter {
   constructor({ authPath, deviceName = 'Omnidesk Cloud' } = {}) {
@@ -961,11 +961,19 @@ class BaileysClient extends EventEmitter {
         // WhatsApp PTT requires genuine OGG OPUS container for native mobile voice note playback
         buffer = await ensureOggOpus(buffer);
         const validPtt = isOgg(buffer);
-        sent = await this.sock.sendMessage(jid, {
+        const voiceMsg = {
           audio: buffer,
           mimetype: validPtt ? 'audio/ogg; codecs=opus' : (content.mimetype || 'audio/mp4'),
           ptt: validPtt
-        });
+        };
+        // Wave bars + length, so WhatsApp shows a real voice note instead of a flat line.
+        if (validPtt) {
+          try {
+            const info = oggOpusVoiceInfo(buffer);
+            if (info) { voiceMsg.waveform = info.waveform; voiceMsg.seconds = info.seconds; }
+          } catch (_) {}
+        }
+        sent = await this.sock.sendMessage(jid, voiceMsg);
       } else if (content.mimetype.startsWith('image/')) {
         sent = await this.sock.sendMessage(jid, {
           image: buffer,
