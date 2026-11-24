@@ -139,6 +139,9 @@ function chatlyRecoverLostCompanies(array &$comps): bool {
         $cfg = @json_decode((string) @file_get_contents(__DIR__ . '/../data/tenants/' . $cid . '/config.json'), true);
         $slug = is_array($cfg) ? strtolower(preg_replace('/[^a-z0-9_-]/i', '', (string) ($cfg['company_slug'] ?? ''))) : '';
         $name = is_array($cfg) ? trim((string) ($cfg['company_name'] ?? '')) : '';
+        // Fallbacks: admins made in super admin are "<slug>_admin"; a placeholder name is replaced.
+        if ($slug === '' && preg_match('/^([a-z0-9_-]+?)_admin$/i', (string) ($u['username'] ?? ''), $m)) $slug = strtolower($m[1]);
+        if ($name === '' || stripos($name, 'Company COMP-') === 0) $name = ucwords(str_replace(['-', '_'], ' ', $slug));
         if ($slug === '' || $name === '' || isset($slugs[$slug])) continue;
         $comps[] = [
             'id'                    => $cid,
