@@ -1203,7 +1203,14 @@ class BaileysClient extends EventEmitter {
 
   async resetSession() {
     this._destroyed = true;
+    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
     if (this.sock) {
+      // Tell WhatsApp to remove this linked device too. Deleting only our copy of the login
+      // left a dead entry in the phone's "Linked devices" list on every re-link; WhatsApp
+      // allows only 4 linked devices, so those ghosts pushed live Chatly sessions out.
+      if (this._auth?.state?.creds?.me?.id && typeof this.sock.logout === 'function') {
+        try { await Promise.race([this.sock.logout('Chatly: device unlinked'), new Promise(r => setTimeout(r, 5000))]); } catch (_) {}
+      }
       try { this.sock.end(undefined); } catch (_) {}
       this.sock = null;
     }
