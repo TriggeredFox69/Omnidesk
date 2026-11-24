@@ -707,7 +707,10 @@ class BaileysClient extends EventEmitter {
           // Baileys status values: ERROR=0, PENDING=1, SERVER_ACK=2, DELIVERY_ACK=3, READ=4, PLAYED=5.
           if (status === 0) {
             const reason = (update.update.messageStubParameters || []).join(' ');
-            console.warn(`[Baileys] WhatsApp refused message ${update.key.id}${reason ? ': ' + reason : ''}`);
+            // Baileys labels 463 "account restricted", but it is also what WhatsApp answers when a
+            // first message to a new contact has no privacy token (see scripts/patch-baileys.js #4).
+            const hint = /^463\b/.test(reason) ? ' [463 = no privacy token for this new contact, or the number is limited for new chats]' : '';
+            console.warn(`[Baileys] WhatsApp refused message ${update.key.id}${reason ? ': ' + reason : ''}${hint}`);
           }
           const ack = status === 0 ? -1 : (status >= 4 ? 3 : (status === 3 ? 2 : (status === 2 ? 1 : 0)));
           const remoteJid = update.key?.remoteJid || '';

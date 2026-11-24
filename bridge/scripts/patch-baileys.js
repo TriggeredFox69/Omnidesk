@@ -97,6 +97,53 @@ applyAll('messages-recv.js', '/* chatly-patch: retry-destination */', [
   }
 ]);
 
+// 4. First message to a NEW contact (campaigns) was refused with error 463 and WhatsApp then
+//    removed the linked device ("conflict: device_removed"), although the account itself was
+//    fine (the phone could message new people). WhatsApp wants a privacy token (tctoken) on a
+//    1:1 message; rc14 only issued ours AFTER sending, fire-and-forget, so every first message
+//    went out without one. Now, when we hold no valid token for the contact, it is issued and
+//    stored BEFORE the send (as WA Web does) and attached to that first message.
+//    Reports: https://github.com/WhiskeySockets/Baileys/issues/2441 , #2698 , #2707 ;
+//    same fix: https://github.com/rmyndharis/OpenWA/pull/1767
+const TC_MARK = '/* chatly-patch: tctoken-before-first-send */';
+applyAll('messages-send.js', TC_MARK, [
+  {
+    from: `            if (tcTokenBuffer?.length && sock.serverProps.privacyTokenOn1to1) {`,
+    to: `            ${TC_MARK}
+            let chatlyPreIssued = false;
+            if (is1on1Send && !tcTokenBuffer?.length && !normalizeMessageContent(message)?.protocolMessage &&
+                destinationJid !== PSA_WID && !isJidBot(destinationJid) && !isJidMetaAI(destinationJid)) {
+                try {
+                    const preIssueTs = unixTimestampSeconds();
+                    const preGetPNForLID = signalRepository.lidMapping.getPNForLID.bind(signalRepository.lidMapping);
+                    const preIssueJid = await resolveIssuanceJid(destinationJid, sock.serverProps.lidTrustedTokenIssueToLid, getLIDForPN, preGetPNForLID);
+                    const preResult = await Promise.race([
+                        issuePrivacyTokens([preIssueJid], preIssueTs),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('privacy token request timed out')), 8000))
+                    ]);
+                    await storeTcTokensFromIqResult({ result: preResult, fallbackJid: tcTokenJid, keys: authState.keys, getLIDForPN });
+                    const preFresh = (await authState.keys.get('tctoken', [tcTokenJid]))[tcTokenJid];
+                    const preIndexWrite = await buildMergedTcTokenIndexWrite(authState.keys, [tcTokenJid]);
+                    await authState.keys.set({ tctoken: { [tcTokenJid]: { token: Buffer.alloc(0), ...preFresh, senderTimestamp: preIssueTs }, ...preIndexWrite } });
+                    if (preFresh?.token?.length && !isTcTokenExpired(preFresh.timestamp)) tcTokenBuffer = preFresh.token;
+                    chatlyPreIssued = true;
+                    logger.debug({ jid: destinationJid, attached: !!tcTokenBuffer?.length }, 'chatly: privacy token issued before first send');
+                }
+                catch (err) {
+                    logger.warn({ jid: destinationJid, err: err?.message }, 'chatly: privacy token issue before send failed');
+                }
+            }
+            if (tcTokenBuffer?.length && sock.serverProps.privacyTokenOn1to1) {`
+  },
+  {
+    from: `                shouldSendNewTcToken(existingTokenEntry?.senderTimestamp) &&
+                !inFlightTcTokenIssuance.has(tcTokenJid)) {`,
+    to: `                shouldSendNewTcToken(existingTokenEntry?.senderTimestamp) &&
+                !chatlyPreIssued &&
+                !inFlightTcTokenIssuance.has(tcTokenJid)) {`
+  }
+]);
+
 applyAll('messages-recv.js', '/* chatly-patch: fresh-session-on-retry */', [
   {
     from: `        if (enableAutoSessionRecreation && messageRetryManager && retryCount > 1 && !injectedFromBundle) {`,
