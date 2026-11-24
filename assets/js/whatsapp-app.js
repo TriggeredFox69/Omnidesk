@@ -6773,7 +6773,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // If Admin, show Employees and Email Studio buttons and fetch roster
     const isSuperAdmin = (user.role === 'superadmin');
     const isAdmin = (user.role === 'admin' || isSuperAdmin);
-    const isTL = (user.role === 'lead');
+    // A Nunno Super Lead (e.g. Erij) follows the Team Leader rules too.
+    const isTL = (user.role === 'lead') || (!!user.super_lead && (user.company_id || 'COMP-001') === 'COMP-001');
 
     // Role-specific Header Badges & Actions
     const openTlModalBtn = document.getElementById('openTlModalBtn');

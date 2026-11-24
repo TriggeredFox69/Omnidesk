@@ -30,7 +30,8 @@
     function isTLUser() {
       const userRole = (state.currentUser?.role || '').toLowerCase();
       const designation = (state.currentUser?.designation || '').toLowerCase();
-      return userRole === 'lead' || userRole === 'tl' || designation.includes('lead') || designation.includes('team lead');
+      // A Super Lead (e.g. Erij) works as a TL too.
+      return userRole === 'lead' || userRole === 'tl' || !!state.currentUser?.super_lead || designation.includes('lead') || designation.includes('team lead');
     }
 
     function shouldFilterNonCampaignMessages() {

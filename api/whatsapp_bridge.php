@@ -2,7 +2,7 @@
 // Bump together with `version` in bridge/service.js. After a deploy, the first
 // request that sees the bridge still running the OLD code restarts it once, so the
 // person updating cPanel never has to restart anything by hand.
-const EXPECTED_BRIDGE_VERSION = '19.3';
+const EXPECTED_BRIDGE_VERSION = '19.4';
 
 function ensureBridgeCurrent(?array $status = null): void {
     static $checked = false;

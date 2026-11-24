@@ -1706,7 +1706,15 @@ switch ($action) {
 
     // 8. TL Provisions New Team Member (TM) — Awards 500 PKR Commission to TL
     case 'tl_create_tm':
-        if (!$currentUser || !in_array(($currentUser['role'] ?? ''), ['lead', 'admin', 'superadmin'], true)) {
+        // A Nunno Super Lead (e.g. Erij) follows the Team Leader rules, so may recruit TMs too.
+        // Read fresh from users.json: the flag can be switched on after this session started.
+        $tlSuperLead = false;
+        if ($currentUser && ($currentUser['company_id'] ?? 'COMP-001') === 'COMP-001') {
+            foreach ((json_decode((string) @file_get_contents(__DIR__ . '/../data/users.json'), true) ?: []) as $su) {
+                if (($su['id'] ?? '') === ($currentUser['id'] ?? '-')) { $tlSuperLead = !empty($su['super_lead']); break; }
+            }
+        }
+        if (!$currentUser || (!$tlSuperLead && !in_array(($currentUser['role'] ?? ''), ['lead', 'admin', 'superadmin'], true))) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Access Denied: Only Team Leads or Administrators can provision Team Members.']);
             exit;
