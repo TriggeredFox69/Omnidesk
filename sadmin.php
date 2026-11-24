@@ -1021,7 +1021,7 @@ async function handleSadminLogin(e) {
           </div>
         </div>
         <div class="panel">
-          <div class="panel-h"><div><div class="panel-t">Persona voice per company</div><div class="panel-d">Pick a voice in ElevenLabs → Voice Library (e.g. a young Urdu / Hindi female voice), add it to My Voices and copy its Voice ID. If a conversion fails, the voice note is not sent.</div></div></div>
+          <div class="panel-h"><div><div class="panel-t">Chatly persona voice</div><div class="panel-d">Only the Chatly company uses the voice changer (never Nunno, Metalink or other companies). Ready set: Alishba (Voice ID Uzk1UAq1qbcVo56v1nhi), switched on. If a conversion fails, the voice note is not sent.</div></div></div>
           <div class="panel-b">
             <div class="frow">
               <div class="fg"><label class="fl" for="vcCompany">Company</label><select id="vcCompany" class="fc"></select></div>
@@ -3404,30 +3404,38 @@ async function vcLoad() {
     VC.settings = d.settings || {}; VC.companies = d.companies || [];
     $('#vcKeyHint').textContent = d.has_key ? `Saved (${d.key_hint}). Paste a new one to replace it.` : 'Not saved yet. ElevenLabs → Profile → API keys.';
     const sel = $('#vcCompany'), cur = sel.value;
-    sel.innerHTML = VC.companies.map(c => `<option value="${esc(c.id)}">${esc(c.name)}${VC.settings[c.id] && VC.settings[c.id].enabled ? '  (voice on)' : ''}</option>`).join('');
-    const chatlyCo = VC.companies.find(c => /chatly/i.test(c.name));
-    sel.value = cur && VC.companies.some(c => c.id === cur) ? cur : (chatlyCo ? chatlyCo.id : (VC.companies[0] || {}).id || '');
+    sel.innerHTML = VC.companies.map(c => `<option value="${esc(c.id)}">${esc(c.name)} · ${esc(c.id)}${VC.settings[c.id] && VC.settings[c.id].enabled ? '  (voice on)' : ''}</option>`).join('');
+    sel.value = cur && VC.companies.some(c => c.id === cur) ? cur : ((VC.companies[0] || {}).id || '');
     vcFill();
+    $('#vcMsg').textContent = !VC.companies.length ? 'No company named Chatly found. Create (or restore) the Chatly company first.'
+      : (!d.has_key ? 'Save the ElevenLabs API key above to start.' : '');
   } catch (err) { $('#vcMsg').textContent = 'Could not load: ' + err.message; }
 }
 async function vcSaveKey(clear) {
   const key = $('#vcKey').value.trim();
   if (!clear && !key) { toast('Paste the API key first.', { kind: 'err' }); return; }
-  const d = await postJSON(VC_API + '?action=save_settings', clear ? { clear_key: true } : { api_key: key });
+  let d;
+  try { d = await postJSON(VC_API + '?action=save_settings', clear ? { clear_key: true } : { api_key: key }); }
+  catch (err) { toast('Could not save: ' + err.message, { kind: 'err' }); return; }
   toast(d.success ? (clear ? 'API key removed.' : 'API key saved.') : (d.error || 'Could not save.'), { kind: d.success ? 'ok' : 'err' });
   $('#vcKey').value = ''; vcLoad();
 }
 async function vcCheck() {
   const voice = $('#vcVoice').value.trim();
   $('#vcVoiceHint').textContent = 'Checking…';
-  const d = await postJSON(VC_API + '?action=check_voice', { voice_id: voice });
+  let d;
+  try { d = await postJSON(VC_API + '?action=check_voice', { voice_id: voice }); }
+  catch (err) { $('#vcVoiceHint').textContent = 'Could not check: ' + err.message; return; }
   $('#vcVoiceHint').textContent = d.success ? `✓ ${d.name}${d.labels ? ' · ' + d.labels : ''}` : (d.error || 'Not found.');
 }
 async function vcSave() {
   const body = { company_id: $('#vcCompany').value, persona: $('#vcPersona').value.trim(), voice_id: $('#vcVoice').value.trim(),
     enabled: $('#vcEnabled').checked, stability: parseFloat($('#vcStab').value), style: parseFloat($('#vcStyle').value), similarity_boost: 0.8 };
+  if (!body.company_id) { toast('The Chatly company was not found.', { kind: 'err' }); return; }
   if (body.enabled && !body.voice_id) { toast('Enter the Voice ID before switching it on.', { kind: 'err' }); return; }
-  const d = await postJSON(VC_API + '?action=save_settings', body);
+  let d;
+  try { d = await postJSON(VC_API + '?action=save_settings', body); }
+  catch (err) { $('#vcMsg').textContent = 'Could not save: ' + err.message; return; }
   $('#vcMsg').textContent = d.success ? '✓ Saved. Closers in this company now send voice notes in this voice.' : (d.error || 'Could not save.');
   if (d.success) vcLoad();
 }

@@ -39,9 +39,34 @@ function vcSave(array $d): void {
     $tmp = VC_FILE . '.tmp.' . uniqid('', true);
     if (@file_put_contents($tmp, json_encode($d, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false) @rename($tmp, VC_FILE);
 }
+// "Alishba": Chatly's own voice, made with ElevenLabs Voice Design (a voice ID is not a secret).
+const VC_DEFAULT_VOICE = 'Uzk1UAq1qbcVo56v1nhi';
+const VC_DEFAULT_PERSONA = 'Alishba';
+
+function vcCompanies(): array {
+    $list = json_decode((string) @file_get_contents(__DIR__ . '/../data/companies.json'), true);
+    return is_array($list) ? $list : [];
+}
+/** The voice changer is for the Chatly company only: never Nunno, Metalink or any other company. */
+function vcIsChatly(string $companyId): bool {
+    if ($companyId === '' || in_array($companyId, ['COMP-001', 'COMP-004', 'GLOBAL'], true)) return false;
+    foreach (vcCompanies() as $co) {
+        if (($co['id'] ?? '') !== $companyId) continue;
+        return strtolower((string) ($co['slug'] ?? '')) === 'chatly' || preg_match('/^\s*chatly\b/i', (string) ($co['name'] ?? '')) === 1;
+    }
+    return false;
+}
+/** Chatly's voice settings with defaults filled in (on, Alishba) until the super admin changes them. */
+function vcChatlySettings(array $cfg, string $companyId): array {
+    $c = is_array($cfg['companies'][$companyId] ?? null) ? $cfg['companies'][$companyId] : ['enabled' => true];
+    if (empty($c['voice_id'])) $c['voice_id'] = VC_DEFAULT_VOICE;
+    if (trim((string) ($c['persona'] ?? '')) === '') $c['persona'] = VC_DEFAULT_PERSONA;
+    return $c;
+}
 function vcCompanyConf(array $cfg, string $companyId): ?array {
-    $c = $cfg['companies'][$companyId] ?? null;
-    return (is_array($c) && !empty($c['enabled']) && !empty($c['voice_id']) && !empty($cfg['api_key'])) ? $c : null;
+    if (empty($cfg['api_key']) || !vcIsChatly($companyId)) return null;
+    $c = vcChatlySettings($cfg, $companyId);
+    return !empty($c['enabled']) ? $c : null;
 }
 /** One ElevenLabs request. Returns [httpCode, body, contentType]. */
 function vcHttp(string $method, string $url, string $key, $postFields = null, int $timeout = 60): array {
@@ -61,6 +86,9 @@ function vcHttp(string $method, string $url, string $key, $postFields = null, in
 function vcErr(string $body, int $code): string {
     $j = json_decode($body, true);
     $msg = is_array($j) ? ($j['detail']['message'] ?? (is_string($j['detail'] ?? null) ? $j['detail'] : ($j['message'] ?? ''))) : '';
+    $status = is_array($j) ? (string) ($j['detail']['status'] ?? '') : '';
+    if (stripos($status . ' ' . $msg, 'unusual') !== false) return 'ElevenLabs blocked the FREE plan from this server ("unusual activity"; they do this to free accounts used from hosting servers). A paid plan (Starter) removes the block.';
+    if ($status === 'missing_permissions' || stripos((string) $msg, 'permission') !== false) return 'The API key is missing a permission: in ElevenLabs edit the key and set Speech to Speech = Access and Voices = Read.';
     if ($code === 401) return 'ElevenLabs rejected the API key. Check it in Super admin -> Voice changer.';
     if ($code === 402 || stripos((string) $msg, 'quota') !== false || stripos((string) $msg, 'credit') !== false) return 'ElevenLabs credits are used up for this month.';
     if ($code === 404) return 'ElevenLabs does not know this voice ID (or it is not added to your account).';
@@ -128,13 +156,16 @@ if ($action === 'convert') {
 if (!$isSuper) vcOut(['success' => false, 'error' => 'Only the super admin can change the voice changer.'], 403);
 
 if ($action === 'settings') {
-    $companies = [];
-    foreach ((json_decode((string) @file_get_contents(__DIR__ . '/../data/companies.json'), true) ?: []) as $co) {
-        if (!empty($co['id'])) $companies[] = ['id' => $co['id'], 'name' => $co['name'] ?? $co['id']];
+    $companies = []; $settings = [];
+    foreach (vcCompanies() as $co) {
+        $id = (string) ($co['id'] ?? '');
+        if (!vcIsChatly($id)) continue;
+        $companies[] = ['id' => $id, 'name' => $co['name'] ?? $id];
+        $settings[$id] = vcChatlySettings($cfg, $id);
     }
     $key = (string) ($cfg['api_key'] ?? '');
     vcOut(['success' => true, 'has_key' => $key !== '', 'key_hint' => $key !== '' ? '••••' . substr($key, -4) : '',
-        'companies' => $companies, 'settings' => $cfg['companies']]);
+        'companies' => $companies, 'settings' => $settings]);
 }
 
 if ($action === 'save_settings') {
@@ -145,6 +176,7 @@ if ($action === 'save_settings') {
         $cfg['api_key'] = $newKey; unset($cfg['opus_ok']);
     }
     $cid = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($in['company_id'] ?? ''));
+    if ($cid !== '' && !vcIsChatly($cid)) vcOut(['success' => false, 'error' => 'The voice changer is only for the Chatly company.'], 400);
     if ($cid !== '') {
         $voice = trim((string) ($in['voice_id'] ?? ''));
         if ($voice !== '' && !preg_match('/^[A-Za-z0-9]{10,40}$/', $voice)) vcOut(['success' => false, 'error' => 'That voice ID does not look right (letters and numbers only).'], 400);
