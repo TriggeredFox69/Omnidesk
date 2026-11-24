@@ -398,8 +398,24 @@ class BaileysClient extends EventEmitter {
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const loggedOut = statusCode === DisconnectReason.loggedOut;
+        const who = `${path.basename(path.dirname(this.authPath))} (${String(this._auth?.state?.creds?.me?.id || 'not linked').split(':')[0].split('@')[0]})`;
+        if (loggedOut && this._auth?.state?.creds?.me?.id && (this._loggedOutChecks || 0) < 2) {
+          // One "logged out" answer is not proof: WhatsApp also sends it during server
+          // hiccups and right after network drops, and deleting the login then forced the
+          // closer to scan a QR again for nothing. Reconnect with the SAME login twice
+          // (after 20 s, then 90 s); only a third "logged out" in a row is believed.
+          this._loggedOutChecks = (this._loggedOutChecks || 0) + 1;
+          const wait = this._loggedOutChecks === 1 ? 20000 : 90000;
+          let detail = '';
+          try { detail = JSON.stringify(lastDisconnect?.error?.data || lastDisconnect?.error?.output?.payload || '').slice(0, 300); } catch (_) {}
+          console.warn(`[Baileys] ${who}: WhatsApp said "logged out" (${lastDisconnect?.error?.message || 'no message'} ${detail}). Check ${this._loggedOutChecks}/2: reconnecting with the same login in ${wait / 1000}s before believing it.`);
+          this.emit('disconnected');
+          this._scheduleReconnect(wait);
+          return;
+        }
         if (loggedOut) {
-          console.warn('[Baileys] WhatsApp session logged out or revoked. Purging credentials and backups...');
+          this._loggedOutChecks = 0;
+          console.warn(`[Baileys] ${who}: WhatsApp session logged out or revoked (confirmed). Purging credentials and backups...`);
           try {
             const backupFile = path.join(this.authPath, '../creds.json.bak');
             const altBak = this.authPath + '.bak';
@@ -441,6 +457,8 @@ class BaileysClient extends EventEmitter {
         }
       } else if (connection === 'open') {
         this._reconnectAttempts = 0;
+        if (this._loggedOutChecks) console.log(`[Baileys] ${path.basename(path.dirname(this.authPath))}: reconnected with the same login; the earlier "logged out" was a false alarm.`);
+        this._loggedOutChecks = 0;
         this._connectedAt = Math.floor(Date.now() / 1000);
         if (this._reconnectTimer) {
           clearTimeout(this._reconnectTimer);
