@@ -132,15 +132,18 @@ function chatlyRecoverLostCompanies(array &$comps): bool {
     $slugs = [];
     foreach ($comps as $c) $slugs[strtolower($c['slug'] ?? '')] = true;
     $added = false;
+    // Company admins first: their username ("<slug>_admin") and name describe the company best.
+    usort($users, fn($a, $b) => (($b['role'] ?? '') === 'admin') <=> (($a['role'] ?? '') === 'admin'));
     foreach ($users as $u) {
         $cid = (string) ($u['company_id'] ?? '');
-        if (($u['role'] ?? '') !== 'admin' || !preg_match('/^COMP-\d+$/', $cid) || isset($known[$cid])) continue;
+        if (($u['role'] ?? '') === 'superadmin' || !preg_match('/^COMP-\d+$/', $cid) || isset($known[$cid])) continue;
         if (in_array($cid, ['COMP-002', 'COMP-003'], true)) continue; // the removed demo companies
         $cfg = @json_decode((string) @file_get_contents(__DIR__ . '/../data/tenants/' . $cid . '/config.json'), true);
         $slug = is_array($cfg) ? strtolower(preg_replace('/[^a-z0-9_-]/i', '', (string) ($cfg['company_slug'] ?? ''))) : '';
         $name = is_array($cfg) ? trim((string) ($cfg['company_name'] ?? '')) : '';
         // Fallbacks: admins made in super admin are "<slug>_admin"; a placeholder name is replaced.
         if ($slug === '' && preg_match('/^([a-z0-9_-]+?)_admin$/i', (string) ($u['username'] ?? ''), $m)) $slug = strtolower($m[1]);
+        if ($slug === '' && $name !== '' && stripos($name, 'Company COMP-') !== 0) $slug = trim(strtolower(preg_replace('/[^a-z0-9]+/i', '-', $name)), '-');
         if ($name === '' || stripos($name, 'Company COMP-') === 0) $name = ucwords(str_replace(['-', '_'], ' ', $slug));
         if ($slug === '' || $name === '' || isset($slugs[$slug])) continue;
         $comps[] = [

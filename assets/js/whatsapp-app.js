@@ -691,12 +691,14 @@ document.addEventListener('DOMContentLoaded', () => {
     state.currentCompanyId = compId;
     // Lets the stylesheet adjust per company (e.g. Metalink's simplified chat header).
     document.body.dataset.company = compId;
+    // Other companies: neutral Chatly look until companies.php sends the real name and logo
+    // (this used to fall back to Metalink's name and logo, so a Chatly closer saw "Metalink").
     let brand = COMPANY_BRAND_CATALOG[compId] || {
-      name: state.currentUser?.company_name || 'Metalink',
-      short_name: (state.currentUser?.company_name || 'Metalink').split(' ')[0],
-      logo: 'assets/images/metalink-logo.webp',
+      name: state.currentUser?.company_name || 'Company Workspace',
+      short_name: (state.currentUser?.company_name || 'Company').split(' ')[0],
+      logo: 'assets/images/chatly-icon.png',
       badge: 'Enterprise Brand',
-      brand_color: '#06b6d4'
+      brand_color: '#10b981'
     };
 
     const logoImg = document.getElementById('mainBrandLogoImg') || document.querySelector('.brand-logo-img');
@@ -750,6 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (data?.success && Array.isArray(data.companies)) {
             const match = data.companies.find(c => c.id === compId);
             if (match) {
+              state.companyBrand = { id: compId, name: match.name || '', logo: match.logo || '' };
               if (compContextName && match.name) compContextName.textContent = match.name;
               if (companyBadgeLogo && match.logo) companyBadgeLogo.src = match.logo;
               if (profileCompLogo && match.logo) profileCompLogo.src = match.logo;
@@ -5473,9 +5476,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const userCompId = user.company_id || state.currentCompanyId || 'COMP-001';
     const compCatalog = (typeof COMPANY_BRAND_CATALOG !== 'undefined' && COMPANY_BRAND_CATALOG[userCompId]) ? COMPANY_BRAND_CATALOG[userCompId] : null;
     const resolvedCompName = user.company_name || compCatalog?.name || 'Company Workspace';
-    const resolvedCompLogo = compCatalog?.logo || 'assets/images/nunno-logo.png';
-    if (profCompName) profCompName.textContent = resolvedCompName;
-    if (profCompLogo) profCompLogo.src = resolvedCompLogo;
+    const resolvedCompLogo = compCatalog?.logo || 'assets/images/chatly-icon.png';
+    // The server's real company name/logo (applyCompanyBranding) wins over these placeholders.
+    const synced = state.companyBrand && state.companyBrand.id === userCompId ? state.companyBrand : null;
+    if (profCompName) profCompName.textContent = synced?.name || resolvedCompName;
+    if (profCompLogo) profCompLogo.src = synced?.logo || resolvedCompLogo;
 
     // Nunno Collab Special Plan Lock Card check
     const lockCard = document.getElementById('nunnoPlanLockCard');
