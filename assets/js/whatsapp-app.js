@@ -2886,6 +2886,88 @@ document.addEventListener('DOMContentLoaded', () => {
         sendMessage();
       }
     });
+    setupNunnoQuickReplies();
+  }
+
+  // ---- "/" quick replies: ready Roman Urdu messages for Nunno's closers only ----
+  // Type "/" in the message box (e.g. /pay, /number), pick one, edit if needed, press Enter.
+  // Facts follow Nunno's plans in Chatly (api/config.php). No profit promises, honest answers.
+  const NUNNO_QUICK_REPLIES = [
+    { cmd: 'greetings', title: 'Greeting: Hi bhai kese ho', text: 'Hi bhai, kese ho? 😊\nUmeed hai sab khairiyat se hai. Aap crypto trading karte ho ya seekhna chahte ho?' },
+    { cmd: 'salam', title: 'Assalam o Alaikum + intro', text: 'Assalam o Alaikum bhai! Kya haal hain? 🙂\nHum Nunno (nunno.cloud) ki team se hain. 2 minute mil sakte hain? Agar aap crypto trade karte ho to aap ke kaam ki cheez hai.' },
+    { cmd: 'who', title: 'Aap kaun ho?', text: 'Hum Nunno (nunno.cloud) ki team se hain 🙂\nNunno traders ke liye AI trading tool hai jo market ke important levels aur alerts pehle dikhata hai. Aap crypto trade karte ho?' },
+    { cmd: 'details', title: 'Product details (Nunno kya hai)', text: '*Nunno* (nunno.cloud) crypto traders ke liye AI trading tool hai 📊\n\n🧲 *Liquidation Magnet:* chart pe wo levels dikhata hai jahan bohot saare stop-loss aur liquidations jama hote hain, taake aap apni entry aur stop-loss soch samajh ke rakho aur faltu wick se bacho\n📈 *Live breakout alerts:* kai coins pe breakout hote hi alert\n📑 *Market report:* coin ka poora analysis ek jagah\n🤖 *AI market chat:* kisi bhi coin ke baare mein seedha sawal poocho\n\nPlans aur price chahiye to batao 👇' },
+    { cmd: 'plans', title: 'Plans aur price', text: '*Nunno ke plans* 👇\n\n⚡ *Starter*: Rs 1,700/month\nLiquidation Magnet indicator + roz ki 50 AI market chats\n\n💎 *Pro*: Rs 5,000/month (sab se popular)\n12-layer full market report + live multi-coin breakout alerts\n\n🐋 *Whale VIP*: Rs 15,000/month\nPrivate whale order flow + 1-on-1 expert access\n\n🎁 Saal ka plan lo to 2 mahine free (Starter Rs 17,000/saal, Pro Rs 50,000/saal)\n\nAap batao kitna aur kaise trade karte ho, phir hum aap ke liye best plan bata dete hain.' },
+    { cmd: 'pay', title: 'How to pay (PayFast)', text: '*Payment ka tareeqa (sirf 2 minute)* 💳\n\n1️⃣ nunno.cloud kholo aur apni email se account banao\n2️⃣ Apna plan select karo\n3️⃣ Checkout pe *PayFast* khulega: wahan Debit/Credit card, bank account ya mobile wallet, jo aap ke paas ho, us se pay kar do\n4️⃣ Payment ke baad plan aap ke account pe active ho jayega ✅\n\n⚠️ Payment sirf official website nunno.cloud pe karni hai, kisi personal account mein paise mat bhejna.\n\nPay karne ke baad screenshot aur wo email yahan bhej dena jo nunno.cloud pe use ki, hum confirm kar dete hain.' },
+    { cmd: 'paid', title: 'Payment ke baad confirm', text: 'Shukriya bhai! 🙏\nPayment ka screenshot aur nunno.cloud wali email yahan bhej do, hum abhi confirm kar dete hain. Koi bhi masla ho to seedha yahin message kar dena.' },
+    { cmd: 'number', title: 'Mera number kahan se mila?', text: 'Bilkul jaiz sawal hai bhai 🙏\nAap ka number hamari marketing contact list mein tha. Hum Pakistan mein traders tak Nunno ka taaruf pohanchate hain.\n\nAgar aap ko dilchaspi nahi, ya aap nahi chahte ke hum dobara message karein, to bas *STOP* likh dein: hum aap ka number list se hata denge aur dobara message nahi aayega.\n\nAur agar aap trade karte ho to ek nazar zaroor dekh lena, shayad aap ke kaam aaye 🙂' },
+    { cmd: 'trust', title: 'Scam to nahi? (bharosa)', text: 'Samajh sakte hain bhai, aaj kal ehtiyaat zaroori hai 👍\n\n• Nunno ek software (trading tool) hai, koi investment scheme nahi. Hum aap se paisa invest nahi karwate aur profit ka koi wada nahi karte\n• Aap ka paisa aap ke apne exchange account mein hi rehta hai. Kabhi kisi ko apna password, OTP ya exchange login mat dena\n• Payment sirf official website nunno.cloud pe hoti hai\n\nPehle website khud check kar lo: nunno.cloud' },
+    { cmd: 'profit', title: 'Profit guarantee?', text: 'Sach bataun bhai: trading mein koi bhi 100% profit ki guarantee nahi de sakta. Jo de raha hai wo jhoot bol raha hai ⚠️\n\nNunno aap ko behtar information deta hai (liquidation levels, breakouts, market report) taake aap soch samajh ke trade karo aur faltu stop-loss hunt se bacho. Faisla aur risk hamesha aap ka apna hota hai.' },
+    { cmd: 'beginner', title: 'Main naya hoon', text: 'Koi masla nahi bhai, seekhne wale ke liye bhi kaam ka hai 🙂\n\n*Starter* plan (Rs 1,700/month) se shuru karo. AI chat mein seedha poocho, jaise "BTC abhi kis level pe support hai?", aur wo samjha deta hai.\n\nShuru mein chhoti amount se trade karna aur sirf utna lagana jitna nuksan bardasht kar sako 👍' },
+    { cmd: 'expensive', title: 'Mehnga hai', text: 'Samajh sakte hain bhai 🙏\nIs liye *Starter* plan sirf Rs 1,700/month ka hai, din ka takreeban Rs 57.\n\nAgar ek bhi bura trade ya stop-loss hunt bach gaya to plan ki qeemat wahin nikal aati hai. Pehle ek mahina try kar lo, pasand aaye to continue karna.' },
+    { cmd: 'demo', title: 'Demo / dekhna hai', text: 'Zaroor! Website pe saare features khud dekh lo: nunno.cloud 👀\nKisi feature ka screenshot ya short video chahiye ho to batao, hum bhej dete hain.' },
+    { cmd: 'coins', title: 'Kaun se coins?', text: 'Nunno crypto market ke liye hai: BTC, ETH aur baaki popular coins 📊\nAap zyada kaunsa coin trade karte ho? Batao, hum us ka example dikha dete hain.' },
+    { cmd: 'refund', title: 'Refund / cancel?', text: 'Refund aur cancellation ki poori policy nunno.cloud pe likhi hui hai.\nAap ka koi specific case ho to batao, hum team se confirm kar ke aap ko seedha jawab dete hain 👍' },
+    { cmd: 'help', title: 'Account / setup help', text: 'Plan lene ke baad nunno.cloud pe login karo, dashboard mein saare tools mil jayenge 🙌\nKahin atak jao to screenshot bhej dena, hum step by step guide kar denge.' },
+    { cmd: 'later', title: 'Baad mein sochunga', text: 'Bilkul bhai, aaram se soch lo 👍\nKoi sawal ho to yahin pooch lena. Kya hum kal aap ko ek chhota sa reminder bhej dein?' },
+    { cmd: 'followup', title: 'Follow-up (agle din)', text: 'Hi bhai, kese ho? 🙂\nKal Nunno ke baare mein baat hui thi, kuch socha? Koi sawal ho to bata do, ya plan lena ho to hum payment ka tareeqa bhej dete hain.' },
+    { cmd: 'call', title: 'Call pe baat', text: 'Agar aap ko aasaan lage to WhatsApp call pe 5 minute baat kar lete hain? 📞\nBatao kis time free ho.' },
+    { cmd: 'thanks', title: 'Welcome (plan lene ke baad)', text: 'Nunno family mein khush aamdeed! 🎉\nShukriya bhai, bharosa karne ka. Kisi bhi waqt koi sawal ho to yahin message kar dena.' },
+    { cmd: 'stop', title: 'Nahi chahiye / STOP', text: 'Koi baat nahi bhai, disturb karne ke liye maazrat 🙏\nAap ko ab dobara message nahi aayega. Khush rahein!' }
+  ];
+
+  function setupNunnoQuickReplies() {
+    const input = els.chatInput;
+    if (!input || input.dataset.qrReady) return;
+    input.dataset.qrReady = '1';
+    const isNunno = () => (state.currentUser?.company_id || '') === 'COMP-001';
+    const box = document.createElement('div');
+    box.className = 'nqr-pop';
+    box.setAttribute('role', 'listbox');
+    box.hidden = true;
+    const host = document.getElementById('chatComposerBar') || input.parentElement;
+    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    host.appendChild(box);
+    let items = []; let sel = 0;
+    const close = () => { box.hidden = true; items = []; };
+    const pick = (i) => {
+      const it = items[i]; if (!it) return;
+      input.value = it.text;
+      close();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+      try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
+    };
+    const draw = () => {
+      box.innerHTML = items.map((it, i) => `<div class="nqr-item${i === sel ? ' on' : ''}" role="option" data-i="${i}"><b>/${escapeHtml(it.cmd)}</b><span>${escapeHtml(it.title)}</span></div>`).join('')
+        + '<div class="nqr-hint">↑ ↓ choose · Enter / Tab insert · Esc close</div>';
+      const on = box.querySelector('.nqr-item.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+    };
+    input.addEventListener('input', () => {
+      const v = input.value;
+      if (!isNunno() || !v.startsWith('/') || v.includes('\n') || v.length > 30) { close(); return; }
+      const q = v.slice(1).trim().toLowerCase();
+      items = NUNNO_QUICK_REPLIES.filter(r => !q || r.cmd.startsWith(q) || r.title.toLowerCase().includes(q));
+      if (!items.length) { close(); return; }
+      sel = 0; box.hidden = false; draw();
+    });
+    // Capture phase: runs before the composer's own Enter-to-send handler.
+    input.addEventListener('keydown', (e) => {
+      if (box.hidden || !items.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        sel = (sel + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length; draw();
+      } else if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+        e.preventDefault(); e.stopImmediatePropagation(); pick(sel);
+      } else if (e.key === 'Escape') {
+        e.preventDefault(); e.stopImmediatePropagation(); close();
+      }
+    }, true);
+    box.addEventListener('mousedown', (e) => {
+      const row = e.target.closest('.nqr-item'); if (!row) return;
+      e.preventDefault(); pick(Number(row.dataset.i));
+    });
+    input.addEventListener('blur', () => setTimeout(close, 150));
   }
 
   // Search Filter Input
@@ -9571,14 +9653,43 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   setTimeout(() => { if (state.currentUser) voiceChangerStatus(); }, 1500);
   async function convertVoiceNote(dataUrl) {
+    // Browsers record in different containers (Chrome WebM, Safari MP4, Firefox Ogg) and a
+    // recorder's file is sometimes missing its header info, which ElevenLabs refused as
+    // "File is corrupted". Decoding here and sending plain WAV works the same everywhere.
+    let wavUrl;
+    try { wavUrl = await recordingToWav(dataUrl); }
+    catch (_) { throw new Error('the recording could not be read. Please record it again.'); }
     const res = await fetch('api/voice_changer.php?action=convert', {
-      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: dataUrl })
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: wavUrl })
     });
     const d = await res.json().catch(() => ({}));
     if (!d.success || !d.audio) throw new Error(d.error || 'the voice changer did not answer');
     if (!d.needs_reencode) return { dataUrl: d.audio, filename: 'voice-note.ogg' };
     return { dataUrl: await reencodeToWebmOpus(d.audio), filename: 'voice-note.webm' };
   }
+  // Any recording -> mono 16-bit WAV at 22.05 kHz (plenty for a voice; about 44 KB a second).
+  async function recordingToWav(dataUrl) {
+    const buf = await (await fetch(dataUrl)).arrayBuffer();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    let decoded;
+    try { decoded = await ctx.decodeAudioData(buf); } finally { ctx.close().catch(() => {}); }
+    if (!decoded || decoded.duration < 0.3) throw new Error('empty recording');
+    const rate = 22050;
+    const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * rate)), rate);
+    const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+    const pcm = (await off.startRendering()).getChannelData(0);
+    const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) out.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); out.setUint32(4, 36 + pcm.length * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+    out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+    str(36, 'data'); out.setUint32(40, pcm.length * 2, true);
+    for (let i = 0; i < pcm.length; i++) { const s = Math.max(-1, Math.min(1, pcm[i])); out.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
+    const blob = new Blob([out.buffer], { type: 'audio/wav' });
+    return await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onloadend = () => resolve(fr.result); fr.onerror = reject; fr.readAsDataURL(blob); });
+  }
+
   // MP3 from the voice changer -> WebM/Opus (what the bridge turns into a WhatsApp voice note).
   // Plays the audio silently into a recorder, so it takes as long as the note itself.
   async function reencodeToWebmOpus(dataUrl) {

@@ -26,7 +26,7 @@ require_once __DIR__ . '/session_user.php';
 const VC_FILE = __DIR__ . '/../data/voice_changer.json';
 const VC_API = 'https://api.elevenlabs.io/v1';
 const VC_MODEL = 'eleven_multilingual_sts_v2';
-const VC_MAX_BYTES = 8 * 1024 * 1024;
+const VC_MAX_BYTES = 12 * 1024 * 1024;   // WAV from the browser: about 4.5 minutes
 
 function vcOut(array $d, int $code = 200): void { http_response_code($code); echo json_encode($d, JSON_UNESCAPED_SLASHES); exit; }
 function vcLoad(): array {
@@ -125,8 +125,8 @@ if ($action === 'convert') {
     }
     $bin = base64_decode($m[2], true);
     if ($bin === false || strlen($bin) < 500) vcOut(['success' => false, 'error' => 'The recording is empty.'], 400);
-    if (strlen($bin) > VC_MAX_BYTES) vcOut(['success' => false, 'error' => 'The recording is too long (max about 3 minutes).'], 413);
-    $ext = stripos($m[1], 'ogg') !== false ? 'ogg' : (stripos($m[1], 'mp4') !== false ? 'm4a' : 'webm');
+    if (strlen($bin) > VC_MAX_BYTES) vcOut(['success' => false, 'error' => 'The recording is too long (max about 4 minutes).'], 413);
+    $ext = stripos($m[1], 'wav') !== false ? 'wav' : (stripos($m[1], 'ogg') !== false ? 'ogg' : (stripos($m[1], 'mp4') !== false ? 'm4a' : (stripos($m[1], 'mpeg') !== false ? 'mp3' : 'webm')));
     $tmp = tempnam(sys_get_temp_dir(), 'vc_') . '.' . $ext;
     file_put_contents($tmp, $bin);
     $settings = json_encode(['stability' => (float) ($c['stability'] ?? 0.45), 'similarity_boost' => (float) ($c['similarity_boost'] ?? 0.8),

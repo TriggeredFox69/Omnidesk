@@ -5725,3 +5725,16 @@ body:not(.theme-dark) .header-quota-pill { color: #067a4a !important; background
   #viewCampaign .cs-card { padding: 16px; }
   #viewCampaign .cs-pace-select { max-width: 100%; }
 }
+
+/* "/" quick replies menu (Nunno closers) */
+.nqr-pop { position: absolute; left: 10px; right: 10px; bottom: calc(100% + 6px); z-index: 60; max-height: 300px; overflow-y: auto;
+  background: #ffffff; color: #0f172a; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: 14px; box-shadow: 0 14px 40px rgba(2, 8, 5, 0.22); padding: 6px; }
+.nqr-pop[hidden] { display: none; }
+.nqr-item { display: flex; align-items: baseline; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; font-size: 13px; }
+.nqr-item b { color: #0b8a57; font-weight: 800; min-width: 92px; }
+.nqr-item span { color: inherit; opacity: 0.85; }
+.nqr-item.on, .nqr-item:hover { background: rgba(16, 185, 129, 0.12); }
+.nqr-hint { padding: 6px 10px 2px; font-size: 11px; opacity: 0.6; }
+body.theme-dark .nqr-pop { background: #0f1f19; color: #e6f4ee; border-color: rgba(255, 255, 255, 0.12); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55); }
+body.theme-dark .nqr-item b { color: #1fe08a; }
+@media (max-width: 600px) { .nqr-item { flex-direction: column; gap: 2px; } .nqr-item b { min-width: 0; } }
