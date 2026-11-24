@@ -676,6 +676,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // The signed-in user's own company name (never another company's name as a fallback).
+  function activeCompanyDisplayName() {
+    const id = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    if (state.companyBrand && state.companyBrand.id === id && state.companyBrand.name) return state.companyBrand.name;
+    return state.currentUser?.company_name || COMPANY_BRAND_CATALOG[id]?.name || 'Company';
+  }
+  // Plan name shown when a lead has none: "Nunno Pro" is Nunno's own plan, so only Nunno uses it.
+  function defaultPlanName() {
+    const id = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
+    return id === 'COMP-001' ? 'Nunno Pro' : 'Plan';
+  }
+
   // Startup loading gate: the launch loader (see #loginAnimOverlay.loading) stays up until the
   // signed-in session AND the first leads load have both finished.
   const _boot = { auth: false, leads: false };
@@ -700,6 +712,15 @@ document.addEventListener('DOMContentLoaded', () => {
       badge: 'Enterprise Brand',
       brand_color: '#10b981'
     };
+    // The real name/logo from companies.php, once loaded, wins on every redraw (this runs on every
+    // lead poll, and used to put the placeholder back over the real company name each time).
+    if (state.companyBrand && state.companyBrand.id === compId) {
+      brand = Object.assign({}, brand, {
+        name: state.companyBrand.name || brand.name,
+        short_name: (state.companyBrand.name || brand.short_name).split(' ')[0],
+        logo: state.companyBrand.logo || brand.logo
+      });
+    }
 
     const logoImg = document.getElementById('mainBrandLogoImg') || document.querySelector('.brand-logo-img');
     const brandName = document.getElementById('mainBrandName') || document.querySelector('.brand-heading span:first-child');
@@ -2587,7 +2608,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==============================
 
     // WIDGET 1: Status Matrix & Deal Value
-    if (els.dossierInterest) els.dossierInterest.textContent = lead.interest || 'Nunno Pro';
+    if (els.dossierInterest) els.dossierInterest.textContent = lead.interest || defaultPlanName();
 
     if (els.dossierStatusPill) {
       if (leadState === 'fresh') els.dossierStatusPill.innerHTML = `<span class="status-pill-clean fresh">🔴 FRESH</span>`;
@@ -4015,7 +4036,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const activeCompanyId = state.currentUser?.company_id || state.currentCompanyId || 'COMP-001';
-    const activeCompanyName = state.currentUser?.company_name || 'Nunno Official';
+    const activeCompanyName = activeCompanyDisplayName();
 
     // Ensure senders pool is loaded from connected team accounts
     if (!window.currentCampaignSenders || window.currentCampaignSenders.length === 0) {
@@ -6388,7 +6409,7 @@ document.addEventListener('DOMContentLoaded', () => {
       userName: user?.name || 'Ali Raza',
       userRole: user?.role || 'member',
       company_id: user?.company_id || window.NUNNO_ACTIVE_USER?.company_id || 'COMP-001',
-      company_name: user?.company_name || window.NUNNO_ACTIVE_USER?.company_name || 'Metalink',
+      company_name: user?.company_name || window.NUNNO_ACTIVE_USER?.company_name || activeCompanyDisplayName(),
       amount,
       method: selectedMethod,
       institution,
@@ -8416,7 +8437,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const adminName = user ? user.name : 'System Administrator';
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const plan = lead.paidDetails?.plan || lead.interest || 'Nunno Pro';
+    const plan = lead.paidDetails?.plan || lead.interest || defaultPlanName();
     const amount = lead.paidDetails?.amount ? Number(lead.paidDetails.amount) : 5000;
     const closerName = lead.originalOwnerName || lead.paidDetails?.closedBy || lead.ownerName || 'Closer';
     const isTakeoverDeal = lead.isTakeover && lead.originalOwnerName;
@@ -8655,7 +8676,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const dealLedger = paidLeads.map(l => {
       const amt = saleAmount(l);
-      const plan = l.paidDetails?.plan || l.interest || 'Nunno Pro';
+      const plan = l.paidDetails?.plan || l.interest || defaultPlanName();
       const before = runningSales;
       runningSales += amt;
       let dealCommission = 0;
@@ -8686,7 +8707,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingLeads.forEach(l => {
       dealLedger.unshift({
         id: l.id, name: l.name, display: l.display || l.phone, email: l.paidDetails?.email || l.email || '',
-        plan: l.paidDetails?.plan || l.interest || 'Nunno Pro', amt: saleAmount(l), method: l.paidDetails?.method || 'EasyPaisa',
+        plan: l.paidDetails?.plan || l.interest || defaultPlanName(), amt: saleAmount(l), method: l.paidDetails?.method || 'EasyPaisa',
         closedAt: l.paidDetails?.closedAt ? new Date(l.paidDetails.closedAt).toLocaleDateString() : l.lastActive,
         dealCommission: 0, dealTag: '⚪ In Review (Awaiting Admin Audit)', isPending: true
       });
@@ -8958,7 +8979,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         els.verifySalesList.innerHTML = allPendingDeals.map(lead => {
           const p = lead.paidDetails || {};
-          const plan = p.plan || lead.interest || 'Nunno Pro';
+          const plan = p.plan || lead.interest || defaultPlanName();
           const amt = p.amount ? Number(p.amount) : 5000;
           const method = p.method || 'EasyPaisa';
           const trxId = p.trxId || 'N/A';

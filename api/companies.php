@@ -651,7 +651,8 @@ switch ($action) {
         $data = json_decode($raw, true) ?: $_POST;
 
         $name          = trim($data['name'] ?? '');
-        $slug          = strtolower(preg_replace('/[^a-z0-9_-]/', '', trim($data['slug'] ?? '')));
+        // Lowercase first: capitals used to be deleted ("Chatly.pk" became "hatlypk").
+        $slug          = preg_replace('/[^a-z0-9_-]/', '', strtolower(trim($data['slug'] ?? '')));
         $ownerName     = trim($data['owner_name'] ?? '');
         $ownerEmail    = trim($data['owner_email'] ?? '');
         $plan          = trim($data['plan'] ?? 'Enterprise Growth');
