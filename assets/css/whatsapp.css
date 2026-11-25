@@ -5727,6 +5727,10 @@ body:not(.theme-dark) .header-quota-pill { color: #067a4a !important; background
 }
 
 /* "/" quick replies menu (Nunno closers) */
+.nqr-btn { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 800; color: #0b8a57; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); cursor: pointer; transition: background 0.15s ease, transform 0.12s ease; }
+.nqr-btn:hover, .nqr-btn.open { background: rgba(16, 185, 129, 0.22); }
+.nqr-btn[hidden] { display: none !important; }
+body.theme-dark .nqr-btn { color: #1fe08a; background: rgba(31, 224, 138, 0.14); border-color: rgba(31, 224, 138, 0.3); }
 .nqr-pop { position: absolute; left: 10px; right: 10px; bottom: calc(100% + 6px); z-index: 60; max-height: 300px; overflow-y: auto;
   background: #ffffff; color: #0f172a; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: 14px; box-shadow: 0 14px 40px rgba(2, 8, 5, 0.22); padding: 6px; }
 .nqr-pop[hidden] { display: none; }

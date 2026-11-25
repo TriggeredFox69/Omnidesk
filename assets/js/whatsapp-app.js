@@ -703,6 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.currentCompanyId = compId;
     // Lets the stylesheet adjust per company (e.g. Metalink's simplified chat header).
     document.body.dataset.company = compId;
+    if (typeof syncNunnoQuickReplyUi === 'function') syncNunnoQuickReplyUi();
     // Other companies: neutral Chatly look until companies.php sends the real name and logo
     // (this used to fall back to Metalink's name and logo, so a Chatly closer saw "Metalink").
     let brand = COMPANY_BRAND_CATALOG[compId] || {
@@ -2445,7 +2446,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (els.chatInput) {
       els.chatInput.disabled = false;
-      els.chatInput.placeholder = 'Write a message…';
+      els.chatInput.placeholder = isNunnoWorkspace()
+        ? 'Write a message or type / for quick replies…'
+        : 'Write a message…';
     }
     if (els.sendMsgBtn) els.sendMsgBtn.disabled = false;
 
@@ -2916,11 +2919,20 @@ document.addEventListener('DOMContentLoaded', () => {
     { cmd: 'stop', title: 'Nahi chahiye / STOP', text: 'Koi baat nahi bhai, disturb karne ke liye maazrat 🙏\nAap ko ab dobara message nahi aayega. Khush rahein!' }
   ];
 
+  function isNunnoWorkspace() {
+    const uComp = String(state.currentUser?.company_id || '').trim().toUpperCase();
+    const curComp = String(state.currentCompanyId || '').trim().toUpperCase();
+    if (uComp === 'COMP-001' || uComp === 'NUNNO') return true;
+    if ((!uComp || uComp === 'GLOBAL') && (!curComp || curComp === 'COMP-001' || curComp === 'NUNNO')) return true;
+    return false;
+  }
+
+  var syncNunnoQuickReplyUi = null;
+
   function setupNunnoQuickReplies() {
     const input = els.chatInput;
     if (!input || input.dataset.qrReady) return;
     input.dataset.qrReady = '1';
-    const isNunno = () => (state.currentUser?.company_id || '') === 'COMP-001';
     const box = document.createElement('div');
     box.className = 'nqr-pop';
     box.setAttribute('role', 'listbox');
@@ -2928,8 +2940,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const host = document.getElementById('chatComposerBar') || input.parentElement;
     if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
     host.appendChild(box);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'nunnoQuickReplyBtn';
+    btn.className = 'btn-composer-icon nqr-btn';
+    btn.title = 'Quick replies (/)';
+    btn.setAttribute('aria-label', 'Quick replies');
+    btn.textContent = '/';
+    if (input.parentElement) input.parentElement.insertBefore(btn, input);
+
     let items = []; let sel = 0;
-    const close = () => { box.hidden = true; items = []; };
+    const close = () => { box.hidden = true; items = []; btn.classList.remove('open'); };
+    const syncUi = () => {
+      const ok = isNunnoWorkspace();
+      btn.hidden = !ok;
+      if (!ok) close();
+      if (input.placeholder === 'Write a message…' || input.placeholder === 'Write a message or type / for quick replies…') {
+        input.placeholder = ok ? 'Write a message or type / for quick replies…' : 'Write a message…';
+      }
+    };
+    syncNunnoQuickReplyUi = syncUi;
+    syncUi();
+
     const pick = (i) => {
       const it = items[i]; if (!it) return;
       input.value = it.text;
@@ -2943,13 +2976,27 @@ document.addEventListener('DOMContentLoaded', () => {
         + '<div class="nqr-hint">↑ ↓ choose · Enter / Tab insert · Esc close</div>';
       const on = box.querySelector('.nqr-item.on'); if (on) on.scrollIntoView({ block: 'nearest' });
     };
+    const openAll = () => {
+      if (!isNunnoWorkspace()) return;
+      items = NUNNO_QUICK_REPLIES.slice();
+      sel = 0;
+      box.hidden = false;
+      btn.classList.add('open');
+      draw();
+      input.focus();
+    };
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      if (!box.hidden) close();
+      else openAll();
+    });
     input.addEventListener('input', () => {
       const v = input.value;
-      if (!isNunno() || !v.startsWith('/') || v.includes('\n') || v.length > 30) { close(); return; }
+      if (!isNunnoWorkspace() || !v.startsWith('/') || v.includes('\n') || v.length > 30) { close(); return; }
       const q = v.slice(1).trim().toLowerCase();
       items = NUNNO_QUICK_REPLIES.filter(r => !q || r.cmd.startsWith(q) || r.title.toLowerCase().includes(q));
       if (!items.length) { close(); return; }
-      sel = 0; box.hidden = false; draw();
+      sel = 0; box.hidden = false; btn.classList.add('open'); draw();
     });
     // Capture phase: runs before the composer's own Enter-to-send handler.
     input.addEventListener('keydown', (e) => {
@@ -2967,7 +3014,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const row = e.target.closest('.nqr-item'); if (!row) return;
       e.preventDefault(); pick(Number(row.dataset.i));
     });
-    input.addEventListener('blur', () => setTimeout(close, 150));
+    document.addEventListener('mousedown', (e) => {
+      if (!box.hidden && !box.contains(e.target) && e.target !== btn && e.target !== input) close();
+    });
+    input.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== input) close(); }, 150));
   }
 
   // Search Filter Input
