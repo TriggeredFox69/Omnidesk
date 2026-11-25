@@ -345,13 +345,16 @@ switch ($action) {
         requireSuperAdmin($currentUser);
         require_once __DIR__ . '/earnings.php';
         // Same engine as the closers' wallets and payouts (api/earnings.php):
-        // first Rs. 10,000 of each TM's verified sales paid 100%, then plan commission.
-        $rows = computeCompanyEarnings(NUNNO_COMPANY_ID);
+        // first Rs. 10,000 of each TM's verified sales paid 100%, then plan commission;
+        // Team Leaders and Super Leads earn Rs. 500 per verified Nunno x Chatly activation.
+        nunnoApplyErijPlan();
+        $leads = earningsCompanyLeads(NUNNO_COMPANY_ID);
+        $users = earningsUsers();
+        $rows = computeCompanyEarnings(NUNNO_COMPANY_ID, $leads, $users);
         $closersSettlement = [];
         $sumRevenue = 0; $sumOwed = 0; $sumDeals = 0; $sumPaidOut = 0; $sumPending = 0;
         foreach ($rows as $r) {
-            if (($r['role'] ?? 'member') !== 'member') continue;
-            $owed = (float) $r['sales_commission'];
+            $owed = (float) $r['total_earned'];
             $sumRevenue += $r['total_sales']; $sumOwed += $owed; $sumDeals += $r['deals_count'];
             $sumPaidOut += $r['paid_out']; $sumPending += $r['pending_withdrawals'];
             $closersSettlement[] = [
@@ -359,10 +362,14 @@ switch ($action) {
                 'name'                    => $r['name'],
                 'username'                => $r['username'],
                 'phone'                   => $r['phone'],
+                'role'                    => $r['role'] ?? 'member',
+                'super_lead'              => !empty($r['super_lead']),
                 'status'                  => $r['status'],
                 'deals'                   => $r['deals_count'],
+                'activation_deals'        => (int) ($r['activation_count'] ?? 0),
                 'gross_revenue'           => $r['total_sales'],
                 'full_pay_progress'       => $r['full_pay_progress'],
+                'full_pay_limit'          => $r['full_pay_limit'],
                 'amount_payable_by_nunno' => $owed,
                 'nunno_retained_profit'   => max(0, $r['total_sales'] - $owed),
                 'paid_out'                => $r['paid_out'],
@@ -371,8 +378,8 @@ switch ($action) {
                 'in_review_count'         => $r['in_review_count'],
             ];
         }
-        usort($closersSettlement, fn($a, $b) => $b['gross_revenue'] <=> $a['gross_revenue']);
-        $planSales = nunnoPlanSales();   // TMs' own Rs. 1,000 Nunno x Chatly plans (paid, verified)
+        usort($closersSettlement, fn($a, $b) => ($b['gross_revenue'] <=> $a['gross_revenue']) ?: ($b['amount_payable_by_nunno'] <=> $a['amount_payable_by_nunno']));
+        $planSales = nunnoPlanSales($leads, $users);   // Direct Rs. 1,000 Nunno x Chatly plans (excluding ones already on a TL/closer row)
         echo json_encode([
             'success' => true,
             'summary' => [
@@ -381,6 +388,7 @@ switch ($action) {
                 'total_confirmed_revenue' => $sumRevenue + $planSales['amount'],
                 'tm_plan_purchases'       => $planSales['count'],
                 'tm_plan_revenue'         => $planSales['amount'],
+                'tm_plan_names'           => array_column($planSales['list'], 'name'),
                 'total_payable_by_nunno'  => $sumOwed,
                 'total_nunno_profit'      => max(0, $sumRevenue + $planSales['amount'] - $sumOwed),
                 'total_paid_out'          => $sumPaidOut,
@@ -399,22 +407,28 @@ switch ($action) {
         requireSuperAdmin($currentUser);
         if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
         require_once __DIR__ . '/earnings.php';
+        nunnoApplyErijPlan();
+        $leads = earningsCompanyLeads(NUNNO_COMPANY_ID);
+        $users = earningsUsers();
         $lines = [];
         $revenue = 0.0; $payable = 0.0; $tmPayable = 0.0; $tlPayable = 0.0; $tmCount = 0; $tlCount = 0; $activations = 0;
-        foreach (computeCompanyEarnings(NUNNO_COMPANY_ID) as $r) {
+        foreach (computeCompanyEarnings(NUNNO_COMPANY_ID, $leads, $users) as $r) {
             $isTL = ($r['role'] ?? 'member') === 'lead';
+            $isSuper = !empty($r['super_lead']);
             $owed = (float) $r['total_earned'];
             if ($owed <= 0 && (float) $r['total_sales'] <= 0) continue;
             $revenue += (float) $r['total_sales'];
             $payable += $owed;
-            if ($isTL) { $tlPayable += $owed; $tlCount++; $activations += (int) $r['deals_count']; }
+            $activations += (int) ($r['activation_count'] ?? ($isTL ? $r['deals_count'] : 0));
+            if ($isTL) { $tlPayable += $owed; $tlCount++; }
             else { $tmPayable += $owed; $tmCount++; }
-            $lines[] = ['name' => $r['name'], 'role' => $isTL ? 'TL' : 'TM', 'deals' => (int) $r['deals_count'],
+            $roleLabel = $isSuper ? 'Super Lead' : ($isTL ? 'TL' : 'TM');
+            $lines[] = ['name' => $r['name'], 'role' => $roleLabel, 'deals' => (int) $r['deals_count'],
                 'revenue' => (float) $r['total_sales'], 'payable' => $owed, 'paid_out' => (float) $r['paid_out']];
         }
         usort($lines, fn($a, $b) => $b['payable'] <=> $a['payable']);
-        // TMs' own Nunno x Chatly plan purchases (Rs. 1,000 each, paid and verified) are revenue Nunno collected.
-        $planSales = nunnoPlanSales();
+        // Direct Nunno x Chatly plan purchases (Rs. 1,000 each, paid and verified, not already on a TL/closer line).
+        $planSales = nunnoPlanSales($leads, $users);
         if ($planSales['count']) {
             $revenue += $planSales['amount'];
             $lines[] = ['name' => 'Nunno x Chatly plan purchases (' . implode(', ', array_column($planSales['list'], 'name')) . ')',

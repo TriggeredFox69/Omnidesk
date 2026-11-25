@@ -2468,8 +2468,13 @@ const loadNunnoSettlement = guarded(async function () {
 function renderNunnoSettlement(data) {
   const s = data.summary || {};
   const closers = Array.isArray(data.closers) ? data.closers : [];
+  const planCount = n0(s.tm_plan_purchases);
+  const planSub = planCount > 0 ? ` (incl. ${fmt(planCount)} direct plan${planCount === 1 ? '' : 's'})` : '';
+  const planTitle = Array.isArray(s.tm_plan_names) && s.tm_plan_names.length ? `Direct plan purchases: ${s.tm_plan_names.join(', ')}` : '';
   $('#nunnoConfirmedRev').textContent = rs(s.total_confirmed_revenue);
-  $('#nunnoConfirmedRevSub').textContent = `${fmt(s.total_plans_sold)} verified sales`;
+  const revSub = $('#nunnoConfirmedRevSub');
+  revSub.textContent = `${fmt(s.total_plans_sold)} verified sales${planSub}`;
+  revSub.title = planTitle;
   $('#nunnoPayableToChatly').textContent = rs(s.total_payable_by_nunno);
   $('#nunnoRetainedProfit').textContent = rs(s.total_nunno_profit);
   $('#nunnoActiveTMs').textContent = fmt(s.total_tms || closers.length);
@@ -2479,12 +2484,23 @@ function renderNunnoSettlement(data) {
   if (!closers.length) { tbody.innerHTML = emptyRow(8, 'No closers currently assigned to Nunno.'); return; }
   tbody.innerHTML = closers.map(c => {
     const prog = n0(c.full_pay_progress);
-    const pct = Math.min(100, Math.round(prog / 100));
-    const progCell = prog >= 10000
-      ? '<span class="tag green">Done · on plan commission</span>'
-      : `<span class="mono c-gold">${esc(rs(prog))} / Rs. 10,000</span><div class="bar" style="width:140px; max-width:100%; margin-top:5px;"><i style="width:${pct}%; background:linear-gradient(90deg, var(--amber), var(--green));"></i></div>`;
+    const lim = (c.full_pay_limit !== null && c.full_pay_limit !== undefined) ? n0(c.full_pay_limit) : 10000;
+    const actDeals = n0(c.activation_deals);
+    const actNote = actDeals > 0 ? `<small>+${fmt(actDeals)} TL activation${actDeals === 1 ? '' : 's'} (Rs. 500 ea)</small>` : '';
+    let progCell;
+    if (c.role === 'lead' && !c.super_lead && prog === 0) {
+      progCell = '<span class="tag cyan">TL · Rs. 500 / activation</span>';
+    } else if (lim <= 0) {
+      progCell = `<span class="tag green">On plan commission</span>${actNote}`;
+    } else if (prog >= lim) {
+      progCell = `<span class="tag green">Done · on plan commission</span>${actNote}`;
+    } else {
+      const pct = Math.min(100, Math.round((prog / lim) * 100));
+      progCell = `<span class="mono c-gold">${esc(rs(prog))} / ${esc(rs(lim))}</span><div class="bar" style="width:140px; max-width:100%; margin-top:5px;"><i style="width:${pct}%; background:linear-gradient(90deg, var(--amber), var(--green));"></i></div>${actNote}`;
+    }
+    const roleTag = c.super_lead ? ' <span class="tag gold">Super Lead</span>' : (c.role === 'lead' ? ' <span class="tag cyan">TL</span>' : '');
     return `<tr>
-      ${td('Closer', `<div class="co"><div class="av">${esc(String(c.name || 'C').charAt(0).toUpperCase())}</div><div><b>${esc(c.name || 'Closer')}</b><small>@${esc(c.username || '')}${c.phone ? ' · ' + esc(c.phone) : ''}</small></div></div>`)}
+      ${td('Closer', `<div class="co"><div class="av">${esc(String(c.name || 'C').charAt(0).toUpperCase())}</div><div><b>${esc(c.name || 'Closer')}</b>${roleTag}<small>@${esc(c.username || '')}${c.phone ? ' · ' + esc(c.phone) : ''}</small></div></div>`)}
       ${td('Verified sales', `<b class="mono">${fmt(c.deals)}</b>${c.in_review_count ? `<small>+${fmt(c.in_review_count)} in review</small>` : ''}`)}
       ${td('Sales revenue', `<b class="mono c-green">${esc(rs(c.gross_revenue))}</b>`)}
       ${td('First Rs. 10,000', progCell)}

@@ -145,18 +145,130 @@ function earningsCountFrom(): int {
     return $from;
 }
 
+function earningsPhoneLast9(string $phone): string {
+    $d = preg_replace('/\D+/', '', $phone);
+    return strlen($d) >= 9 ? substr($d, -9) : $d;
+}
+
+function earningsNormEmail(string $email): string {
+    return strtolower(trim($email));
+}
+
+function earningsNormName(string $name): string {
+    $n = strtolower(trim((string) preg_replace('/\s+/', ' ', $name)));
+    if ($n === '' || preg_match('/^\+?\d[\d\s-]*$/', $n)) return '';
+    return $n;
+}
+
+/** Whether a verified Nunno sale is a Rs. 1,000 Nunno x Chatly activation (pays Rs. 500). */
+function earningsIsNunnoActivation(array $l, ?array $ownerUser = null): bool {
+    $planName = trim((string) ($l['paidDetails']['plan'] ?? ''));
+    if (strcasecmp($planName, NUNNO_TL_PLAN_NAME) === 0) return true;
+    $amt = (float) ($l['paidDetails']['amount'] ?? 0);
+    if (abs($amt - NUNNO_TL_PLAN_PRICE) < 1) return true;
+    // Plain Team Leaders (not Super Leads) only sell the Rs. 1,000 Nunno x Chatly plan
+    // in normal inbox chats; Super Leads sell regular Nunno plans too.
+    $isPlainTL = $ownerUser
+        && strtolower((string) ($ownerUser['role'] ?? '')) === 'lead'
+        && empty($ownerUser['super_lead']);
+    return $isPlainTL && empty($l['unofficial']);
+}
+
 /**
- * Nunno x Chatly plan purchases (Rs. 1,000 each) that were really paid: the admin verified a TM's
- * submitted payment (auth.php activate_tm_plan), or the owner confirmed it (Erij, below).
- * "Force upgrade" unlocks a TM without payment and is not counted. Nunno revenue, not TM earnings.
+ * Direct Nunno x Chatly plan purchases (Rs. 1,000 each) that were really paid: the admin verified
+ * a user's submitted payment (auth.php activate_tm_plan), or the owner confirmed it (Erij, below).
+ * "Force upgrade" unlocks without payment and is not counted.
+ *
+ * Recruited TMs whose Rs. 1,000 plan purchase already appears as a verified activation lead under a
+ * TL / Super Lead (who earns Rs. 500 on it) are excluded here so that Rs. 1,000 is never counted
+ * twice in settlement or invoice totals.
  */
-function nunnoPlanSales(): array {
-    $from = earningsCountFrom(); $list = [];
-    foreach (earningsUsers() as $u) {
+function nunnoPlanSales(?array $leadsCache = null, ?array $usersCache = null): array {
+    if ($usersCache === null) nunnoApplyErijPlan();
+    $from = earningsCountFrom();
+    $users = $usersCache ?? earningsUsers();
+    $leads = $leadsCache ?? earningsCompanyLeads(NUNNO_COMPANY_ID);
+
+    $usersById = [];
+    foreach ($users as $u) {
+        if (!empty($u['id'])) $usersById[(string) $u['id']] = $u;
+    }
+
+    $activationLeads = [];
+    foreach ($leads as $l) {
+        if (earningsLeadState($l) !== 'paid' || earningsSaleTime($l) < $from) continue;
+        $ownerId = earningsSaleOwner($l);
+        $ownerUser = $ownerId !== '' ? ($usersById[$ownerId] ?? null) : null;
+        if (!earningsIsNunnoActivation($l, $ownerUser)) continue;
+
+        $emails = [];
+        foreach ([$l['paidDetails']['email'] ?? '', $l['email'] ?? ''] as $em) {
+            $em = earningsNormEmail((string) $em);
+            if ($em !== '') $emails[$em] = true;
+        }
+        $trx = strtolower((string) preg_replace('/\s+/', '', (string) ($l['paidDetails']['trxId'] ?? '')));
+        if (str_starts_with($trx, 'email:')) {
+            $em = earningsNormEmail(substr($trx, 6));
+            if ($em !== '') $emails[$em] = true;
+        }
+        $activationLeads[] = [
+            'owner_id' => $ownerId,
+            'phone9'   => earningsPhoneLast9((string) ($l['phone'] ?? '')),
+            'emails'   => $emails,
+            'trx'      => $trx,
+            'name'     => earningsNormName((string) ($l['name'] ?? '')),
+            'used'     => false,
+        ];
+    }
+
+    $list = [];
+    foreach ($users as $u) {
         if ((($u['company_id'] ?? NUNNO_COMPANY_ID) ?: NUNNO_COMPANY_ID) !== NUNNO_COMPANY_ID || empty($u['nunno_plan_paid'])) continue;
         $t = strtotime((string) ($u['nunno_plan_paid_at'] ?? '')) ?: 0;
         if ($t && $t < $from) continue;
-        $list[] = ['user_id' => $u['id'] ?? '', 'name' => $u['name'] ?? '', 'amount' => NUNNO_TL_PLAN_PRICE, 'paid_at' => $u['nunno_plan_paid_at'] ?? null];
+
+        $uid = (string) ($u['id'] ?? '');
+        $uPhone9 = earningsPhoneLast9((string) ($u['phone'] ?? ''));
+        $uEmails = [];
+        foreach ([$u['nunno_plan_email'] ?? '', $u['email'] ?? ''] as $em) {
+            $em = earningsNormEmail((string) $em);
+            if ($em !== '') $uEmails[$em] = true;
+        }
+        $uTrx = strtolower((string) preg_replace('/\s+/', '', (string) ($u['nunno_plan_trx'] ?? '')));
+        if (str_starts_with($uTrx, 'email:')) {
+            $em = earningsNormEmail(substr($uTrx, 6));
+            if ($em !== '') $uEmails[$em] = true;
+        }
+        $uName = earningsNormName((string) ($u['name'] ?? ''));
+        $uSponsor = (string) ($u['joined_via_tl'] ?? ($u['tl_id'] ?? ''));
+
+        $matchedIdx = null;
+        foreach ($activationLeads as $idx => $al) {
+            if ($al['used'] || ($uid !== '' && $al['owner_id'] === $uid)) continue;
+            if ($uPhone9 !== '' && $uPhone9 === $al['phone9']) { $matchedIdx = $idx; break; }
+            if ($uEmails && $al['emails'] && array_intersect_key($uEmails, $al['emails'])) { $matchedIdx = $idx; break; }
+            if ($uTrx !== '' && strlen($uTrx) >= 4 && !str_starts_with($uTrx, 'email:') && $uTrx === $al['trx']) { $matchedIdx = $idx; break; }
+        }
+        if ($matchedIdx === null && $uName !== '') {
+            foreach ($activationLeads as $idx => $al) {
+                if ($al['used'] || ($uid !== '' && $al['owner_id'] === $uid) || $al['name'] === '') continue;
+                if ($al['name'] === $uName && ($uSponsor === $al['owner_id'] || str_contains($uName, ' '))) {
+                    $matchedIdx = $idx;
+                    break;
+                }
+                if ($uSponsor !== '' && $uSponsor === $al['owner_id'] && strlen($al['name']) >= 3
+                    && (str_contains($uName, $al['name']) || str_contains($al['name'], $uName))) {
+                    $matchedIdx = $idx;
+                    break;
+                }
+            }
+        }
+        if ($matchedIdx !== null) {
+            $activationLeads[$matchedIdx]['used'] = true;
+            continue;
+        }
+
+        $list[] = ['user_id' => $uid, 'name' => $u['name'] ?? '', 'amount' => NUNNO_TL_PLAN_PRICE, 'paid_at' => $u['nunno_plan_paid_at'] ?? null];
     }
     return ['count' => count($list), 'amount' => count($list) * NUNNO_TL_PLAN_PRICE, 'list' => $list];
 }
@@ -231,18 +343,18 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
     // it per person, e.g. Rs. 100,000), then the plan commission on every sale after it.
     $fullPayLimit = $isNunno ? max(0, (int) ($user['nunno_full_pay_limit'] ?? NUNNO_FULL_PAY_LIMIT)) : 0;
     $salesCommission = 0.0;
+    $activationCount = 0;
     $deals = [];
-    $isNunnoTL = $isNunno && strtolower((string) ($user['role'] ?? '')) === 'lead';
     foreach ($paid as $l) {
         // The Rs. 1,000 Nunno x Chatly plan always pays Rs. 500, whoever sold it (a TL's recruit,
-        // a Super Lead, or an unofficial lead). A TL's deals are that plan, except a regular
-        // Nunno plan they claimed as an unofficial lead, which pays like a TM's sale.
-        $planName = (string) ($l['paidDetails']['plan'] ?? '');
-        $isActivation = $isNunno && (strcasecmp($planName, NUNNO_TL_PLAN_NAME) === 0 || ($isNunnoTL && empty($l['unofficial'])));
+        // a Super Lead, or an unofficial lead). A plain TL's inbox deals are that plan;
+        // Super Leads and TMs earn normal Nunno commission on regular plans (1,700 / 5,000 / 15,000).
+        $isActivation = $isNunno && earningsIsNunnoActivation($l, $user);
         $amount = $isActivation ? NUNNO_TL_PLAN_PRICE : earningsSaleAmount($l);
         $totalSales += $amount;
         $before = $running;
         if ($isActivation) {
+            $activationCount++;
             $comm = NUNNO_TL_COMMISSION;
             $rule = 'Nunno x Chatly plan activated: Rs. ' . number_format(NUNNO_TL_COMMISSION);
         } elseif ($isNunno) {
@@ -283,10 +395,12 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
         'user_id' => $userId,
         'name' => $user['name'] ?? '',
         'role' => $user['role'] ?? 'member',
+        'super_lead' => !empty($user['super_lead']),
         'company_id' => $companyId,
         'scheme' => $isNunno ? 'nunno_first_10k' : 'product_commission',
         'total_sales' => $totalSales,
         'deals_count' => count($paid),
+        'activation_count' => $activationCount,
         'in_review_count' => count($inReview),
         'in_review_amount' => array_sum(array_map('earningsSaleAmount', $inReview)),
         'full_pay_progress' => $isNunno ? min($running, $fullPayLimit) : null,
@@ -303,12 +417,13 @@ function computeEarnings(string $userId, ?array $user = null, ?array $leadsCache
 }
 
 /** Earnings for every TM/TL of a company (admin ledgers). */
-function computeCompanyEarnings(string $companyId): array {
-    if ($companyId === NUNNO_COMPANY_ID) nunnoApplyErijPlan();
-    $leads = earningsCompanyLeads($companyId);
+function computeCompanyEarnings(string $companyId, ?array $leadsCache = null, ?array $usersCache = null): array {
+    if ($companyId === NUNNO_COMPANY_ID && $usersCache === null) nunnoApplyErijPlan();
+    $leads = $leadsCache ?? earningsCompanyLeads($companyId);
+    $users = $usersCache ?? earningsUsers();
     $wds = earningsWithdrawals();
     $rows = [];
-    foreach (earningsUsers() as $u) {
+    foreach ($users as $u) {
         if (($u['company_id'] ?? NUNNO_COMPANY_ID) !== $companyId) continue;
         if (!in_array($u['role'] ?? 'member', ['member', 'lead'], true)) continue;
         $e = computeEarnings($u['id'], $u, $leads, $wds);
