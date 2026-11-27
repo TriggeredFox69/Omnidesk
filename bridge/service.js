@@ -39,9 +39,10 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   const devicePool = createDevicePool({
     dataDir: bridgeDataDir,
     qrImage,
-    createClient: createDeviceClient || ((authPath, deviceName) => {
+    getUsersPath: () => require('node:path').resolve(__dirname, '../data/users.json'),
+    createClient: createDeviceClient || ((authPath, deviceName, opts) => {
       const { BaileysClient } = require('./baileys-client');
-      return new BaileysClient({ authPath, deviceName });
+      return new BaileysClient({ authPath, deviceName, proxyUrl: opts?.proxyUrl || '' });
     }),
     onMessage: (device, devClient, message, knownPhone) => {
       (async () => {
@@ -108,7 +109,8 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   function campaignAck(message, ack) {
     if (Number(ack) !== -1) return;
     const id = message && message.id && message.id._serialized;
-    for (const mgr of campaignManagers.values()) { try { mgr.noteAck(id, ack); } catch (_) {} }
+    const reason = (message && message.ackReason) || '';
+    for (const mgr of campaignManagers.values()) { try { mgr.noteAck(id, ack, reason); } catch (_) {} }
   }
   // Bring back other companies' campaigns after a restart (they come back paused).
   try {
@@ -124,7 +126,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
   };
   const snapshot = () => ({ success: true, mode: 'whatsapp_web', state: phase,
     is_connected: phase === 'ready', is_configured: phase === 'ready',
-    connected_number: number, qr, message: error, version: '19.5', engine: 'baileys' });
+    connected_number: number, qr, message: error, version: '19.6', engine: 'baileys' });
 
   async function disconnect(wipe = false) {
     phase = 'disconnected'; qr = null; number = ''; error = '';
@@ -387,6 +389,7 @@ function createService({ createClient, createDeviceClient, qrImage, token, stora
       if (url.pathname === '/device/send') { reply(200, await devicePool.send(body.id, body)); return; }
       if (url.pathname === '/device/pair') { reply(200, await devicePool.pairWithPhone(body.id, body.phone, body.name)); return; }
       if (url.pathname === '/device/connect') { reply(200, devicePool.connect(body.id, body.name, Boolean(body.force))); return; }
+      if (url.pathname === '/device/proxy') { reply(200, devicePool.setProxy(body.id, body.proxy_url ?? body.proxy ?? '')); return; }
       if (url.pathname === '/device/reset') {
         await devicePool.disconnect(body.id, true);
         reply(200, body.relink ? devicePool.connect(body.id, body.name, true) : { success: true, state: 'disconnected', is_connected: false });

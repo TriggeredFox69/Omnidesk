@@ -15,9 +15,15 @@ test('live campaigns never send faster than every 30 s, nor slower than every 15
     getUsersPath: () => path_.join(dir, 'u.json'), mainStatus: () => ({ ready: true }) });
   const st = mgr.start({ message: 'Hi', delay: 10, audience: [{ phone: '923001112223' }], senders: [{ id: 'TM-1', name: 'A', roleType: 'member' }] });
   assert.equal(st.minDelay, 30);
+  assert.equal(st.maxDelay, 45);
   mgr.stop();
   const st2 = mgr.start({ message: 'Hi', delay: 5000, audience: [{ phone: '923001112224' }], senders: [{ id: 'TM-1', name: 'A', roleType: 'member' }] });
-  assert.equal(st2.minDelay, 900);
+  assert.equal(st2.minDelay, 885);
+  assert.equal(st2.maxDelay, 900);
+  mgr.stop();
+  const st3 = mgr.start({ message: 'Hi', delay: 300, audience: [{ phone: '923001112225' }], senders: [{ id: 'TM-1', name: 'A', roleType: 'member' }] });
+  assert.equal(st3.minDelay, 285);
+  assert.equal(st3.maxDelay, 315);
   mgr.stop();
   fs_.rmSync(dir, { recursive: true, force: true });
 });
@@ -264,4 +270,44 @@ test('Ultimate campaign: closers from several companies, each chat lands in the 
   assert.ok(metalink.length >= 1 && metalink.every(l => l.ownerId === 'ML-1' && l.company_id === 'COMP-004'), 'Metalink TM\'s chats are in Metalink');
   assert.equal(fs.existsSync(leadsOf('CHATLY-HQ')), false, 'nothing is stored under CHATLY-HQ');
   assert.ok(sentFrom.every(([id]) => id !== 'ML-2'));
+});
+
+test('explicit 463 / 403 refusal triggers immediate 24 h circuit-breaker on the first occurrence', async t => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camp-463-'));
+  fs.writeFileSync(path.join(tmpDir, 'leads.json'), '[]');
+  fs.writeFileSync(path.join(tmpDir, 'users.json'), '[]');
+  const sentTo = [];
+  const mgr = createCampaignManager({
+    send: async p => {
+      if (p.phone === '923006666661') throw new Error('WhatsApp server error 403 Forbidden');
+      sentTo.push(p.phone);
+      return { success: true, message_id: 'CB' + p.phone.slice(-1) };
+    },
+    dataDir: tmpDir, getLeadsPath: () => path.join(tmpDir, 'leads.json'), getUsersPath: () => path.join(tmpDir, 'users.json'),
+    mainStatus: () => ({ ready: true })
+  });
+  t.after(() => { mgr.stop(); fs.rmSync(tmpDir, { recursive: true, force: true }); });
+  mgr.start({
+    message: 'Hi',
+    audience: [
+      { phone: '923006666660' },
+      { phone: '923006666661' },
+      { phone: '923006666662' },
+      { phone: '923006666663' }
+    ],
+    minDelay: 1, maxDelay: 1,
+    senders: [
+      { id: 'TM-1', name: 'One', phone: '923000000001', roleType: 'member' },
+      { id: 'TM-2', name: 'Two', phone: '923000000002', roleType: 'member' }
+    ]
+  });
+  await new Promise(r => setTimeout(r, 1500));
+  mgr.noteAck('CB0', -1, '463');
+  const lane1 = mgr.getStatus().lanes.find(l => l.id === 'TM-1');
+  const lane2 = mgr.getStatus().lanes.find(l => l.id === 'TM-2');
+  assert.equal(lane1.pauseReason, 'restricted', '463 ack pauses TM-1 immediately');
+  assert.ok(lane1.pausedUntil - Date.now() > 23 * 3600e3);
+  assert.equal(lane2.pauseReason, 'restricted', '403 error pauses TM-2 immediately');
+  assert.ok(lane2.pausedUntil - Date.now() > 23 * 3600e3);
+  assert.ok(!sentTo.includes('923006666663'), 'paused lane does not send further messages');
 });

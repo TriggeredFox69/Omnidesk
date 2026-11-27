@@ -56,7 +56,7 @@ function personalizeMessage(template, contact, companyName = 'Chatly') {
   return msg;
 }
 
-function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption, store: storeOverride, isBusyElsewhere, minGapS }) {
+function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbox, dataDir, getLeadsPath, getUsersPath, offlineGraceMs, stateFile: stateFileOption, store: storeOverride, isBusyElsewhere, minGapS, jitterS }) {
   const digits = v => String(v || '').replace(/\D/g, '');
   const chatStoreRef = storeOverride || chatStore();   // chats in Supabase while its switch is on
   const samePhone = (a, b) => { a = digits(a); b = digits(b); return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9))); };
@@ -609,6 +609,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
   // A campaign saved with a shorter gap is raised to 30 s when it runs.
   const MIN_DELAY_S = Number.isFinite(minGapS) ? minGapS : 30;   // (tests pass a smaller minimum)
   const MAX_DELAY_S = 900;
+  const DEFAULT_JITTER_S = Number.isFinite(jitterS) ? Math.max(0, Math.round(jitterS)) : 15;
   const clampDelay = v => Math.min(MAX_DELAY_S, Math.max(MIN_DELAY_S, Math.round(Number(v) || 0) || MIN_DELAY_S));
   const laneTimers = new Map();
   const laneBusy = new Set();
@@ -767,19 +768,23 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     log(message, 'warn');
     saveState();
   }
-  function recordRefusal(lane) {
+  const isSevereRefusal = reason => /\b(463|403)\b|account restricted|forbidden/i.test(String(reason || ''));
+  function recordRefusal(lane, opts = {}) {
     const now = Date.now();
+    const severe = Boolean(opts.immediate);
     lane.refusals = (lane.refusals || []).filter(t => now - t < REFUSAL_WINDOW_MS);
     lane.refusals.push(now);
-    if (lane.refusals.length >= REFUSALS_TO_PAUSE && !(lane.pausedUntil > now)) {
+    const threshold = severe ? 1 : REFUSALS_TO_PAUSE;
+    if (lane.refusals.length >= threshold && !(lane.pausedUntil > now)) {
+      const reasonNote = severe ? ` (${String(opts.reason || '463/403').slice(0, 80)})` : '';
       pauseLane(lane, 'restricted', now + RESTRICT_PAUSE_MS,
-        `🛑 WhatsApp refused ${lane.refusals.length} messages from ${lane.name} (${lane.display}): it is limiting this number. ` +
+        `🛑 WhatsApp refused ${severe ? 'a message immediately' : `${lane.refusals.length} messages`} from ${lane.name} (${lane.display})${reasonNote}: it is limiting this number. ` +
         `Chatly stopped sending from it for 24 hours to protect it from a ban. Its remaining numbers wait.`);
       if (state.status === 'running') scheduleLane(lane, 10 * 60 * 1000);
     }
   }
   // Delivery receipts from the bridge: -1 = WhatsApp refused the message.
-  function noteAck(messageId, ack) {
+  function noteAck(messageId, ack, ackReason = '') {
     if (Number(ack) !== -1 || !messageId) return;
     const hit = sentBy.get(messageId);
     if (!hit) return;
@@ -788,12 +793,12 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     const c = hit.contact;
     if (c && c.status !== 'failed') {
       c.status = 'failed';
-      c.error = 'Refused by WhatsApp';
+      c.error = ackReason ? `Refused by WhatsApp (${ackReason})` : 'Refused by WhatsApp';
       state.totalSent = Math.max(0, state.totalSent - 1);
       state.totalFailed++;
       if (lane) { lane.sent = Math.max(0, (lane.sent || 0) - 1); lane.failed = (lane.failed || 0) + 1; }
     }
-    if (lane) recordRefusal(lane);
+    if (lane) recordRefusal(lane, { immediate: isSevereRefusal(ackReason), reason: ackReason });
     saveState();
   }
 
@@ -928,8 +933,8 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
         log(`❌ ${lane.name} ➔ ${contact.display || contact.phone}: ${err.message}`, 'error');
         // No CRM message for a send that never happened.
         // A number that is not on WhatsApp says nothing about this closer's number; any other
-        // refusal may mean WhatsApp is limiting it.
-        if (!notOnWhatsApp) recordRefusal(lane);
+        // refusal may mean WhatsApp is limiting it. Explicit 463/403 pauses immediately.
+        if (!notOnWhatsApp) recordRefusal(lane, { immediate: isSevereRefusal(msg), reason: msg });
       }
     } finally {
       laneBusy.delete(laneId);
@@ -1087,9 +1092,19 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     state.currentIndex = 0;
     state.totalSent = 0;
     state.totalFailed = 0;
-    // One gap for every message (the campaign page sends minDelay = maxDelay = the chosen gap).
-    state.minDelay = clampDelay(parseInt(params.delay, 10) || parseInt(params.minDelay, 10) || 60);
-    state.maxDelay = Math.max(state.minDelay, clampDelay(parseInt(params.maxDelay, 10) || state.minDelay));
+    // Random ±15 s jitter around the chosen delay (e.g. 300 s -> 285-315 s) unless an
+    // explicit minDelay/maxDelay range is provided without a jitter override.
+    const explicitJitter = params.jitter !== undefined ? Math.max(0, Math.min(120, Math.round(Number(params.jitter) || 0))) : null;
+    const hasExplicitRange = params.minDelay !== undefined && params.maxDelay !== undefined && explicitJitter === null;
+    const jitter = explicitJitter !== null ? explicitJitter : (hasExplicitRange ? 0 : DEFAULT_JITTER_S);
+    const baseDelay = clampDelay(parseInt(params.delay, 10) || parseInt(params.minDelay, 10) || 60);
+    if (hasExplicitRange) {
+      state.minDelay = clampDelay(parseInt(params.minDelay, 10) || baseDelay);
+      state.maxDelay = Math.max(state.minDelay, clampDelay(parseInt(params.maxDelay, 10) || state.minDelay));
+    } else {
+      state.minDelay = clampDelay(baseDelay - jitter);
+      state.maxDelay = Math.max(state.minDelay, clampDelay(baseDelay + jitter));
+    }
     state.remainingSeconds = 0;
     state.assignMode = 'equal_split';
     state.status = 'running';
@@ -1103,7 +1118,7 @@ function createCampaignManager({ send, deviceSend, deviceReady, mainStatus, inbo
     if (skipped.length) log(`⚠️ Not included (WhatsApp not connected): ${skipped.map(s => s.name).join(', ')}`, 'warn');
     if (stoppedByAdmin.length) log(`⏹️ Not included (stopped by the admin, or Nunno plan not verified yet): ${stoppedByAdmin.map(s => s.name).join(', ')}`, 'warn');
     if (busyElsewhere.length) log(`⏭️ Not included (already sending another campaign): ${busyElsewhere.map(s => s.name).join(', ')}`, 'warn');
-    log(`⏱️ Gap between messages: ${state.minDelay === state.maxDelay ? state.minDelay + ' s' : state.minDelay + '-' + state.maxDelay + ' s'} per WhatsApp.`, 'info');
+    log(`⏱️ Gap between messages: ${state.minDelay === state.maxDelay ? state.minDelay + ' s' : state.minDelay + '-' + state.maxDelay + ' s (random jitter)'} per WhatsApp.`, 'info');
     recount();
     writeStateNow();
     kickAllLanes();

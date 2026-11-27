@@ -14,6 +14,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { submitOnce } = require('./submit');
+const { normalizeProxyUrl, maskProxyUrl, resolveProxy } = require('./proxy');
 
 const safeId = id => String(id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
 const LOGIN_PREFIX = 'login_';
@@ -31,27 +32,34 @@ const samePhone = (a, b) => {
   return !!a && !!b && (a === b || (a.length >= 9 && b.length >= 9 && a.slice(-9) === b.slice(-9)));
 };
 
-function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) {
+function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck, getUsersPath }) {
   const root = path.join(dataDir, 'devices');
   fs.mkdirSync(root, { recursive: true, mode: 0o700 });
   const devices = new Map();   // owner id (user id, or login_… while unclaimed) -> device
 
+  const usersFile = typeof getUsersPath === 'function' ? getUsersPath() : path.resolve(dataDir, '../users.json');
+  const proxyFor = d => resolveProxy({ deviceId: d?.id, metaProxy: d?.proxyUrl, dataDir, usersFile });
+
   const metaFile = d => path.join(root, d.dir, 'meta.json');
   function saveMeta(d) {
     try {
-      fs.writeFileSync(metaFile(d), JSON.stringify({ owner: d.id, name: d.name, number: d.number, linkedAt: d.linkedAt, createdAt: d.createdAt }), { mode: 0o600 });
+      const meta = { owner: d.id, name: d.name, number: d.number, linkedAt: d.linkedAt, createdAt: d.createdAt };
+      if (d.proxyUrl) meta.proxy_url = d.proxyUrl;
+      fs.writeFileSync(metaFile(d), JSON.stringify(meta), { mode: 0o600 });
     } catch (_) {}
   }
 
   const PAIRING_TTL_MS = 3 * 60 * 1000;
   function snapshot(d) {
-    if (!d) return { success: true, state: 'disconnected', is_connected: false, connected_number: '', qr: null };
+    if (!d) return { success: true, state: 'disconnected', is_connected: false, connected_number: '', qr: null, proxy_configured: false, proxy_host: '' };
     const pairing = d.pairing && d.phase === 'qr' && Date.now() - d.pairing.at < PAIRING_TTL_MS ? d.pairing : null;
+    const effectiveProxy = proxyFor(d);
     return {
       success: true, user_id: d.id, name: d.name, state: d.phase, is_connected: d.phase === 'ready',
       connected_number: d.number, qr: d.phase === 'qr' ? d.qr : null, message: d.error || '',
       linked_at: d.linkedAt || null, sent: d.sent || 0, claimed: !d.id.startsWith(LOGIN_PREFIX),
       pairing_code: pairing ? pairing.code : null, pairing_phone: pairing ? pairing.phone : null,
+      proxy_configured: Boolean(effectiveProxy), proxy_host: maskProxyUrl(effectiveProxy),
     };
   }
 
@@ -80,9 +88,9 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
 
   function get(id) { return devices.get(safeId(id)) || null; }
 
-  function newDevice(id, name, dir) {
+  function newDevice(id, name, dir, proxyUrl = '') {
     return { id, dir: dir || id, name: name || id, phase: 'idle', qr: null, number: '', error: '', client: null,
-      queue: Promise.resolve(), sent: 0, linkedAt: null, createdAt: Date.now() };
+      queue: Promise.resolve(), sent: 0, linkedAt: null, createdAt: Date.now(), proxyUrl: normalizeProxyUrl(proxyUrl) };
   }
 
   function connect(id, name, force = false) {
@@ -102,7 +110,8 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     d.starting = (async () => {
       if (d.client) { d.client.removeAllListeners(); await d.client.destroy().catch(() => {}); }
-      const client = createClient(path.join(dir, 'baileys_auth'), 'Chatly');
+      const proxyUrl = proxyFor(d);
+      const client = createClient(path.join(dir, 'baileys_auth'), 'Chatly', { deviceId: d.id, proxyUrl });
       d.client = client;
       client.on('qr', async value => {
         if (d.client !== client) return;
@@ -248,12 +257,36 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
         continue;
       }
       if (devices.has(owner)) continue;
-      const d = newDevice(owner, meta.name || owner, dir);
+      const d = newDevice(owner, meta.name || owner, dir, meta.proxy_url || meta.proxy || '');
       d.number = meta.number || '';
       d.linkedAt = meta.linkedAt || null;
       devices.set(owner, d);
       start(d);
     }
+  }
+
+  function setProxy(id, proxyUrl = '') {
+    id = safeId(id);
+    if (!id) throw Object.assign(new Error('A user id is required.'), { status: 400 });
+    const raw = String(proxyUrl || '').trim();
+    const norm = raw ? normalizeProxyUrl(raw) : '';
+    if (raw && !norm) {
+      throw Object.assign(new Error('Invalid proxy URL. Use http://, https://, socks5://, or socks5h://.'), { status: 400 });
+    }
+    let d = devices.get(id);
+    if (!d) {
+      d = newDevice(id, id, id, norm);
+      devices.set(id, d);
+      fs.mkdirSync(path.join(root, d.dir), { recursive: true, mode: 0o700 });
+      saveMeta(d);
+      return snapshot(d);
+    }
+    d.proxyUrl = norm;
+    saveMeta(d);
+    if (d.client || ['ready', 'qr', 'authenticated', 'starting'].includes(d.phase)) {
+      start(d);
+    }
+    return snapshot(d);
   }
 
   // Drop login scans nobody claimed (abandoned signups), so they don't stay linked.
@@ -276,7 +309,7 @@ function createDevicePool({ dataDir, createClient, qrImage, onMessage, onAck }) 
   // The live client of one TM's linked WhatsApp (for presence), or null if it is not connected.
   const clientOf = id => { const d = get(id); return d && d.phase === 'ready' && d.client ? d.client : null; };
 
-  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll, clients, clientOf, pairWithPhone };
+  return { connect, disconnect, adopt, send, list, get: id => snapshot(get(id)), isReady, restoreAll, closeAll, clients, clientOf, pairWithPhone, setProxy };
 }
 
 module.exports = { createDevicePool, normalizePhone, samePhone };

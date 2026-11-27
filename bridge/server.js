@@ -6,6 +6,7 @@ let QRCode = null;
 try { QRCode = require('qrcode'); } catch (_) {}
 const { createService } = require('./service');
 const { BaileysClient } = require('./baileys-client');
+const { resolveProxy } = require('./proxy');
 
 const dataPath = process.env.WHATSAPP_DATA_DIR ||
   (fs.existsSync(path.resolve(__dirname, '../data'))
@@ -22,7 +23,8 @@ if (!process.env.WHATSAPP_BRIDGE_TOKEN && !fs.existsSync(tokenPath)) {
 console.log('⚡ Using pure WebSocket WhatsApp engine (Baileys) — Zero Chromium required, cPanel 24/7 native.');
 const createClientFn = () => new BaileysClient({
   authPath: path.join(dataPath, 'baileys_auth'),
-  deviceName: 'Omnidesk cPanel 24/7'
+  deviceName: 'Omnidesk cPanel 24/7',
+  proxyUrl: resolveProxy({ deviceId: 'main', dataDir: dataPath })
 });
 
 const activeToken = process.env.WHATSAPP_BRIDGE_TOKEN ||

@@ -185,10 +185,10 @@ switch ($action) {
             'message' => mb_substr($message, 0, 4000),
             'variation' => $variation, 'media' => $media,
             'delay' => max(30, min(900, (int) ($in['delay'] ?? 60))),   // 30 s - 15 min, like every campaign
+            'jitter' => 15,
             'senders' => $senders, 'closers' => $senders,
             'auto_data' => !empty($in['auto_data']),
         ];
-        $payload['minDelay'] = $payload['maxDelay'] = $payload['delay'];
 
         $autoClaim = null;
         $autoNote = '';

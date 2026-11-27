@@ -57,15 +57,18 @@ try {
   }
 }
 const { ensureOggOpus, isOgg, oggOpusVoiceInfo } = require('./audio');
+const { buildProxyAgent } = require('./proxy');
 
 class BaileysClient extends EventEmitter {
-  constructor({ authPath, deviceName = 'Omnidesk Cloud' } = {}) {
+  constructor({ authPath, deviceName = 'Omnidesk Cloud', proxyUrl = '', humanDelay = true } = {}) {
     super();
     this.isBaileys = true;
     this.authPath = authPath || path.resolve(__dirname, '../data/whatsapp-bridge/baileys_auth');
     this.rawStorePath = path.resolve(this.authPath, '../raw_messages.json');
     this.lidMapPath = path.resolve(this.authPath, '../lid_map.json');
     this.deviceName = deviceName;
+    this.proxyUrl = String(proxyUrl || '').trim();
+    this.humanDelay = humanDelay !== false;
     this.sock = null;
     this.info = { wid: { user: '' } };
     this._destroyed = false;
@@ -315,8 +318,15 @@ class BaileysClient extends EventEmitter {
     };
     this.getMessage = getMessageFn;
 
+    const proxyCfg = this.proxyUrl ? buildProxyAgent(this.proxyUrl) : null;
+    if (proxyCfg) {
+      const label = path.basename(path.dirname(this.authPath));
+      console.log(`[Baileys] ${label}: routing session via sticky proxy ${proxyCfg.masked}`);
+    }
+
     this.sock = makeWASocket({
       version,
+      ...(proxyCfg ? { agent: proxyCfg.agent, fetchAgent: proxyCfg.fetchAgent } : {}),
       // Signal keys are cached in memory and written to disk atomically.
       auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
       printQRInTerminal: false,
@@ -431,6 +441,16 @@ class BaileysClient extends EventEmitter {
           // Normal right after a QR scan: WhatsApp asks for a fresh socket. Do it at once.
           console.log('[Baileys] Pairing complete; restarting the socket to finish login.');
           this._scheduleReconnect(300);
+        } else if (statusCode === 403 || statusCode === DisconnectReason.forbidden) {
+          // 403 Forbidden usually means WhatsApp restricted or blocked the account.
+          // Back off for 10 minutes instead of hammering reconnects every few seconds.
+          console.warn(`[Baileys] ${who}: WhatsApp returned 403 Forbidden (account restricted/blocked). Backing off reconnect for 10m.`);
+          this.emit('disconnected');
+          if (!this._destroyed) {
+            if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+            this._reconnectAttempts = 10;
+            this._reconnectTimer = setTimeout(() => { this._reconnectTimer = null; this._scheduleReconnect(600000); }, 600000);
+          }
         } else if (statusCode === DisconnectReason.connectionReplaced) {
           // Another session took over this login (a second bridge copy, or the same
           // creds on another PC). Reconnecting at once makes both kick each other in a
@@ -705,12 +725,13 @@ class BaileysClient extends EventEmitter {
         const status = update.update?.status;
         if (typeof status === 'number' && update.key?.id) {
           // Baileys status values: ERROR=0, PENDING=1, SERVER_ACK=2, DELIVERY_ACK=3, READ=4, PLAYED=5.
+          let ackReason = '';
           if (status === 0) {
-            const reason = (update.update.messageStubParameters || []).join(' ');
+            ackReason = (update.update.messageStubParameters || []).join(' ');
             // Baileys labels 463 "account restricted", but it is also what WhatsApp answers when a
             // first message to a new contact has no privacy token (see scripts/patch-baileys.js #4).
-            const hint = /^463\b/.test(reason) ? ' [463 = no privacy token for this new contact, or the number is limited for new chats]' : '';
-            console.warn(`[Baileys] WhatsApp refused message ${update.key.id}${reason ? ': ' + reason : ''}${hint}`);
+            const hint = /^463\b/.test(ackReason) ? ' [463 = no privacy token for this new contact, or the number is limited for new chats]' : '';
+            console.warn(`[Baileys] WhatsApp refused message ${update.key.id}${ackReason ? ': ' + ackReason : ''}${hint}`);
           }
           const ack = status === 0 ? -1 : (status >= 4 ? 3 : (status === 3 ? 2 : (status === 2 ? 1 : 0)));
           const remoteJid = update.key?.remoteJid || '';
@@ -718,7 +739,8 @@ class BaileysClient extends EventEmitter {
             id: { _serialized: update.key.id, fromMe: update.key.fromMe, remote: remoteJid },
             fromMe: update.key.fromMe,
             from: remoteJid,
-            to: remoteJid
+            to: remoteJid,
+            ackReason
           }, ack);
         }
       }
@@ -966,11 +988,41 @@ class BaileysClient extends EventEmitter {
     return jid;
   }
 
+  async _simulateHumanPreSend(jid, content, isVoice, caption) {
+    if (!this.sock || !this.humanDelay || !jid) return;
+    if (String(jid).endsWith('@g.us') || String(jid).endsWith('@broadcast') || String(jid).endsWith('@newsletter')) return;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const randInt = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+    try {
+      this._presenceActive();
+      // Natural pause before starting to type/record
+      await sleep(randInt(600, 1400));
+      const presenceType = isVoice ? 'recording' : 'composing';
+      if (typeof this.sock.sendPresenceUpdate === 'function') {
+        await this.sock.sendPresenceUpdate(presenceType, jid).catch(() => {});
+      }
+      const textLen = typeof content === 'string' ? content.length : String(caption || '').length;
+      const activeMs = isVoice
+        ? randInt(2000, 3800)
+        : (typeof content === 'string'
+          ? Math.min(5500, Math.max(1500, textLen * 28)) + randInt(0, 1200)
+          : randInt(1500, 2800));
+      await sleep(activeMs);
+      if (typeof this.sock.sendPresenceUpdate === 'function') {
+        await this.sock.sendPresenceUpdate('paused', jid).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
   async sendMessage(toJid, content, options = {}) {
     if (!this.sock) throw new Error('WhatsApp connection is not initialized.');
     const jid = await this._preferLidAddress(this._normalizeJid(toJid));
     let sent;
     const isVoice = Boolean(options.sendAudioAsVoice || (content?.mimetype?.startsWith('audio/') && options.voice));
+
+    if (!options.skipHumanDelay) {
+      await this._simulateHumanPreSend(jid, content, isVoice, options.caption);
+    }
 
     console.log(`[Baileys] Sending to ${jid}: ${typeof content === 'string' ? content.slice(0, 40) : (isVoice ? 'Voice Note' : (content?.mimetype || 'media'))}`);
 

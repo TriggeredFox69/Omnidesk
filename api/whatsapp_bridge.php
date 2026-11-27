@@ -2,7 +2,7 @@
 // Bump together with `version` in bridge/service.js. After a deploy, the first
 // request that sees the bridge still running the OLD code restarts it once, so the
 // person updating cPanel never has to restart anything by hand.
-const EXPECTED_BRIDGE_VERSION = '19.5';
+const EXPECTED_BRIDGE_VERSION = '19.6';
 
 function ensureBridgeCurrent(?array $status = null): void {
     static $checked = false;
@@ -487,7 +487,7 @@ function handleWhatsAppBridge(string $action, array $input): void {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
-    if (in_array($action, ['campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'campaign_device_pair', 'list_campaign_devices'], true)) {
+    if (in_array($action, ['campaign_device_status', 'campaign_device_connect', 'campaign_device_reset', 'campaign_device_pair', 'campaign_device_proxy', 'list_campaign_devices'], true)) {
         handleCampaignDevice($action, $input);
     }
     if (in_array($action, ['login_qr_start', 'login_qr_status', 'login_qr_reset', 'login_qr_pair'], true)) {
@@ -832,6 +832,9 @@ function handleCampaignDevice(string $action, array $input): void {
         }
         $phone = trim((string) ($input['phone'] ?? '')) ?: (string) ((chatlyUsersById()[$targetId]['phone'] ?? '') ?: ($user['phone'] ?? ''));
         $result = whatsappBridgeRequest('/device/pair', ['id' => $targetId, 'phone' => $phone, 'name' => (string) ($user['name'] ?? $targetId)]);
+    } elseif ($action === 'campaign_device_proxy') {
+        if (!$isAdmin) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'Administrator access required.']); exit; }
+        $result = whatsappBridgeRequest('/device/proxy', ['id' => $targetId, 'proxy_url' => trim((string) ($input['proxy_url'] ?? ($input['proxy'] ?? '')))]);
     } else {
         $result = whatsappBridgeRequest('/device/reset', ['id' => $targetId, 'name' => (string) ($user['name'] ?? $targetId), 'relink' => !empty($input['relink'])]);
     }
